@@ -38,3 +38,11 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
 
   ctx.stroke()
 }
+
+// Clear the whole canvas and draw a list of strokes
+export function drawStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[]) {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+  for (const stroke of strokes) {
+    drawStroke(ctx, stroke)
+  }
+}

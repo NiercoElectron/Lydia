@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Point, Stroke } from './drawing/types'
-import { drawStroke } from './drawing/render'
+import { drawStrokes } from './drawing/render'
 import './App.css'
 
 const WIDTH = 800
@@ -11,27 +11,41 @@ function App() {
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>([]) // finished strokes
 
+  // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
+  useEffect(() => {
+    const ctx = canvasRef.current!.getContext('2d')!
+    drawStrokes(ctx, strokes)
+  }, [strokes])
+
+  // Undo with Ctrl+Z (Windows/Linux) or Cmd+Z (macOS)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z'
+      if (!isUndo) return
+      e.preventDefault()
+      setStrokes(prev => prev.slice(0, -1))
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Convert a pointer position (relative to the window) into canvas coordinates
   function getPosition(rect: DOMRect, e: { clientX: number; clientY: number }): Point {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
 
-  // Clear the canvas and draw all finished strokes plus the one in progress
-  function drawAll() {
+  // Draw the finished strokes plus the one in progress
+  function drawWithCurrent(stroke: Stroke) {
     const ctx = canvasRef.current!.getContext('2d')!
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
-    for (const stroke of strokes) {
-      drawStroke(ctx, stroke)
-    }
-    if (currentStroke.current) {
-      drawStroke(ctx, currentStroke.current)
-    }
+    drawStrokes(ctx, [...strokes, stroke])
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
-    currentStroke.current = { color: '#000000', width: 4, points: [getPosition(rect, e)] }
-    drawAll()
+    const newStroke: Stroke = { color: '#000000', width: 4, points: [getPosition(rect, e)] }
+    currentStroke.current = newStroke
+    drawWithCurrent(newStroke)
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -44,7 +58,7 @@ function App() {
     for (const ev of events) {
       stroke.points.push(getPosition(rect, ev))
     }
-    drawAll()
+    drawWithCurrent(stroke)
   }
 
   function handlePointerUp() {
@@ -54,13 +68,14 @@ function App() {
     currentStroke.current = null
   }
 
-    function handleClear() {
-    setStrokes([])               // empty the data (takes effect on the next render)
-    currentStroke.current = null // drop any stroke in progress
-    const ctx = canvasRef.current!.getContext('2d')!
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
+  function handleUndo() {
+    setStrokes(prev => prev.slice(0, -1)) // new array without the last stroke
   }
 
+  function handleClear() {
+    setStrokes([])
+    currentStroke.current = null // drop any stroke in progress
+  }
 
   return (
     <>
@@ -74,6 +89,7 @@ function App() {
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       />
+      <button onClick={handleUndo} disabled={strokes.length === 0}>Undo</button>
       <button onClick={handleClear}>Clear</button>
     </>
   )
