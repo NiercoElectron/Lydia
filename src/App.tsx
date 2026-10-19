@@ -2,9 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import type { Point, Stroke } from './drawing/types'
 import { drawStrokes } from './drawing/render'
 import './App.css'
+import { exportPng } from './drawing/file'
 
 const WIDTH = 800
 const HEIGHT = 600
+
+// Current local date and time for file names, e.g. "2026-10-19_14-32-05"
+function timestamp() {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+}
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -77,6 +85,10 @@ function App() {
     currentStroke.current = null // drop any stroke in progress
   }
 
+  function handleExport() {
+    exportPng(strokes, WIDTH, HEIGHT, `lydia-${timestamp()}.png`)
+  }
+
   return (
     <>
       <canvas
@@ -91,6 +103,7 @@ function App() {
       />
       <button onClick={handleUndo} disabled={strokes.length === 0}>Undo</button>
       <button onClick={handleClear}>Clear</button>
+      <button onClick={handleExport} disabled={strokes.length === 0}>Export PNG</button>
     </>
   )
 }
