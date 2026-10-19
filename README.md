@@ -1,75 +1,62 @@
-# React + TypeScript + Vite
+# Lydia
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A simple, open source drawing app built with React, TypeScript and the HTML canvas. It runs in the browser, and a desktop version is planned.
 
-Currently, two official plugins are available:
+> **Work in progress:** Lydia is in early development. Many features are still missing, and things may change or break.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Freehand drawing with mouse, touch or pen
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Roadmap
 
-## Expanding the ESLint configuration
+- [ ] Start screen (new project / open project)
+- [ ] Color and brush size selection
+- [ ] Undo
+- [ ] Save and open projects
+- [ ] Export drawings as PNG
+- [ ] Desktop app for Windows, macOS and Linux (Electron)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+You need [Node.js](https://nodejs.org) 20.19+ or 22.12+.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+git clone https://github.com/NiercoElectron/Lydia.git
+cd Lydia
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Then open the address shown in the terminal (usually http://localhost:5173).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Available scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Command           | Description                              |
+| ----------------- | ---------------------------------------- |
+| `npm run dev`     | Start the development server             |
+| `npm run build`   | Type-check and build for production      |
+| `npm run preview` | Preview the production build locally     |
+| `npm run lint`    | Run ESLint                               |
+
+## Project structure
 
 ```
+src/
+├── drawing/      Pure drawing logic (types, rendering, file handling), no React
+├── hooks/        React hooks that hold the app state and actions
+├── components/   Reusable UI pieces (canvas, toolbar)
+├── screens/      Full screens (start screen, editor)
+└── App.tsx       Chooses which screen to show
+```
+
+Dependencies only go one way: `components` → `hooks` → `drawing`. Code in `drawing/` must not import React.
+
+## Contributing
+
+Contributions are welcome! Feel free to open an issue to report a bug or suggest a feature.
+For larger changes, please open an issue first so we can discuss the idea before you start working on it.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
