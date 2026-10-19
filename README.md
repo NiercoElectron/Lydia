@@ -13,8 +13,13 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 ## Roadmap
 
 - [ ] Start screen (new project / open project)
+  - [ ] Choose canvas size
+  - [ ] Choose background color or transparent background
 - [ ] Color and brush size selection
 - [x] Undo
+- [ ] Redo, and undo for every action (including clear)
+- [ ] Layers (add, delete, reorder, hide)
+- [ ] Eraser
 - [ ] Save and open projects
 - [ ] Export drawings as PNG
 - [ ] Desktop app for Windows, macOS and Linux (Electron)
