@@ -7,12 +7,14 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 ## Features
 
 - Freehand drawing with mouse, touch or pen
+- Undo (button or Ctrl/Cmd+Z)
+- Clear the canvas
 
 ## Roadmap
 
 - [ ] Start screen (new project / open project)
 - [ ] Color and brush size selection
-- [ ] Undo
+- [x] Undo
 - [ ] Save and open projects
 - [ ] Export drawings as PNG
 - [ ] Desktop app for Windows, macOS and Linux (Electron)
