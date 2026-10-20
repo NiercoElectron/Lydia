@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Point, Project, Stroke } from '../drawing/types'
 import { drawStrokes } from '../drawing/render'
-import { exportPng } from '../drawing/file'
+import { downloadBlob, renderPng } from '../drawing/file'
 
 // Current local date and time for file names, e.g. "2026-10-19_14-32-05"
 function timestamp() {
@@ -105,9 +105,15 @@ export function Editor({ project, onBack }: Props) {
     activePointerId.current = null
   }
 
-  function handleExport() {
-    exportPng(strokes, project.width, project.height, `lydia-${timestamp()}.png`)
+  async function handleExport() {
+    try {
+      const blob = await renderPng(strokes, project.width, project.height)
+      downloadBlob(blob, `lydia-${timestamp()}.png`)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not export the image.')
+    }
   }
+
 
     function handleBack() {
     if (strokes.length > 0 && !window.confirm('Discard this drawing and go back to the start screen?')) return

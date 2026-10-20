@@ -1,8 +1,8 @@
 import type { Stroke } from './types'
 import { drawStrokes } from './render'
 
-// Draw the strokes on a new, off-screen canvas and download it as a PNG file
-export async function exportPng(strokes: Stroke[], width: number, height: number, fileName: string) {
+// Draw the strokes on a new, off-screen canvas and return it as a PNG image
+export async function renderPng(strokes: Stroke[], width: number, height: number): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
@@ -11,9 +11,12 @@ export async function exportPng(strokes: Stroke[], width: number, height: number
 
   // toBlob uses a callback; wrap it in a Promise so we can await it
   const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
-  if (!blob) throw new Error('Could not create the PNG image')
+  if (!blob) throw new Error('Could not create the PNG image.')
+  return blob
+}
 
-  // Download the file by clicking a temporary link that points to the image
+// Make the browser download a file by clicking a temporary link that points to it
+export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
