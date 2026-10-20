@@ -14,6 +14,13 @@ function timestamp() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
 }
 
+// Get the 2D context, scaled so that 1 unit = 1 CSS pixel on any screen density
+function getScaledContext(canvas: HTMLCanvasElement, dpr: number) {
+  const ctx = canvas.getContext('2d')!
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  return ctx
+}
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
@@ -21,12 +28,11 @@ function App() {
   const activePointerId = useRef<number | null>(null) // pointer that started the current stroke
   const dpr = window.devicePixelRatio || 1 // physical pixels per CSS pixel (2 on Retina screens)
 
-
   // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
   useEffect(() => {
-    const ctx = canvasRef.current!.getContext('2d')!
+    const ctx = getScaledContext(canvasRef.current!, dpr)
     drawStrokes(ctx, strokes)
-  }, [strokes])
+  }, [strokes, dpr])
 
   // Undo with Ctrl+Z (Windows/Linux) or Cmd+Z (macOS)
   useEffect(() => {
@@ -48,7 +54,7 @@ function App() {
 
   // Draw the finished strokes plus the one in progress
   function drawWithCurrent(stroke: Stroke) {
-    const ctx = canvasRef.current!.getContext('2d')!
+    const ctx = getScaledContext(canvasRef.current!, dpr)
     drawStrokes(ctx, [...strokes, stroke])
   }
 
