@@ -14,7 +14,7 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 ## Roadmap
 
 - [ ] Start screen (new project / open project)
-  - [ ] Choose canvas size
+  - [x] Choose canvas size
   - [ ] Choose background color or transparent background
 - [ ] Color and brush size selection
 - [x] Undo
