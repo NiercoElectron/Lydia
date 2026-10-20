@@ -18,6 +18,7 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>([]) // finished strokes
+  const activePointerId = useRef<number | null>(null) // pointer that started the current stroke
 
   // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
   useEffect(() => {
@@ -50,6 +51,9 @@ function App() {
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (activePointerId.current !== null) return // already drawing with another pointer
+    activePointerId.current = e.pointerId
+
     const rect = e.currentTarget.getBoundingClientRect()
     const newStroke: Stroke = { color: '#000000', width: 4, points: [getPosition(rect, e)] }
     currentStroke.current = newStroke
@@ -57,8 +61,10 @@ function App() {
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (e.pointerId !== activePointerId.current) return // ignore other pointers (second finger, palm)
+
     const stroke = currentStroke.current
-    if (!stroke) return // pointer is just hovering, not drawing
+    if (!stroke) return // should not happen, but tells TypeScript that stroke is not null
 
     const rect = e.currentTarget.getBoundingClientRect()
     // The browser groups fast movements into one event; get all the points in between
@@ -69,7 +75,10 @@ function App() {
     drawWithCurrent(stroke)
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (e.pointerId !== activePointerId.current) return // ignore other pointers
+    activePointerId.current = null // free the slot for the next stroke
+
     const stroke = currentStroke.current
     if (!stroke) return
     setStrokes(prev => [...prev, stroke])
@@ -83,6 +92,7 @@ function App() {
   function handleClear() {
     setStrokes([])
     currentStroke.current = null // drop any stroke in progress
+    activePointerId.current = null
   }
 
   function handleExport() {
