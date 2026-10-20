@@ -8,3 +8,9 @@ export type Stroke = {
     width: number
     points: Point[]
 }
+
+export type Project = {
+  width: number
+  height: number
+  strokes: Stroke[]
+}
