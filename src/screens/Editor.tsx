@@ -19,9 +19,10 @@ function getScaledContext(canvas: HTMLCanvasElement, dpr: number) {
 
 type Props = {
   project: Project
+  onBack: () => void
 }
 
-export function Editor({ project }: Props) {
+export function Editor({ project, onBack }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>(project.strokes) // finished strokes
@@ -108,6 +109,11 @@ export function Editor({ project }: Props) {
     exportPng(strokes, project.width, project.height, `lydia-${timestamp()}.png`)
   }
 
+    function handleBack() {
+    if (strokes.length > 0 && !window.confirm('Discard this drawing and go back to the start screen?')) return
+    onBack()
+  }
+
   return (
     <>
       <canvas
@@ -123,6 +129,7 @@ export function Editor({ project }: Props) {
       <button onClick={handleUndo} disabled={strokes.length === 0}>Undo</button>
       <button onClick={handleClear}>Clear</button>
       <button onClick={handleExport} disabled={strokes.length === 0}>Export PNG</button>
+      <button onClick={handleBack}>Back</button>
     </>
   )
 }
