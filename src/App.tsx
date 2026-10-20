@@ -19,6 +19,8 @@ function App() {
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>([]) // finished strokes
   const activePointerId = useRef<number | null>(null) // pointer that started the current stroke
+  const dpr = window.devicePixelRatio || 1 // physical pixels per CSS pixel (2 on Retina screens)
+
 
   // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
   useEffect(() => {
@@ -103,9 +105,9 @@ function App() {
     <>
       <canvas
         ref={canvasRef}
-        width={WIDTH}
-        height={HEIGHT}
-        style={{ border: '1px solid #ccc', touchAction: 'none' }}
+        width={Math.round(WIDTH * dpr)}
+        height={Math.round(HEIGHT * dpr)}
+        style={{ width: WIDTH, height: HEIGHT, border: '1px solid #ccc', touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
