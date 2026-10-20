@@ -115,13 +115,13 @@ export function Editor({ project, onBack }: Props) {
     }
   }
 
-    function handleSave() {
-      const text = serializeProject({ ...project, strokes })
-      const blob = new Blob([text], { type: 'application/json' })
-      downloadBlob(blob, `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+  function handleSave() {
+    const text = serializeProject({ ...project, strokes })
+    const blob = new Blob([text], { type: 'application/json' })
+    downloadBlob(blob, `lydia-${timestamp()}${PROJECT_EXTENSION}`)
   }
 
-    function handleBack() {
+  function handleBack() {
     if (strokes.length > 0 && !window.confirm('Discard this drawing and go back to the start screen?')) return
     onBack()
   }
