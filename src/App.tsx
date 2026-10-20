@@ -59,6 +59,7 @@ function App() {
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (e.button !== 0) return // only the main button draws (left click, pen tip, touch)
     if (activePointerId.current !== null) return // already drawing with another pointer
     activePointerId.current = e.pointerId
 
