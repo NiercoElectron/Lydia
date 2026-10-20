@@ -6,7 +6,7 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 
 ## Features
 
-- Freehand drawing with mouse, touch or pen
+- Freehand drawing with mouse or pen (drawing tablets)
 - Undo (button or Ctrl/Cmd+Z)
 - Clear the canvas
 - Export the drawing as a PNG image
