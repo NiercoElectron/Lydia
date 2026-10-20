@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Point, Project, Stroke } from '../drawing/types'
 import { drawStrokes } from '../drawing/render'
 import { downloadBlob, renderPng } from '../drawing/file'
+import { PROJECT_EXTENSION, serializeProject } from '../drawing/projectFile'
 
 // Current local date and time for file names, e.g. "2026-10-19_14-32-05"
 function timestamp() {
@@ -114,6 +115,11 @@ export function Editor({ project, onBack }: Props) {
     }
   }
 
+    function handleSave() {
+      const text = serializeProject({ ...project, strokes })
+      const blob = new Blob([text], { type: 'application/json' })
+      downloadBlob(blob, `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+  }
 
     function handleBack() {
     if (strokes.length > 0 && !window.confirm('Discard this drawing and go back to the start screen?')) return
@@ -136,6 +142,7 @@ export function Editor({ project, onBack }: Props) {
       <button onClick={handleClear}>Clear</button>
       <button onClick={handleExport} disabled={strokes.length === 0}>Export PNG</button>
       <button onClick={handleBack}>Back</button>
+      <button onClick={handleSave}>Save</button>
     </>
   )
 }
