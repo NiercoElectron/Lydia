@@ -1,0 +1,4 @@
+button[aria-pressed='true'] {
+  font-weight: bold;
+  outline: 2px solid currentColor;
+}

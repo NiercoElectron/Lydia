@@ -5,6 +5,9 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   const [first, ...rest] = stroke.points
   if (!first) return // Empty stroke, nothing to draw
 
+  // The eraser removes what is already on the canvas instead of painting over it
+  ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over'
+
   ctx.strokeStyle = stroke.color
   ctx.fillStyle = stroke.color
   ctx.lineWidth = stroke.width
@@ -39,13 +42,9 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   ctx.stroke()
 }
 
-// Clear the whole canvas, paint the background (null = transparent) and draw a list of strokes
-export function drawStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[], background: string | null = null) {
+// Clear the whole canvas and draw a list of strokes
+export function drawStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[]) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-  if (background) {
-    ctx.fillStyle = background
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-  }
   for (const stroke of strokes) {
     drawStroke(ctx, stroke)
   }

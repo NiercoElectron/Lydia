@@ -1,16 +1,28 @@
 import type { Stroke } from './types'
 import { drawStrokes } from './render'
 
-// Draw the strokes on a new, off-screen canvas and return it as a PNG image
-export async function renderPng(strokes: Stroke[], width: number, height: number): Promise<Blob> {
+function createCanvas(width: number, height: number) {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
-  const ctx = canvas.getContext('2d')!
-  drawStrokes(ctx, strokes, '#ffffff') // white background for now, until projects have their own
+  return canvas
+}
+
+// Draw the strokes on a white background and return the result as a PNG image
+export async function renderPng(strokes: Stroke[], width: number, height: number): Promise<Blob> {
+  // Draw the strokes on their own transparent canvas first, so the eraser only removes strokes
+  const drawing = createCanvas(width, height)
+  drawStrokes(drawing.getContext('2d')!, strokes)
+
+  // Then paint a white background and put the drawing on top of it
+  const image = createCanvas(width, height)
+  const ctx = image.getContext('2d')!
+  ctx.fillStyle = '#ffffff' // white background for now, until projects have their own
+  ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(drawing, 0, 0)
 
   // toBlob uses a callback; wrap it in a Promise so we can await it
-  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+  const blob = await new Promise<Blob | null>(resolve => image.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('Could not create the PNG image.')
   return blob
 }

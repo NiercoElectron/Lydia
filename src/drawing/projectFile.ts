@@ -1,4 +1,4 @@
-import type { Point, Project, Stroke } from './types'
+import type { Point, Project, Stroke, Tool } from './types'
 
 export const PROJECT_EXTENSION = '.lyd'
 
@@ -10,6 +10,9 @@ type ProjectFile = Project & {
   format: typeof FORMAT
   version: typeof VERSION
 }
+
+// A stroke as it can appear in a file: files saved before the eraser existed have no tool
+type SavedStroke = Omit<Stroke, 'tool'> & { tool?: Tool }
 
 // Turn a project into the text that goes inside a .lyd file
 export function serializeProject(project: Project): string {
@@ -36,7 +39,9 @@ export function parseProject(text: string): Project {
     throw new Error('This project file is damaged.')
   }
 
-  return { width: data.width, height: data.height, strokes: data.strokes }
+  // Strokes without a tool were all drawn with the brush
+  const strokes = data.strokes.map(stroke => ({ ...stroke, tool: stroke.tool ?? 'brush' }))
+  return { width: data.width, height: data.height, strokes }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -51,6 +56,10 @@ function isPoint(value: unknown): value is Point {
   return isObject(value) && isNumber(value.x) && isNumber(value.y)
 }
 
-function isStroke(value: unknown): value is Stroke {
-  return isObject(value) && typeof value.color === 'string' && isNumber(value.width) && Array.isArray(value.points) && value.points.every(isPoint)
+function isStroke(value: unknown): value is SavedStroke {
+  return isObject(value) && (value.tool === undefined || isTool(value.tool)) && typeof value.color === 'string' && isNumber(value.width) && Array.isArray(value.points) && value.points.every(isPoint)
+}
+
+function isTool(value: unknown): value is Tool {
+  return value === 'brush' || value === 'eraser'
 }

@@ -3,7 +3,10 @@ export type Point = {
   y: number
 }
 
+export type Tool = 'brush' | 'eraser'
+
 export type Stroke = {
+  tool: Tool
   color: string
   width: number
   points: Point[]

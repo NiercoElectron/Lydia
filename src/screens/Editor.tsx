@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Point, Project, Stroke } from '../drawing/types'
+import type { Point, Project, Stroke, Tool } from '../drawing/types'
 import { drawStrokes } from '../drawing/render'
 import { downloadBlob, renderPng } from '../drawing/file'
 import { PROJECT_EXTENSION, serializeProject } from '../drawing/projectFile'
+import { Toolbar } from '../components/Toolbar'
 
 // Current local date and time for file names, e.g. "2026-10-19_14-32-05"
 function timestamp() {
@@ -28,6 +29,9 @@ export function Editor({ project, onBack }: Props) {
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>(project.strokes) // finished strokes
   const activePointerId = useRef<number | null>(null) // pointer that started the current stroke
+  const [tool, setTool] = useState<Tool>('brush')
+  const [color, setColor] = useState('#000000')
+  const [size, setSize] = useState(4)
   const dpr = window.devicePixelRatio || 1 // physical pixels per CSS pixel (2 on Retina screens)
 
   // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
@@ -66,7 +70,7 @@ export function Editor({ project, onBack }: Props) {
     activePointerId.current = e.pointerId
 
     const rect = e.currentTarget.getBoundingClientRect()
-    const newStroke: Stroke = { color: '#000000', width: 4, points: [getPosition(rect, e)] }
+    const newStroke: Stroke = { tool, color, width: size, points: [getPosition(rect, e)] }
     currentStroke.current = newStroke
     drawWithCurrent(newStroke)
   }
@@ -128,6 +132,7 @@ export function Editor({ project, onBack }: Props) {
 
   return (
     <>
+      <Toolbar tool={tool} color={color} size={size} onToolChange={setTool} onColorChange={setColor} onSizeChange={setSize} />
       <canvas
         ref={canvasRef}
         width={Math.round(project.width * dpr)}
