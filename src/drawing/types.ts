@@ -1,12 +1,12 @@
 export type Point = {
-    x: number
-    y: number
+  x: number
+  y: number
 }
 
 export type Stroke = {
-    color: string
-    width: number
-    points: Point[]
+  color: string
+  width: number
+  points: Point[]
 }
 
 export type Project = {

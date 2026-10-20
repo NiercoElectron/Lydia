@@ -1,23 +1,23 @@
-import type { Stroke } from "./types";
+import type { Stroke } from './types'
 
 // Draw a single stroke on the canvas
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
-    const [first, ...rest] = stroke.points
-    if (!first) return // Empty stroke, nothing to draw
+  const [first, ...rest] = stroke.points
+  if (!first) return // Empty stroke, nothing to draw
 
-    ctx.strokeStyle = stroke.color
-    ctx.fillStyle = stroke.color
-    ctx.lineWidth = stroke.width
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
+  ctx.strokeStyle = stroke.color
+  ctx.fillStyle = stroke.color
+  ctx.lineWidth = stroke.width
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
 
-    // A single point (click without dragging) has no line, so draw a dot
-    if (rest.length === 0) {
-        ctx.beginPath()
-        ctx.arc(first.x, first.y, stroke.width / 2, 0, Math.PI * 2)
-        ctx.fill()
-        return
-    }
+  // A single point (click without dragging) has no line, so draw a dot
+  if (rest.length === 0) {
+    ctx.beginPath()
+    ctx.arc(first.x, first.y, stroke.width / 2, 0, Math.PI * 2)
+    ctx.fill()
+    return
+  }
 
   ctx.beginPath()
   ctx.moveTo(first.x, first.y)
