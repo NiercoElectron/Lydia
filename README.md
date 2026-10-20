@@ -10,10 +10,12 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 - Undo (button or Ctrl/Cmd+Z)
 - Clear the canvas
 - Export the drawing as a PNG image
+- Start screen to create a new project (with a custom canvas size) or open an existing one
+- Save and open projects as `.lyd` files
 
 ## Roadmap
 
-- [ ] Start screen (new project / open project)
+- [x] Start screen (new project / open project)
   - [x] Choose canvas size
   - [ ] Choose background color or transparent background
 - [ ] Color and brush size selection
@@ -21,7 +23,7 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
 - [ ] Redo, and undo for every action (including clear)
 - [ ] Layers (add, delete, reorder, hide)
 - [ ] Eraser
-- [ ] Save and open projects (.lyd files)
+- [x] Save and open projects (.lyd files)
 - [x] Export drawings as PNG
 - [ ] Desktop app for Windows, macOS and Linux (Electron)
 
