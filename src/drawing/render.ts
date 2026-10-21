@@ -1,5 +1,13 @@
 import type { Stroke } from './types'
 
+// Create a canvas that is not shown on the page, to draw on in the background
+export function createCanvas(width: number, height: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
 // Draw a single stroke on the canvas
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   const [first, ...rest] = stroke.points

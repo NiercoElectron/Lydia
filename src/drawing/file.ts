@@ -1,12 +1,5 @@
 import type { Stroke } from './types'
-import { drawStrokes } from './render'
-
-function createCanvas(width: number, height: number) {
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  return canvas
-}
+import { createCanvas, drawStrokes } from './render'
 
 // Draw the strokes on a white background and return the result as a PNG image
 export async function renderPng(strokes: Stroke[], width: number, height: number): Promise<Blob> {

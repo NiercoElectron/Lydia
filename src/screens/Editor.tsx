@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Point, Project, Stroke, Tool } from '../drawing/types'
-import { drawStrokes } from '../drawing/render'
+import { createCanvas, drawStroke, drawStrokes } from '../drawing/render'
 import { downloadBlob, renderPng } from '../drawing/file'
 import { PROJECT_EXTENSION, serializeProject } from '../drawing/projectFile'
 import { Toolbar } from '../components/Toolbar'
@@ -19,6 +19,29 @@ function getScaledContext(canvas: HTMLCanvasElement, dpr: number) {
   return ctx
 }
 
+const MAX_CANVAS_PIXELS = 8192 * 8192 // per canvas; much more than this and the browser may run out of memory
+
+// Physical pixels per CSS pixel (2 on Retina screens), limited so the canvas never gets too big
+function getCanvasScale(width: number, height: number) {
+  const dpr = window.devicePixelRatio || 1
+  const maxScale = Math.sqrt(MAX_CANVAS_PIXELS / (width * height))
+  return Math.min(dpr, maxScale)
+}
+
+// Show the finished strokes (already drawn on the committed canvas) and, on top, the stroke in progress
+function paint(canvas: HTMLCanvasElement, committed: HTMLCanvasElement, dpr: number, stroke: Stroke | null) {
+  const ctx = canvas.getContext('2d')!
+  ctx.setTransform(1, 0, 0, 1, 0, 0) // the committed canvas already has the same size in real pixels: copy it 1:1
+  ctx.globalCompositeOperation = 'source-over' // the last stroke drawn may have left the eraser mode on
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(committed, 0, 0)
+
+  if (stroke) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    drawStroke(ctx, stroke)
+  }
+}
+
 type Props = {
   project: Project
   onBack: () => void
@@ -29,15 +52,32 @@ export function Editor({ project, onBack }: Props) {
   const currentStroke = useRef<Stroke | null>(null) // stroke being drawn right now, null when not drawing
   const [strokes, setStrokes] = useState<Stroke[]>(project.strokes) // finished strokes
   const activePointerId = useRef<number | null>(null) // pointer that started the current stroke
+  const committedCanvas = useRef<HTMLCanvasElement | null>(null) // off-screen canvas with the finished strokes already drawn
+  const committedStrokes = useRef<Stroke[] | null>(null) // the list of strokes the committed canvas is showing
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState('#000000')
   const [size, setSize] = useState(4)
-  const dpr = window.devicePixelRatio || 1 // physical pixels per CSS pixel (2 on Retina screens)
+  const dpr = getCanvasScale(project.width, project.height) // physical pixels per CSS pixel, limited to save memory
 
-  // Redraw the canvas every time the list of strokes changes (new stroke, undo, clear...)
+  // Keep the committed canvas in sync with the list of strokes, then show it
   useEffect(() => {
-    const ctx = getScaledContext(canvasRef.current!, dpr)
-    drawStrokes(ctx, strokes)
+    const canvas = canvasRef.current!
+
+    // (Re)create the committed canvas when it does not exist yet or the screen density changed its size
+    let committed = committedCanvas.current
+    if (!committed || committed.width !== canvas.width || committed.height !== canvas.height) {
+      committed = createCanvas(canvas.width, canvas.height)
+      committedCanvas.current = committed
+      committedStrokes.current = null // the new canvas is empty, so it must be redrawn
+    }
+
+    // Redraw everything only when the strokes changed in a way that can't be drawn on top (undo, clear...)
+    if (committedStrokes.current !== strokes) {
+      drawStrokes(getScaledContext(committed, dpr), strokes)
+      committedStrokes.current = strokes
+    }
+
+    paint(canvas, committed, dpr, null)
   }, [strokes, dpr])
 
   // Undo with Ctrl+Z (Windows/Linux) or Cmd+Z (macOS)
@@ -60,8 +100,7 @@ export function Editor({ project, onBack }: Props) {
 
   // Draw the finished strokes plus the one in progress
   function drawWithCurrent(stroke: Stroke) {
-    const ctx = getScaledContext(canvasRef.current!, dpr)
-    drawStrokes(ctx, [...strokes, stroke])
+    paint(canvasRef.current!, committedCanvas.current!, dpr, stroke)
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -96,7 +135,12 @@ export function Editor({ project, onBack }: Props) {
 
     const stroke = currentStroke.current
     if (!stroke) return
-    setStrokes(prev => [...prev, stroke])
+
+    // Add only the new stroke to the committed canvas, instead of redrawing all of them
+    drawStroke(getScaledContext(committedCanvas.current!, dpr), stroke)
+    const nextStrokes = [...strokes, stroke]
+    committedStrokes.current = nextStrokes // tell the effect that the committed canvas is already up to date
+    setStrokes(nextStrokes)
     currentStroke.current = null
   }
 
