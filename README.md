@@ -42,13 +42,13 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 
 ### Available scripts
 
-| Command           | Description                          |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Start the development server         |
-| `npm run build`   | Type-check and build for production  |
-| `npm run preview` | Preview the production build locally |
-| `npm run lint`    | Run ESLint                           |
-| `npm run format`       | Format all files with Prettier            |
+| Command                | Description                                |
+| ---------------------- | ------------------------------------------ |
+| `npm run dev`          | Start the development server               |
+| `npm run build`        | Type-check and build for production        |
+| `npm run preview`      | Preview the production build locally       |
+| `npm run lint`         | Run ESLint                                 |
+| `npm run format`       | Format all files with Prettier             |
 | `npm run format:check` | Check that all files follow the code style |
 
 ## Project structure
