@@ -53,7 +53,9 @@ export function Home({ onNewProject, onOpenProject }: Props) {
           Height
           <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={height} onChange={e => setHeight(e.target.value)} />
         </label>
-        <button type="submit" disabled={!isValid}>New project</button>
+        <button type="submit" disabled={!isValid}>
+          New project
+        </button>
       </form>
       <button onClick={() => fileInputRef.current?.click()}>Open project</button>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />

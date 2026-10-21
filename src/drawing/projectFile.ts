@@ -35,7 +35,12 @@ export function parseProject(text: string): Project {
   if (data.version !== VERSION) {
     throw new Error(`This project uses an unsupported format version (${String(data.version)}).`)
   }
-  if (!isNumber(data.width) || !isNumber(data.height) || !Array.isArray(data.strokes) || !data.strokes.every(isStroke)) {
+  if (
+    !isNumber(data.width) ||
+    !isNumber(data.height) ||
+    !Array.isArray(data.strokes) ||
+    !data.strokes.every(isStroke)
+  ) {
     throw new Error('This project file is damaged.')
   }
 
@@ -57,7 +62,14 @@ function isPoint(value: unknown): value is Point {
 }
 
 function isStroke(value: unknown): value is SavedStroke {
-  return isObject(value) && (value.tool === undefined || isTool(value.tool)) && typeof value.color === 'string' && isNumber(value.width) && Array.isArray(value.points) && value.points.every(isPoint)
+  return (
+    isObject(value) &&
+    (value.tool === undefined || isTool(value.tool)) &&
+    typeof value.color === 'string' &&
+    isNumber(value.width) &&
+    Array.isArray(value.points) &&
+    value.points.every(isPoint)
+  )
 }
 
 function isTool(value: unknown): value is Tool {

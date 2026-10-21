@@ -176,7 +176,14 @@ export function Editor({ project, onBack }: Props) {
 
   return (
     <>
-      <Toolbar tool={tool} color={color} size={size} onToolChange={setTool} onColorChange={setColor} onSizeChange={setSize} />
+      <Toolbar
+        tool={tool}
+        color={color}
+        size={size}
+        onToolChange={setTool}
+        onColorChange={setColor}
+        onSizeChange={setSize}
+      />
       <canvas
         ref={canvasRef}
         width={Math.round(project.width * dpr)}
@@ -187,9 +194,13 @@ export function Editor({ project, onBack }: Props) {
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       />
-      <button onClick={handleUndo} disabled={strokes.length === 0}>Undo</button>
+      <button onClick={handleUndo} disabled={strokes.length === 0}>
+        Undo
+      </button>
       <button onClick={handleClear}>Clear</button>
-      <button onClick={handleExport} disabled={strokes.length === 0}>Export PNG</button>
+      <button onClick={handleExport} disabled={strokes.length === 0}>
+        Export PNG
+      </button>
       <button onClick={handleBack}>Back</button>
       <button onClick={handleSave}>Save</button>
     </>
