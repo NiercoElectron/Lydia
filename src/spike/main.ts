@@ -120,7 +120,7 @@ async function main() {
   world.addChild(layer)
   const tiles = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
 
-    // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
+  // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
   let tileScaleMode: 'nearest' | 'linear' = 'linear'
   app.ticker.add(() => {
     const scaleMode = world.scale.x >= 1 ? 'nearest' : 'linear'
