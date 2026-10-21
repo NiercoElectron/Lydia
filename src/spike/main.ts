@@ -120,12 +120,24 @@ async function main() {
   world.addChild(layer)
   const tiles = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
 
+    // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
+  let tileScaleMode: 'nearest' | 'linear' = 'linear'
+  app.ticker.add(() => {
+    const scaleMode = world.scale.x >= 1 ? 'nearest' : 'linear'
+    if (scaleMode === tileScaleMode) return
+    tileScaleMode = scaleMode
+    for (const texture of tiles.values()) {
+      texture.source.scaleMode = scaleMode
+      texture.source.style.update() // tell PixiJS the setting changed, so the graphics card uses it
+    }
+  })
+
   // Get the tile at this column and row, creating it (transparent) the first time it is painted on
   function getTile(column: number, row: number) {
     const key = `${column},${row}`
     let texture = tiles.get(key)
     if (!texture) {
-      texture = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+      texture = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE, scaleMode: tileScaleMode })
       app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
       const sprite = new Sprite(texture)
       sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
