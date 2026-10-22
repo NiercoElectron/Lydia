@@ -1,28 +1,16 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
+import { useDrawingShortcuts, useEngineSnapshot } from '../components/engineHooks'
 import { LayersPanel } from '../components/LayersPanel'
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, Toolbar } from '../components/Toolbar'
+import { Toolbar } from '../components/Toolbar'
 import type { Tool } from '../engine/brush'
 import { brushFileName } from '../engine/brushFile'
-import type { Engine, EngineSnapshot, ImageType } from '../engine/engine'
+import type { Engine, ImageType } from '../engine/engine'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
-import { isTyping } from '../engine/view'
 import { downloadBlob, timestamp } from '../files'
 import { loadBrushId, saveBrushId } from '../settings'
-
-// What the screen shows while the engine is starting
-const startingSnapshot: EngineSnapshot = {
-  layers: [],
-  activeLayerId: 0,
-  canUndo: false,
-  canRedo: false,
-  isModified: false,
-  isUpdating: false,
-}
-const subscribeToNothing = () => () => {}
-const getStartingSnapshot = () => startingSnapshot
 
 type Props = {
   project: ProjectData
@@ -32,11 +20,7 @@ type Props = {
 
 export function Editor({ project, gpuMemory, onBack }: Props) {
   const [engine, setEngine] = useState<Engine | null>(null)
-  // Show the engine's latest state, and update the screen whenever it changes
-  const snapshot = useSyncExternalStore(
-    engine?.subscribe ?? subscribeToNothing,
-    engine?.getSnapshot ?? getStartingSnapshot,
-  )
+  const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState('#000000')
   const [size, setSize] = useState(20)
@@ -153,31 +137,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
     }
   }, [importBrushes])
 
-  // Shortcuts, like in Photoshop and Krita: Ctrl/Cmd + Z undoes, Ctrl/Cmd + Shift + Z or Ctrl + Y redoes; B is the
-  // brush, E the eraser; [ and ] change the brush size
-  useEffect(() => {
-    if (!engine) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return
-      const key = e.key.toLowerCase()
-      if (e.ctrlKey || e.metaKey) {
-        if (key === 'z' && !e.shiftKey) {
-          e.preventDefault() // stop the browser from using the shortcut itself
-          engine.undo()
-        } else if ((key === 'z' && e.shiftKey) || key === 'y') {
-          e.preventDefault()
-          engine.redo()
-        }
-        return
-      }
-      if (key === 'b') setTool('brush')
-      else if (key === 'e') setTool('eraser')
-      else if (key === '[') setSize(s => Math.max(MIN_BRUSH_SIZE, Math.round(s / 1.25)))
-      else if (key === ']') setSize(s => Math.min(MAX_BRUSH_SIZE, Math.max(s + 1, Math.round(s * 1.25))))
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [engine])
+  useDrawingShortcuts(engine, setTool, setSize)
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {

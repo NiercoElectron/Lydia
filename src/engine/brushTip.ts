@@ -46,3 +46,58 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
   ctx.putImageData(pixels, 0, 0)
   return { image, reach: farthest / halfSide }
 }
+
+const TIP_MARGIN = 2 // white pixels kept around the paint, so the edge of a turned dab fades out instead of being cut
+
+// The tip drawn in the Brush Designer, from a picture of its paper (white where nothing is painted), as a PNG cut down
+// to the painted part, like Photoshop does when it defines a brush: the brush size then measures the drawing, not
+// the paper. Null when nothing is painted
+export async function tipFromPicture(picture: Blob): Promise<Uint8Array | null> {
+  const bitmap = await createImageBitmap(picture)
+  const { width, height } = bitmap
+  const paper = document.createElement('canvas')
+  paper.width = width
+  paper.height = height
+  const ctx = paper.getContext('2d', { willReadFrequently: true })!
+  ctx.drawImage(bitmap, 0, 0)
+  bitmap.close()
+
+  // The box around everything that isn't white
+  const data = ctx.getImageData(0, 0, width, height).data
+  let left = width
+  let top = height
+  let right = -1
+  let bottom = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4
+      if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255) continue
+      left = Math.min(left, x)
+      right = Math.max(right, x)
+      top = Math.min(top, y)
+      bottom = Math.max(bottom, y)
+    }
+  }
+  if (right === -1) return null
+
+  const tip = document.createElement('canvas')
+  tip.width = right - left + 1 + 2 * TIP_MARGIN
+  tip.height = bottom - top + 1 + 2 * TIP_MARGIN
+  const tipCtx = tip.getContext('2d')!
+  tipCtx.fillStyle = '#fff'
+  tipCtx.fillRect(0, 0, tip.width, tip.height)
+  tipCtx.drawImage(
+    paper,
+    left,
+    top,
+    right - left + 1,
+    bottom - top + 1,
+    TIP_MARGIN,
+    TIP_MARGIN,
+    right - left + 1,
+    bottom - top + 1,
+  )
+  const png = await new Promise<Blob | null>(resolve => tip.toBlob(resolve, 'image/png'))
+  if (!png) throw new Error('Could not make a picture of the tip.')
+  return new Uint8Array(await png.arrayBuffer())
+}

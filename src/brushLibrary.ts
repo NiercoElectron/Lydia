@@ -30,6 +30,16 @@ function orderOf(brush: LibraryBrush) {
   return index === -1 ? BUILT_IN_ORDER.length : index
 }
 
+// One of the brushes that come with Lydia, by its file name ("soft-round")
+export function builtInBrush(name: string) {
+  const brush = builtInBrushes.find(b => b.id === `built-in/${name}`)
+  if (!brush) throw new Error(`Lydia has no brush called "${name}".`)
+  return brush
+}
+
+// The number an added brush is kept under in the browser's database: "added/12" -> 12
+const keyOf = (id: string) => Number(id.slice('added/'.length))
+
 // ----- Tips -----
 
 // Each brush's tip is decoded once, the first time it is needed
@@ -126,6 +136,17 @@ export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
 
 export async function removeBrush(brush: LibraryBrush) {
   if (brush.isBuiltIn) return
-  await withStore('readwrite', store => store.delete(Number(brush.id.slice('added/'.length))))
+  await withStore('readwrite', store => store.delete(keyOf(brush.id)))
   tips.delete(brush.id)
+}
+
+// Keep a brush made in the Brush Designer. "replacing" is the id it got the last time it was saved, so saving again
+// changes that brush instead of adding another one. Returns the brush's id
+export async function saveBrush(file: string, replacing?: string) {
+  const key = await withStore('readwrite', store =>
+    replacing ? store.put({ id: keyOf(replacing), file }) : store.add({ file }),
+  )
+  const id = `added/${key}`
+  tips.delete(id) // its tip may have changed
+  return id
 }

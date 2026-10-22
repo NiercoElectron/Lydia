@@ -99,6 +99,9 @@ export function createView(
     const isPan = e.button === 1 || (e.button === 0 && isSpaceDown)
     if (!isPan && e.button !== 0) return
     e.preventDefault() // the middle button would otherwise start the browser's auto-scroll
+    // That also keeps the keyboard where it was, so take it away from a text field (like the brush name) as any other
+    // click would: otherwise shortcuts like Ctrl+Z keep going to the field instead of the drawing
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     canvas.setPointerCapture(e.pointerId) // keep receiving the moves even if the pointer leaves the canvas
     if (isPan) {
       panStart = { x: e.clientX - world.position.x, y: e.clientY - world.position.y }

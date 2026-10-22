@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { DEFAULT_TIP_SIZE, TIP_SIZES } from '../engine/brushFile'
 import {
   MAX_SIZE,
   MIN_SIZE,
@@ -21,12 +22,14 @@ type Props = {
   onGpuMemoryChange: (gigabytes: number) => void
   onNewProject: (project: ProjectData) => void
   onOpenProject: (project: ProjectData) => void
+  onOpenDesigner: (tipSize: number) => void
 }
 
-export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject }: Props) {
+export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
   const [width, setWidth] = useState('800')
   const [height, setHeight] = useState('600')
   const [isOpening, setIsOpening] = useState(false)
+  const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
@@ -75,6 +78,23 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
         {isOpening ? 'Opening…' : 'Open project'}
       </button>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+
+      <section className="designer-start">
+        <h2>Brush Designer</h2>
+        <p className="hint">Draw the tip of a new brush, try it, and save it to your brushes or as a file.</p>
+        <label>
+          Tip paper
+          <select value={tipSize} onChange={e => setTipSize(Number(e.target.value))}>
+            {TIP_SIZES.map(tip => (
+              <option key={tip} value={tip}>
+                {tip}×{tip}
+                {tip === DEFAULT_TIP_SIZE ? ' (default)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button onClick={() => onOpenDesigner(tipSize)}>Open Brush Designer</button>
+      </section>
 
       <section className="gpu-memory">
         <h2>Graphics card memory</h2>

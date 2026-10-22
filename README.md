@@ -10,6 +10,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - Brushes are `.lydbrush` files: six come with Lydia, and more can be added (Import…, or drop the files on the window),
   exported to share them, and deleted
+- Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
+  brush list or as a file
 - Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
@@ -38,7 +40,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   - [ ] Choose background color or transparent background
 - [x] Color and brush size selection
 - [x] Brushes as files (`.lydbrush`): a brush list, import, export
-- [ ] Brush Designer: draw a brush tip and save it as a brush
+- [x] Brush Designer: draw a brush tip and save it as a brush
 - [ ] Brush grain (a paper texture, for pencils)
 - [x] Undo and redo (painting, clearing a layer and every layer change)
 - [x] Layers: add, delete, choose, reorder, rename, hide, opacity
@@ -77,8 +79,8 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 ```
 src/
 ├── engine/          The drawing engine (tiles, layers, brush, undo, project and brush files), no React
-├── components/      UI pieces (drawing area, toolbar, brushes and layers panels)
-├── screens/         Full screens (start screen, editor)
+├── components/      UI pieces (drawing area, toolbar, brushes and layers panels, the Brush Designer's parts)
+├── screens/         Full screens (start screen, editor, Brush Designer)
 ├── brushes/         The brushes that come with Lydia (.lydbrush files)
 ├── brushLibrary.ts  The brush list: the brushes above and the ones the user added
 ├── files.ts         Downloading files

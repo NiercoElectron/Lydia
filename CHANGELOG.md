@@ -6,6 +6,19 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- The Brush Designer, opened from the start screen ([decision 30](docs/decisions.md#30-the-brush-designer)). Draw the
+  tip of a new brush in black and gray on a paper of 256, 512 or 1024 pixels, choose its settings (spacing, angle,
+  turning with the stroke, random angle, scatter, flow and the pen's pressure), and try it in a test area that paints
+  your strokes again after every change. **Save to my brushes** adds it to the brush list, chosen and ready in the
+  next drawing, and **Export file** saves it as a `.lydbrush` file.
+
+### Fixed
+
+- Shortcuts like Ctrl+Z work right after typing in a text field, such as a layer's name: painting now takes the
+  keyboard away from the field.
+
 ## [0.4.0] - 2026-10-22
 
 Brushes that are files, so they can be shared and added

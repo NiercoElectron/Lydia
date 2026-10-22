@@ -401,6 +401,37 @@ for the history) or **open** (not decided yet).
   grain inside the tip averages out where the dabs overlap, so a Pencil brush tried for this version looked like a
   soft round brush and was left out.
 
+## 30. The Brush Designer
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:**
+  - The Brush Designer is a screen of its own, opened from the start screen, with a paper of 256, 512 or 1024 pixels
+    for the tip (512 by default).
+  - The tip is drawn with Lydia's own engine, so zoom, undo, the eraser and the pen's pressure work as in a drawing.
+    It is painted with the round brushes that come with Lydia (soft or hard edge), and instead of a color there is a
+    strength: black paints fully, gray paints lightly.
+  - The tip is the painted part of the paper, cut out with a margin of 2 pixels, like Photoshop does when it defines
+    a brush. The brush size then measures the drawing, not the whole paper.
+  - Next to the paper are the brush's name, its settings (decision 29) and a test area. The test area starts with a
+    sample stroke and takes strokes from the mouse or the pen; every change to the tip or the settings paints all of
+    them again, so the before and after can be compared.
+  - **Save to my brushes** keeps the brush in the browser and makes it the chosen brush, ready in the next drawing.
+    Saving again during the same visit changes that brush instead of adding another one. **Export file** saves the
+    `.lydbrush` file.
+- **Why:**
+  - It was Enrico's idea, together with brushes as files (decision 29).
+  - A screen of its own was Enrico's choice, over a window on top of the drawing. It keeps the Designer simple: the
+    drawing and the Designer never run at the same time, nor share the keyboard.
+  - Left out for now, also Enrico's choice: opening an existing brush to change it, using an image as the tip, and
+    painting the tip with the other brushes.
+- **How:** after every change to the paper (a stroke, undo, redo, clearing), its picture is exported, cut to the
+  painted part and read as a tip again. The engine and the brush list share code with the Designer: the shortcuts,
+  the engine's state for the screen (`engineHooks.ts`) and the drawing of strokes on an ordinary canvas
+  (`dabCanvas.ts`).
+- **Measured (RTX 4060 Ti):** the tip is ready 18–35 ms after a stroke on papers of 256 and 512 pixels, and
+  73–97 ms on a paper of 1024.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

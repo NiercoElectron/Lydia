@@ -1,6 +1,8 @@
 export const BRUSH_EXTENSION = '.lydbrush'
 export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each side
 export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip of 1024×1024 full of detail is well under this
+export const TIP_SIZES = [256, 512, 1024] // the papers the Brush Designer offers for drawing a tip
+export const DEFAULT_TIP_SIZE = 512
 const MAX_NAME_LENGTH = 100
 
 // How copies of the tip are placed along a stroke (see dabs.ts)
@@ -100,6 +102,12 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip }
 }
 
+// The text of a .lydbrush file for this brush
+export function serializeBrushFile({ name, tip, ...shape }: BrushPreset) {
+  const file = { format: FORMAT, version: VERSION, name, ...shape, tip: PNG_DATA_URL + toBase64(tip) }
+  return JSON.stringify(file, null, 2) + '\n'
+}
+
 // A file name for a brush: "Soft round" -> "soft-round.lydbrush"
 export function brushFileName(name: string) {
   const simple = name
@@ -135,4 +143,11 @@ function fromBase64(text: string) {
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes
+}
+
+function toBase64(bytes: Uint8Array) {
+  let binary = ''
+  const CHUNK = 0x8000 // String.fromCharCode takes a limited number of arguments at once
+  for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  return btoa(binary)
 }

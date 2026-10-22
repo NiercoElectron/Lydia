@@ -11,15 +11,22 @@ button[aria-pressed='true'] {
   color: #666;
 }
 
+.designer-start,
 .gpu-memory {
   max-width: 640px;
   margin-top: 32px;
 }
 
+.designer-start h2,
 .gpu-memory h2 {
   font-size: 1.1rem;
 }
 
+.designer-start label {
+  margin-bottom: 8px;
+}
+
+.designer-start label,
 .gpu-memory label {
   display: flex;
   flex-wrap: wrap;
@@ -153,6 +160,111 @@ button.brush[aria-pressed='true'] {
 .brush-name {
   font-size: 0.85rem;
   text-align: left;
+}
+
+/* The Brush Designer: the same bar and drawing area as the editor, with the brush's settings on the right */
+.button-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Numbers next to sliders keep their width, so the sliders don't move while they change */
+.slider-value {
+  min-width: 5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.designer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 300px;
+  padding: 8px;
+  border-left: 1px solid #ccc;
+  overflow-y: auto;
+}
+
+.designer-panel h2 {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+.designer-panel .hint {
+  margin: 0;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.name-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.shape-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-row input {
+  min-width: 0;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.test-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 280 / 200;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: crosshair;
+  touch-action: none; /* the pen and the fingers paint instead of scrolling the panel */
+}
+
+.test-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.test-controls label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+}
+
+.test-controls input {
+  flex: 1;
+  min-width: 0;
+}
+
+.designer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.designer-actions button {
+  flex: 1;
 }
 
 /* Shown over everything while files are dragged over the window */
