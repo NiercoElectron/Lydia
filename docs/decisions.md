@@ -213,7 +213,8 @@ for the history) or **open** (not decided yet).
   and no line in the changelog, since the numbers tell what the app itself does.
 - **Versions:** 0.1.0 was the first usable version, still with strokes stored as data (decision 3); 0.2.0 brought the
   tile engine from the spike into the main app; 0.3.0 completed the layers (delete, move, rename, undo of every layer
-  change). 1.0.0 will be the desktop app, packaged with Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
+  change); 0.4.0 made brushes files that can be shared and added (decision 29). 1.0.0 will be the desktop app,
+  packaged with Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is.
 

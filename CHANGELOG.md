@@ -6,6 +6,11 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-22
+
+Brushes that are files, so they can be shared and added
+([decision 29](docs/decisions.md#29-brushes-are-files)).
+
 ### Added
 
 - A brushes panel on the left, with six brushes: Soft round, Hard round, Airbrush, Chalk, Calligraphy and Dashes. Each
@@ -115,7 +120,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/NiercoElectron/Lydia/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/NiercoElectron/Lydia/compare/v0.2.1...v0.2.2
