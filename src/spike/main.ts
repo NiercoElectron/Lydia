@@ -1,4 +1,5 @@
 import { Application, BufferImageSource, Container, Graphics, RenderTexture, Sprite, Texture } from 'pixi.js'
+import type { GlRenderTarget, GlRenderTargetAdaptor, WebGLRenderer } from 'pixi.js'
 
 const PROJECT_WIDTH = 10000
 const PROJECT_HEIGHT = 10000
@@ -197,20 +198,32 @@ async function main() {
     uploadCount++
   }
 
-  // Read a tile's pixels back from the graphics card into RAM (slow: the graphics card has to finish its work first).
-  // Returns null when the tile is completely transparent, so empty tiles take no memory at all
-  function readBack(texture: RenderTexture) {
-    const { pixels } = app.renderer.extract.pixels(texture)
-    readBackCount++
+  // Tiles that are completely transparent are not kept in RAM, so empty tiles take no memory at all
+  function emptyToNull(pixels: Uint8ClampedArray) {
     for (let i = 3; i < pixels.length; i += 4) {
       if (pixels[i] !== 0) return pixels
     }
     return null
   }
 
+  // Read a tile's pixels back from the graphics card into RAM, right now. Slow: the processor has to wait until the
+  // graphics card has finished all the work it was given. Used only when the pixels are needed immediately
+  function readBack(texture: RenderTexture) {
+    const { pixels } = app.renderer.extract.pixels(texture)
+    readBackCount++
+    return emptyToNull(pixels)
+  }
+
   // ----- The graphics card cache -----
 
-  type CachedTile = { layer: Layer; key: string; texture: RenderTexture; dirty: boolean }
+  type CachedTile = {
+    layer: Layer
+    key: string
+    texture: RenderTexture
+    dirty: boolean // painted since its pixels were last saved in RAM
+    version: number // goes up every time the tile is painted, to notice reads that finished too late
+    readingVersion: number // the version being read without waiting, or -1 when there is no such read
+  }
   // "layerId/column,row" -> the tile's copy on the graphics card. A Map remembers the order in which keys were added, so
   // moving a tile to the end every time it is used keeps the least recently used tiles at the start
   const gpuTiles = new Map<string, CachedTile>()
@@ -228,7 +241,7 @@ async function main() {
       if (!pixels && !create) return null
       const texture = createTexture(column, row)
       if (pixels) upload(pixels, texture)
-      cached = { layer, key, texture, dirty: false }
+      cached = { layer, key, texture, dirty: false, version: 0, readingVersion: -1 }
     }
     gpuTiles.set(id, cached)
     return cached.texture
@@ -240,16 +253,21 @@ async function main() {
   function markDirty(layer: Layer, key: string) {
     const cached = gpuTiles.get(`${layer.id}/${key}`)!
     cached.dirty = true
+    cached.version++
     dirtyTiles.add(cached)
   }
 
-  // Read a painted tile back into RAM, so RAM has its latest pixels
-  function saveTile(cached: CachedTile) {
-    const pixels = readBack(cached.texture)
+  // Keep a tile's latest pixels in RAM (null = no paint)
+  function storePixels(cached: CachedTile, pixels: Uint8ClampedArray | null) {
     if (pixels) cached.layer.tiles.set(cached.key, pixels)
     else cached.layer.tiles.delete(cached.key)
     cached.dirty = false
     dirtyTiles.delete(cached)
+  }
+
+  // Read a painted tile back into RAM right now, so RAM has its latest pixels
+  function saveTile(cached: CachedTile) {
+    storePixels(cached, readBack(cached.texture))
   }
 
   // Before using a tile's pixels in RAM, make sure they are the latest ones
@@ -267,6 +285,103 @@ async function main() {
       cached.texture.destroy(true)
       gpuTiles.delete(id)
     }
+  }
+
+  // ----- Reading back without waiting (WebGL2) -----
+
+  // Instead of making the processor wait, ask the graphics card to copy the tile into a buffer of its own (a "pixel
+  // buffer object") and to signal when it has done it (a "fence"). A frame or two later the pixels are fetched from
+  // the buffer, without waiting for anything. Like leaving an order at a factory and picking it up when it is ready,
+  // instead of stopping the production line to inspect one piece
+  const renderer = app.renderer as WebGLRenderer
+  const gl = renderer.gl as WebGL2RenderingContext
+  // Pixels that are on their way from the graphics card, like an IOU: "pixels" is filled in when the read finishes
+  type PendingPixels = { read: PendingRead; pixels?: Uint8ClampedArray | null }
+  type PendingRead = {
+    cached: CachedTile
+    version: number // the tile's version when the read started
+    width: number
+    height: number
+    buffer: WebGLBuffer
+    fence: WebGLSync
+    waiters: PendingPixels[] // IOUs to fill in when the read finishes
+  }
+  const pendingReads: PendingRead[] = []
+  const MAX_PENDING_READS = 64
+
+  // Start reading a tile without waiting. The graphics card does its work in the order it was given, so the read gets
+  // the tile as it is now, even if something is painted on it right afterwards
+  function startRead(cached: CachedTile) {
+    // Tell PixiJS which texture to read from, the same way it does when it reads pixels itself
+    const renderTarget = renderer.renderTarget.getRenderTarget(cached.texture)
+    const glRenderTarget = renderer.renderTarget.getGpuRenderTarget(renderTarget) as GlRenderTarget
+    ;(renderer.renderTarget.adaptor as GlRenderTargetAdaptor).bindFramebuffer(glRenderTarget.resolveTargetFramebuffer)
+
+    // A new buffer for every read: Chrome prepares a copy of each read buffer to make fetching it fast, and throws it
+    // away (with a warning) when a buffer is reused, so reusing buffers would make fetching slow again
+    const { width, height } = cached.texture
+    const buffer = gl.createBuffer()
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer)
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, width * height * 4, gl.STREAM_READ)
+    // With a pixel buffer bound, readPixels copies into it instead of into RAM, so it doesn't wait
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, 0)
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)!
+    const read: PendingRead = { cached, version: cached.version, width, height, buffer, fence, waiters: [] }
+    pendingReads.push(read)
+    cached.readingVersion = cached.version
+    return read
+  }
+
+  // Fetch the pixels of a read: fill in its IOUs and, if they are still the tile's latest pixels, keep them in RAM.
+  // If the read hasn't finished yet, the processor has to wait for it (only for undo right after a stroke)
+  function completeRead(read: PendingRead) {
+    gl.deleteSync(read.fence)
+    pendingReads.splice(pendingReads.indexOf(read), 1)
+    const { cached } = read
+    if (cached.readingVersion === read.version) cached.readingVersion = -1
+
+    // The pixels are the tile's latest only if it is still on the graphics card, still needs saving, and was not
+    // painted again after the read started
+    const stillCached = gpuTiles.get(`${cached.layer.id}/${cached.key}`) === cached
+    const isLatest = stillCached && cached.dirty && cached.version === read.version
+    let saved = false
+    if (isLatest || read.waiters.length > 0) {
+      const pixels = new Uint8ClampedArray(read.width * read.height * 4)
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, read.buffer)
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels)
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
+      readBackCount++
+      const result = emptyToNull(pixels)
+      for (const waiter of read.waiters) waiter.pixels = result
+      if (isLatest) {
+        storePixels(cached, result)
+        saved = true
+      }
+    }
+    gl.deleteBuffer(read.buffer) // used or not, the buffer is not needed anymore
+    return saved
+  }
+
+  // Fetch the reads that are ready, using at most "budget" milliseconds. Returns how many tiles were saved
+  function finishReads(budget: number) {
+    const start = performance.now()
+    let saved = 0
+    for (let i = 0; i < pendingReads.length && performance.now() - start < budget;) {
+      const read = pendingReads[i]
+      if (gl.clientWaitSync(read.fence, 0, 0) === gl.TIMEOUT_EXPIRED) {
+        i++ // not ready yet: check again in the next frame
+        continue
+      }
+      if (completeRead(read)) saved++ // completeRead removes it from the list, so "i" stays the same
+    }
+    return saved
+  }
+
+  // Get the pixels of an IOU, waiting for its read if it hasn't finished yet
+  function redeem(pending: PendingPixels) {
+    if (pending.pixels === undefined) completeRead(pending.read)
+    return pending.pixels!
   }
 
   // ----- Projection -----
@@ -373,9 +488,11 @@ async function main() {
 
   // ----- Undo -----
 
-  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, the tile's pixels in RAM
-  // from before the stroke (null = the tile had no paint). Pixels are never changed, so no copy is needed
-  type UndoStep = { layer: Layer; tiles: Map<string, Uint8ClampedArray | null> }
+  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, the tile's pixels from
+  // before the stroke (null = the tile had no paint). Pixels are never changed, so no copy is needed. If the tile's
+  // latest pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or two later
+  type TileBackup = Uint8ClampedArray | null | PendingPixels
+  type UndoStep = { layer: Layer; tiles: Map<string, TileBackup> }
   const undoStack: UndoStep[] = []
   const redoStack: UndoStep[] = []
   let strokeBackup: UndoStep | null = null // the step being recorded while the user paints
@@ -384,8 +501,23 @@ async function main() {
   // Before a stroke paints on a tile for the first time, keep its pixels from before the stroke
   function backUpTile(key: string) {
     if (!strokeBackup || strokeBackup.tiles.has(key)) return // not painting, or already saved during this stroke
-    saveIfDirty(strokeBackup.layer, key)
-    strokeBackup.tiles.set(key, strokeBackup.layer.tiles.get(key) ?? null)
+    const { layer } = strokeBackup
+    const cached = gpuTiles.get(`${layer.id}/${key}`)
+    if (cached?.dirty) {
+      // Painted again before its pixels reached RAM: read it without waiting and keep an IOU. The read happens before
+      // the new dabs, because the graphics card works in order. A read of this same version may already be on its way
+      const read = pendingReads.find(r => r.cached === cached && r.version === cached.version) ?? startRead(cached)
+      const pending: PendingPixels = { read }
+      read.waiters.push(pending)
+      strokeBackup.tiles.set(key, pending)
+    } else {
+      strokeBackup.tiles.set(key, layer.tiles.get(key) ?? null)
+    }
+  }
+
+  // The pixels a backup stands for (an IOU is redeemed first)
+  function pixelsOf(backup: TileBackup) {
+    return backup === null || backup instanceof Uint8ClampedArray ? backup : redeem(backup)
   }
 
   // How many tiles with pixels a step keeps (tiles that had no paint cost nothing)
@@ -400,8 +532,9 @@ async function main() {
   function swapTiles(step: UndoStep) {
     const start = performance.now()
     const isBelowActive = layers.indexOf(step.layer) < layers.indexOf(activeLayer)
-    for (const [key, saved] of step.tiles) {
+    for (const [key, backup] of step.tiles) {
       const [column, row] = key.split(',').map(Number)
+      const saved = pixelsOf(backup)
       saveIfDirty(step.layer, key)
       const current = step.layer.tiles.get(key) ?? null
       if (saved) step.layer.tiles.set(key, saved)
@@ -581,21 +714,25 @@ async function main() {
     strokeBackup = null
   })
 
-  // Painted tiles are read back into RAM a few at a time between frames, using at most SAVE_BUDGET_MS of each frame,
-  // so letting go of the pen doesn't freeze the screen. Nothing is saved while painting
-  const SAVE_BUDGET_MS = 4
+  // Every frame: fetch the reads that are ready, then, if not painting, start reads for the painted tiles. Nothing waits,
+  // so letting go of the pen doesn't freeze the screen
+  const SAVE_BUDGET_MS = 4 // at most this much of each frame is spent fetching pixels
   let savedCount = 0
   let saveStart = 0
   app.ticker.add(() => {
-    if (drawingPointerId !== null || dirtyTiles.size === 0) return
+    if (dirtyTiles.size === 0 && pendingReads.length === 0) return
     if (savedCount === 0) saveStart = performance.now()
-    const frameStart = performance.now()
-    for (const cached of dirtyTiles) {
-      if (performance.now() - frameStart > SAVE_BUDGET_MS) break
-      saveTile(cached)
-      savedCount++
+    savedCount += finishReads(SAVE_BUDGET_MS)
+
+    if (drawingPointerId === null) {
+      for (const cached of dirtyTiles) {
+        if (pendingReads.length >= MAX_PENDING_READS) break
+        if (cached.readingVersion !== cached.version) startRead(cached)
+      }
     }
-    if (dirtyTiles.size > 0) return
+    gl.flush() // send the reads to the graphics card now, so their fences can be signaled
+
+    if (dirtyTiles.size > 0 || savedCount === 0) return
     const time = Math.round(performance.now() - saveStart)
     console.log(`Saved ${savedCount} tiles to RAM in the background, over ${time} ms`)
     savedCount = 0

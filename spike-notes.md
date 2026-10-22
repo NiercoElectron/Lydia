@@ -207,9 +207,27 @@ drawings with many layers.
 - Why: reading pixels back makes the processor wait until the graphics card has finished all the work it was given
   (like stopping a production line to inspect one piece). The first read of each frame pays for that wait, which takes
   most of a frame at 144 Hz. Reading many tiles at once pays it only once, but freezes the screen for longer.
-- Fix for the real app: read back asynchronously. WebGL2 can copy the pixels into a buffer on the graphics card and
-  signal when they are ready (a "pixel buffer object" and a "fence"), so the processor fetches them a frame or two
-  later, without waiting. A tile painted again before its read finishes must be read again.
+- Fix (done): read back without waiting. WebGL2 can copy the pixels into a buffer on the graphics card and signal when
+  they are ready (a "pixel buffer object" and a "fence"), so the processor fetches them a frame or two later. Each tile
+  has a version that goes up every time it is painted; a read that finishes after the tile was painted again is
+  thrown away, and the tile is read again.
+- A second source of waiting: painting again over a tile before its pixels reached RAM needs its pixels from before
+  the stroke for undo. Now a read without waiting is started right before the new dabs (the graphics card works in
+  order, so it gets the tile as it was), and the undo step keeps an "IOU" that is filled in when the read finishes.
+  Only an undo pressed before that (a frame or two) has to wait.
+- Tested (headless Chrome, real cache size): a session of strokes painted back to back over the same places, on the
+  top layer and on a middle one, made **0 waiting reads** (it was 297 before). All the earlier tests still pass,
+  including undo right after a stroke.
+- Waiting reads are still used when a painted tile must leave the cache before its read finished (only when one
+  operation paints more tiles than the cache holds) and for undo right after a stroke.
+- Retested (mine): the hitch is gone, and the background saving got much faster (12–62 tiles in 4–79 ms, it was
+  19–94 tiles in 99–573 ms).
+- But Chrome printed a warning hundreds of times: "READ-usage buffer was written, then fenced, but written again before
+  being read back. This discarded the shadow copy that was created to accelerate readback." (and then "too many
+  errors", because Chrome only shows the first 256 WebGL messages; there were no real WebGL errors). Tested in a
+  minimal WebGL page: Chrome prints it whenever a read buffer is reused, even after it was read correctly, and the
+  copy it throws away is what makes fetching fast. Fixed: a new buffer for every read, deleted afterwards. 0 warnings.
+- Retested (mine, 20 full layers): console clean, 144 FPS, strokes of 9–29 tiles saved to RAM in 10–36 ms.
 - RAM: 400 MB per full layer, because nothing is compressed yet. 20 full layers take 8 GB, too much for a 16 GB Mac.
   Next: store tiles of a single color as just that color, and compress the others.
 
