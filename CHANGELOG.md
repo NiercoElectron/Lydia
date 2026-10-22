@@ -6,6 +6,27 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- Delete the active layer with the new **Delete layer** button; the layer under it becomes active.
+- Move a layer by dragging it up or down in the list. A line shows where it will go.
+- Rename a layer by double-clicking its name. Enter keeps the new name, Escape keeps the old one.
+- Undo and redo for every layer change: adding, deleting, moving, renaming, hiding, showing and changing the opacity.
+  A whole drag of the opacity slider is a single step.
+
+### Changed
+
+- On big drawings with many layers, layer changes no longer freeze the screen: hiding, showing, moving and deleting
+  layers, undoing those changes, and moving or letting go of the opacity slider. The new picture is prepared in the
+  background and appears all at once when it is ready, with "Updating…" in the bar meanwhile.
+- Layer changes are much faster: the graphics card now keeps up to 8,000 tiles (about 2 GB) instead of 2,000, so
+  most changes no longer send the layers to it again. With 4 full layers of 10000×10000, moving a layer went from
+  1.3 s to under 0.25 s.
+
+### Fixed
+
+- The opacity slider no longer changes size when the value reaches 100%.
+
 ## [0.2.2] - 2026-10-22
 
 ### Added

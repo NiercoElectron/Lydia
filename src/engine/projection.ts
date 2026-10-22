@@ -2,7 +2,7 @@ import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
 import type { Texture, WebGLRenderer } from 'pixi.js'
 import type { GpuTiles } from './gpuTiles'
 import { activeIndex, type Layer, type LayerStack } from './layers'
-import { forEachTile, parseTileKey, TILE_SIZE, tileKey, type Grid } from './tiles'
+import { forEachTile, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the white
 // paper and all the visible layers already put together, like Krita does. To put a tile together quickly while
@@ -17,6 +17,17 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
   // "below" tiles that still have the layers of a previously active layer. Choosing another layer doesn't change the
   // image, so the projection stays as it is, and each "below" tile is put together again only when it is needed
   const staleBelow = new Set<string>()
+
+  // Projection tiles waiting to be put together again after a layer change, and the new versions already put together
+  // but not shown yet (see composeLayerTiles)
+  const waiting = new Set<string>()
+  const prepared = new Map<string, RenderTexture>()
+  // Textures of projection tiles that were replaced, reused for the next new versions: creating and deleting
+  // thousands of textures at once takes time. When nothing is being updated, they are freed a few every frame
+  const spareTextures: RenderTexture[] = []
+  const FREE_PER_FRAME = 32
+  // The order to work through the waiting tiles in (see cachedFirst); null = to be worked out again
+  let waitingOrder: string[] | null = null
 
   const composeRoot = new Container()
   const paperTile = new Graphics().rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0xffffff)
@@ -61,18 +72,136 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
     composeLayers(paperTile, 0, activeIndex(stack), column, row, below.get(tileKey(column, row))!)
   }
 
-  // The projection tile = the "below" tile + the active layer + the layers above it
-  function composeTile(column: number, row: number) {
+  // The projection tile = the "below" tile + the active layer + the layers above it, put together into "target"
+  function composeTileInto(column: number, row: number, target: RenderTexture) {
     const key = tileKey(column, row)
     if (staleBelow.delete(key)) composeBelowTile(column, row) // delete() returns true if the key was in the set
     belowSprite.texture = below.get(key)!
-    composeLayers(belowSprite, activeIndex(stack), stack.layers.length, column, row, projection.get(key)!)
-    stopLive(key) // the projection tile is up to date again
+    composeLayers(belowSprite, activeIndex(stack), stack.layers.length, column, row, target)
   }
 
-  // Put the whole projection together again (after a layer is hidden, shown, or changes its opacity)
+  // Put a projection tile together right away, on the screen (while painting, after undoing a stroke...)
+  function composeTile(column: number, row: number) {
+    const key = tileKey(column, row)
+    composeTileInto(column, row, projection.get(key)!)
+    // It is up to date now, so a new version waiting or being prepared isn't needed anymore
+    waiting.delete(key)
+    dropPrepared(key)
+    stopLive(key)
+  }
+
+  // Put the whole projection together again
   function composeAll() {
     forEachTile(grid, composeTile)
+  }
+
+  // Put together again the tiles a layer changes: the ones where it has paint. Elsewhere the layer is transparent, so
+  // hiding, showing, moving or deleting it, or changing its opacity, changes nothing there.
+  // With many big layers that can be thousands of tiles, each needing every layer at its place, and most of those
+  // must be sent from RAM to the graphics card again: seconds of work. Doing it all at once would freeze the screen,
+  // and showing each tile as soon as it is ready makes the change spread over the picture like a short video. So the
+  // new versions are put together out of sight, a few every frame (see composeWaiting), and once they are all ready
+  // the screen shows them at once
+  function composeLayerTiles(layer: Layer) {
+    const index = stack.layers.indexOf(layer) // -1 for a layer that was just deleted, which may have been in "below"
+    const isBelowActive = index < activeIndex(stack)
+    for (const key of gpu.tilesWithPaint(layer)) {
+      if (isBelowActive) markBelowStale(key)
+      dropPrepared(key) // a version prepared before this change is out of date
+      addWaiting(key)
+    }
+    // Tiles of this layer still shown live (just after the opacity slider was let go) follow it right away
+    if (layer === liveLayer) {
+      for (const tile of live.values()) {
+        tile.layerSprite.alpha = layer.opacity
+        tile.layerSprite.visible = layer.visible
+      }
+    }
+  }
+
+  // Do the waiting work for at most "budget" milliseconds: first start the tiles to show live (while the opacity slider
+  // moves), then prepare the new versions of the waiting tiles. Each group is shown all at once when it is complete
+  function composeWaiting(budget: number) {
+    if (waiting.size === 0 && startingLive.size === 0 && prepared.size === 0) {
+      for (const texture of spareTextures.splice(-FREE_PER_FRAME)) texture.destroy(true)
+      return
+    }
+    const deadline = performance.now() + budget
+    startingOrder ??= cachedFirst(startingLive)
+    for (const key of startingOrder) {
+      if (!startingLive.has(key)) continue
+      if (performance.now() >= deadline) return // the rest in the next frame
+      startingLive.delete(key)
+      startLive(liveLayer!, key)
+    }
+    startingOrder = null
+    showStartedLive()
+    waitingOrder ??= cachedFirst(waiting)
+    for (const key of waitingOrder) {
+      if (!waiting.has(key)) continue
+      if (performance.now() >= deadline) return
+      const { column, row } = parseTileKey(key)
+      const texture = takeTexture(column, row)
+      composeTileInto(column, row, texture)
+      waiting.delete(key)
+      prepared.set(key, texture)
+    }
+    waitingOrder = null
+    showPrepared()
+    releaseLiveLayerIfDone()
+  }
+
+  function addWaiting(key: string) {
+    waiting.add(key)
+    waitingOrder = null
+  }
+
+  // The tiles whose layers are most on the graphics card go first. With more tiles than the graphics card keeps, going
+  // through them in the same order every time would push each one out just before it is needed again (the tile unused
+  // for the longest time leaves first); starting with the ones still there uses them before they leave
+  function cachedFirst(keys: Set<string>) {
+    const cachedLayers = new Map<string, number>()
+    for (const key of keys) {
+      let count = 0
+      for (const layer of stack.layers) if (layer.visible && gpu.getCached(layer, key)) count++
+      cachedLayers.set(key, count)
+    }
+    return [...keys].sort((a, b) => cachedLayers.get(b)! - cachedLayers.get(a)!)
+  }
+
+  // Once every waiting tile has its new version, show them all at once
+  function showPrepared() {
+    for (const [key, texture] of prepared) {
+      applyScaleMode(texture)
+      const old = projection.get(key)!
+      projection.set(key, texture)
+      tileSprites.get(key)!.texture = texture
+      spareTextures.push(old)
+      stopLive(key)
+    }
+    prepared.clear()
+  }
+
+  // A texture for a new version of a tile: a spare one of the same size, or a new one
+  function takeTexture(column: number, row: number) {
+    const { width, height } = tileSize(grid, column, row)
+    for (let i = spareTextures.length - 1; i >= 0; i--) {
+      const texture = spareTextures[i]
+      if (texture.width === width && texture.height === height) return spareTextures.splice(i, 1)[0]
+    }
+    return RenderTexture.create({ width, height })
+  }
+
+  function dropPrepared(key: string) {
+    const texture = prepared.get(key)
+    if (!texture) return
+    spareTextures.push(texture)
+    prepared.delete(key)
+  }
+
+  // Do all the waiting work now (before the projection is read for exporting)
+  function finishWaiting() {
+    composeWaiting(Infinity)
   }
 
   // Every "below" tile must be put together again, the next time it is needed (after choosing another layer, adding
@@ -101,9 +230,16 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
   // the slider moves, each tile of the active layer is shown with three sprites instead of its projection tile: its
   // "below" tile, the layer's own tile with the new opacity, and the layers above it, put together once. A new opacity
   // then only changes one sprite per tile, and the graphics card puts the three together on every frame. A tile goes
-  // back to its projection tile as soon as that is put together again (see composeTile)
+  // back to its projection tile as soon as that is put together again (see composeTile).
+  // Starting a tile needs every layer at its place, so with many big layers, starting all of them at once would
+  // freeze the screen: they start a few every frame instead (see composeWaiting), out of sight, and are shown all at
+  // once when they are all ready
   type LiveTile = { sprites: Container; layerSprite: Sprite; above: RenderTexture | null }
   const live = new Map<string, LiveTile>() // "column,row" -> the tile shown live
+  const startingLive = new Set<string>() // tiles waiting to be shown live
+  const startedLive: string[] = [] // live tiles ready but not shown yet
+  let startingOrder: string[] | null = null // the order to start them in (see cachedFirst)
+  let liveLayer: Layer | null = null // the layer the live tiles show
   const liveContainer = new Container() // on top of the projection's sprites
   const emptyBase = new Container() // the layers above are put together over nothing (transparent)
 
@@ -120,23 +256,30 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
     // when they all use the normal blend mode: the others (like multiply) depend on what is under them
     const above = stack.layers.slice(activeIndex(stack) + 1)
     if (above.some(other => other.visible && other.blendMode !== 'normal')) return false
-    gpu.keep(layer) // the sprites show the layer's own textures, so they must stay on the graphics card
+    if (liveLayer !== layer) {
+      finishLive()
+      gpu.keep(layer) // the sprites show the layer's own textures, so they must stay on the graphics card
+      liveLayer = layer
+    }
+    for (const tile of live.values()) tile.layerSprite.alpha = layer.opacity
     for (const key of keys) {
-      const tile = live.get(key) ?? startLive(layer, key)
-      if (tile) tile.layerSprite.alpha = layer.opacity
+      if (live.has(key) || startingLive.has(key)) continue
+      startingLive.add(key)
+      startingOrder = null
     }
     return true
   }
 
+  // Get a live tile ready, out of sight until the others are ready too (see showStartedLive)
   function startLive(layer: Layer, key: string) {
     const { column, row } = parseTileKey(key)
     const texture = gpu.getTexture(layer, column, row, false)
-    if (!texture) return null // no paint here
+    if (!texture) return // no paint here
     if (staleBelow.delete(key)) composeBelowTile(column, row)
     const first = activeIndex(stack) + 1
     let above: RenderTexture | null = null
     if (stack.layers.slice(first).some(other => other.visible && hasPaint(other, key))) {
-      above = gpu.createTexture(column, row)
+      above = takeTexture(column, row)
       composeLayers(emptyBase, first, stack.layers.length, column, row, above)
     }
 
@@ -147,12 +290,23 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
     sprites.addChild(new Sprite(below.get(key)!), layerSprite)
     if (above) sprites.addChild(new Sprite(above))
     for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
+    layerSprite.alpha = layer.opacity
+    sprites.visible = false
     liveContainer.addChild(sprites)
-    tileSprites.get(key)!.visible = false
+    live.set(key, { sprites, layerSprite, above })
+    startedLive.push(key)
+  }
 
-    const tile = { sprites, layerSprite, above }
-    live.set(key, tile)
-    return tile
+  // Once every live tile is ready, show them all at once instead of their projection tiles
+  function showStartedLive() {
+    if (startingLive.size > 0) return
+    for (const key of startedLive) {
+      const tile = live.get(key)
+      if (!tile) continue // put together again in the meantime
+      tile.sprites.visible = true
+      tileSprites.get(key)!.visible = false
+    }
+    startedLive.length = 0
   }
 
   // Show the projection tile again instead of the live one
@@ -160,18 +314,39 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
     const tile = live.get(key)
     if (!tile) return
     tile.sprites.destroy({ children: true }) // only the sprites: their textures belong to the layer and to "below"
-    tile.above?.destroy(true)
+    if (tile.above) spareTextures.push(tile.above) // freed later, a few every frame (see composeWaiting)
     tileSprites.get(key)!.visible = true
     live.delete(key)
-    if (live.size === 0) gpu.keep(null)
+    releaseLiveLayerIfDone()
   }
 
-  // Put the tiles shown live together for good (once the opacity slider is let go)
+  // Once no tile is shown live or waiting to be, the layer's tiles can leave the graphics card again
+  function releaseLiveLayerIfDone() {
+    if (!liveLayer || live.size > 0 || startingLive.size > 0) return
+    gpu.keep(null)
+    liveLayer = null
+  }
+
+  // Put the tiles shown live together for good, now (before the "below" tiles change, or before exporting). The ones
+  // not shown live yet still have the old opacity in the projection, so they wait to be put together again
   function finishLive() {
+    for (const key of startingLive) addWaiting(key)
+    startingLive.clear()
+    startedLive.length = 0
     for (const key of [...live.keys()]) {
       const { column, row } = parseTileKey(key)
       composeTile(column, row)
     }
+    releaseLiveLayerIfDone()
+  }
+
+  // The same, a few every frame like the other waiting tiles (once the opacity slider is let go). Until it is put
+  // together, each live tile stays live, showing the right picture
+  function finishLiveLater() {
+    for (const key of [...startingLive, ...live.keys()]) addWaiting(key)
+    startingLive.clear()
+    startedLive.length = 0 // those not shown yet stay hidden: the new versions replace them all at once
+    releaseLiveLayerIfDone()
   }
 
   // ----- Zoom -----
@@ -213,6 +388,7 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
 
   function destroy() {
     for (const tile of live.values()) tile.above?.destroy(true)
+    for (const texture of [...prepared.values(), ...spareTextures]) texture.destroy(true)
     for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
     container.destroy({ children: true })
     composeRoot.destroy()
@@ -225,11 +401,16 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
     tiles: projection,
     composeTile,
     composeAll,
+    composeLayerTiles,
+    composeWaiting,
+    finishWaiting,
+    isUpdating: () => waiting.size > 0 || startingLive.size > 0 || prepared.size > 0,
     markAllBelowStale,
     markBelowStale,
     prepareTile,
     showOpacityLive,
     finishLive,
+    finishLiveLater,
     setZoom,
     destroy,
   }

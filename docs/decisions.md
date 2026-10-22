@@ -234,7 +234,8 @@ for the history) or **open** (not decided yet).
 - **Date:** 2026-10-22
 - **Status:** adopted in 0.2.0
 - **Decision:** 0.2.0 already has a layers panel: add a layer (above the active one), choose the active layer, hide and
-  show, and change the opacity. Deleting, reordering and blend modes come in a later version.
+  show, and change the opacity. Deleting, reordering and blend modes come in a later version (deleting, moving and
+  renaming came next, with decision 25).
 - **Why:** the engine already works with layers, and an artist can't draw seriously without them.
 
 ## 23. The opacity changes live while the slider moves
@@ -277,7 +278,85 @@ for the history) or **open** (not decided yet).
   20 instead of 13 in painted areas). PNG stays the choice for keeping every pixel exactly (line art, printing). The
   quality can become a setting later if someone needs it.
 
+## 25. Every layer change can be undone
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:** the undo history has three kinds of steps instead of one. Besides the tiles a change painted over
+  (decision 8), a step can keep the list of layers and the active layer from before a layer was added, deleted or
+  moved, or the visibility, opacity and name a layer had before. Like the tile steps, each one works in both
+  directions: undo swaps it in, redo swaps it back. A deleted layer stays alive inside its step, with its tiles,
+  which count for the memory budget (decision 14) and the undo limit; when the step is forgotten and no other step
+  needs the layer, its tiles leave the graphics card. Moving, deleting, hiding or showing a layer only puts together
+  again the tiles where it has paint, since it is transparent everywhere else. A whole drag of the opacity slider is
+  one step. Layers are moved by dragging them in the list, with pointer events (the same for the mouse and the pen),
+  and renamed with a double-click, like in Photoshop and Krita.
+- **Why:** deleting a layer by mistake must not lose work, and artists expect Ctrl+Z to undo anything. Keeping the
+  same layers in the step, instead of copies, costs no memory until a layer is deleted.
+
+## 26. Big layer changes are prepared in the background
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Problem:** a layer change must put together again every tile where the layer has paint, and each of those tiles
+  needs every layer at its place. With 8 full layers of 10000×10000 that is ~12,800 tiles sent from RAM to the graphics
+  card, which keeps only 2,000 (decision 11), so it happens every time, not only the first. Measured on the RTX 4060
+  Ti, the screen froze 1.1–1.4 s for each move, delete, hide, show or undo of one of them. With 20 layers it would be
+  several seconds, and more with compressed tiles. Hiding and showing had this since 0.2.0, and so did the first step
+  of the opacity slider (decision 23).
+- **First try:** put the tiles together a few every frame and show each one as soon as it is ready, like Krita. The
+  screen never froze, but the change spread over the picture "like a short video", which felt worse than a change
+  that happens at once.
+- **Decision:** the new versions of the tiles are put together out of sight, a few every frame (at most 5 ms of each
+  frame, 2 ms while painting), and the screen shows them all at once when they are all ready. Meanwhile the bar shows
+  "Updating…", and zooming and moving around keep working. Painting on a waiting tile puts it together right away,
+  and exporting finishes the work first. The opacity slider (decision 23) works the same way: its live tiles are
+  started out of sight and shown together, and when it is let go the final tiles replace them together. The textures
+  of the replaced tiles are reused for the next change, and freed a few every frame once nothing is being updated,
+  since creating and deleting thousands of textures at once took time too.
+- **Measured (RTX 4060 Ti, 8 full layers):** every layer change blocks the screen ~1 ms instead of 1.1–1.4 s; the new
+  picture appears, in a single step, 2.0–2.6 s later. The longest frame meanwhile takes 13–34 ms (49 ms when the
+  opacity slider is let go).
+- **Why:** the goal is 20 or more layers at 10000×10000 (decision 9). That many pixels don't fit in the graphics card,
+  so a change to all of them can't be instant, but the screen must never freeze, and the user prefers a change that
+  appears at once. Sending fewer tiles is still open: unpacking in workers (decision 14), batches (decision 18), a
+  bigger cache on cards with more memory.
+
+## 27. A bigger graphics card cache, used in a better order
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Problem:** even prepared in the background (decision 26), a layer change on the user's drawing (4 full layers)
+  took 0.7–1 s to appear, which they found too slow. With 4 full layers of 10000×10000 (6,400 tiles), each change
+  sent ~6,000 tiles from RAM to the graphics card again, because it kept only 2,000 (decision 11). Measured on the RTX
+  4060 Ti: 1.3 s to move a layer.
+- **Decision:** the graphics card keeps up to 8,000 tiles that are not painted (about 2 GB, so ~3 GB in all with the
+  projection). When more tiles are needed than it keeps, the waiting tiles whose layers are already on the graphics
+  card are put together first: going through them in the same order every time pushed out each tile just before it
+  was needed again, so almost nothing was reused.
+- **Measured (RTX 4060 Ti):** 4 full layers: moving a layer 1.3 s → 0.09–0.25 s, deleting it or undoing that 1.0–1.4 s
+  → 80–90 ms, hiding or showing 30–313 ms → 38–46 ms, first step of the opacity slider 290 ms → 51 ms, all without
+  sending a tile. 8 full layers (12,800 tiles, more than it keeps): 2.0–2.9 s → 1.1–1.4 s for most changes, ~4,700
+  tiles sent instead of ~12,700; showing a layer again or undoing a delete still takes ~2.3 s.
+- **Why:** the user's card has 8 GB, and so does the friend's RTX 3050. Cards with 4 GB or less may get slower, since
+  Windows then keeps part of the textures in the computer's RAM. Browsers don't tell how much memory the graphics card
+  has; the desktop app (1.0) can find out and choose the size from it.
+
 ## Open questions
+
+### Thin diagonal lines (seen once)
+
+- **Date:** 2026-10-22
+- **Status:** open
+- **What was seen:** zoomed in a little on a drawing with big strokes (size 500, mouse), thin lines one pixel wide
+  appeared inside the strokes of the top layer, all exactly at 45° (down to the right), one per dab of the brush. On
+  them the layer looked ~10% see-through. That matches the diagonal where the graphics card splits each dab's square
+  into two triangles.
+- **What was tried:** big and fast strokes, changing pressure, undo and redo, moving the layer, the opacity slider,
+  sending the layer to RAM and back, and zoom levels from 0.3× to 2.5×, on the same graphics card, headless and in a
+  visible window: no lines. The user couldn't make them appear again either.
+- **Next time:** save the project with the lines on screen (to see whether they are in the layer's pixels or only on
+  the screen), and write down what was done just before.
 
 ### Phone or desktop?
 

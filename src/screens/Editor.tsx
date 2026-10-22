@@ -15,6 +15,7 @@ const startingSnapshot: EngineSnapshot = {
   canUndo: false,
   canRedo: false,
   isModified: false,
+  isUpdating: false,
 }
 const subscribeToNothing = () => () => {}
 const getStartingSnapshot = () => startingSnapshot
@@ -141,7 +142,7 @@ export function Editor({ project, onBack }: Props) {
             Save
           </button>
           <button onClick={handleBack}>Back</button>
-          {busy && <span className="busy">{busy}</span>}
+          {(busy || snapshot.isUpdating) && <span className="busy">{busy ?? 'Updating…'}</span>}
         </div>
       </header>
       <div className="editor-main">
@@ -150,7 +151,10 @@ export function Editor({ project, onBack }: Props) {
           layers={snapshot.layers}
           activeLayerId={snapshot.activeLayerId}
           onAdd={() => engine?.addLayer()}
+          onDelete={() => engine?.deleteLayer()}
           onSelect={id => engine?.selectLayer(id)}
+          onMove={(id, index) => engine?.moveLayer(id, index)}
+          onRename={(id, name) => engine?.renameLayer(id, name)}
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
           onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
           onOpacityChangeEnd={() => engine?.finishLayerOpacity()}

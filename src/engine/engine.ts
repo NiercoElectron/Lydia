@@ -2,7 +2,7 @@ import { Application, Container } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import { createBrush, type BrushSettings } from './brush'
 import { createGpuTiles } from './gpuTiles'
-import { createHistory } from './history'
+import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
 import { createTileMemory, type StoredTile } from './memory'
 import { createProjection } from './projection'
@@ -17,6 +17,7 @@ export type EngineSnapshot = {
   canUndo: boolean
   canRedo: boolean
   isModified: boolean // changed since it was opened or last saved
+  isUpdating: boolean // putting the picture together again after a layer change (see composeLayerTiles)
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -90,6 +91,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
       canUndo: history.canUndo(),
       canRedo: history.canRedo(),
       isModified,
+      isUpdating: projection.isUpdating(),
     }
   }
 
@@ -102,11 +104,14 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
 
   // ----- Work done in the background, every frame -----
 
-  // Painted tiles are read back into RAM without waiting, a few per frame (fewer while painting, skipping the tiles of
-  // the stroke, which will change again in a moment). Once a second, the tiles in RAM are kept within their budget
+  // Tiles waiting after a layer change are put together a few every frame (a frame lasts 7 ms at 144 Hz). Painted
+  // tiles are read back into RAM without waiting, a few per frame (fewer while painting, skipping the tiles of the
+  // stroke, which will change again in a moment). Once a second, the tiles in RAM are kept within their budget
   let lastBudgetCheck = 0
   function backgroundWork() {
     const isPainting = view.isPainting()
+    projection.composeWaiting(isPainting ? 2 : 5)
+    if (projection.isUpdating() !== snapshot.isUpdating) changed(false) // show or hide "Updating…"
     if (gpu.hasUnsaved()) {
       gpu.finishReads(isPainting ? 2 : 4)
       gpu.trim() // the tiles saved just now can leave the graphics card, if it is over its budget
@@ -132,28 +137,51 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     return stack.layers.find(layer => layer.id === id)
   }
 
-  // The tiles where a layer has paint, in RAM or still only on the graphics card
-  function tilesWithPaint(layer: Layer) {
-    return new Set([...layer.tiles.keys(), ...gpu.dirtyKeysOf(layer)])
-  }
-
-  // Put together again the tiles a layer changes, after it was hidden, shown, or got another opacity
-  function recomposeLayer(layer: Layer) {
-    const isBelowActive = stack.layers.indexOf(layer) < activeIndex(stack)
-    for (const key of tilesWithPaint(layer)) {
-      if (isBelowActive) projection.markBelowStale(key)
-      const { column, row } = parseTileKey(key)
-      projection.composeTile(column, row)
-    }
-  }
-
   // A new empty layer above the active one, which becomes the active layer
   function addLayer() {
     if (view.isPainting()) return
     const layer = createLayer(`Layer ${++layersCreated}`)
+    history.recordOrder(layer)
     stack.layers.splice(activeIndex(stack) + 1, 0, layer)
     stack.active = layer
     projection.markAllBelowStale() // "below" now has one more layer
+    changed()
+  }
+
+  // Delete the active layer; the one under it becomes the active layer, like in Photoshop. The last layer can't be
+  // deleted
+  function deleteLayer() {
+    if (view.isPainting() || stack.layers.length === 1) return
+    const layer = stack.active
+    const index = activeIndex(stack)
+    history.recordOrder(layer) // the layer stays in the undo step, with its tiles, so it can come back
+    stack.layers.splice(index, 1)
+    stack.active = stack.layers[Math.max(0, index - 1)]
+    projection.markAllBelowStale() // "below" now has other layers
+    if (layer.visible) projection.composeLayerTiles(layer)
+    changed()
+  }
+
+  // Move a layer to another place in the list. "index" counts from the bottom (0 = the bottom layer)
+  function moveLayer(id: number, index: number) {
+    const layer = findLayer(id)
+    if (!layer || view.isPainting() || index < 0 || index >= stack.layers.length) return
+    const from = stack.layers.indexOf(layer)
+    if (from === index) return
+    history.recordOrder(layer)
+    stack.layers.splice(from, 1)
+    stack.layers.splice(index, 0, layer)
+    projection.markAllBelowStale() // "below" may have other layers now
+    if (layer.visible) projection.composeLayerTiles(layer)
+    changed()
+  }
+
+  function renameLayer(id: number, name: string) {
+    const layer = findLayer(id)
+    const newName = name.trim()
+    if (!layer || !newName || newName === layer.name) return
+    history.recordLayer(layer, propsOf(layer))
+    layer.name = newName
     changed()
   }
 
@@ -168,24 +196,42 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
   function setLayerVisible(id: number, visible: boolean) {
     const layer = findLayer(id)
     if (!layer || layer.visible === visible || view.isPainting()) return
+    history.recordLayer(layer, propsOf(layer))
     layer.visible = visible
-    recomposeLayer(layer)
+    projection.composeLayerTiles(layer)
     changed()
   }
+
+  // The layer whose opacity the slider is changing, and its values from before, so the whole drag becomes one undo step
+  let opacityChange: { layer: Layer; before: LayerProps } | null = null
 
   // While the opacity slider moves, the active layer shows each new opacity right away (see showOpacityLive in
   // projection.ts); its tiles are put together for good once the slider is let go (finishLayerOpacity)
   function setLayerOpacity(id: number, opacity: number) {
     const layer = findLayer(id)
     if (!layer || layer.opacity === opacity || view.isPainting()) return
+    if (opacityChange?.layer !== layer) {
+      finishLayerOpacity()
+      opacityChange = { layer, before: propsOf(layer) }
+    }
     layer.opacity = opacity
     // A hidden layer changes nothing on the screen: it is put together with its new opacity when it is shown again
-    if (layer.visible && !projection.showOpacityLive(layer, tilesWithPaint(layer))) recomposeLayer(layer)
+    if (layer.visible && !projection.showOpacityLive(layer, gpu.tilesWithPaint(layer))) {
+      projection.composeLayerTiles(layer)
+    }
     changed()
   }
 
   function finishLayerOpacity() {
-    projection.finishLive()
+    projection.finishLiveLater()
+    if (!opacityChange) return
+    const { layer, before } = opacityChange
+    opacityChange = null
+    // Dragged back to where it started: nothing to undo
+    if (layer.opacity !== before.opacity) {
+      history.recordLayer(layer, before)
+      changed()
+    }
   }
 
   // Remove all the paint from the active layer. It can be undone like a stroke
@@ -193,7 +239,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     if (view.isPainting()) return
     const layer = stack.active
     history.begin(layer)
-    for (const key of tilesWithPaint(layer)) {
+    for (const key of gpu.tilesWithPaint(layer)) {
       history.backUpTile(key) // before the tile changes: the graphics card works in order
       layer.tiles.delete(key)
       const cached = gpu.getCached(layer, key)
@@ -210,13 +256,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
   // ----- Undo -----
 
   function undo() {
-    if (view.isPainting() || !history.canUndo()) return
+    if (view.isPainting()) return
+    finishLayerOpacity() // an opacity change still on its way (Ctrl+Z while dragging) becomes a step first
+    if (!history.canUndo()) return
     history.undo()
     changed()
   }
 
   function redo() {
-    if (view.isPainting() || !history.canRedo()) return
+    if (view.isPainting()) return
+    finishLayerOpacity()
+    if (!history.canRedo()) return
     history.redo()
     changed()
   }
@@ -227,7 +277,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
   // put together, so only its tiles need to be copied
   async function exportImage(type: ImageType) {
     await nextFrame() // let the screen show that the export started before the slow part
-    projection.finishLive() // tiles still shown live are not in the projection yet
+    // Tiles still shown live, or waiting after a layer change, are not in the projection yet
+    projection.finishLive()
+    projection.finishWaiting()
     const canvas = document.createElement('canvas')
     canvas.width = grid.width
     canvas.height = grid.height
@@ -296,6 +348,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     redo,
     clearLayer,
     addLayer,
+    deleteLayer,
+    moveLayer,
+    renameLayer,
     selectLayer,
     setLayerVisible,
     setLayerOpacity,

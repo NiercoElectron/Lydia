@@ -8,8 +8,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 
 - Canvases up to 10000×10000 pixels, drawn by the graphics card
 - Soft brush and eraser, with mouse or pen; the pen's pressure changes the brush size
-- Layers: add, choose, hide and show, change the opacity
-- Undo and redo (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
+- Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
+- Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
 - Zoom and move around the drawing
 - Export the drawing as a PNG or JPEG image, at full size
@@ -34,10 +34,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   - [x] Choose canvas size
   - [ ] Choose background color or transparent background
 - [x] Color and brush size selection
-- [x] Undo and redo (painting and clearing a layer)
-- [ ] Undo for layer changes (adding, hiding, opacity)
-- [x] Layers: add, choose, hide, opacity
-- [ ] Layers: delete, reorder, rename, blend modes
+- [x] Undo and redo (painting, clearing a layer and every layer change)
+- [x] Layers: add, delete, choose, reorder, rename, hide, opacity
+- [ ] Layers: blend modes
 - [x] Eraser
 - [x] Save and open projects (.lyd files; projects from Lydia 0.1 can't be opened)
 - [x] Export drawings as PNG or JPEG

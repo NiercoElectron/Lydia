@@ -58,15 +58,19 @@ button[aria-pressed='true'] {
   overflow-y: auto;
 }
 
-.layers-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.layers-header h2 {
+.layers-panel h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.layers-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.layers-actions button {
+  flex: 1;
 }
 
 .opacity {
@@ -81,6 +85,13 @@ button[aria-pressed='true'] {
   min-width: 0;
 }
 
+/* Always as wide as "100%", so the slider doesn't change size while it moves */
+.opacity-value {
+  min-width: 5ch; /* "ch" is the width of a "0", and "%" is wider than that */
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .layers-list {
   margin: 0;
   padding: 0;
@@ -92,13 +103,36 @@ button[aria-pressed='true'] {
   align-items: center;
   gap: 4px;
   padding: 2px;
+  /* room for the line that shows where a dragged layer would go */
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
 }
 
 .layers-list li.active {
   background: #e6efff;
 }
 
-.layers-list button {
+.layers-list li.dragging {
+  opacity: 0.5;
+}
+
+.layers-list li.drop-before {
+  border-top-color: #2f6fde;
+}
+
+.layers-list li.drop-after {
+  border-bottom-color: #2f6fde;
+}
+
+.layer-name {
   flex: 1;
+  min-width: 0;
   text-align: left;
+}
+
+button.layer-name {
+  touch-action: none; /* dragging with a pen or a finger moves the layer instead of scrolling the panel */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

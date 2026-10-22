@@ -7,7 +7,7 @@ import { tileKey, tileSize, type Grid } from './tiles'
 // The pixels of every layer live in RAM (the "shelf"), which is much bigger than the graphics card's memory. The
 // graphics card (the "desk") only keeps copies of the tiles it needs right now, up to GPU_CACHE_TILES tiles that are
 // not painted. A tile painted on the graphics card is "dirty" until its pixels are read back into RAM
-const GPU_CACHE_TILES = 2000 // about 500 MB of graphics card memory
+const GPU_CACHE_TILES = 8000 // about 2 GB of graphics card memory (see decision 27)
 const TRIM_BATCH = 32 // tiles over the budget before trimming, so the cache isn't searched every time
 const MAX_SAVING_READS = 64 // reads for the background saving on their way at the same time
 
@@ -172,11 +172,21 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     }
   }
 
-  // The tiles of a layer whose latest pixels are only on the graphics card
-  function dirtyKeysOf(layer: Layer) {
-    const keys: string[] = []
-    for (const cached of dirtyTiles) if (cached.layer === layer) keys.push(cached.key)
+  // The tiles where a layer has paint, in RAM or still only on the graphics card
+  function tilesWithPaint(layer: Layer) {
+    const keys = new Set(layer.tiles.keys())
+    for (const cached of dirtyTiles) if (cached.layer === layer) keys.add(cached.key)
     return keys
+  }
+
+  // A layer that is gone for good (deleted, and its undo step forgotten): free its copies on the graphics card
+  function dropLayer(layer: Layer) {
+    for (const [id, cached] of cache) {
+      if (cached.layer !== layer) continue
+      cached.texture.destroy(true)
+      cache.delete(id)
+      dirtyTiles.delete(cached)
+    }
   }
 
   // ----- Reading back without waiting (WebGL2) -----
@@ -331,7 +341,8 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     markClean,
     keep,
     trim,
-    dirtyKeysOf,
+    tilesWithPaint,
+    dropLayer,
     finishReads,
     startSaving,
     readLater,
