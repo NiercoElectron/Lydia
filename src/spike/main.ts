@@ -175,6 +175,66 @@ async function main() {
     strokeBackup.set(key, texture ? copyTexture(texture) : null)
   }
 
+  const MAX_UNDO_TILES = 2000 // tile copies kept for undo and redo: about 500 MB of graphics card memory
+  const redoStack: UndoStep[] = []
+
+  // Free the graphics card memory used by the copies of a step
+  function destroyStep(step: UndoStep) {
+    for (const copy of step.values()) copy?.destroy(true)
+  }
+
+  // Put the saved copies back into the tiles, and keep in the step what the tiles had instead.
+  // That way the same step works in both directions: undo swaps it once, redo swaps it back
+  function swapTiles(step: UndoStep) {
+    const start = performance.now()
+    for (const [key, saved] of step) {
+      const [column, row] = key.split(',').map(Number)
+      const tile = getTile(column, row)
+      const current = copyTexture(tile)
+      if (saved) {
+        copySprite.texture = saved
+        app.renderer.render({ container: copySprite, target: tile, clear: true })
+        saved.destroy(true)
+      } else {
+        app.renderer.render({ container: new Container(), target: tile, clear: true }) // the tile didn't exist: empty it
+      }
+      step.set(key, current)
+    }
+    console.log(`Swapped ${step.size} tiles in ${Math.round(performance.now() - start)} ms`)
+  }
+
+  function undo() {
+    const step = undoStack.pop()
+    if (!step) return // nothing to undo
+    swapTiles(step)
+    redoStack.push(step)
+  }
+
+  function redo() {
+    const step = redoStack.pop()
+    if (!step) return // nothing to redo
+    swapTiles(step)
+    undoStack.push(step)
+  }
+
+  // Add a finished stroke to the history
+  function addUndoStep(step: UndoStep) {
+    undoStack.push(step)
+
+    // After a new stroke, the steps that were undone can't be redone anymore
+    for (const undone of redoStack) destroyStep(undone)
+    redoStack.length = 0
+
+    // When the copies take too much memory, forget the oldest steps (but always keep the newest one)
+    let tileCount = 0
+    for (const s of undoStack) tileCount += s.size
+    while (tileCount > MAX_UNDO_TILES && undoStack.length > 1) {
+      const oldest = undoStack.shift()!
+      tileCount -= oldest.size
+      destroyStep(oldest)
+    }
+  }
+
   // ----- Brush -----
 
   const brushTip = createBrushTip(BRUSH_HARDNESS)
@@ -206,12 +266,19 @@ async function main() {
       sprite.blendMode = isErasing ? 'erase' : 'normal' // the eraser removes paint from the tile instead of adding it
       stamp.addChild(sprite)
 
-      // Which tiles does this dab cover?
+      // The part of the dab that is on the paper (the rest is cut off)
       const radius = dab.size / 2
-      const firstColumn = Math.max(0, Math.floor((dab.x - radius) / TILE_SIZE))
-      const lastColumn = Math.min(Math.ceil(PROJECT_WIDTH / TILE_SIZE) - 1, Math.floor((dab.x + radius) / TILE_SIZE))
-      const firstRow = Math.max(0, Math.floor((dab.y - radius) / TILE_SIZE))
-      const lastRow = Math.min(Math.ceil(PROJECT_HEIGHT / TILE_SIZE) - 1, Math.floor((dab.y + radius) / TILE_SIZE))
+      const left = Math.max(0, dab.x - radius)
+      const right = Math.min(PROJECT_WIDTH, dab.x + radius)
+      const top = Math.max(0, dab.y - radius)
+      const bottom = Math.min(PROJECT_HEIGHT, dab.y + radius)
+      if (left >= right || top >= bottom) return // the dab is entirely outside the paper
+
+      // Which tiles does that part cover?
+      const firstColumn = Math.floor(left / TILE_SIZE)
+      const lastColumn = Math.ceil(right / TILE_SIZE) - 1
+      const firstRow = Math.floor(top / TILE_SIZE)
+      const lastRow = Math.ceil(bottom / TILE_SIZE) - 1
       for (let column = firstColumn; column <= lastColumn; column++) {
         for (let row = firstRow; row <= lastRow; row++) {
           touchedTiles.add(`${column},${row}`)
@@ -288,11 +355,25 @@ async function main() {
     if (e.pointerId !== drawingPointerId) return
     drawingPointerId = null
     lastPoint = null
-    if (strokeBackup) {
+    // A click outside the paper changes no tiles: an empty step would make Ctrl+Z seem to do nothing
+    if (strokeBackup && strokeBackup.size > 0) {
       console.log(`Stroke changed ${strokeBackup.size} tiles, ${undoStack.length + 1} undo steps`)
-      undoStack.push(strokeBackup)
-      strokeBackup = null
+      addUndoStep(strokeBackup)
     }
+    strokeBackup = null
+  })
+
+  // Ctrl/Cmd + Z undoes; Ctrl/Cmd + Shift + Z or Ctrl + Y redoes, like in Photoshop and Krita
+  window.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey)) return
+    const key = e.key.toLowerCase()
+    const isUndo = key === 'z' && !e.shiftKey
+    const isRedo = (key === 'z' && e.shiftKey) || key === 'y'
+    if (!isUndo && !isRedo) return
+    e.preventDefault() // stop the browser from using the shortcut itself
+    if (drawingPointerId !== null) return // not in the middle of a stroke
+    if (isUndo) undo()
+    else redo()
   })
 
   // ----- Export -----
