@@ -6,6 +6,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-22
+
 ### Added
 
 - A choice on the start screen of how much of the graphics card's memory Lydia may use to keep layers ready, from
@@ -99,7 +101,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/NiercoElectron/Lydia/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/NiercoElectron/Lydia/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/NiercoElectron/Lydia/compare/v0.2.0...v0.2.1
