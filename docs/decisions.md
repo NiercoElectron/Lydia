@@ -182,11 +182,14 @@ for the history) or **open** (not decided yet).
 
 - **Date:** 2026-10-22
 - **Status:** adopted
-- **Decision:** Lydia is built with Claude Code (an AI coding assistant). I set the goals and the scope, test on real
-  machines and decide what is good enough; Claude writes the code and says what it is doing and why before each step.
-  Afterwards, a separate session with no history will read the whole code and write the documentation.
-- **Why:** the graphics engine needs experience that I don't have yet, and testing on real hardware found every real
-  problem in the spike.
+- **Decision:** I lead the project, and Claude Code (an AI coding assistant) writes most of the code. I set the goals
+  and the scope, review every step, test and measure on real machines, and decide what goes in and what is good
+  enough. Claude says what it is going to do and why before each step. Afterwards, a separate session with no history
+  will read the whole code and write the documentation.
+- **Why:** it puts my time where it matters most for the product: deciding what to build and making sure it is right.
+  In the spike, the problems that mattered most were found by my tests on real hardware, not by automated tests: paint
+  going past the edge of the paper, the graphics card filling up with 10 layers, Chrome's warnings, the freeze at the
+  start of a stroke, the slowdown with fast strokes and the slow undo of big strokes.
 
 ## Open questions
 
