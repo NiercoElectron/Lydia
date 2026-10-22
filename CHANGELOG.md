@@ -6,6 +6,10 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-22
+
+The Brush Designer: make new brushes in Lydia itself.
+
 ### Added
 
 - The Brush Designer, opened from the start screen ([decision 30](docs/decisions.md#30-the-brush-designer)). Draw the
@@ -133,7 +137,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/NiercoElectron/Lydia/compare/v0.2.2...v0.3.0
