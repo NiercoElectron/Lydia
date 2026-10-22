@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react'
-import type { Project } from '../drawing/types'
-import { PROJECT_EXTENSION, parseProject } from '../drawing/projectFile'
-
-const MIN_SIZE = 16
-const MAX_SIZE = 4096
+import {
+  MAX_SIZE,
+  MIN_SIZE,
+  newProject,
+  parseProject,
+  PROJECT_EXTENSION,
+  type ProjectData,
+} from '../engine/projectFile'
 
 // Input values are text; a valid size is a whole number within the limits
 function isValidSize(value: string) {
@@ -12,13 +15,14 @@ function isValidSize(value: string) {
 }
 
 type Props = {
-  onNewProject: (project: Project) => void
-  onOpenProject: (project: Project) => void
+  onNewProject: (project: ProjectData) => void
+  onOpenProject: (project: ProjectData) => void
 }
 
 export function Home({ onNewProject, onOpenProject }: Props) {
   const [width, setWidth] = useState('800')
   const [height, setHeight] = useState('600')
+  const [isOpening, setIsOpening] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
@@ -26,10 +30,13 @@ export function Home({ onNewProject, onOpenProject }: Props) {
     e.target.value = '' // reset the input so choosing the same file again still triggers onChange
     if (!file) return
 
+    setIsOpening(true)
     try {
-      onOpenProject(parseProject(await file.text()))
+      onOpenProject(parseProject(await file.arrayBuffer()))
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Could not open the project.')
+    } finally {
+      setIsOpening(false)
     }
   }
 
@@ -38,11 +45,11 @@ export function Home({ onNewProject, onOpenProject }: Props) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault() // stop the browser from reloading the page
     if (!isValid) return
-    onNewProject({ width: Number(width), height: Number(height), strokes: [] })
+    onNewProject(newProject(Number(width), Number(height)))
   }
 
   return (
-    <main>
+    <main className="home">
       <h1>Lydia</h1>
       <form onSubmit={handleSubmit}>
         <label>
@@ -57,7 +64,12 @@ export function Home({ onNewProject, onOpenProject }: Props) {
           New project
         </button>
       </form>
-      <button onClick={() => fileInputRef.current?.click()}>Open project</button>
+      <p className="hint">
+        From {MIN_SIZE} to {MAX_SIZE} pixels on each side.
+      </p>
+      <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
+        {isOpening ? 'Opening…' : 'Open project'}
+      </button>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
     </main>
   )

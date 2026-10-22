@@ -1,17 +1,32 @@
 # Lydia
 
-A simple, open source drawing app built with React, TypeScript and the HTML canvas. It runs in the browser, and a desktop version is planned.
+An open source drawing app built with React, TypeScript and PixiJS (WebGL). It aims to feel like Photoshop or Krita, on canvases up to 10000×10000 pixels with 20 or more layers. It runs in the browser, and a desktop version is planned.
 
 > **Work in progress:** Lydia is in early development. Many features are still missing, and things may change or break.
 
 ## Features
 
-- Freehand drawing with mouse or pen (drawing tablets)
-- Undo (button or Ctrl/Cmd+Z)
-- Clear the canvas
-- Export the drawing as a PNG image
-- Start screen to create a new project (with a custom canvas size) or open an existing one
+- Canvases up to 10000×10000 pixels, drawn by the graphics card
+- Soft brush and eraser, with mouse or pen; the pen's pressure changes the brush size
+- Layers: add, choose, hide and show, change the opacity
+- Undo and redo (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
+- Clear a layer (it can be undone too)
+- Zoom and move around the drawing
+- Export the drawing as a PNG image, at full size
 - Save and open projects as `.lyd` files
+
+### Shortcuts
+
+| Shortcut                                     | Action                 |
+| -------------------------------------------- | ---------------------- |
+| Ctrl/Cmd + Z                                 | Undo                   |
+| Ctrl/Cmd + Shift + Z, Ctrl + Y               | Redo                   |
+| B / E                                        | Brush / eraser         |
+| [ / ]                                        | Smaller / bigger brush |
+| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                   |
+| Mouse wheel, or two fingers on a trackpad    | Move around            |
+| Space + drag, or drag with the middle button | Move around            |
+| Ctrl/Cmd + 0                                 | Show the whole drawing |
 
 ## Roadmap
 
@@ -19,11 +34,12 @@ A simple, open source drawing app built with React, TypeScript and the HTML canv
   - [x] Choose canvas size
   - [ ] Choose background color or transparent background
 - [x] Color and brush size selection
-- [x] Undo
-- [ ] Redo, and undo for every action (including clear)
-- [ ] Layers (add, delete, reorder, hide)
+- [x] Undo and redo (painting and clearing a layer)
+- [ ] Undo for layer changes (adding, hiding, opacity)
+- [x] Layers: add, choose, hide, opacity
+- [ ] Layers: delete, reorder, rename, blend modes
 - [x] Eraser
-- [x] Save and open projects (.lyd files)
+- [x] Save and open projects (.lyd files; projects from Lydia 0.1 can't be opened)
 - [x] Export drawings as PNG
 - [ ] Desktop app for Windows, macOS and Linux (Electron)
 
@@ -55,14 +71,17 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 
 ```
 src/
-├── drawing/      Pure drawing logic (types, rendering, file handling), no React
-├── hooks/        React hooks that hold the app state and actions
-├── components/   Reusable UI pieces (canvas, toolbar)
+├── engine/       The drawing engine (tiles, layers, brush, undo, project files), no React
+├── components/   UI pieces (drawing area, toolbar, layers panel)
 ├── screens/      Full screens (start screen, editor)
+├── files.ts      Downloading files
 └── App.tsx       Chooses which screen to show
 ```
 
-Dependencies only go one way: `components` → `hooks` → `drawing`. Code in `drawing/` must not import React.
+Dependencies only go one way: `screens` → `components` → `engine`. Code in `engine/` must not import React.
+
+Why things are built the way they are: [docs/decisions.md](docs/decisions.md). Measurements from the prototype that
+tested the engine: [docs/spike-notes.md](docs/spike-notes.md).
 
 ## Contributing
 

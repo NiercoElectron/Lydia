@@ -1,7 +1,7 @@
-import type { Tool } from '../drawing/types'
+import type { Tool } from '../engine/brush'
 
-const MIN_BRUSH_SIZE = 1
-const MAX_BRUSH_SIZE = 64
+export const MIN_BRUSH_SIZE = 1
+export const MAX_BRUSH_SIZE = 500
 
 type Props = {
   tool: Tool
@@ -14,18 +14,18 @@ type Props = {
 
 export function Toolbar({ tool, color, size, onToolChange, onColorChange, onSizeChange }: Props) {
   return (
-    <div>
-      <button aria-pressed={tool === 'brush'} onClick={() => onToolChange('brush')}>
+    <div className="toolbar">
+      <button aria-pressed={tool === 'brush'} onClick={() => onToolChange('brush')} title="Brush (B)">
         Brush
       </button>
-      <button aria-pressed={tool === 'eraser'} onClick={() => onToolChange('eraser')}>
+      <button aria-pressed={tool === 'eraser'} onClick={() => onToolChange('eraser')} title="Eraser (E)">
         Eraser
       </button>
       <label>
         Color
         <input type="color" value={color} disabled={tool === 'eraser'} onChange={e => onColorChange(e.target.value)} />
       </label>
-      <label>
+      <label title="Brush size ([ and ])">
         Size
         <input
           type="range"

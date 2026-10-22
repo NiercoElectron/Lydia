@@ -2,3 +2,103 @@ button[aria-pressed='true'] {
   font-weight: bold;
   outline: 2px solid currentColor;
 }
+
+.home {
+  padding: 16px;
+}
+
+.hint {
+  color: #666;
+}
+
+/* The editor fills the window: the bar on top, the drawing in the middle and the layers on the right */
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ccc;
+}
+
+.toolbar,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.busy {
+  color: #666;
+}
+
+.editor-main {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* let the drawing area shrink instead of pushing the window bigger */
+}
+
+.draw-space {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.layers-panel {
+  width: 220px;
+  padding: 8px;
+  border-left: 1px solid #ccc;
+  overflow-y: auto;
+}
+
+.layers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layers-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.opacity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.opacity input {
+  flex: 1;
+  min-width: 0;
+}
+
+.layers-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.layers-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+}
+
+.layers-list li.active {
+  background: #e6efff;
+}
+
+.layers-list button {
+  flex: 1;
+  text-align: left;
+}
