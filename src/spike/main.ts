@@ -150,6 +150,31 @@ async function main() {
     return texture
   }
 
+  // ----- Undo -----
+
+  // Each undo step keeps, for every tile the stroke touched, a copy of the tile from before the stroke
+  // (null = the tile didn't exist yet)
+  type UndoStep = Map<string, RenderTexture | null>
+  const undoStack: UndoStep[] = []
+  let strokeBackup: UndoStep | null = null // the step being recorded while the user paints
+
+  const copySprite = new Sprite() // reused to draw one texture into another
+
+  // Copy a texture inside the graphics card, without bringing it back to the CPU (that would be slow)
+  function copyTexture(texture: RenderTexture) {
+    const copy = RenderTexture.create({ width: texture.width, height: texture.height })
+    copySprite.texture = texture
+    app.renderer.render({ container: copySprite, target: copy, clear: true })
+    return copy
+  }
+
+  // Before a stroke paints on a tile for the first time, keep a copy of how the tile was
+  function backUpTile(key: string) {
+    if (!strokeBackup || strokeBackup.has(key)) return // not painting, or already saved during this stroke
+    const texture = tiles.get(key)
+    strokeBackup.set(key, texture ? copyTexture(texture) : null)
+  }
+
   // ----- Brush -----
 
   const brushTip = createBrushTip(BRUSH_HARDNESS)
@@ -197,6 +222,7 @@ async function main() {
     // Render all the dabs into each touched tile, shifted so that the tile's corner is at (0, 0)
     for (const key of touchedTiles) {
       const [column, row] = key.split(',').map(Number)
+      backUpTile(key) // must come before getTile, which would create the tile and hide that it didn't exist
       stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
       app.renderer.render({ container: stampRoot, target: getTile(column, row), clear: false })
     }
@@ -244,6 +270,7 @@ async function main() {
     const point = toProject(e)
     lastPoint = { x: point.x, y: point.y }
     distanceSinceLastDab = 0
+    strokeBackup = new Map() // start recording the tiles this stroke changes
     paintDabs([{ x: point.x, y: point.y, size: sizeFor(e) }])
   })
 
@@ -261,6 +288,11 @@ async function main() {
     if (e.pointerId !== drawingPointerId) return
     drawingPointerId = null
     lastPoint = null
+    if (strokeBackup) {
+      console.log(`Stroke changed ${strokeBackup.size} tiles, ${undoStack.length + 1} undo steps`)
+      undoStack.push(strokeBackup)
+      strokeBackup = null
+    }
   })
 
   // ----- Export -----
