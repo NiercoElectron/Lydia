@@ -342,6 +342,22 @@ for the history) or **open** (not decided yet).
   Windows then keeps part of the textures in the computer's RAM. Browsers don't tell how much memory the graphics card
   has; the desktop app (1.0) can find out and choose the size from it.
 
+## 28. The user chooses the graphics card memory, for now
+
+- **Date:** 2026-10-22
+- **Status:** adopted (until the desktop app)
+- **Decision:** the start screen has a choice of how much of the graphics card's memory Lydia may use to keep layers
+  ready (the cache of decision 27): 0.5, 1, 2, 3, 4, 6 or 8 GB, 2 GB by default, remembered by the browser. Each
+  choice shows how many tiles it keeps (2 GB = 8,192), next to a reminder that a full layer has 1,600. Under it,
+  a big red warning says that too much can crash Lydia or slow down the whole computer, and how to see the graphics
+  card's memory on Windows. The smallest choice (2,048 tiles) is still more than the 1,600 tiles of a full layer,
+  which the opacity slider keeps on the graphics card (decision 23).
+- **Why:** browsers don't tell how much memory the graphics card has (decision 27), and a fixed 2 GB is too little
+  for big cards and too much for small ones. Asking is the honest choice in the browser; the warning is there because
+  a choice that is too big doesn't fail with an error: the computer gets slow, or the browser loses the graphics card.
+  The desktop app (1.0) will read the graphics card's memory and the real RAM from the system and choose by itself,
+  keeping this as an option in its preferences, like Photoshop.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

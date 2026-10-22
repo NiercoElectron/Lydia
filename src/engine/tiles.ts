@@ -2,6 +2,11 @@
 // with what is painted, not with the size of the paper
 export const TILE_SIZE = 256
 
+// How many whole tiles fit in this many GB (each pixel takes 4 bytes)
+export function tilesInGigabytes(gigabytes: number) {
+  return Math.floor((gigabytes * 1024 ** 3) / (TILE_SIZE * TILE_SIZE * 4))
+}
+
 // The grid of tiles that covers a paper of this size. The last column and row are cut at the edge of the paper
 // (10000 is not a multiple of 256)
 export type Grid = {

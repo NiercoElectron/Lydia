@@ -11,6 +11,39 @@ button[aria-pressed='true'] {
   color: #666;
 }
 
+.gpu-memory {
+  max-width: 640px;
+  margin-top: 32px;
+}
+
+.gpu-memory h2 {
+  font-size: 1.1rem;
+}
+
+.gpu-memory label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Big and red on purpose: a choice that is too big can crash the browser */
+.danger {
+  margin-top: 12px;
+  padding: 16px;
+  border: 4px solid #c00000;
+  border-radius: 8px;
+  background: #ffe5e5;
+  color: #5c0000;
+}
+
+.danger-title {
+  margin-top: 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #c00000;
+}
+
 /* The editor fills the window: the bar on top, the drawing in the middle and the layers on the right */
 .editor {
   display: flex;

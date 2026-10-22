@@ -14,6 +14,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Zoom and move around the drawing
 - Export the drawing as a PNG or JPEG image, at full size
 - Save and open projects as `.lyd` files
+- Choose how much of the graphics card's memory Lydia may use (on the start screen)
 
 ### Shortcuts
 
@@ -74,6 +75,7 @@ src/
 ├── components/   UI pieces (drawing area, toolbar, layers panel)
 ├── screens/      Full screens (start screen, editor)
 ├── files.ts      Downloading files
+├── settings.ts   Settings remembered by the browser
 └── App.tsx       Chooses which screen to show
 ```
 

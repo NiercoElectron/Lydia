@@ -5,9 +5,9 @@ import { toStoredTile, type StoredTile, type TileMemory } from './memory'
 import { tileKey, tileSize, type Grid } from './tiles'
 
 // The pixels of every layer live in RAM (the "shelf"), which is much bigger than the graphics card's memory. The
-// graphics card (the "desk") only keeps copies of the tiles it needs right now, up to GPU_CACHE_TILES tiles that are
-// not painted. A tile painted on the graphics card is "dirty" until its pixels are read back into RAM
-const GPU_CACHE_TILES = 8000 // about 2 GB of graphics card memory (see decision 27)
+// graphics card (the "desk") only keeps copies of the tiles it needs right now, up to "cacheTiles" tiles that are not
+// painted (chosen on the start screen, see decision 28). A tile painted on the graphics card is "dirty" until its
+// pixels are read back into RAM
 const TRIM_BATCH = 32 // tiles over the budget before trimming, so the cache isn't searched every time
 const MAX_SAVING_READS = 64 // reads for the background saving on their way at the same time
 
@@ -34,7 +34,7 @@ export type PendingRead = {
   isSaving: boolean // started by the background saving
 }
 
-export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: TileMemory) {
+export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: TileMemory, cacheTiles: number) {
   const gl = renderer.gl as WebGL2RenderingContext
 
   // ----- Textures -----
@@ -149,8 +149,8 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
   }
 
   // A layer whose tiles must stay on the graphics card, because sprites on the screen show them (see showOpacityLive
-  // in projection.ts). A layer has at most 1600 tiles (10000 / 256 = 40 columns and rows), fewer than the budget, so
-  // there is always room left for the other layers
+  // in projection.ts). A layer has at most 1600 tiles (10000 / 256 = 40 columns and rows), fewer than the smallest
+  // budget (0.5 GB = 2048 tiles), so there is always room left for the other layers
   let keptLayer: Layer | null = null
 
   function keep(layer: Layer | null) {
@@ -163,9 +163,9 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
   // painted tiles would push out every other tile, and the layers above and below would be sent again and again
   function trim() {
     const cleanCount = () => cache.size - dirtyTiles.size
-    if (cleanCount() <= GPU_CACHE_TILES + TRIM_BATCH) return
+    if (cleanCount() <= cacheTiles + TRIM_BATCH) return
     for (const [id, cached] of cache) {
-      if (cleanCount() <= GPU_CACHE_TILES) break
+      if (cleanCount() <= cacheTiles) break
       if (cached.dirty || cached.layer === keptLayer) continue
       cached.texture.destroy(true)
       cache.delete(id)

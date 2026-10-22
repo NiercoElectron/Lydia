@@ -22,10 +22,11 @@ const getStartingSnapshot = () => startingSnapshot
 
 type Props = {
   project: ProjectData
+  gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   onBack: () => void
 }
 
-export function Editor({ project, onBack }: Props) {
+export function Editor({ project, gpuMemory, onBack }: Props) {
   const [engine, setEngine] = useState<Engine | null>(null)
   // Show the engine's latest state, and update the screen whenever it changes
   const snapshot = useSyncExternalStore(
@@ -146,7 +147,7 @@ export function Editor({ project, onBack }: Props) {
         </div>
       </header>
       <div className="editor-main">
-        <DrawSpace project={project} onEngineChange={setEngine} />
+        <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine} />
         <LayersPanel
           layers={snapshot.layers}
           activeLayerId={snapshot.activeLayerId}

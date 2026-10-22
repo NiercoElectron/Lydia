@@ -7,6 +7,8 @@ import {
   PROJECT_EXTENSION,
   type ProjectData,
 } from '../engine/projectFile'
+import { tilesInGigabytes } from '../engine/tiles'
+import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES } from '../settings'
 
 // Input values are text; a valid size is a whole number within the limits
 function isValidSize(value: string) {
@@ -15,11 +17,13 @@ function isValidSize(value: string) {
 }
 
 type Props = {
+  gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
+  onGpuMemoryChange: (gigabytes: number) => void
   onNewProject: (project: ProjectData) => void
   onOpenProject: (project: ProjectData) => void
 }
 
-export function Home({ onNewProject, onOpenProject }: Props) {
+export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject }: Props) {
   const [width, setWidth] = useState('800')
   const [height, setHeight] = useState('600')
   const [isOpening, setIsOpening] = useState(false)
@@ -71,6 +75,38 @@ export function Home({ onNewProject, onOpenProject }: Props) {
         {isOpening ? 'Opening…' : 'Open project'}
       </button>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+
+      <section className="gpu-memory">
+        <h2>Graphics card memory</h2>
+        <label>
+          Memory Lydia may use to keep layers ready
+          <select value={gpuMemory} onChange={e => onGpuMemoryChange(Number(e.target.value))}>
+            {GPU_MEMORY_CHOICES.map(gigabytes => (
+              <option key={gigabytes} value={gigabytes}>
+                {gigabytes} GB ({tilesInGigabytes(gigabytes).toLocaleString('en-US')} tiles
+                {gigabytes === DEFAULT_GPU_MEMORY ? ', default' : ''})
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="hint">
+          A tile is a square of 256×256 pixels of a layer. A full layer of 10000×10000 has 1,600 tiles.
+        </p>
+        <div className="danger">
+          <p className="danger-title">
+            <span aria-hidden="true">⚠️</span> Too much can crash Lydia or slow down your whole computer
+          </p>
+          <p>
+            Lydia uses this much on top of about 1 GB for the drawing itself. If your graphics card doesn't have that
+            much free memory, the computer starts using its RAM instead and everything becomes very slow, or the browser
+            loses the graphics card: the drawing stops working and changes that weren't saved are lost.
+          </p>
+          <p>
+            <strong>Choose at most half of your graphics card's memory.</strong> To see it on Windows: Task Manager →
+            Performance → GPU → Dedicated GPU memory. If you're not sure, keep {DEFAULT_GPU_MEMORY} GB.
+          </p>
+        </div>
+      </section>
     </main>
   )
 }

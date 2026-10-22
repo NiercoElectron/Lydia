@@ -4,11 +4,12 @@ import type { ProjectData } from '../engine/projectFile'
 
 type Props = {
   project: ProjectData
+  gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   onEngineChange: (engine: Engine | null) => void // the engine once it is ready, null when it goes away
 }
 
 // The area where the drawing is shown and painted on. The engine draws into it with the graphics card
-export function DrawSpace({ project, onEngineChange }: Props) {
+export function DrawSpace({ project, gpuMemory, onEngineChange }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -16,7 +17,7 @@ export function DrawSpace({ project, onEngineChange }: Props) {
     // purpose in development, to find bugs), the engine is destroyed as soon as it arrives
     let cancelled = false
     let engine: Engine | null = null
-    createEngine(hostRef.current!, project).then(
+    createEngine(hostRef.current!, project, gpuMemory).then(
       created => {
         if (cancelled) {
           created.destroy()
@@ -38,7 +39,7 @@ export function DrawSpace({ project, onEngineChange }: Props) {
       engine?.destroy()
       onEngineChange(null)
     }
-  }, [project, onEngineChange])
+  }, [project, gpuMemory, onEngineChange])
 
   return <div ref={hostRef} className="draw-space" />
 }

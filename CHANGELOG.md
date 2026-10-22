@@ -6,6 +6,12 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A choice on the start screen of how much of the graphics card's memory Lydia may use to keep layers ready, from
+  0.5 to 8 GB (2 GB by default), each with how many tiles it keeps, and a big warning: too much can crash Lydia or
+  slow down the whole computer. The browser remembers the choice.
+
 ## [0.3.0] - 2026-10-22
 
 Complete layers, and layer changes that are fast on big drawings

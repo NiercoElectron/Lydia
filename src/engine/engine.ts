@@ -7,7 +7,7 @@ import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
 import { createTileMemory, type StoredTile } from './memory'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
-import { createGrid, parseTileKey, TILE_SIZE } from './tiles'
+import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes } from './tiles'
 import { createView } from './view'
 
 // What the screen needs to know about the drawing. A new object every time something changes, so React can tell
@@ -33,8 +33,9 @@ const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
 // The drawing engine: shows the drawing inside "host" and lets the user paint on it. Everything that touches the
-// graphics card lives here; React only shows the controls around it
-export async function createEngine(host: HTMLElement, project: ProjectData) {
+// graphics card lives here; React only shows the controls around it. "gpuMemory": how many GB of the graphics card's
+// memory to use for keeping layers ready (see settings.ts)
+export async function createEngine(host: HTMLElement, project: ProjectData, gpuMemory: number) {
   const app = new Application()
   await app.init({
     resizeTo: host,
@@ -68,7 +69,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
   let layersCreated = layers.length // for naming new layers
 
   const memory = createTileMemory(RAW_BUDGET)
-  const gpu = createGpuTiles(renderer, grid, memory)
+  const gpu = createGpuTiles(renderer, grid, memory, tilesInGigabytes(gpuMemory))
   const projection = createProjection(renderer, grid, stack, gpu)
   const history = createHistory(stack, gpu, projection)
   const brush = createBrush(renderer, grid, stack, gpu, projection, history)
