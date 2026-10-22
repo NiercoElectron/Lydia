@@ -81,7 +81,8 @@ src/
 Dependencies only go one way: `screens` → `components` → `engine`. Code in `engine/` must not import React.
 
 Why things are built the way they are: [docs/decisions.md](docs/decisions.md). Measurements from the prototype that
-tested the engine: [docs/spike-notes.md](docs/spike-notes.md).
+tested the engine: [docs/spike-notes.md](docs/spike-notes.md). What changed in each version:
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
