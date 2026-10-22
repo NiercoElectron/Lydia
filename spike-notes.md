@@ -75,6 +75,21 @@ drawing experience on large canvases, before rewriting the editor.
 A 6× slower CPU would be an old or very basic laptop. My friend's Ryzen 5 5500 is in the same performance range as
 my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine. Not yet confirmed with a performance recording where the time goes.
 
+## 7. Undo and redo
+
+- Before a stroke paints on a tile for the first time, a copy of the tile is kept on the graphics card (or `null` if
+  the tile didn't exist). Undo swaps the copies with the tiles; redo swaps them back, so one step works both ways.
+- Mine: undo and redo of 13–271 tiles took 2–10 ms (time to send the work to the graphics card).
+- The history is limited by the number of tile copies (2000, about 500 MB), not by the number of steps: a dot changes
+  1 tile, a big stroke can change hundreds.
+- Tested: undo, redo, redo cleared after a new stroke, eraser strokes, and dropping the oldest steps past the limit.
+  Pixels come back exactly as they were.
+- Bugs found and fixed:
+  - A click outside the paper added an empty step, so the next Ctrl+Z seemed to do nothing.
+  - Dabs past the right and bottom edges counted as touching the last tiles (the tile grid goes up to 10240), creating
+    steps that changed nothing. Fixed by cutting each dab to the paper before finding its tiles. A dab whose center is
+    outside but whose edge touches the paper still paints, like in Photoshop and Krita.
+
 ## Optimizations for the real app
 
 - Collect the dabs from pointer events and render them once per frame, instead of once per event
@@ -83,10 +98,11 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
 - Encode the exported PNG in a Web Worker, so the screen doesn't freeze, and show progress while exporting
 - Read the tiles back from the graphics card faster when exporting (in bigger batches, or asynchronously),
   since it takes about 0.8 ms per tile
+- Don't create tiles for eraser strokes where there is no paint (today the eraser creates empty tiles, wasting
+  memory)
 
 ## Not covered by this spike
 
-- Undo/redo with tile copies (highest technical risk left)
 - Several layers composited together
 - Saving and opening projects with tiles
 - Integrating PixiJS with the React app
@@ -96,11 +112,12 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
 **Provisional: adopt PixiJS with tiled layers.**
 
 On my machine everything ran at 144 FPS, even with the whole 10000×10000 paper painted, and the export works at full
-size. With the CPU slowed down 4×, it stayed smooth.
+size. With the CPU slowed down 4×, it stayed smooth. Undo and redo with tile copies, the biggest technical risk left,
+work and take only a few milliseconds.
 
 Pending:
 
 - Confirm on my friend's machine (Ryzen 5 5500, RTX 3050) with a pen tablet: smoothness, pressure, and how the
   brush feels to an artist. If it is not smooth there, revisit before migrating.
-- Measure the export with the whole paper painted, and the GPU process memory.
+- Measure the graphics card memory more precisely (the Task Manager only shows one decimal).
 - Test on the Mac (integrated graphics) as a reference for an average machine.
