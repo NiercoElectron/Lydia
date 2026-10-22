@@ -24,6 +24,11 @@ export type EngineSnapshot = {
 const ramGigabytes = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4
 const RAW_BUDGET = Math.max(0.5, ramGigabytes / 4) * 1024 ** 3
 
+// PNG keeps every pixel exactly; JPEG makes much smaller files by leaving out details the eye hardly notices, and has
+// no transparency (the paper is always white, so nothing is lost)
+export type ImageType = 'png' | 'jpeg'
+const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
+
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
 // The drawing engine: shows the drawing inside "host" and lets the user paint on it. Everything that touches the
@@ -218,9 +223,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
 
   // ----- Files -----
 
-  // The drawing as a PNG image at its full size. The projection already has the white paper and all the visible
-  // layers put together, so only its tiles need to be copied
-  async function exportPng() {
+  // The drawing as an image at its full size. The projection already has the white paper and all the visible layers
+  // put together, so only its tiles need to be copied
+  async function exportImage(type: ImageType) {
     await nextFrame() // let the screen show that the export started before the slow part
     projection.finishLive() // tiles still shown live are not in the projection yet
     const canvas = document.createElement('canvas')
@@ -232,7 +237,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
       const { column, row } = parseTileKey(key)
       ctx.drawImage(renderer.extract.canvas(texture) as HTMLCanvasElement, column * TILE_SIZE, row * TILE_SIZE)
     }
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
     if (!blob) throw new Error('This image is too big for this browser.')
     return blob
   }
@@ -296,7 +301,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     setLayerOpacity,
     finishLayerOpacity,
     fitToScreen: view.fitToScreen,
-    exportPng,
+    exportImage,
     saveProject,
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)

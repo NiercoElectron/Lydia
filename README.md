@@ -12,7 +12,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Undo and redo (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
 - Zoom and move around the drawing
-- Export the drawing as a PNG image, at full size
+- Export the drawing as a PNG or JPEG image, at full size
 - Save and open projects as `.lyd` files
 
 ### Shortcuts
@@ -40,7 +40,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - [ ] Layers: delete, reorder, rename, blend modes
 - [x] Eraser
 - [x] Save and open projects (.lyd files; projects from Lydia 0.1 can't be opened)
-- [x] Export drawings as PNG
+- [x] Export drawings as PNG or JPEG
 - [ ] Desktop app for Windows, macOS and Linux (Electron)
 
 ## Getting started

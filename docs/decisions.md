@@ -258,6 +258,28 @@ for the history) or **open** (not decided yet).
 - **Why:** Photoshop and Krita show the opacity while the slider moves. The extra graphics card memory (the "above"
   tiles) is only used while the slider is held.
 
+## 24. Exporting as JPEG too
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:** besides PNG, the drawing can be exported as JPEG, with a fixed quality of 0.95 (from 0 to 1), with an
+  `Export JPEG` button next to `Export PNG`. A real File menu can come with the desktop app.
+- **Measured (headless):**
+
+  | Drawing                                    | PNG             | JPEG 0.95     | JPEG 0.9 | JPEG 1  |
+  | ------------------------------------------ | --------------- | ------------- | -------- | ------- |
+  | 4000×4000, lines on white paper            | 2.9 MB, 0.8 s   | 0.9 MB, 0.3 s | 0.7 MB   | 2.3 MB  |
+  | 10000×10000, covered with soft color paint | 138.4 MB, 8.9 s | 8.6 MB, 2.8 s | 4.6 MB   | 57.6 MB |
+
+  At 0.95 the colors are 0.2–0.6 (out of 255) away from the PNG on average. Painted areas never differ by more than
+  13; next to thin colored lines on white a few pixels (0.4%) differ more, because JPEG keeps colors at half the
+  resolution of the brightness.
+
+- **Why:** JPEG files are much smaller, which is what most sites and messaging apps want. 0.95 still looks the same as
+  the PNG. 1 makes files 2.5–7 times bigger for almost nothing; 0.9 makes them 20–45% smaller but loses more (up to
+  20 instead of 13 in painted areas). PNG stays the choice for keeping every pixel exactly (line art, printing). The
+  quality can become a setting later if someone needs it.
+
 ## Open questions
 
 ### Phone or desktop?

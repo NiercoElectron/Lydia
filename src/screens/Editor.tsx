@@ -3,7 +3,7 @@ import { DrawSpace } from '../components/DrawSpace'
 import { LayersPanel } from '../components/LayersPanel'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, Toolbar } from '../components/Toolbar'
 import type { Tool } from '../engine/brush'
-import type { Engine, EngineSnapshot } from '../engine/engine'
+import type { Engine, EngineSnapshot, ImageType } from '../engine/engine'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { isTyping } from '../engine/view'
 import { downloadBlob, timestamp } from '../files'
@@ -86,9 +86,10 @@ export function Editor({ project, onBack }: Props) {
     }
   }
 
-  function handleExport() {
+  function handleExport(type: ImageType) {
     if (!engine) return
-    runTask('Exporting…', async () => downloadBlob(await engine.exportPng(), `lydia-${timestamp()}.png`))
+    const extension = type === 'jpeg' ? 'jpg' : 'png' // ".jpg" is the name most programs use for JPEG files
+    runTask('Exporting…', async () => downloadBlob(await engine.exportImage(type), `lydia-${timestamp()}.${extension}`))
   }
 
   function handleSave() {
@@ -130,8 +131,11 @@ export function Editor({ project, onBack }: Props) {
           <button onClick={() => engine?.fitToScreen()} disabled={!engine} title="Show the whole drawing (Ctrl+0)">
             Fit
           </button>
-          <button onClick={handleExport} disabled={!engine || busy !== null}>
+          <button onClick={() => handleExport('png')} disabled={!engine || busy !== null}>
             Export PNG
+          </button>
+          <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null}>
+            Export JPEG
           </button>
           <button onClick={handleSave} disabled={!engine || busy !== null}>
             Save
