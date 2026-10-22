@@ -209,7 +209,8 @@ for the history) or **open** (not decided yet).
   last one with each small fix or small feature: one change, one number, so each version can be traced to the change it
   brought. Each version is marked with a git tag (`v0.1.0`, `v0.2.0`…), and what it changed is written in
   [CHANGELOG.md](../CHANGELOG.md): each change is added under "Unreleased" when it is made, and moves under its
-  number when the version comes out.
+  number when the version comes out. Changes that leave the app the same (documentation, notes, tests) get no number
+  and no line in the changelog, since the numbers tell what the app itself does.
 - **Versions:** 0.1.0 was the first usable version, still with strokes stored as data (decision 3); 0.2.0 brought the
   tile engine from the spike into the main app. 1.0.0 will be the desktop app, packaged with Electron. The full list
   is in [CHANGELOG.md](../CHANGELOG.md).
