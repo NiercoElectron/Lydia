@@ -206,7 +206,8 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:** versions follow semantic versioning: three numbers, MAJOR.MINOR.PATCH. The first number stays at 0
   until Lydia is packaged with Electron (decision 6). The middle number goes up with each big stage finished, and the
-  last one with small fixes. Each version is marked with a git tag (`v0.1.0`, `v0.2.0`…).
+  last one with small fixes: one fix, one number, so each version can be traced to the change it brought. Each version
+  is marked with a git tag (`v0.1.0`, `v0.2.0`…).
 - **Versions:**
   - **0.1.0** (tag `v0.1.0`, branch `main` on 2026-10-22): the first usable version. Start screen with a custom canvas
     size, drawing with mouse or pen, brush color and size, eraser, undo, save and open `.lyd` projects, PNG export. It
@@ -214,6 +215,7 @@ for the history) or **open** (not decided yet).
   - **0.2.0** (tag `v0.2.0`, branch `main` on 2026-10-22): the tile engine from the spike inside the main app.
     Canvases up to 10000×10000, brush with pen pressure, eraser, zoom and pan, undo and redo, layers (add, choose,
     hide, opacity), clear a layer, save and open the new `.lyd` format (decision 21), PNG export.
+  - **0.2.1** (tag `v0.2.1`, 2026-10-22): the layer opacity changes live while the slider moves (decision 23).
   - **1.0.0:** the desktop app, packaged with Electron.
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is.
@@ -237,6 +239,24 @@ for the history) or **open** (not decided yet).
 - **Decision:** 0.2.0 already has a layers panel: add a layer (above the active one), choose the active layer, hide and
   show, and change the opacity. Deleting, reordering and blend modes come in a later version.
 - **Why:** the engine already works with layers, and an artist can't draw seriously without them.
+
+## 23. The opacity changes live while the slider moves
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Problem:** in 0.2.0 the layer only changed once the opacity slider stopped, because putting every tile of a big
+  layer together again takes 200–350 ms (measured headless on a full 10000×10000 layer), far too slow for each step.
+- **Decision:** while the slider moves, each tile of the active layer is shown with three sprites instead of its
+  projection tile: its "below" tile (decision 10), the layer's own tile with the new opacity, and the layers above it,
+  put together once. Each step then only changes the opacity of the middle sprite, and the graphics card puts the three
+  together on every frame. When the slider is let go, the tiles are put together for good. If a layer above uses a
+  blend mode other than normal, its look depends on what is under it, so it can't be put together on its own: then the
+  tiles are put together at every step, as before.
+- **Measured (headless, full 10000×10000 layer with layers above and below):** the first step takes ~340 ms (it puts
+  the "above" tiles together), each next step ~2 ms, letting go ~35 ms. At full size the live tiles are exactly the
+  final tiles; zoomed out, the screen can differ by 2/255 because each sprite is smoothed on its own.
+- **Why:** Photoshop and Krita show the opacity while the slider moves. The extra graphics card memory (the "above"
+  tiles) is only used while the slider is held.
 
 ## Open questions
 

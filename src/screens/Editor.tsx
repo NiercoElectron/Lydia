@@ -149,6 +149,7 @@ export function Editor({ project, onBack }: Props) {
           onSelect={id => engine?.selectLayer(id)}
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
           onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
+          onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
         />
       </div>
     </div>

@@ -148,6 +148,15 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     dirtyTiles.delete(cached)
   }
 
+  // A layer whose tiles must stay on the graphics card, because sprites on the screen show them (see showOpacityLive
+  // in projection.ts). A layer has at most 1600 tiles (10000 / 256 = 40 columns and rows), fewer than the budget, so
+  // there is always room left for the other layers
+  let keptLayer: Layer | null = null
+
+  function keep(layer: Layer | null) {
+    keptLayer = layer
+  }
+
   // Free graphics card memory: remove the least recently used tiles until the cache fits its budget again.
   // Painted tiles are skipped and don't count against the budget: reading them back now would make the processor wait
   // for the graphics card, so they stay until the background saving has their pixels in RAM. If they counted, many
@@ -157,7 +166,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     if (cleanCount() <= GPU_CACHE_TILES + TRIM_BATCH) return
     for (const [id, cached] of cache) {
       if (cleanCount() <= GPU_CACHE_TILES) break
-      if (cached.dirty) continue
+      if (cached.dirty || cached.layer === keptLayer) continue
       cached.texture.destroy(true)
       cache.delete(id)
     }
@@ -320,6 +329,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     getTexture,
     markDirty,
     markClean,
+    keep,
     trim,
     dirtyKeysOf,
     finishReads,

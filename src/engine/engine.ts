@@ -168,12 +168,19 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     changed()
   }
 
+  // While the opacity slider moves, the active layer shows each new opacity right away (see showOpacityLive in
+  // projection.ts); its tiles are put together for good once the slider is let go (finishLayerOpacity)
   function setLayerOpacity(id: number, opacity: number) {
     const layer = findLayer(id)
     if (!layer || layer.opacity === opacity || view.isPainting()) return
     layer.opacity = opacity
-    recomposeLayer(layer)
+    // A hidden layer changes nothing on the screen: it is put together with its new opacity when it is shown again
+    if (layer.visible && !projection.showOpacityLive(layer, tilesWithPaint(layer))) recomposeLayer(layer)
     changed()
+  }
+
+  function finishLayerOpacity() {
+    projection.finishLive()
   }
 
   // Remove all the paint from the active layer. It can be undone like a stroke
@@ -215,6 +222,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
   // layers put together, so only its tiles need to be copied
   async function exportPng() {
     await nextFrame() // let the screen show that the export started before the slow part
+    projection.finishLive() // tiles still shown live are not in the projection yet
     const canvas = document.createElement('canvas')
     canvas.width = grid.width
     canvas.height = grid.height
@@ -286,6 +294,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData) {
     selectLayer,
     setLayerVisible,
     setLayerOpacity,
+    finishLayerOpacity,
     fitToScreen: view.fitToScreen,
     exportPng,
     saveProject,

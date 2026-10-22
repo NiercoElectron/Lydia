@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 
 type Props = {
@@ -8,9 +8,18 @@ type Props = {
   onSelect: (id: number) => void
   onVisibleChange: (id: number, visible: boolean) => void
   onOpacityChange: (id: number, opacity: number) => void
+  onOpacityChangeEnd: () => void
 }
 
-export function LayersPanel({ layers, activeLayerId, onAdd, onSelect, onVisibleChange, onOpacityChange }: Props) {
+export function LayersPanel({
+  layers,
+  activeLayerId,
+  onAdd,
+  onSelect,
+  onVisibleChange,
+  onOpacityChange,
+  onOpacityChangeEnd,
+}: Props) {
   const active = layers.find(layer => layer.id === activeLayerId)
 
   return (
@@ -20,7 +29,11 @@ export function LayersPanel({ layers, activeLayerId, onAdd, onSelect, onVisibleC
         <button onClick={onAdd}>New layer</button>
       </div>
       {active && (
-        <OpacitySlider key={active.id} opacity={active.opacity} onChange={value => onOpacityChange(active.id, value)} />
+        <OpacitySlider
+          opacity={active.opacity}
+          onChange={value => onOpacityChange(active.id, value)}
+          onChangeEnd={onOpacityChangeEnd}
+        />
       )}
       {/* Shown from the top to the bottom, like in Photoshop and Krita */}
       <ul className="layers-list">
@@ -45,29 +58,33 @@ export function LayersPanel({ layers, activeLayerId, onAdd, onSelect, onVisibleC
 
 type OpacitySliderProps = {
   opacity: number // from 0 to 1
-  onChange: (opacity: number) => void
+  onChange: (opacity: number) => void // on every step, while the slider moves
+  onChangeEnd: () => void // once the slider is let go
 }
 
-const APPLY_DELAY_MS = 150
+function OpacitySlider({ opacity, onChange, onChangeEnd }: OpacitySliderProps) {
+  const percent = Math.round(opacity * 100)
+  const input = useRef<HTMLInputElement>(null)
 
-// Changing the opacity puts every tile of the layer together again, which takes a moment on a big layer. So the slider
-// shows the new value while it is dragged, and the layer changes once the slider stops moving for a moment
-function OpacitySlider({ opacity, onChange }: OpacitySliderProps) {
-  const [percent, setPercent] = useState(Math.round(opacity * 100))
-  const timer = useRef<number | undefined>(undefined)
-
-  useEffect(() => () => clearTimeout(timer.current), []) // don't apply after the slider is gone
-
-  function handleChange(value: number) {
-    setPercent(value)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => onChange(value / 100), APPLY_DELAY_MS)
-  }
+  // React's onChange runs on every step; the browser's own "change" event runs once the slider is let go (and after
+  // each arrow key), which React doesn't offer
+  useEffect(() => {
+    const element = input.current!
+    element.addEventListener('change', onChangeEnd)
+    return () => element.removeEventListener('change', onChangeEnd)
+  }, [onChangeEnd])
 
   return (
     <label className="opacity">
       Opacity
-      <input type="range" min={0} max={100} value={percent} onChange={e => handleChange(Number(e.target.value))} />
+      <input
+        ref={input}
+        type="range"
+        min={0}
+        max={100}
+        value={percent}
+        onChange={e => onChange(Number(e.target.value) / 100)}
+      />
       {percent}%
     </label>
   )
