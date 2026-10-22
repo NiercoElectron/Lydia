@@ -173,6 +173,46 @@ drawings with many layers.
 
 **Conclusion:** the projection fixes the FPS. The number of layers no longer changes how much is drawn per frame.
 
+## 10. Layers in RAM, graphics card as a cache
+
+- The pixels of every layer live in RAM, one array per tile. Tiles without paint are not stored, so the eraser no longer
+  leaves empty tiles behind.
+- The graphics card only keeps a cache of up to 2000 layer tiles (about 500 MB). When it is full, the least recently
+  used tiles leave it; a painted tile is read back into RAM first, so nothing is lost.
+- "Below": a second grid with the paper and every layer under the active one already put together. While painting,
+  each tile only puts together below + the active layer + the layers above it.
+- Undo keeps references to the pixels in RAM, without copying them (pixels are never changed, only replaced).
+- Tested (headless Chrome, with the cache cut to 300 tiles to force tiles in and out of RAM): same colors as before,
+  the projection stays identical bit by bit after sending ~28000 tiles back and forth, and undo and redo work.
+
+### Stress test: 20 full layers (mine)
+
+| What                                | Before (everything on the GPU)  | Now                            |
+| ----------------------------------- | ------------------------------- | ------------------------------ |
+| Dedicated GPU memory (whole system) | 7.4 of 8 GB with only 10 layers | **3.2 of 8 GB** with 20 layers |
+| FPS                                 | 144                             | 144                            |
+| Tab memory (RAM)                    | ~110 MB                         | ~8.0–8.4 GB                    |
+
+- The graphics card memory stays put no matter how many layers there are. This was the goal.
+- Filling a layer took 35 ms, plus 483 ms to read its 1600 tiles back into RAM (about 0.3 ms per tile).
+- Choosing another layer took **3.7 s**: it put everything together again from RAM (32470 tiles sent to the graphics
+  card, about 0.11 ms each). Fixed afterwards: choosing a layer doesn't change the image, so the projection stays as
+  it is, and each "below" tile is put together again only the first time it is painted on.
+- Painting on the top layer had a hitch. Probably the tiles of the stroke being read back into RAM all at once when
+  the pen is lifted. Changed afterwards: they are read back a few at a time between frames (at most 4 ms per frame),
+  and only while not painting.
+- Retested with 17 full layers: choosing another layer is now instant, and the hitch got smaller but is still there,
+  painting on the top layer and on a middle one. The background saving only managed about 1 tile per frame (19–94
+  tiles over 99–573 ms, about 5–6 ms per tile), compared to 0.3 ms per tile when saving 1600 tiles in a row.
+- Why: reading pixels back makes the processor wait until the graphics card has finished all the work it was given
+  (like stopping a production line to inspect one piece). The first read of each frame pays for that wait, which takes
+  most of a frame at 144 Hz. Reading many tiles at once pays it only once, but freezes the screen for longer.
+- Fix for the real app: read back asynchronously. WebGL2 can copy the pixels into a buffer on the graphics card and
+  signal when they are ready (a "pixel buffer object" and a "fence"), so the processor fetches them a frame or two
+  later, without waiting. A tile painted again before its read finishes must be read again.
+- RAM: 400 MB per full layer, because nothing is compressed yet. 20 full layers take 8 GB, too much for a 16 GB Mac.
+  Next: store tiles of a single color as just that color, and compress the others.
+
 ## Optimizations for the real app
 
 - Collect the dabs from pointer events and render them once per frame, instead of once per event

@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, RenderTexture, Sprite, Texture } from 'pixi.js'
+import { Application, BufferImageSource, Container, Graphics, RenderTexture, Sprite, Texture } from 'pixi.js'
 
 const PROJECT_WIDTH = 10000
 const PROJECT_HEIGHT = 10000
@@ -110,70 +110,203 @@ async function main() {
     panStart = null
   })
 
-  // ----- Layers made of tiles -----
+  // ----- Layers: pixels in RAM, with a cache on the graphics card -----
 
-  // A layer is a transparent sheet made of tiles that are created only where there is paint.
-  // Layers are not drawn on the screen directly: they are put together into the projection (below)
+  // The pixels of every layer live in RAM (the "shelf"), which is much bigger than the graphics card's memory. The
+  // graphics card (the "desk") only keeps copies of the tiles it needs right now, up to GPU_CACHE_TILES. A tile painted
+  // on the graphics card is "dirty" until its pixels are read back into RAM
+  const GPU_CACHE_TILES = 2000 // about 500 MB of graphics card memory for layer tiles
+  const COLUMNS = Math.ceil(PROJECT_WIDTH / TILE_SIZE)
+  const ROWS = Math.ceil(PROJECT_HEIGHT / TILE_SIZE)
+
   type Layer = {
-    tiles: Map<string, RenderTexture> // "column,row" -> the tile's texture
+    id: number
+    // "column,row" -> the tile's pixels in RAM. Pixels are never changed, only replaced by new ones, so the undo
+    // history can keep them without copying. Tiles without paint are not stored at all
+    tiles: Map<string, Uint8ClampedArray>
     visible: boolean
     opacity: number // from 0 (invisible) to 1
     blendMode: 'normal' | 'multiply'
   }
   const layers: Layer[] = [] // from the bottom to the top
+  let nextLayerId = 1
 
   // Add an empty layer on top of all the others
   function addLayer() {
-    const layer: Layer = { tiles: new Map(), visible: true, opacity: 1, blendMode: 'normal' }
+    const layer: Layer = { id: nextLayerId++, tiles: new Map(), visible: true, opacity: 1, blendMode: 'normal' }
     layers.push(layer)
     return layer
   }
   let activeLayer = addLayer() // the layer the brush paints on
 
-  // Create a transparent tile, cut at the edge of the paper (10000 is not a multiple of 256)
-  function createTile(column: number, row: number) {
+  // Call "callback" for every tile of the paper
+  function forEachTile(callback: (column: number, row: number) => void) {
+    for (let column = 0; column < COLUMNS; column++) {
+      for (let row = 0; row < ROWS; row++) callback(column, row)
+    }
+  }
+
+  const emptyContainer = new Container()
+  function clearTexture(texture: RenderTexture) {
+    app.renderer.render({ container: emptyContainer, target: texture, clear: true })
+  }
+
+  // Create a transparent texture on the graphics card for the tile at this column and row. The last column and row are
+  // cut at the edge of the paper (10000 is not a multiple of 256)
+  function createTexture(column: number, row: number) {
     const width = Math.min(TILE_SIZE, PROJECT_WIDTH - column * TILE_SIZE)
     const height = Math.min(TILE_SIZE, PROJECT_HEIGHT - row * TILE_SIZE)
     const texture = RenderTexture.create({ width, height })
-    app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
+    clearTexture(texture)
     return texture
   }
 
-  // Get the tile of this layer at this column and row, creating it the first time it is painted on
-  function getTile(layer: Layer, column: number, row: number) {
-    const key = `${column},${row}`
-    let texture = layer.tiles.get(key)
-    if (!texture) {
-      texture = createTile(column, row)
-      layer.tiles.set(key, texture)
+  // ----- Moving pixels between RAM and the graphics card -----
+
+  const copySprite = new Sprite() // reused to draw one texture into another
+  const stagingTextures = new Map<string, Texture>() // one per tile size, reused to send pixels to the graphics card
+  let uploadCount = 0
+  let readBackCount = 0
+
+  // Draw one texture into another, inside the graphics card
+  function copyInto(source: Texture, target: RenderTexture) {
+    copySprite.texture = source
+    app.renderer.render({ container: copySprite, target, clear: true })
+  }
+
+  // Send a tile's pixels from RAM to a texture on the graphics card (fast)
+  function upload(pixels: Uint8ClampedArray, target: RenderTexture) {
+    const size = `${target.width}x${target.height}`
+    let staging = stagingTextures.get(size)
+    if (!staging) {
+      // The pixels came from the graphics card already multiplied by their alpha ("premultiplied"): send them as they are
+      const source = new BufferImageSource({
+        resource: pixels,
+        width: target.width,
+        height: target.height,
+        format: 'rgba8unorm',
+        alphaMode: 'premultiplied-alpha',
+      })
+      staging = new Texture({ source })
+      stagingTextures.set(size, staging)
+    } else {
+      staging.source.resource = pixels
+      staging.source.update() // tell PixiJS to send the new pixels the next time the texture is used
     }
-    return texture
+    copyInto(staging, target)
+    uploadCount++
+  }
+
+  // Read a tile's pixels back from the graphics card into RAM (slow: the graphics card has to finish its work first).
+  // Returns null when the tile is completely transparent, so empty tiles take no memory at all
+  function readBack(texture: RenderTexture) {
+    const { pixels } = app.renderer.extract.pixels(texture)
+    readBackCount++
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] !== 0) return pixels
+    }
+    return null
+  }
+
+  // ----- The graphics card cache -----
+
+  type CachedTile = { layer: Layer; key: string; texture: RenderTexture; dirty: boolean }
+  // "layerId/column,row" -> the tile's copy on the graphics card. A Map remembers the order in which keys were added, so
+  // moving a tile to the end every time it is used keeps the least recently used tiles at the start
+  const gpuTiles = new Map<string, CachedTile>()
+
+  // Get the copy of a layer's tile on the graphics card, sending it from RAM if needed.
+  // Returns null when the tile has no paint and "create" is false
+  function getGpuTile(layer: Layer, column: number, row: number, create: boolean) {
+    const key = `${column},${row}`
+    const id = `${layer.id}/${key}`
+    let cached = gpuTiles.get(id)
+    if (cached) {
+      gpuTiles.delete(id) // it goes back in at the end: it is now the most recently used tile
+    } else {
+      const pixels = layer.tiles.get(key)
+      if (!pixels && !create) return null
+      const texture = createTexture(column, row)
+      if (pixels) upload(pixels, texture)
+      cached = { layer, key, texture, dirty: false }
+    }
+    gpuTiles.set(id, cached)
+    return cached.texture
+  }
+
+  const dirtyTiles = new Set<CachedTile>() // painted tiles whose latest pixels are only on the graphics card
+
+  // Painting on a tile makes its copy on the graphics card newer than RAM
+  function markDirty(layer: Layer, key: string) {
+    const cached = gpuTiles.get(`${layer.id}/${key}`)!
+    cached.dirty = true
+    dirtyTiles.add(cached)
+  }
+
+  // Read a painted tile back into RAM, so RAM has its latest pixels
+  function saveTile(cached: CachedTile) {
+    const pixels = readBack(cached.texture)
+    if (pixels) cached.layer.tiles.set(cached.key, pixels)
+    else cached.layer.tiles.delete(cached.key)
+    cached.dirty = false
+    dirtyTiles.delete(cached)
+  }
+
+  // Before using a tile's pixels in RAM, make sure they are the latest ones
+  function saveIfDirty(layer: Layer, key: string) {
+    const cached = gpuTiles.get(`${layer.id}/${key}`)
+    if (cached?.dirty) saveTile(cached)
+  }
+
+  // Free graphics card memory: remove the least recently used tiles until the cache fits its budget again.
+  // Painted tiles are read back into RAM first, so nothing is lost
+  function trimGpuCache() {
+    for (const [id, cached] of gpuTiles) {
+      if (gpuTiles.size <= GPU_CACHE_TILES) break
+      if (cached.dirty) saveTile(cached)
+      cached.texture.destroy(true)
+      gpuTiles.delete(id)
+    }
   }
 
   // ----- Projection -----
 
   // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the white
-  // paper and all the visible layers already put together, like Krita does. The screen draws the same 1600 tiles
-  // every frame no matter how many layers there are, and only the tiles that change are put together again
-  const COLUMNS = Math.ceil(PROJECT_WIDTH / TILE_SIZE)
-  const ROWS = Math.ceil(PROJECT_HEIGHT / TILE_SIZE)
+  // paper and all the visible layers already put together, like Krita does. To put a tile together quickly while
+  // painting, "below" keeps the paper and every layer under the active one already put together as well, so only the
+  // active layer and the layers above it need to be added
   const projection = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
+  const below = new Map<string, RenderTexture>()
   const projectionContainer = new Container() // holds one sprite per projection tile
   world.addChild(projectionContainer)
 
-  // A tile is put together in "composeRoot": the white paper, then the tile of each visible layer, bottom to top
+  // "below" tiles that still have the layers of a previously active layer. Choosing another layer doesn't change the
+  // image, so the projection stays as it is, and each "below" tile is put together again only when it is needed
+  const staleBelow = new Set<string>()
+
   const composeRoot = new Container()
   const paperTile = new Graphics().rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0xffffff)
+  const belowSprite = new Sprite()
   const layerSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
 
-  function composeTile(column: number, row: number) {
-    const key = `${column},${row}`
+  // Put the tiles at this column and row of the layers from "first" to "last" (not included) on top of "base",
+  // into "target"
+  function composeLayers(
+    base: Container,
+    first: number,
+    last: number,
+    column: number,
+    row: number,
+    target: RenderTexture,
+  ) {
     composeRoot.removeChildren()
-    composeRoot.addChild(paperTile)
+    composeRoot.addChild(base)
     let count = 0
-    for (const layer of layers) {
-      const texture = layer.tiles.get(key)
-      if (!layer.visible || !texture) continue
+    for (let i = first; i < last; i++) {
+      const layer = layers[i]
+      if (!layer.visible) continue
+      const texture = getGpuTile(layer, column, row, false)
+      if (!texture) continue // no paint on this layer here
       let sprite = layerSprites[count]
       if (!sprite) {
         sprite = new Sprite()
@@ -185,28 +318,45 @@ async function main() {
       composeRoot.addChild(sprite)
       count++
     }
-    app.renderer.render({ container: composeRoot, target: projection.get(key)!, clear: true })
+    app.renderer.render({ container: composeRoot, target, clear: true })
+    trimGpuCache()
   }
 
-  // Put the whole projection together again (after changing a layer's visibility, opacity or blend mode)
+  // The projection tile = the "below" tile + the active layer + the layers above it
+  function composeTile(column: number, row: number) {
+    const key = `${column},${row}`
+    if (staleBelow.delete(key)) composeBelowTile(column, row) // delete() returns true if the key was in the set
+    belowSprite.texture = below.get(key)!
+    composeLayers(belowSprite, layers.indexOf(activeLayer), layers.length, column, row, projection.get(key)!)
+  }
+
+  // The "below" tile = the paper + every layer under the active one
+  function composeBelowTile(column: number, row: number) {
+    composeLayers(paperTile, 0, layers.indexOf(activeLayer), column, row, below.get(`${column},${row}`)!)
+  }
+
+  // Put the whole projection together again (after changing the active layer's visibility, opacity or blend mode)
   function composeAll() {
     const start = performance.now()
-    for (let column = 0; column < COLUMNS; column++) {
-      for (let row = 0; row < ROWS; row++) composeTile(column, row)
-    }
-    console.log(`Composed the whole projection in ${Math.round(performance.now() - start)} ms`)
+    const uploadsBefore = uploadCount
+    forEachTile(composeTile)
+    const uploads = uploadCount - uploadsBefore
+    console.log(
+      `Composed the whole projection in ${Math.round(performance.now() - start)} ms (${uploads} tiles sent from RAM)`,
+    )
   }
 
-  // Create the projection's tiles with one sprite each, and show the empty paper
-  for (let column = 0; column < COLUMNS; column++) {
-    for (let row = 0; row < ROWS; row++) {
-      const texture = createTile(column, row)
-      projection.set(`${column},${row}`, texture)
-      const sprite = new Sprite(texture)
-      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
-      projectionContainer.addChild(sprite)
-    }
-  }
+  // Create the tiles of the projection (with one sprite each) and of "below", and show the empty paper
+  forEachTile((column, row) => {
+    const key = `${column},${row}`
+    below.set(key, createTexture(column, row))
+    staleBelow.add(key)
+    const texture = createTexture(column, row)
+    projection.set(key, texture)
+    const sprite = new Sprite(texture)
+    sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
+    projectionContainer.addChild(sprite)
+  })
   composeAll()
 
   // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
@@ -223,60 +373,50 @@ async function main() {
 
   // ----- Undo -----
 
-  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, a copy of the tile
-  // from before the stroke (null = the tile didn't exist yet)
-  type UndoStep = { layer: Layer; tiles: Map<string, RenderTexture | null> }
+  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, the tile's pixels in RAM
+  // from before the stroke (null = the tile had no paint). Pixels are never changed, so no copy is needed
+  type UndoStep = { layer: Layer; tiles: Map<string, Uint8ClampedArray | null> }
   const undoStack: UndoStep[] = []
+  const redoStack: UndoStep[] = []
   let strokeBackup: UndoStep | null = null // the step being recorded while the user paints
+  const MAX_UNDO_TILES = 2000 // tiles kept for undo and redo: about 500 MB of RAM
 
-  const copySprite = new Sprite() // reused to draw one texture into another
-
-  // Copy a texture inside the graphics card, without bringing it back to the CPU (that would be slow)
-  function copyTexture(texture: RenderTexture) {
-    const copy = RenderTexture.create({ width: texture.width, height: texture.height })
-    copySprite.texture = texture
-    app.renderer.render({ container: copySprite, target: copy, clear: true })
-    return copy
-  }
-
-  // Before a stroke paints on a tile for the first time, keep a copy of how the tile was
+  // Before a stroke paints on a tile for the first time, keep its pixels from before the stroke
   function backUpTile(key: string) {
     if (!strokeBackup || strokeBackup.tiles.has(key)) return // not painting, or already saved during this stroke
-    const texture = strokeBackup.layer.tiles.get(key)
-    strokeBackup.tiles.set(key, texture ? copyTexture(texture) : null)
+    saveIfDirty(strokeBackup.layer, key)
+    strokeBackup.tiles.set(key, strokeBackup.layer.tiles.get(key) ?? null)
   }
 
-  const MAX_UNDO_TILES = 2000 // tile copies kept for undo and redo: about 500 MB of graphics card memory
-  const redoStack: UndoStep[] = []
-
-  // Free the graphics card memory used by the copies of a step
-  function destroyStep(step: UndoStep) {
-    for (const copy of step.tiles.values()) copy?.destroy(true)
-  }
-
-  // How many copies a step really keeps on the graphics card (tiles that didn't exist cost nothing)
+  // How many tiles with pixels a step keeps (tiles that had no paint cost nothing)
   function countCopies(step: UndoStep) {
     let count = 0
-    for (const copy of step.tiles.values()) if (copy) count++
+    for (const pixels of step.tiles.values()) if (pixels) count++
     return count
   }
 
-  // Put the saved copies back into the tiles, and keep in the step what the tiles had instead.
+  // Put the saved pixels back into the layer, and keep in the step what the layer had instead.
   // That way the same step works in both directions: undo swaps it once, redo swaps it back
   function swapTiles(step: UndoStep) {
     const start = performance.now()
+    const isBelowActive = layers.indexOf(step.layer) < layers.indexOf(activeLayer)
     for (const [key, saved] of step.tiles) {
       const [column, row] = key.split(',').map(Number)
-      const tile = getTile(step.layer, column, row)
-      const current = copyTexture(tile)
-      if (saved) {
-        copySprite.texture = saved
-        app.renderer.render({ container: copySprite, target: tile, clear: true })
-        saved.destroy(true)
-      } else {
-        app.renderer.render({ container: new Container(), target: tile, clear: true }) // the tile didn't exist: empty it
-      }
+      saveIfDirty(step.layer, key)
+      const current = step.layer.tiles.get(key) ?? null
+      if (saved) step.layer.tiles.set(key, saved)
+      else step.layer.tiles.delete(key)
       step.tiles.set(key, current)
+
+      // If the graphics card has a copy of this tile, update it too
+      const cached = gpuTiles.get(`${step.layer.id}/${key}`)
+      if (cached) {
+        if (saved) upload(saved, cached.texture)
+        else clearTexture(cached.texture)
+      }
+
+      // A layer under the active one is part of "below", so that tile must be put together again too
+      if (isBelowActive) staleBelow.add(key)
       composeTile(column, row)
     }
     console.log(`Swapped ${step.tiles.size} tiles in ${Math.round(performance.now() - start)} ms`)
@@ -301,16 +441,13 @@ async function main() {
     undoStack.push(step)
 
     // After a new stroke, the steps that were undone can't be redone anymore
-    for (const undone of redoStack) destroyStep(undone)
     redoStack.length = 0
 
-    // When the copies take too much memory, forget the oldest steps (but always keep the newest one)
+    // When the history takes too much memory, forget the oldest steps (but always keep the newest one)
     let copyCount = 0
     for (const s of undoStack) copyCount += countCopies(s)
     while (copyCount > MAX_UNDO_TILES && undoStack.length > 1) {
-      const oldest = undoStack.shift()!
-      copyCount -= countCopies(oldest)
-      destroyStep(oldest)
+      copyCount -= countCopies(undoStack.shift()!)
     }
   }
 
@@ -368,9 +505,10 @@ async function main() {
     // Render all the dabs into each touched tile, shifted so that the tile's corner is at (0, 0)
     for (const key of touchedTiles) {
       const [column, row] = key.split(',').map(Number)
-      backUpTile(key) // must come before getTile, which would create the tile and hide that it didn't exist
+      backUpTile(key)
       stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
-      app.renderer.render({ container: stampRoot, target: getTile(activeLayer, column, row), clear: false })
+      app.renderer.render({ container: stampRoot, target: getGpuTile(activeLayer, column, row, true)!, clear: false })
+      markDirty(activeLayer, key)
       composeTile(column, row)
     }
   }
@@ -443,6 +581,26 @@ async function main() {
     strokeBackup = null
   })
 
+  // Painted tiles are read back into RAM a few at a time between frames, using at most SAVE_BUDGET_MS of each frame,
+  // so letting go of the pen doesn't freeze the screen. Nothing is saved while painting
+  const SAVE_BUDGET_MS = 4
+  let savedCount = 0
+  let saveStart = 0
+  app.ticker.add(() => {
+    if (drawingPointerId !== null || dirtyTiles.size === 0) return
+    if (savedCount === 0) saveStart = performance.now()
+    const frameStart = performance.now()
+    for (const cached of dirtyTiles) {
+      if (performance.now() - frameStart > SAVE_BUDGET_MS) break
+      saveTile(cached)
+      savedCount++
+    }
+    if (dirtyTiles.size > 0) return
+    const time = Math.round(performance.now() - saveStart)
+    console.log(`Saved ${savedCount} tiles to RAM in the background, over ${time} ms`)
+    savedCount = 0
+  })
+
   // Ctrl/Cmd + Z undoes; Ctrl/Cmd + Shift + Z or Ctrl + Y redoes, like in Photoshop and Krita
   window.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey)) return
@@ -458,22 +616,25 @@ async function main() {
 
   // ----- Layer controls and stress test -----
 
-  // Show the layers in the console, from the top to the bottom, and how much graphics card memory they use
+  // Show the layers in the console, from the top to the bottom, and how much memory they use.
+  // Each tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
   function logLayers() {
-    let tileCount = 0
+    let ramTiles = 0
     const lines = layers.map((layer, i) => {
-      tileCount += layer.tiles.size
+      ramTiles += layer.tiles.size
       const { opacity, blendMode, visible } = layer
       const marker = layer === activeLayer ? '>' : ' '
       return `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, opacity ${opacity}, ${blendMode}${visible ? '' : ', hidden'}`
     })
-    let copyCount = 0
-    for (const step of [...undoStack, ...redoStack]) copyCount += countCopies(step)
-    // Each tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
+    let undoTiles = 0
+    for (const step of [...undoStack, ...redoStack]) undoTiles += countCopies(step)
+    const gpuTileCount = gpuTiles.size + projection.size + below.size
     console.log(
       `${lines.reverse().join('\n')}\n` +
-        `Tiles: ${tileCount} (~${Math.round(tileCount / 4)} MB), undo copies: ${copyCount} (~${Math.round(copyCount / 4)} MB), ` +
-        `projection: ${projection.size} (~${Math.round(projection.size / 4)} MB)`,
+        `RAM: ${ramTiles} layer tiles (~${Math.round(ramTiles / 4)} MB) + ${undoTiles} undo tiles (~${Math.round(undoTiles / 4)} MB)\n` +
+        `Graphics card: ${gpuTiles.size} cached layer tiles + ${projection.size} projection + ${below.size} below ` +
+        `(~${Math.round(gpuTileCount / 4)} MB)\n` +
+        `So far: ${uploadCount} tiles sent from RAM, ${readBackCount} read back into RAM`,
     )
   }
   logLayers()
@@ -485,16 +646,16 @@ async function main() {
     const start = performance.now()
     fillRect.tint = brushColor
     strokeBackup = { layer: activeLayer, tiles: new Map() } // filling can be undone like a stroke
-    for (let column = 0; column < COLUMNS; column++) {
-      for (let row = 0; row < ROWS; row++) {
-        backUpTile(`${column},${row}`)
-        app.renderer.render({ container: fillRect, target: getTile(activeLayer, column, row), clear: false })
-        composeTile(column, row)
-      }
-    }
+    forEachTile((column, row) => {
+      const key = `${column},${row}`
+      backUpTile(key)
+      app.renderer.render({ container: fillRect, target: getGpuTile(activeLayer, column, row, true)!, clear: false })
+      markDirty(activeLayer, key)
+      composeTile(column, row)
+    })
+    console.log(`Filled the layer in ${Math.round(performance.now() - start)} ms`)
     addUndoStep(strokeBackup)
     strokeBackup = null
-    console.log(`Filled the layer in ${Math.round(performance.now() - start)} ms`)
     logLayers()
   }
 
@@ -503,14 +664,19 @@ async function main() {
   window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || drawingPointerId !== null) return
     const layer = activeLayer
-    if (e.key === 'n') activeLayer = addLayer()
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    if (e.key === 'n') {
+      // The new layer goes on top, so everything on the screen is now below it: "below" becomes a copy of the projection
+      activeLayer = addLayer()
+      for (const [key, texture] of projection) copyInto(texture, below.get(key)!)
+      staleBelow.clear()
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const index = layers.indexOf(activeLayer) + (e.key === 'ArrowUp' ? 1 : -1)
       if (index < 0 || index >= layers.length) return // already at the top or bottom
       activeLayer = layers[index]
+      for (const key of below.keys()) staleBelow.add(key) // "below" now has different layers
     } else if (e.key === 'f') return fillActiveLayer()
     else {
-      // These change how the layer looks, so the whole projection must be put together again
+      // These change how the active layer looks, so the whole projection must be put together again
       if (e.key === 'h') layer.visible = !layer.visible
       else if (e.key === 'o') layer.opacity = layer.opacity === 1 ? 0.5 : layer.opacity === 0.5 ? 0.25 : 1
       else if (e.key === 'm') layer.blendMode = layer.blendMode === 'multiply' ? 'normal' : 'multiply'
