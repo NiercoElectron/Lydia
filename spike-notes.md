@@ -104,6 +104,52 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
     steps that changed nothing. Fixed by cutting each dab to the paper before finding its tiles. A dab whose center is
     outside but whose edge touches the paper still paints, like in Photoshop and Krita.
 
+## 8. Several layers
+
+- Each layer is its own container of tile sprites, stacked in the world from the bottom to the top. Visibility,
+  opacity and the multiply blend mode are set on the layer's container. Undo steps remember which layer they belong to.
+- The export puts the layers together one by one, with their visibility, opacity and blend mode.
+- Tested (headless Chrome): paint stays in the right order between layers, undo and redo go back to the right layer,
+  and opacity, multiply and hiding give the same colors on the screen and in the PNG.
+
+### Stress test: whole layers filled with paint (F key)
+
+| Full layers | Tiles | FPS, no slowdown | FPS, CPU 4× slower |
+| ----------- | ----- | ---------------- | ------------------ |
+| 1           | 1600  | 144              | –                  |
+| 5           | 8000  | –                | ~120               |
+| 10          | 16000 | ~72              | ~75                |
+
+- Mine. The FPS was measured with the whole paper on the screen, where every tile of every layer is drawn.
+- With 10 full layers the FPS halves, even on an RTX 4060 Ti.
+- Slowing down the CPU barely changes the result, so the time is not spent in Lydia's JavaScript but in drawing:
+  every frame draws all 16000 tiles, and since the graphics card can only use a limited number of different textures
+  at once (usually 16), that takes around 1000 separate drawing commands per frame.
+- Graphics card memory (Windows Task Manager, dedicated GPU memory of the whole system): 2.1 GB with 1 full layer,
+  **7.5 of 8.0 GB** with 10 full layers (66 FPS at that moment). That is about 0.6 GB per full layer, more than the
+  0.4 GB of the pixels alone, as seen before. The graphics card was almost full.
+- The graphics card was only 28% busy, so it was not short of computing power: the time goes into the number of
+  drawing commands, and possibly into memory running out.
+- Filling a whole layer took 69 ms (190–365 ms with the CPU 4× slower). It is only a testing tool, not a real action.
+
+**Conclusion:** keeping every layer on the graphics card doesn't scale. There are two separate problems:
+
+1. **Memory (the hard limit).** With 8 GB, about 10 full layers of 10000×10000 fill the graphics card. My friend's
+   RTX 3050 has 6–8 GB, and the Mac shares its 16 GB with the whole system. A real drawing can easily have more than
+   10 layers. Krita keeps the layers' pixels in normal memory (RAM, compressed, and on disk when needed) and uses the
+   graphics card only to show the result. Lydia would need something similar: only the layer being painted on and the
+   image shown on the screen on the graphics card, the other layers in RAM.
+2. **Drawing every layer every frame (the FPS).** Ways to fix it, from the most important:
+   - **Projection** (what Krita does): keep one extra grid of tiles with all the layers already put together, and
+     update only the tiles that change while painting. The screen then draws 1600 tiles, no matter how many layers
+     there are. It costs the memory of one more full layer.
+   - **Lower resolution when zoomed out**: with the whole paper on the screen, each screen pixel covers about
+     11 × 11 pixels of the paper. Drawing smaller copies of the tiles would be much cheaper.
+   - **Skip the tiles outside the screen** when zoomed in (PixiJS calls this culling).
+
+The projection fixes the FPS but not the memory; moving the other layers to RAM fixes the memory. Both are needed for
+drawings with many layers.
+
 ## Optimizations for the real app
 
 - Collect the dabs from pointer events and render them once per frame, instead of once per event
@@ -117,13 +163,16 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
 
 ## Not covered by this spike
 
-- Several layers composited together
 - Saving and opening projects with tiles
 - Integrating PixiJS with the React app
 
 ## Decision
 
 **Provisional: adopt PixiJS with tiled layers.**
+
+**Performance target:** Lydia must work well with canvases up to 10000×10000 and **20 or more layers**, well enough
+that someone would choose it over another drawing app. Bigger canvases are out of scope for now and will be looked at
+later.
 
 On my machine everything ran at 144 FPS, even with the whole 10000×10000 paper painted, and the export works at full
 size. With the CPU slowed down 4×, it stayed smooth. Undo and redo with tile copies, the biggest technical risk left,
@@ -137,4 +186,6 @@ Pending:
 - Confirm on my friend's machine (Ryzen 5 5500, RTX 3050) with a pen tablet: smoothness, pressure, and how the
   brush feels to an artist. If it is not smooth there, revisit before migrating.
 - Measure the graphics card memory more precisely (the Task Manager only shows one decimal).
-- Test several layers: how many fully painted layers fit in memory and still draw smoothly.
+- Several layers: with 10 full layers the simple stack halves the FPS and almost fills an 8 GB graphics card. Before
+  migrating, decide (and test) how to keep the layers that are not being painted on in RAM, and the projection.
+- Ask my friend the canvas size and number of layers of a typical drawing of hers: memory grows with both.

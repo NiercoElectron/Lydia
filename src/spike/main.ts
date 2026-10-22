@@ -114,11 +114,23 @@ async function main() {
     panStart = null
   })
 
-  // ----- Layer made of tiles -----
+  // ----- Layers made of tiles -----
 
-  const layer = new Container() // holds one sprite per tile, on top of the paper
-  world.addChild(layer)
-  const tiles = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
+  // A layer is a transparent sheet on top of the paper, made of tiles that are created only where there is paint
+  type Layer = {
+    container: Container // holds one sprite per tile
+    tiles: Map<string, RenderTexture> // "column,row" -> the tile's texture
+  }
+  const layers: Layer[] = [] // from the bottom to the top
+
+  // Add an empty layer on top of all the others
+  function addLayer() {
+    const layer: Layer = { container: new Container(), tiles: new Map() }
+    world.addChild(layer.container) // addChild always puts it above everything already in the world
+    layers.push(layer)
+    return layer
+  }
+  let activeLayer = addLayer() // the layer the brush paints on
 
   // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
   let tileScaleMode: 'nearest' | 'linear' = 'linear'
@@ -126,16 +138,18 @@ async function main() {
     const scaleMode = world.scale.x >= 1 ? 'nearest' : 'linear'
     if (scaleMode === tileScaleMode) return
     tileScaleMode = scaleMode
-    for (const texture of tiles.values()) {
-      texture.source.scaleMode = scaleMode
-      texture.source.style.update() // tell PixiJS the setting changed, so the graphics card uses it
+    for (const layer of layers) {
+      for (const texture of layer.tiles.values()) {
+        texture.source.scaleMode = scaleMode
+        texture.source.style.update() // tell PixiJS the setting changed, so the graphics card uses it
+      }
     }
   })
 
-  // Get the tile at this column and row, creating it (transparent) the first time it is painted on
-  function getTile(column: number, row: number) {
+  // Get the tile of this layer at this column and row, creating it (transparent) the first time it is painted on
+  function getTile(layer: Layer, column: number, row: number) {
     const key = `${column},${row}`
-    let texture = tiles.get(key)
+    let texture = layer.tiles.get(key)
     if (!texture) {
       // The last column and row are cut at the edge of the paper (10000 is not a multiple of 256)
       const width = Math.min(TILE_SIZE, PROJECT_WIDTH - column * TILE_SIZE)
@@ -144,17 +158,17 @@ async function main() {
       app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
       const sprite = new Sprite(texture)
       sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
-      layer.addChild(sprite)
-      tiles.set(key, texture)
+      layer.container.addChild(sprite)
+      layer.tiles.set(key, texture)
     }
     return texture
   }
 
   // ----- Undo -----
 
-  // Each undo step keeps, for every tile the stroke touched, a copy of the tile from before the stroke
-  // (null = the tile didn't exist yet)
-  type UndoStep = Map<string, RenderTexture | null>
+  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, a copy of the tile
+  // from before the stroke (null = the tile didn't exist yet)
+  type UndoStep = { layer: Layer; tiles: Map<string, RenderTexture | null> }
   const undoStack: UndoStep[] = []
   let strokeBackup: UndoStep | null = null // the step being recorded while the user paints
 
@@ -170,9 +184,9 @@ async function main() {
 
   // Before a stroke paints on a tile for the first time, keep a copy of how the tile was
   function backUpTile(key: string) {
-    if (!strokeBackup || strokeBackup.has(key)) return // not painting, or already saved during this stroke
-    const texture = tiles.get(key)
-    strokeBackup.set(key, texture ? copyTexture(texture) : null)
+    if (!strokeBackup || strokeBackup.tiles.has(key)) return // not painting, or already saved during this stroke
+    const texture = strokeBackup.layer.tiles.get(key)
+    strokeBackup.tiles.set(key, texture ? copyTexture(texture) : null)
   }
 
   const MAX_UNDO_TILES = 2000 // tile copies kept for undo and redo: about 500 MB of graphics card memory
@@ -180,16 +194,23 @@ async function main() {
 
   // Free the graphics card memory used by the copies of a step
   function destroyStep(step: UndoStep) {
-    for (const copy of step.values()) copy?.destroy(true)
+    for (const copy of step.tiles.values()) copy?.destroy(true)
+  }
+
+  // How many copies a step really keeps on the graphics card (tiles that didn't exist cost nothing)
+  function countCopies(step: UndoStep) {
+    let count = 0
+    for (const copy of step.tiles.values()) if (copy) count++
+    return count
   }
 
   // Put the saved copies back into the tiles, and keep in the step what the tiles had instead.
   // That way the same step works in both directions: undo swaps it once, redo swaps it back
   function swapTiles(step: UndoStep) {
     const start = performance.now()
-    for (const [key, saved] of step) {
+    for (const [key, saved] of step.tiles) {
       const [column, row] = key.split(',').map(Number)
-      const tile = getTile(column, row)
+      const tile = getTile(step.layer, column, row)
       const current = copyTexture(tile)
       if (saved) {
         copySprite.texture = saved
@@ -198,9 +219,9 @@ async function main() {
       } else {
         app.renderer.render({ container: new Container(), target: tile, clear: true }) // the tile didn't exist: empty it
       }
-      step.set(key, current)
+      step.tiles.set(key, current)
     }
-    console.log(`Swapped ${step.size} tiles in ${Math.round(performance.now() - start)} ms`)
+    console.log(`Swapped ${step.tiles.size} tiles in ${Math.round(performance.now() - start)} ms`)
   }
 
   function undo() {
@@ -226,11 +247,11 @@ async function main() {
     redoStack.length = 0
 
     // When the copies take too much memory, forget the oldest steps (but always keep the newest one)
-    let tileCount = 0
-    for (const s of undoStack) tileCount += s.size
-    while (tileCount > MAX_UNDO_TILES && undoStack.length > 1) {
+    let copyCount = 0
+    for (const s of undoStack) copyCount += countCopies(s)
+    while (copyCount > MAX_UNDO_TILES && undoStack.length > 1) {
       const oldest = undoStack.shift()!
-      tileCount -= oldest.size
+      copyCount -= countCopies(oldest)
       destroyStep(oldest)
     }
   }
@@ -291,7 +312,7 @@ async function main() {
       const [column, row] = key.split(',').map(Number)
       backUpTile(key) // must come before getTile, which would create the tile and hide that it didn't exist
       stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
-      app.renderer.render({ container: stampRoot, target: getTile(column, row), clear: false })
+      app.renderer.render({ container: stampRoot, target: getTile(activeLayer, column, row), clear: false })
     }
   }
 
@@ -337,7 +358,7 @@ async function main() {
     const point = toProject(e)
     lastPoint = { x: point.x, y: point.y }
     distanceSinceLastDab = 0
-    strokeBackup = new Map() // start recording the tiles this stroke changes
+    strokeBackup = { layer: activeLayer, tiles: new Map() } // start recording the tiles this stroke changes
     paintDabs([{ x: point.x, y: point.y, size: sizeFor(e) }])
   })
 
@@ -356,8 +377,8 @@ async function main() {
     drawingPointerId = null
     lastPoint = null
     // A click outside the paper changes no tiles: an empty step would make Ctrl+Z seem to do nothing
-    if (strokeBackup && strokeBackup.size > 0) {
-      console.log(`Stroke changed ${strokeBackup.size} tiles, ${undoStack.length + 1} undo steps`)
+    if (strokeBackup && strokeBackup.tiles.size > 0) {
+      console.log(`Stroke changed ${strokeBackup.tiles.size} tiles, ${undoStack.length + 1} undo steps`)
       addUndoStep(strokeBackup)
     }
     strokeBackup = null
@@ -376,6 +397,65 @@ async function main() {
     else redo()
   })
 
+  // ----- Layer controls and stress test -----
+
+  // Show the layers in the console, from the top to the bottom, and how much graphics card memory they use
+  function logLayers() {
+    let tileCount = 0
+    const lines = layers.map((layer, i) => {
+      tileCount += layer.tiles.size
+      const { alpha, visible } = layer.container
+      const blendMode = layer.container.blendMode === 'multiply' ? 'multiply' : 'normal' // new layers start as "inherit"
+      const marker = layer === activeLayer ? '>' : ' '
+      return `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, opacity ${alpha}, ${blendMode}${visible ? '' : ', hidden'}`
+    })
+    let copyCount = 0
+    for (const step of [...undoStack, ...redoStack]) copyCount += countCopies(step)
+    // Each tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
+    console.log(
+      `${lines.reverse().join('\n')}\n` +
+        `Tiles: ${tileCount} (~${Math.round(tileCount / 4)} MB), undo copies: ${copyCount} (~${Math.round(copyCount / 4)} MB)`,
+    )
+  }
+  logLayers()
+
+  // Stress test: fill every tile of the active layer with the brush color, as if the whole layer had been painted
+  const fillRect = new Graphics().rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0xffffff)
+  function fillActiveLayer() {
+    if (drawingPointerId !== null) return // not in the middle of a stroke
+    const start = performance.now()
+    fillRect.tint = brushColor
+    strokeBackup = { layer: activeLayer, tiles: new Map() } // filling can be undone like a stroke
+    for (let column = 0; column < Math.ceil(PROJECT_WIDTH / TILE_SIZE); column++) {
+      for (let row = 0; row < Math.ceil(PROJECT_HEIGHT / TILE_SIZE); row++) {
+        backUpTile(`${column},${row}`)
+        app.renderer.render({ container: fillRect, target: getTile(activeLayer, column, row), clear: false })
+      }
+    }
+    addUndoStep(strokeBackup)
+    strokeBackup = null
+    console.log(`Filled the layer in ${Math.round(performance.now() - start)} ms`)
+    logLayers()
+  }
+
+  // N adds a layer on top; the arrows choose the active layer; H hides or shows it; O changes its opacity;
+  // M switches it between normal and multiply; F fills it (to test many full layers)
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || drawingPointerId !== null) return
+    const layer = activeLayer.container
+    if (e.key === 'n') activeLayer = addLayer()
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const index = layers.indexOf(activeLayer) + (e.key === 'ArrowUp' ? 1 : -1)
+      if (index < 0 || index >= layers.length) return // already at the top or bottom
+      activeLayer = layers[index]
+    } else if (e.key === 'h') layer.visible = !layer.visible
+    else if (e.key === 'o') layer.alpha = layer.alpha === 1 ? 0.5 : layer.alpha === 0.5 ? 0.25 : 1
+    else if (e.key === 'm') layer.blendMode = layer.blendMode === 'multiply' ? 'normal' : 'multiply'
+    else if (e.key === 'f') return fillActiveLayer()
+    else return // not a layer key
+    logLayers()
+  })
+
   // ----- Export -----
 
   // Put all the tiles together on a white background, at the full size of the project, and encode it as PNG
@@ -389,11 +469,19 @@ async function main() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, PROJECT_WIDTH, PROJECT_HEIGHT)
 
-    // Copy each tile from the graphics card back to a normal canvas, at its place in the image
-    for (const [key, texture] of tiles) {
-      const [column, row] = key.split(',').map(Number)
-      const tileCanvas = app.renderer.extract.canvas(texture) as HTMLCanvasElement
-      ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE)
+    // Copy each tile from the graphics card back to a normal canvas, at its place in the image,
+    // layer by layer from the bottom to the top, with the layer's visibility, opacity and blend mode
+    let tileCount = 0
+    for (const layer of layers) {
+      if (!layer.container.visible) continue
+      ctx.globalAlpha = layer.container.alpha
+      ctx.globalCompositeOperation = layer.container.blendMode === 'multiply' ? 'multiply' : 'source-over'
+      for (const [key, texture] of layer.tiles) {
+        const [column, row] = key.split(',').map(Number)
+        const tileCanvas = app.renderer.extract.canvas(texture) as HTMLCanvasElement
+        ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE)
+        tileCount++
+      }
     }
 
     const encodeStart = performance.now()
@@ -402,7 +490,7 @@ async function main() {
 
     // Spike measurements: how long each part took and how big the file is
     console.log(
-      `Export: ${tiles.size} tiles, assembled in ${Math.round(encodeStart - assembleStart)} ms, ` +
+      `Export: ${tileCount} tiles, assembled in ${Math.round(encodeStart - assembleStart)} ms, ` +
         `PNG encoded in ${Math.round(performance.now() - encodeStart)} ms, ${(blob.size / 1024 / 1024).toFixed(1)} MB`,
     )
     return blob
