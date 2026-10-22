@@ -11,15 +11,21 @@ drawing experience on large canvases, before rewriting the editor.
 | ------- | ------------ | ----------- | ----- | ----------------- | ---------- |
 | Mine    | i5-11400F    | RTX 4060 Ti | 32 GB | 2560×1440, 144 Hz | None       |
 | Friend  | Ryzen 5 5500 | RTX 3050    | TBD   | TBD               | TBD        |
-| Mac     | TBD          | Integrated  | TBD   | Retina            | None       |
+| Mac     | Apple M4     | Integrated  | 16 GB | Retina, 60 Hz     | None       |
+
+The Mac is a MacBook Air: it has no fan, so it slows down under long heavy work to stay cool. Its memory is shared
+between the processor and the graphics card.
 
 ## 1. Zoom and pan
 
 - Mine: 144 FPS (the monitor's maximum) while zooming and panning, with the paper empty and with the whole paper painted.
+- Mac: 60 FPS (the screen's maximum), with the paper empty and with the whole paper painted.
+- Mac trackpad: pinch zooms and dragging with two fingers moves the view.
 
 ## 2. Brush
 
 - Mine: 144 FPS while painting, including fast strokes with a big brush.
+- Mac: 60 FPS the whole time while painting.
 - The brush follows the cursor exactly at every zoom level.
 - Paint used to go past the right and bottom edges of the paper, because 10000 is not a multiple of 256: the last
   column and row of tiles reached 10240. Fix: cut the edge tiles to the project size (applied).
@@ -31,13 +37,16 @@ drawing experience on large canvases, before rewriting the editor.
 
 ## 4. Export (10000×10000 PNG)
 
-| Drawing      | Tiles | Assemble | Encode  | File size |
-| ------------ | ----- | -------- | ------- | --------- |
-| Two dots     | 2     | 13 ms    | 1226 ms | 1.8 MB    |
-| Small stroke | 148   | 185 ms   | 1142 ms | 7.9 MB    |
-| Whole paper  | 1600  | 1230 ms  | 980 ms  | 1.8 MB    |
+| Machine | Drawing      | Tiles | Assemble | Encode  | File size |
+| ------- | ------------ | ----- | -------- | ------- | --------- |
+| Mine    | Two dots     | 2     | 13 ms    | 1226 ms | 1.8 MB    |
+| Mine    | Small stroke | 148   | 185 ms   | 1142 ms | 7.9 MB    |
+| Mine    | Whole paper  | 1600  | 1230 ms  | 980 ms  | 1.8 MB    |
+| Mac     | Whole paper  | 1600  | 618 ms   | 382 ms  | 1.8 MB    |
 
 - The small stroke was measured in an automated test (headless Chrome) on my machine; the two dots in my browser.
+- The Mac exported the whole paper in about 1 s, twice as fast as my PC. On Macs the processor and the graphics
+  card share the same memory, so reading the tiles back is cheaper (about 0.4 ms per tile instead of 0.8 ms).
 - The output is correct: full size, white background, drawing in the right place, eraser respected.
 - Assembling grows with the number of tiles: about 0.8 ms per tile, almost all of it reading the tile back from the
   graphics card. With the whole paper painted it becomes the slowest part (1.2 s).
@@ -66,6 +75,10 @@ drawing experience on large canvases, before rewriting the editor.
 - Expected: 1600 tiles × 256 KB ≈ 0.4 GB. The Task Manager only shows one decimal (±0.1 GB), and each tile may
   have some extra overhead as a render target. Worth measuring more precisely in the real app.
 - On my friend's RTX 3050 (6–8 GB), a whole 10000×10000 layer would use under 10% of the graphics card's memory.
+- Mac (Chrome's Task Manager): the tab used 121 MB with the paper empty and 171 MB with the whole paper painted.
+  The GPU process used 380 MB with the paper empty and 1.1 GB with the whole paper painted (+0.7 GB). Unlike the
+  measurement on my PC, this one includes the undo history: painting over tiles that already had paint keeps copies
+  of them (up to 2000 copies, about 500 MB), so the tiles themselves are only part of it.
 
 ## 6. CPU throttling (Chrome DevTools, Performance tab)
 
@@ -80,6 +93,7 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
 - Before a stroke paints on a tile for the first time, a copy of the tile is kept on the graphics card (or `null` if
   the tile didn't exist). Undo swaps the copies with the tiles; redo swaps them back, so one step works both ways.
 - Mine: undo and redo of 13–271 tiles took 2–10 ms (time to send the work to the graphics card).
+- Mac: undo and redo of 270 tiles took 6–7 ms.
 - The history is limited by the number of tile copies (2000, about 500 MB), not by the number of steps: a dot changes
   1 tile, a big stroke can change hundreds.
 - Tested: undo, redo, redo cleared after a new stroke, eraser strokes, and dropping the oldest steps past the limit.
@@ -115,9 +129,12 @@ On my machine everything ran at 144 FPS, even with the whole 10000×10000 paper 
 size. With the CPU slowed down 4×, it stayed smooth. Undo and redo with tile copies, the biggest technical risk left,
 work and take only a few milliseconds.
 
+The MacBook Air (M4, integrated graphics) also stayed at its screen's maximum of 60 FPS in every test, and exported
+twice as fast as my PC.
+
 Pending:
 
 - Confirm on my friend's machine (Ryzen 5 5500, RTX 3050) with a pen tablet: smoothness, pressure, and how the
   brush feels to an artist. If it is not smooth there, revisit before migrating.
 - Measure the graphics card memory more precisely (the Task Manager only shows one decimal).
-- Test on the Mac (integrated graphics) as a reference for an average machine.
+- Test several layers: how many fully painted layers fit in memory and still draw smoothly.
