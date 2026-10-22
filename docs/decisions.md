@@ -211,7 +211,9 @@ for the history) or **open** (not decided yet).
   - **0.1.0** (tag `v0.1.0`, branch `main` on 2026-10-22): the first usable version. Start screen with a custom canvas
     size, drawing with mouse or pen, brush color and size, eraser, undo, save and open `.lyd` projects, PNG export. It
     still uses strokes stored as data (decision 3).
-  - **0.2.0** (next): the tile engine from the spike inside the main app.
+  - **0.2.0** (tag `v0.2.0`, branch `main` on 2026-10-22): the tile engine from the spike inside the main app.
+    Canvases up to 10000×10000, brush with pen pressure, eraser, zoom and pan, undo and redo, layers (add, choose,
+    hide, opacity), clear a layer, save and open the new `.lyd` format (decision 21), PNG export.
   - **1.0.0:** the desktop app, packaged with Electron.
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is.
