@@ -231,14 +231,112 @@ drawings with many layers.
 - RAM: 400 MB per full layer, because nothing is compressed yet. 20 full layers take 8 GB, too much for a 16 GB Mac.
   Next: store tiles of a single color as just that color, and compress the others.
 
+## 11. Compressing the tiles in RAM
+
+What changed:
+
+- A tile of a single color (a filled area) is kept as just that color: 4 bytes instead of 256 KB.
+- The other tiles are compressed with LZ4 by a worker, on another core of the processor, in the background. LZ4 was
+  chosen because it unpacks fast: a tile is unpacked every time it goes back to the graphics card, sometimes while
+  painting. Checked against another LZ4 library: each reads what the other writes.
+- New keys: S scribbles thousands of random soft strokes of random colors over the active layer (realistic pixels,
+  unlike F, whose tiles all have one color); L shows the layers and how much memory they take.
+- The undo history is limited by memory (500 MB) instead of by number of tiles.
+- Each tile now gets only the dabs that touch it (it was in the list of optimizations below).
+
+Compression methods compared on tiles made by S (per 256×256 tile, on my processor):
+
+| Method                                | Size left | Unpack |
+| ------------------------------------- | --------- | ------ |
+| LZ4 (chosen)                          | 60%       | 0.8 ms |
+| LZ4 compiled to WebAssembly           | 59%       | 0.3 ms |
+| Deflate with a filter (what PNG does) | 24%       | 2.6 ms |
+
+On made-up line art and flat colors, LZ4 leaves 2–5% of the size. Soft gradients are what compresses worst.
+
+Tested in a browser without a screen (the graphics card is simulated there, but the processor times are real):
+
+- A layer filled with F: 1600 tiles in 0.0 MB (it was 400 MB).
+- A layer scribbled with S: about 227 MB (it was 400 MB). One worker takes ~5.5 s to compress it, in the background.
+- The image stays exactly the same after tiles go to RAM and back, and after undo, redo and export.
+- **Problem:** painting on layer 3 of 6 scribbled layers, right after switching to it, spent 650 ms of a ~1 s stroke
+  unpacking (818 tiles). Every new tile the brush touches needs the tiles of all the layers at that place, and each
+  one has to be unpacked first. With 20 such layers it would be about 3 times worse. Hiding a scribbled layer (H):
+  ~5 s unpacking.
+
+Conclusion:
+
+- Tiles of a single color: a clear win, with no downside.
+- Compression trades RAM for processor time, and unpacking becomes the bottleneck when many layers are full of
+  detailed painting.
+- For the real app, do what Krita and Photoshop do: a **memory budget**. Keep tiles uncompressed while there is RAM
+  to spare and compress only the least recently used ones beyond it (on a 32 GB PC, 20 full layers would never be
+  compressed; on a 16 GB Mac, part of them would). Also: unpack in workers instead of the main thread, put "below"
+  back together in the background after switching layers, and use LZ4 compiled to WebAssembly.
+- 20 layers full of detailed painting at 10000×10000 is the extreme case: 8 GB uncompressed, ~4.5 GB with LZ4, ~2 GB
+  with deflate. Krita and Photoshop also have to use the disk for this.
+
+Retested (mine):
+
+- 20 layers filled with F: the tab takes **165 MB** (it was about 8 GB), still 144 FPS while painting. The graphics
+  card process: 2.5 GB.
+- 5 layers scribbled with S: each scribble freezes the screen for about 1 s; once compressed, ~230 MB per layer.
+- Painting on a middle layer of the scribbled ones, with a big brush (strokes of 540–680 tiles): the FPS drops below
+  70 at times and is unstable. The same problem the test without a screen found.
+- To find out whether unpacking is the only cause, `spike.html?raw` keeps every tile uncompressed (tiles of a single
+  color are still kept as just the color). It was still unstable that way (strokes of 790–960 tiles), so there was a
+  second cause.
+- The second cause: a stroke that big needs about 5 times as many tiles as it touches (every layer at each place), more
+  than the 2000 the graphics card cache keeps. So the cache threw out tiles painted moments before, and throwing out a
+  painted tile meant reading it back while the processor waited (46 to 379 times per stroke, in the test without a
+  screen). Fixed: the cache now only throws out tiles that are not painted, and painted tiles stay until the background
+  saving has them in RAM (the cache can go over its budget meanwhile). Time spent painting a big stroke, without
+  compression: 289 / 958 / 423 ms before, 217 / 222 / 152 ms after. With compression it is still ~1 s per stroke,
+  almost all of it unpacking, which confirms the memory budget.
+- Retested with `?raw` (mine): much less unstable, but the screen still froze for a moment at the start of each
+  stroke. The first dab of a big brush covers dozens of tiles at once, and each of them needed every layer at that
+  place sent to the graphics card in the same frame: 25–45 ms for the first event (140–245 new textures), against
+  ~2 ms for each of the following ones.
+- Fixed: while the pointer moves over the paper without painting, the tiles under the brush are made ready, using at
+  most 3 ms of each frame. Starting a stroke after the pointer rested for a moment: 0.5–1.5 ms for the first event.
+- Retested (mine), pushing it to the limit: scribbling 4 layers back to back, then scribbling fast with a big brush on
+  one of them. The faster the brush moved, the worse it got: below 7 FPS at times, and once a freeze of ~200 ms. Three
+  causes:
+  1. A mistake in the cache fix above: painted tiles still counted against the budget. With ~6400 painted tiles
+     waiting to be saved, every other tile was thrown out after each tile was put together, and sent again the next
+     time.
+  2. The background saving (~400 tiles per second here) stopped while painting, so painted tiles piled up.
+  3. Painting over tiles not saved yet needs a read for undo for each of them (~400 per stroke here).
+- Fixed: the budget counts only tiles that are not painted, and the saving goes on while painting (fewer tiles per
+  frame, skipping the tiles of the current stroke). Same scenario in the test without a screen: time spent painting
+  per stroke 109–222 ms before, 35–54 ms after; the worst event 13 ms before, 3 ms after.
+- Still open, for the real app: reading tiles back costs a lot per tile, so saving is slow; reading many tiles in one
+  go (copying them into one big texture first) would make it much faster. And painted tiles that are not saved yet
+  have no limit on the graphics card.
+- Retested (mine), same test: much better. 144 FPS with strokes of ~1300 tiles over scribbled layers, and the
+  background saving got faster too (8000 tiles in 11.6 s, ~690 per second).
+- Undo of a long stroke with a big brush, right after painting it: 440–930 ms for 1100–1200 tiles (mine). To keep the
+  tiles for redo, undo read every painted tile that wasn't saved yet while the processor waited, and the tiles kept
+  for undo that were still on their way were fetched to RAM and sent back to the graphics card. Fixed: undo keeps an
+  IOU for redo instead of waiting, and puts IOU pixels back straight from the read's buffer on the graphics card
+  (WebGL2 can copy a buffer into a texture), with no trip to RAM. Nothing waits for the graphics card anymore. In the
+  test without a screen, for 561 tiles: undo 468 → 251 ms (what is left is sending saved tiles from RAM, which is
+  much slower on the simulated graphics card than on a real one), redo right after 272 → 14 ms.
+- Retested (mine): undo of strokes of 1000–1180 tiles in 386–420 ms (it was 440–930 ms); small strokes 2–3 ms. What is
+  left is sending ~1000 tiles from RAM to the graphics card, ~0.35 ms each.
+- For the real app: keep a copy on the graphics card of the tiles of the last stroke, so undoing it doesn't send
+  anything from RAM. Section 7 kept every undo copy on the graphics card and swapped 271 tiles in under 10 ms, so a
+  stroke of ~1200 tiles would take roughly 40 ms.
+
 ## Optimizations for the real app
 
 - Collect the dabs from pointer events and render them once per frame, instead of once per event
-- Render into each tile only the dabs that touch it, instead of all the dabs of the event
+- A memory budget for the tiles in RAM, with unpacking in workers (see section 11)
+- Put "below" back together in the background after switching layers, starting with the tiles on the screen
 - Stop rendering every frame when nothing changes (PixiJS renders continuously by default), to save battery on laptops
 - Encode the exported PNG in a Web Worker, so the screen doesn't freeze, and show progress while exporting
-- Read the tiles back from the graphics card faster when exporting (in bigger batches, or asynchronously),
-  since it takes about 0.8 ms per tile
+- Read the tiles back from the graphics card in bigger batches (copy many tiles into one big texture and read it in
+  one go), for exporting and for the background saving (see section 11)
 - Don't create tiles for eraser strokes where there is no paint (today the eraser creates empty tiles, wasting
   memory)
 
@@ -262,11 +360,14 @@ work and take only a few milliseconds.
 The MacBook Air (M4, integrated graphics) also stayed at its screen's maximum of 60 FPS in every test, and exported
 twice as fast as my PC.
 
+Many layers (sections 8–11): the screen draws only the projection, so the FPS doesn't depend on the number of layers.
+The layers live in RAM, with the graphics card as a cache, so 20 full layers fit; tiles of a single color take almost
+no memory. Pushed to the limit, the weak spots found all have a fix, either already in the spike or on the list above.
+
 Pending:
 
 - Confirm on my friend's machine (Ryzen 5 5500, RTX 3050) with a pen tablet: smoothness, pressure, and how the
   brush feels to an artist. If it is not smooth there, revisit before migrating.
 - Measure the graphics card memory more precisely (the Task Manager only shows one decimal).
-- Several layers: the projection keeps 144 FPS with 10 full layers, but they still almost fill an 8 GB graphics card.
-  Before migrating, test keeping the layers that are not being painted on in RAM.
+- Test section 11 on the Mac (16 GB): RAM with F and S layers, and how painting feels over several S layers.
 - Ask my friend the canvas size and number of layers of a typical drawing of hers: memory grows with both.

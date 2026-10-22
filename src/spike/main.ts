@@ -1,5 +1,6 @@
 import { Application, BufferImageSource, Container, Graphics, RenderTexture, Sprite, Texture } from 'pixi.js'
 import type { GlRenderTarget, GlRenderTargetAdaptor, WebGLRenderer } from 'pixi.js'
+import { decompress } from './lz4'
 
 const PROJECT_WIDTH = 10000
 const PROJECT_HEIGHT = 10000
@@ -25,7 +26,7 @@ function createBrushTip(hardness: number) {
   return Texture.from(canvas)
 }
 
-type Dab = { x: number; y: number; size: number }
+type Dab = { x: number; y: number; size: number; color?: number } // without a color, the dab uses the brush color
 
 async function main() {
   const app = new Application()
@@ -120,11 +121,19 @@ async function main() {
   const COLUMNS = Math.ceil(PROJECT_WIDTH / TILE_SIZE)
   const ROWS = Math.ceil(PROJECT_HEIGHT / TILE_SIZE)
 
+  // A tile's pixels in RAM, kept in the smallest form that gives back exactly the same pixels. Only one of the three is
+  // set. The pixels never change, only get replaced by new ones, so the undo history can keep a tile without copying
+  // it; only the form changes, when the compressor finishes
+  type StoredTile = {
+    color?: number // every pixel has this same color (a filled area): 4 bytes instead of 256 KB
+    pixels?: Uint8ClampedArray // not compressed (yet)
+    packed?: Uint8Array // compressed (see lz4.ts)
+  }
+
   type Layer = {
     id: number
-    // "column,row" -> the tile's pixels in RAM. Pixels are never changed, only replaced by new ones, so the undo
-    // history can keep them without copying. Tiles without paint are not stored at all
-    tiles: Map<string, Uint8ClampedArray>
+    // "column,row" -> the tile in RAM. Tiles without paint are not stored at all
+    tiles: Map<string, StoredTile>
     visible: boolean
     opacity: number // from 0 (invisible) to 1
     blendMode: 'normal' | 'multiply'
@@ -175,8 +184,9 @@ async function main() {
     app.renderer.render({ container: copySprite, target, clear: true })
   }
 
-  // Send a tile's pixels from RAM to a texture on the graphics card (fast)
-  function upload(pixels: Uint8ClampedArray, target: RenderTexture) {
+  // Send a tile from RAM to a texture on the graphics card (fast)
+  function upload(tile: StoredTile, target: RenderTexture) {
+    const pixels = unpack(tile, target.width, target.height)
     const size = `${target.width}x${target.height}`
     let staging = stagingTextures.get(size)
     if (!staging) {
@@ -198,20 +208,105 @@ async function main() {
     uploadCount++
   }
 
-  // Tiles that are completely transparent are not kept in RAM, so empty tiles take no memory at all
-  function emptyToNull(pixels: Uint8ClampedArray) {
-    for (let i = 3; i < pixels.length; i += 4) {
-      if (pixels[i] !== 0) return pixels
+  // ----- Keeping tiles small in RAM -----
+
+  // Open spike.html?raw to keep every tile uncompressed, to compare how painting feels with and without compression
+  const COMPRESS_TILES = !new URLSearchParams(location.search).has('raw')
+
+  // Turn pixels read back from the graphics card into a stored tile: nothing for a tile without paint (null), just the
+  // color for a tile of a single color, and the pixels themselves otherwise, which are then sent to the compressor
+  function toStoredTile(pixels: Uint8ClampedArray): StoredTile | null {
+    // Look at each pixel as one number (its 4 bytes together), to compare whole pixels at once
+    const colors = new Uint32Array(pixels.buffer, pixels.byteOffset, pixels.length / 4)
+    const first = colors[0]
+    let isOneColor = true
+    let isEmpty = true
+    for (let i = 0; i < colors.length && (isOneColor || isEmpty); i++) {
+      if (colors[i] !== first) isOneColor = false
+      if (pixels[i * 4 + 3] !== 0) isEmpty = false // the pixel's alpha
     }
-    return null
+    if (isEmpty) return null
+    if (isOneColor) return { color: first }
+    const tile: StoredTile = { pixels }
+    if (COMPRESS_TILES) compressLater(tile)
+    return tile
   }
 
-  // Read a tile's pixels back from the graphics card into RAM, right now. Slow: the processor has to wait until the
-  // graphics card has finished all the work it was given. Used only when the pixels are needed immediately
-  function readBack(texture: RenderTexture) {
-    const { pixels } = app.renderer.extract.pixels(texture)
-    readBackCount++
-    return emptyToNull(pixels)
+  // How much RAM a stored tile takes
+  function bytesOf(tile: StoredTile) {
+    return tile.pixels?.length ?? tile.packed?.length ?? 4
+  }
+  const toMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(1)
+
+  const unpackBuffers = new Map<string, Uint8ClampedArray>() // one per tile size, reused to unpack tiles
+
+  // The pixels of a stored tile. Unpacked pixels go into a buffer that is reused, so they are only valid until the
+  // next call
+  function unpack(tile: StoredTile, width: number, height: number) {
+    if (tile.pixels) return tile.pixels
+    const size = `${width}x${height}`
+    let buffer = unpackBuffers.get(size)
+    if (!buffer) {
+      buffer = new Uint8ClampedArray(width * height * 4)
+      unpackBuffers.set(size, buffer)
+    }
+    if (tile.packed) decompress(tile.packed, buffer)
+    else new Uint32Array(buffer.buffer).fill(tile.color!) // every pixel gets the same color
+    return buffer
+  }
+
+  // Most tiles have big areas of one color or of transparency, which can be kept in much less memory (see lz4.ts). A
+  // worker compresses them in the background, on another core of the processor, so painting never waits for it. It
+  // gets a copy of the pixels, so the tile can still be used while it is being compressed
+  const compressor = new Worker(new URL('./compressor.ts', import.meta.url), { type: 'module' })
+  const compressQueue: StoredTile[] = [] // tiles waiting for their turn
+  const compressing = new Map<number, StoredTile>() // job number -> the tile being compressed
+  const MAX_COMPRESSING = 8 // each job holds a copy of the tile, so only a few are sent at a time
+  let nextJob = 0
+  // Measurements: the tiles compressed since the compressor last had nothing to do, and their size before and after
+  let compressedCount = 0
+  let compressStart = 0
+  let bytesBefore = 0
+  let bytesAfter = 0
+
+  function compressLater(tile: StoredTile) {
+    compressQueue.push(tile)
+    sendToCompressor()
+  }
+
+  function sendToCompressor() {
+    while (compressing.size < MAX_COMPRESSING && compressQueue.length > 0) {
+      if (compressedCount === 0 && compressing.size === 0) compressStart = performance.now()
+      const tile = compressQueue.shift()!
+      compressing.set(nextJob, tile)
+      compressor.postMessage({ job: nextJob, pixels: tile.pixels })
+      nextJob++
+    }
+  }
+
+  compressor.onmessage = (e: MessageEvent<{ job: number; packed: Uint8Array }>) => {
+    const { job, packed } = e.data
+    const tile = compressing.get(job)!
+    compressing.delete(job)
+    const pixels = tile.pixels!
+    // Keep whichever is smaller (pixels that look like noise don't get smaller)
+    if (packed.length < pixels.length) {
+      tile.packed = packed
+      tile.pixels = undefined
+    }
+    compressedCount++
+    bytesBefore += pixels.length
+    bytesAfter += bytesOf(tile)
+    sendToCompressor()
+
+    if (compressing.size > 0) return
+    const time = Math.round(performance.now() - compressStart)
+    console.log(
+      `Compressed ${compressedCount} tiles in the background over ${time} ms: ${toMB(bytesBefore)} MB -> ${toMB(bytesAfter)} MB`,
+    )
+    compressedCount = 0
+    bytesBefore = 0
+    bytesAfter = 0
   }
 
   // ----- The graphics card cache -----
@@ -237,10 +332,10 @@ async function main() {
     if (cached) {
       gpuTiles.delete(id) // it goes back in at the end: it is now the most recently used tile
     } else {
-      const pixels = layer.tiles.get(key)
-      if (!pixels && !create) return null
+      const tile = layer.tiles.get(key)
+      if (!tile && !create) return null
       const texture = createTexture(column, row)
-      if (pixels) upload(pixels, texture)
+      if (tile) upload(tile, texture)
       cached = { layer, key, texture, dirty: false, version: 0, readingVersion: -1 }
     }
     gpuTiles.set(id, cached)
@@ -258,30 +353,24 @@ async function main() {
   }
 
   // Keep a tile's latest pixels in RAM (null = no paint)
-  function storePixels(cached: CachedTile, pixels: Uint8ClampedArray | null) {
-    if (pixels) cached.layer.tiles.set(cached.key, pixels)
+  function keepInRam(cached: CachedTile, tile: StoredTile | null) {
+    if (tile) cached.layer.tiles.set(cached.key, tile)
     else cached.layer.tiles.delete(cached.key)
     cached.dirty = false
     dirtyTiles.delete(cached)
   }
 
-  // Read a painted tile back into RAM right now, so RAM has its latest pixels
-  function saveTile(cached: CachedTile) {
-    storePixels(cached, readBack(cached.texture))
-  }
-
-  // Before using a tile's pixels in RAM, make sure they are the latest ones
-  function saveIfDirty(layer: Layer, key: string) {
-    const cached = gpuTiles.get(`${layer.id}/${key}`)
-    if (cached?.dirty) saveTile(cached)
-  }
-
   // Free graphics card memory: remove the least recently used tiles until the cache fits its budget again.
-  // Painted tiles are read back into RAM first, so nothing is lost
+  // Painted tiles are skipped and don't count against the budget: reading them back now would make the processor wait
+  // for the graphics card, so they stay until the background saving has their pixels in RAM. If they counted, many
+  // painted tiles would push out every other tile, and the layers above and below would be sent again and again
+  const TRIM_BATCH = 32 // tiles over the budget before trimming, so the cache isn't searched every time
   function trimGpuCache() {
+    const cleanCount = () => gpuTiles.size - dirtyTiles.size
+    if (cleanCount() <= GPU_CACHE_TILES + TRIM_BATCH) return
     for (const [id, cached] of gpuTiles) {
-      if (gpuTiles.size <= GPU_CACHE_TILES) break
-      if (cached.dirty) saveTile(cached)
+      if (cleanCount() <= GPU_CACHE_TILES) break
+      if (cached.dirty) continue
       cached.texture.destroy(true)
       gpuTiles.delete(id)
     }
@@ -295,8 +384,8 @@ async function main() {
   // instead of stopping the production line to inspect one piece
   const renderer = app.renderer as WebGLRenderer
   const gl = renderer.gl as WebGL2RenderingContext
-  // Pixels that are on their way from the graphics card, like an IOU: "pixels" is filled in when the read finishes
-  type PendingPixels = { read: PendingRead; pixels?: Uint8ClampedArray | null }
+  // Pixels that are on their way from the graphics card, like an IOU: "tile" is filled in when the read finishes
+  type PendingPixels = { read: PendingRead; tile?: StoredTile | null }
   type PendingRead = {
     cached: CachedTile
     version: number // the tile's version when the read started
@@ -352,10 +441,10 @@ async function main() {
       gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels)
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
       readBackCount++
-      const result = emptyToNull(pixels)
-      for (const waiter of read.waiters) waiter.pixels = result
+      const tile = toStoredTile(pixels)
+      for (const waiter of read.waiters) waiter.tile = tile
       if (isLatest) {
-        storePixels(cached, result)
+        keepInRam(cached, tile)
         saved = true
       }
     }
@@ -380,8 +469,24 @@ async function main() {
 
   // Get the pixels of an IOU, waiting for its read if it hasn't finished yet
   function redeem(pending: PendingPixels) {
-    if (pending.pixels === undefined) completeRead(pending.read)
-    return pending.pixels!
+    if (pending.tile === undefined) completeRead(pending.read)
+    return pending.tile ?? null
+  }
+
+  // Copy the pixels of a read that hasn't been fetched into a texture, straight from the read's buffer: everything
+  // stays on the graphics card, so nothing waits
+  function restoreFromRead(read: PendingRead, target: RenderTexture) {
+    renderer.texture.bind(target.source, 0) // bind it through PixiJS, so PixiJS knows which texture is bound
+    // These two must be off when the pixels come from a buffer; they are put back afterwards for PixiJS
+    const flipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL)
+    const premultiply = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
+    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, read.buffer)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, read.width, read.height, gl.RGBA, gl.UNSIGNED_BYTE, 0)
+    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY)
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultiply)
   }
 
   // ----- Projection -----
@@ -488,43 +593,49 @@ async function main() {
 
   // ----- Undo -----
 
-  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, the tile's pixels from
-  // before the stroke (null = the tile had no paint). Pixels are never changed, so no copy is needed. If the tile's
-  // latest pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or two later
-  type TileBackup = Uint8ClampedArray | null | PendingPixels
+  // Each undo step keeps the layer that was painted on and, for every tile the stroke touched, the tile from before
+  // the stroke (null = the tile had no paint). Pixels are never changed, so no copy is needed. If the tile's latest
+  // pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or two later
+  type TileBackup = StoredTile | null | PendingPixels
   type UndoStep = { layer: Layer; tiles: Map<string, TileBackup> }
   const undoStack: UndoStep[] = []
   const redoStack: UndoStep[] = []
   let strokeBackup: UndoStep | null = null // the step being recorded while the user paints
-  const MAX_UNDO_TILES = 2000 // tiles kept for undo and redo: about 500 MB of RAM
+  const MAX_UNDO_BYTES = 500 * 1024 * 1024 // RAM kept for undo and redo
 
-  // Before a stroke paints on a tile for the first time, keep its pixels from before the stroke
-  function backUpTile(key: string) {
-    if (!strokeBackup || strokeBackup.tiles.has(key)) return // not painting, or already saved during this stroke
-    const { layer } = strokeBackup
+  // What a layer's tile has right now, to keep for undo or redo: the tile in RAM or, if its latest pixels are still
+  // only on the graphics card, an IOU, read without waiting. The read gets the tile as it is now, even if something
+  // changes it right afterwards, because the graphics card works in order. A read of this same version may already be
+  // on its way
+  function currentTile(layer: Layer, key: string): TileBackup {
     const cached = gpuTiles.get(`${layer.id}/${key}`)
-    if (cached?.dirty) {
-      // Painted again before its pixels reached RAM: read it without waiting and keep an IOU. The read happens before
-      // the new dabs, because the graphics card works in order. A read of this same version may already be on its way
-      const read = pendingReads.find(r => r.cached === cached && r.version === cached.version) ?? startRead(cached)
-      const pending: PendingPixels = { read }
-      read.waiters.push(pending)
-      strokeBackup.tiles.set(key, pending)
-    } else {
-      strokeBackup.tiles.set(key, layer.tiles.get(key) ?? null)
+    if (!cached?.dirty) return layer.tiles.get(key) ?? null
+    const read = pendingReads.find(r => r.cached === cached && r.version === cached.version) ?? startRead(cached)
+    const pending: PendingPixels = { read }
+    read.waiters.push(pending)
+    return pending
+  }
+
+  // Before a stroke paints on a tile for the first time, keep what the tile had before the stroke
+  function backUpTile(key: string) {
+    if (!strokeBackup || strokeBackup.tiles.has(key)) return // not painting, or already kept during this stroke
+    strokeBackup.tiles.set(key, currentTile(strokeBackup.layer, key))
+  }
+
+  // The tile a backup stands for (an IOU is redeemed first)
+  function tileOf(backup: TileBackup) {
+    return backup && 'read' in backup ? redeem(backup) : backup
+  }
+
+  // How much RAM a step keeps (tiles that had no paint cost nothing)
+  function stepBytes(step: UndoStep) {
+    let bytes = 0
+    for (const backup of step.tiles.values()) {
+      const tile = backup && 'read' in backup ? backup.tile : backup
+      if (tile) bytes += bytesOf(tile)
+      else if (tile === undefined) bytes += TILE_SIZE * TILE_SIZE * 4 // an IOU not filled in yet counts as a whole tile
     }
-  }
-
-  // The pixels a backup stands for (an IOU is redeemed first)
-  function pixelsOf(backup: TileBackup) {
-    return backup === null || backup instanceof Uint8ClampedArray ? backup : redeem(backup)
-  }
-
-  // How many tiles with pixels a step keeps (tiles that had no paint cost nothing)
-  function countCopies(step: UndoStep) {
-    let count = 0
-    for (const pixels of step.tiles.values()) if (pixels) count++
-    return count
+    return bytes
   }
 
   // Put the saved pixels back into the layer, and keep in the step what the layer had instead.
@@ -534,19 +645,31 @@ async function main() {
     const isBelowActive = layers.indexOf(step.layer) < layers.indexOf(activeLayer)
     for (const [key, backup] of step.tiles) {
       const [column, row] = key.split(',').map(Number)
-      const saved = pixelsOf(backup)
-      saveIfDirty(step.layer, key)
-      const current = step.layer.tiles.get(key) ?? null
-      if (saved) step.layer.tiles.set(key, saved)
-      else step.layer.tiles.delete(key)
-      step.tiles.set(key, current)
+      const current = currentTile(step.layer, key) // what the layer has now, to swap back later
 
-      // If the graphics card has a copy of this tile, update it too
-      const cached = gpuTiles.get(`${step.layer.id}/${key}`)
-      if (cached) {
-        if (saved) upload(saved, cached.texture)
-        else clearTexture(cached.texture)
+      if (backup && 'read' in backup && backup.tile === undefined) {
+        // An IOU whose pixels haven't been fetched: they are still on the graphics card, in the read's buffer, so put
+        // them back from there instead of bringing them to RAM and back. The tile is now newer than RAM, like a
+        // painted tile, and the background saving takes care of it
+        restoreFromRead(backup.read, getGpuTile(step.layer, column, row, true)!)
+        markDirty(step.layer, key)
+      } else {
+        const saved = tileOf(backup) // no waiting: an IOU here already has its pixels
+        if (saved) step.layer.tiles.set(key, saved)
+        else step.layer.tiles.delete(key)
+
+        // If the graphics card has a copy of this tile, update it too. It now has the same pixels as RAM, so it doesn't
+        // need saving anymore, and a read of its old pixels still on its way must not be kept as its latest
+        const cached = gpuTiles.get(`${step.layer.id}/${key}`)
+        if (cached) {
+          if (saved) upload(saved, cached.texture)
+          else clearTexture(cached.texture)
+          cached.dirty = false
+          cached.version++
+          dirtyTiles.delete(cached)
+        }
       }
+      step.tiles.set(key, current)
 
       // A layer under the active one is part of "below", so that tile must be put together again too
       if (isBelowActive) staleBelow.add(key)
@@ -577,10 +700,10 @@ async function main() {
     redoStack.length = 0
 
     // When the history takes too much memory, forget the oldest steps (but always keep the newest one)
-    let copyCount = 0
-    for (const s of undoStack) copyCount += countCopies(s)
-    while (copyCount > MAX_UNDO_TILES && undoStack.length > 1) {
-      copyCount -= countCopies(undoStack.shift()!)
+    let bytes = 0
+    for (const s of undoStack) bytes += stepBytes(s)
+    while (bytes > MAX_UNDO_BYTES && undoStack.length > 1) {
+      bytes -= stepBytes(undoStack.shift()!)
     }
   }
 
@@ -591,37 +714,23 @@ async function main() {
   let brushColor = '#000000'
   let isErasing = false
 
-  // The dabs of one pointer event are put in "stamp" and rendered once into each tile they touch
+  // The dabs that touch a tile are put in "stamp" and rendered into that tile at once
   const stampRoot = new Container()
   const stamp = new Container()
   stampRoot.addChild(stamp)
-  const dabSprites: Sprite[] = [] // reused between events instead of creating new sprites every time
+  const dabSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
 
   function paintDabs(dabs: Dab[]) {
-    stamp.removeChildren()
-    const touchedTiles = new Set<string>()
-
-    dabs.forEach((dab, i) => {
-      let sprite = dabSprites[i]
-      if (!sprite) {
-        sprite = new Sprite(brushTip)
-        sprite.anchor.set(0.5) // position the dab by its center
-        dabSprites[i] = sprite
-      }
-      sprite.position.set(dab.x, dab.y)
-      sprite.width = dab.size
-      sprite.height = dab.size
-      sprite.tint = brushColor
-      sprite.blendMode = isErasing ? 'erase' : 'normal' // the eraser removes paint from the tile instead of adding it
-      stamp.addChild(sprite)
-
+    // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
+    const dabsByTile = new Map<string, Dab[]>()
+    for (const dab of dabs) {
       // The part of the dab that is on the paper (the rest is cut off)
       const radius = dab.size / 2
       const left = Math.max(0, dab.x - radius)
       const right = Math.min(PROJECT_WIDTH, dab.x + radius)
       const top = Math.max(0, dab.y - radius)
       const bottom = Math.min(PROJECT_HEIGHT, dab.y + radius)
-      if (left >= right || top >= bottom) return // the dab is entirely outside the paper
+      if (left >= right || top >= bottom) continue // the dab is entirely outside the paper
 
       // Which tiles does that part cover?
       const firstColumn = Math.floor(left / TILE_SIZE)
@@ -630,15 +739,36 @@ async function main() {
       const lastRow = Math.ceil(bottom / TILE_SIZE) - 1
       for (let column = firstColumn; column <= lastColumn; column++) {
         for (let row = firstRow; row <= lastRow; row++) {
-          touchedTiles.add(`${column},${row}`)
+          const key = `${column},${row}`
+          let tileDabs = dabsByTile.get(key)
+          if (!tileDabs) {
+            tileDabs = []
+            dabsByTile.set(key, tileDabs)
+          }
+          tileDabs.push(dab)
         }
       }
-    })
+    }
 
-    // Render all the dabs into each touched tile, shifted so that the tile's corner is at (0, 0)
-    for (const key of touchedTiles) {
+    // Render into each touched tile only the dabs that touch it, shifted so that the tile's corner is at (0, 0)
+    for (const [key, tileDabs] of dabsByTile) {
       const [column, row] = key.split(',').map(Number)
       backUpTile(key)
+      stamp.removeChildren()
+      tileDabs.forEach((dab, i) => {
+        let sprite = dabSprites[i]
+        if (!sprite) {
+          sprite = new Sprite(brushTip)
+          sprite.anchor.set(0.5) // position the dab by its center
+          dabSprites[i] = sprite
+        }
+        sprite.position.set(dab.x, dab.y)
+        sprite.width = dab.size
+        sprite.height = dab.size
+        sprite.tint = dab.color ?? brushColor
+        sprite.blendMode = isErasing ? 'erase' : 'normal' // the eraser removes paint from the tile instead of adding it
+        stamp.addChild(sprite)
+      })
       stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
       app.renderer.render({ container: stampRoot, target: getGpuTile(activeLayer, column, row, true)!, clear: false })
       markDirty(activeLayer, key)
@@ -714,21 +844,66 @@ async function main() {
     strokeBackup = null
   })
 
-  // Every frame: fetch the reads that are ready, then, if not painting, start reads for the painted tiles. Nothing waits,
-  // so letting go of the pen doesn't freeze the screen
+  // The first dab of a stroke can cover dozens of tiles at once, and each of them needs every layer at that place on
+  // the graphics card, which used to freeze the screen for a moment. So while the pointer moves over the paper without
+  // painting, the tiles under the brush are made ready, a few per frame
+  const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready
+  let hoverPoint: { x: number; y: number } | null = null // where the brush is waiting, or null when all is ready
+
+  app.canvas.addEventListener('pointermove', e => {
+    if (drawingPointerId === null && !panStart) hoverPoint = toProject(e)
+  })
+
+  // Make a tile ready for painting: its "below" up to date, and the active layer and the ones above on the graphics card
+  function prepareTile(column: number, row: number) {
+    if (staleBelow.delete(`${column},${row}`)) composeBelowTile(column, row)
+    for (let i = layers.indexOf(activeLayer); i < layers.length; i++) {
+      if (layers[i].visible) getGpuTile(layers[i], column, row, false)
+    }
+  }
+
+  app.ticker.add(() => {
+    if (!hoverPoint || drawingPointerId !== null) return
+    const start = performance.now()
+    // The tiles under the brush, as in paintDabs
+    const radius = brushSize / 2
+    const firstColumn = Math.max(0, Math.floor((hoverPoint.x - radius) / TILE_SIZE))
+    const lastColumn = Math.min(COLUMNS - 1, Math.floor((hoverPoint.x + radius) / TILE_SIZE))
+    const firstRow = Math.max(0, Math.floor((hoverPoint.y - radius) / TILE_SIZE))
+    const lastRow = Math.min(ROWS - 1, Math.floor((hoverPoint.y + radius) / TILE_SIZE))
+    for (let column = firstColumn; column <= lastColumn; column++) {
+      for (let row = firstRow; row <= lastRow; row++) {
+        prepareTile(column, row) // tiles that are already ready cost almost nothing
+        if (performance.now() - start > PREPARE_BUDGET_MS) return // continue in the next frame
+      }
+    }
+    hoverPoint = null // everything under the brush is ready
+    trimGpuCache()
+  })
+
+  // Every frame: fetch the reads that are ready, then start reads for the painted tiles. Nothing waits, so letting go of
+  // the pen doesn't freeze the screen. While painting, less is done, to leave the frame to the brush, and the tiles the
+  // stroke has touched are skipped, since they will change again in a moment
   const SAVE_BUDGET_MS = 4 // at most this much of each frame is spent fetching pixels
+  const SAVE_BUDGET_PAINTING_MS = 2
+  const MAX_READS_STARTED_PAINTING = 8 // reads started per frame while painting
   let savedCount = 0
   let saveStart = 0
   app.ticker.add(() => {
     if (dirtyTiles.size === 0 && pendingReads.length === 0) return
     if (savedCount === 0) saveStart = performance.now()
-    savedCount += finishReads(SAVE_BUDGET_MS)
+    const isPainting = drawingPointerId !== null
+    savedCount += finishReads(isPainting ? SAVE_BUDGET_PAINTING_MS : SAVE_BUDGET_MS)
+    trimGpuCache() // the tiles saved just now can leave the graphics card, if it is over its budget
 
-    if (drawingPointerId === null) {
-      for (const cached of dirtyTiles) {
-        if (pendingReads.length >= MAX_PENDING_READS) break
-        if (cached.readingVersion !== cached.version) startRead(cached)
-      }
+    let started = 0
+    for (const cached of dirtyTiles) {
+      if (pendingReads.length >= MAX_PENDING_READS) break
+      if (isPainting && started >= MAX_READS_STARTED_PAINTING) break
+      if (cached.readingVersion === cached.version) continue // already being read
+      if (strokeBackup?.layer === cached.layer && strokeBackup.tiles.has(cached.key)) continue // part of this stroke
+      startRead(cached)
+      started++
     }
     gl.flush() // send the reads to the graphics card now, so their fences can be signaled
 
@@ -754,21 +929,37 @@ async function main() {
   // ----- Layer controls and stress test -----
 
   // Show the layers in the console, from the top to the bottom, and how much memory they use.
-  // Each tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
+  // An uncompressed tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
   function logLayers() {
     let ramTiles = 0
+    let ramBytes = 0
+    let oneColor = 0
+    let compressed = 0
     const lines = layers.map((layer, i) => {
+      let layerBytes = 0
+      for (const tile of layer.tiles.values()) {
+        layerBytes += bytesOf(tile)
+        if (tile.color !== undefined) oneColor++
+        else if (tile.packed) compressed++
+      }
       ramTiles += layer.tiles.size
+      ramBytes += layerBytes
       const { opacity, blendMode, visible } = layer
       const marker = layer === activeLayer ? '>' : ' '
-      return `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, opacity ${opacity}, ${blendMode}${visible ? '' : ', hidden'}`
+      return (
+        `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, ${toMB(layerBytes)} MB, ` +
+        `opacity ${opacity}, ${blendMode}${visible ? '' : ', hidden'}`
+      )
     })
-    let undoTiles = 0
-    for (const step of [...undoStack, ...redoStack]) undoTiles += countCopies(step)
+    let undoBytes = 0
+    for (const step of [...undoStack, ...redoStack]) undoBytes += stepBytes(step)
+    const waiting = compressQueue.length + compressing.size
     const gpuTileCount = gpuTiles.size + projection.size + below.size
     console.log(
       `${lines.reverse().join('\n')}\n` +
-        `RAM: ${ramTiles} layer tiles (~${Math.round(ramTiles / 4)} MB) + ${undoTiles} undo tiles (~${Math.round(undoTiles / 4)} MB)\n` +
+        `RAM: ${toMB(ramBytes)} MB for ${ramTiles} layer tiles (~${Math.round(ramTiles / 4)} MB uncompressed; ` +
+        `${oneColor} of one color, ${compressed} compressed, ${waiting} waiting for the compressor) + ` +
+        `${toMB(undoBytes)} MB for undo\n` +
         `Graphics card: ${gpuTiles.size} cached layer tiles + ${projection.size} projection + ${below.size} below ` +
         `(~${Math.round(gpuTileCount / 4)} MB)\n` +
         `So far: ${uploadCount} tiles sent from RAM, ${readBackCount} read back into RAM`,
@@ -796,8 +987,38 @@ async function main() {
     logLayers()
   }
 
+  // Stress test with realistic pixels: cover the active layer with thousands of random soft strokes, like a painted
+  // background. Unlike F, its tiles don't have a single color, so they show how much compression really saves
+  function scribbleActiveLayer() {
+    if (drawingPointerId !== null) return // not in the middle of a stroke
+    const start = performance.now()
+    const dabs: Dab[] = []
+    for (let i = 0; i < 3000; i++) {
+      let x = Math.random() * PROJECT_WIDTH
+      let y = Math.random() * PROJECT_HEIGHT
+      let angle = Math.random() * Math.PI * 2
+      const size = 20 + Math.random() * 380
+      const length = 200 + Math.random() * 1800
+      const color = Math.floor(Math.random() * 0x1000000)
+      const spacing = size * BRUSH_SPACING
+      for (let along = 0; along < length; along += spacing) {
+        dabs.push({ x, y, size, color })
+        x += Math.cos(angle) * spacing
+        y += Math.sin(angle) * spacing
+        angle += (Math.random() - 0.5) * 0.1 // a gentle curve
+      }
+    }
+    strokeBackup = { layer: activeLayer, tiles: new Map() } // scribbling can be undone like a stroke
+    paintDabs(dabs)
+    console.log(`Scribbled ${dabs.length} dabs over the layer in ${Math.round(performance.now() - start)} ms`)
+    addUndoStep(strokeBackup)
+    strokeBackup = null
+    logLayers()
+  }
+
   // N adds a layer on top; the arrows choose the active layer; H hides or shows it; O changes its opacity;
-  // M switches it between normal and multiply; F fills it (to test many full layers)
+  // M switches it between normal and multiply; F fills it and S scribbles all over it (to test many full layers);
+  // L only shows the layers and their memory
   window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || drawingPointerId !== null) return
     const layer = activeLayer
@@ -812,7 +1033,8 @@ async function main() {
       activeLayer = layers[index]
       for (const key of below.keys()) staleBelow.add(key) // "below" now has different layers
     } else if (e.key === 'f') return fillActiveLayer()
-    else {
+    else if (e.key === 's') return scribbleActiveLayer()
+    else if (e.key !== 'l') {
       // These change how the active layer looks, so the whole projection must be put together again
       if (e.key === 'h') layer.visible = !layer.visible
       else if (e.key === 'o') layer.opacity = layer.opacity === 1 ? 0.5 : layer.opacity === 0.5 ? 0.25 : 1
