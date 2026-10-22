@@ -17,10 +17,12 @@ for the history) or **open** (not decided yet).
 ## 2. Desktop only, with mouse and pen
 
 - **Date:** 2026-10-19
-- **Status:** adopted (see "Phone or desktop?" in the open questions)
+- **Status:** adopted
 - **Decision:** Lydia is for desktop computers. It takes mouse and pen (drawing tablet) input, not touch.
 - **Why:** drawing on a computer with a tablet is the target. Supporting touch screens and phones would multiply the
   work.
+- **Confirmed (2026-10-22):** the artist friend, who drew on a phone, built a computer and now draws on it (see
+  "Phone or desktop?" in the open questions).
 
 ## 3. Strokes stored as data
 
@@ -451,6 +453,14 @@ for the history) or **open** (not decided yet).
 ### Phone or desktop?
 
 - **Date:** 2026-10-19
+- **Status:** answered (2026-10-22)
+- **Question:** the artist friend drew on a phone, while Lydia is desktop only (decision 2). Does the friend draw on a
+  computer too?
+- **Answer:** yes: the friend built a computer and left the phone for it. Lydia stays desktop only.
+
+### A typical drawing of the artist friend
+
+- **Date:** 2026-10-19
 - **Status:** open
-- **Question:** the artist friend draws on her phone, while Lydia is desktop only (decision 2). To ask her: does she
-  draw on a computer too, how big are her canvases, and how many layers does a typical drawing have?
+- **Question:** how big are the friend's canvases, and how many layers does a typical drawing have? The memory Lydia
+  needs grows with both (decisions 9 and 11).
