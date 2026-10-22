@@ -206,8 +206,8 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:** versions follow semantic versioning: three numbers, MAJOR.MINOR.PATCH. The first number stays at 0
   until Lydia is packaged with Electron (decision 6). The middle number goes up with each big stage finished, and the
-  last one with small fixes: one fix, one number, so each version can be traced to the change it brought. Each version
-  is marked with a git tag (`v0.1.0`, `v0.2.0`…).
+  last one with each small fix or small feature: one change, one number, so each version can be traced to the change it
+  brought. Each version is marked with a git tag (`v0.1.0`, `v0.2.0`…).
 - **Versions:**
   - **0.1.0** (tag `v0.1.0`, branch `main` on 2026-10-22): the first usable version. Start screen with a custom canvas
     size, drawing with mouse or pen, brush color and size, eraser, undo, save and open `.lyd` projects, PNG export. It
@@ -216,6 +216,7 @@ for the history) or **open** (not decided yet).
     Canvases up to 10000×10000, brush with pen pressure, eraser, zoom and pan, undo and redo, layers (add, choose,
     hide, opacity), clear a layer, save and open the new `.lyd` format (decision 21), PNG export.
   - **0.2.1** (tag `v0.2.1`, 2026-10-22): the layer opacity changes live while the slider moves (decision 23).
+  - **0.2.2** (tag `v0.2.2`, 2026-10-22): export as JPEG too (decision 24).
   - **1.0.0:** the desktop app, packaged with Electron.
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is.
