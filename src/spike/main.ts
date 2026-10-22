@@ -137,7 +137,10 @@ async function main() {
     const key = `${column},${row}`
     let texture = tiles.get(key)
     if (!texture) {
-      texture = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE, scaleMode: tileScaleMode })
+      // The last column and row are cut at the edge of the paper (10000 is not a multiple of 256)
+      const width = Math.min(TILE_SIZE, PROJECT_WIDTH - column * TILE_SIZE)
+      const height = Math.min(TILE_SIZE, PROJECT_HEIGHT - row * TILE_SIZE)
+      texture = RenderTexture.create({ width, height, scaleMode: tileScaleMode })
       app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
       const sprite = new Sprite(texture)
       sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)

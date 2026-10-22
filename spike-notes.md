@@ -22,8 +22,7 @@ drawing experience on large canvases, before rewriting the editor.
 - Mine: 144 FPS while painting, including fast strokes with a big brush.
 - The brush follows the cursor exactly at every zoom level.
 - Paint used to go past the right and bottom edges of the paper, because 10000 is not a multiple of 256: the last
-  column and row of tiles reached 10240. Fix: cut the edge tiles to the project size (tested, not yet applied to the
-  spike code).
+  column and row of tiles reached 10240. Fix: cut the edge tiles to the project size (applied).
 - Pen pressure: not tested yet (needs a pen tablet).
 
 ## 3. Eraser
