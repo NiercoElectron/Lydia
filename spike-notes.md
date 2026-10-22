@@ -150,6 +150,29 @@ my i5-11400F (both 6-core desktop CPUs), so it should behave close to my machine
 The projection fixes the FPS but not the memory; moving the other layers to RAM fixes the memory. Both are needed for
 drawings with many layers.
 
+## 9. Projection
+
+- Layers are no longer drawn on the screen. They only hold their tiles, visibility, opacity and blend mode. The screen
+  draws the projection: one grid of 1600 tiles with the white paper and all the visible layers already put together.
+- When a stroke, undo, redo or fill changes a tile, only that tile of the projection is put together again (the paper,
+  then that tile of each visible layer, from the bottom to the top). Changing a layer's visibility, opacity or blend
+  mode puts the whole projection together again.
+- The export now reads only the 1600 projection tiles, instead of every tile of every layer.
+- Tested (headless Chrome): exactly the same colors as the stack of layers, on the screen and in the PNG.
+- Headless Chrome without a graphics card (only good to compare the two versions): with 10 full layers, a frame took
+  67.6 ms with the stack and 27.7 ms with the projection.
+
+| Full layers | Tiles | FPS with the stack | FPS with the projection |
+| ----------- | ----- | ------------------ | ----------------------- |
+| 10          | 16000 | ~72                | **144** (steady)        |
+
+- Mine: 144 FPS (the monitor's maximum) with 10 full layers. The graphics card was 20% busy.
+- Dedicated GPU memory: 7.4 of 8.0 GB, with almost nothing spilling into shared memory (0.1 GB). Still almost full: the
+  memory problem is not solved yet.
+- Filling a layer now also puts its projection tiles together: 79–100 ms per layer.
+
+**Conclusion:** the projection fixes the FPS. The number of layers no longer changes how much is drawn per frame.
+
 ## Optimizations for the real app
 
 - Collect the dabs from pointer events and render them once per frame, instead of once per event
@@ -186,6 +209,6 @@ Pending:
 - Confirm on my friend's machine (Ryzen 5 5500, RTX 3050) with a pen tablet: smoothness, pressure, and how the
   brush feels to an artist. If it is not smooth there, revisit before migrating.
 - Measure the graphics card memory more precisely (the Task Manager only shows one decimal).
-- Several layers: with 10 full layers the simple stack halves the FPS and almost fills an 8 GB graphics card. Before
-  migrating, decide (and test) how to keep the layers that are not being painted on in RAM, and the projection.
+- Several layers: the projection keeps 144 FPS with 10 full layers, but they still almost fill an 8 GB graphics card.
+  Before migrating, test keeping the layers that are not being painted on in RAM.
 - Ask my friend the canvas size and number of layers of a typical drawing of hers: memory grows with both.

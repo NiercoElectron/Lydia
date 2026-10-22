@@ -41,10 +41,6 @@ async function main() {
   const world = new Container()
   app.stage.addChild(world)
 
-  // The paper: a white rectangle the size of the project
-  const paper = new Graphics().rect(0, 0, PROJECT_WIDTH, PROJECT_HEIGHT).fill(0xffffff)
-  world.addChild(paper)
-
   // Show the whole project, centered, with a small margin around it
   function fitToScreen() {
     const scale = Math.min(app.screen.width / PROJECT_WIDTH, app.screen.height / PROJECT_HEIGHT) * 0.9
@@ -116,21 +112,102 @@ async function main() {
 
   // ----- Layers made of tiles -----
 
-  // A layer is a transparent sheet on top of the paper, made of tiles that are created only where there is paint
+  // A layer is a transparent sheet made of tiles that are created only where there is paint.
+  // Layers are not drawn on the screen directly: they are put together into the projection (below)
   type Layer = {
-    container: Container // holds one sprite per tile
     tiles: Map<string, RenderTexture> // "column,row" -> the tile's texture
+    visible: boolean
+    opacity: number // from 0 (invisible) to 1
+    blendMode: 'normal' | 'multiply'
   }
   const layers: Layer[] = [] // from the bottom to the top
 
   // Add an empty layer on top of all the others
   function addLayer() {
-    const layer: Layer = { container: new Container(), tiles: new Map() }
-    world.addChild(layer.container) // addChild always puts it above everything already in the world
+    const layer: Layer = { tiles: new Map(), visible: true, opacity: 1, blendMode: 'normal' }
     layers.push(layer)
     return layer
   }
   let activeLayer = addLayer() // the layer the brush paints on
+
+  // Create a transparent tile, cut at the edge of the paper (10000 is not a multiple of 256)
+  function createTile(column: number, row: number) {
+    const width = Math.min(TILE_SIZE, PROJECT_WIDTH - column * TILE_SIZE)
+    const height = Math.min(TILE_SIZE, PROJECT_HEIGHT - row * TILE_SIZE)
+    const texture = RenderTexture.create({ width, height })
+    app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
+    return texture
+  }
+
+  // Get the tile of this layer at this column and row, creating it the first time it is painted on
+  function getTile(layer: Layer, column: number, row: number) {
+    const key = `${column},${row}`
+    let texture = layer.tiles.get(key)
+    if (!texture) {
+      texture = createTile(column, row)
+      layer.tiles.set(key, texture)
+    }
+    return texture
+  }
+
+  // ----- Projection -----
+
+  // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the white
+  // paper and all the visible layers already put together, like Krita does. The screen draws the same 1600 tiles
+  // every frame no matter how many layers there are, and only the tiles that change are put together again
+  const COLUMNS = Math.ceil(PROJECT_WIDTH / TILE_SIZE)
+  const ROWS = Math.ceil(PROJECT_HEIGHT / TILE_SIZE)
+  const projection = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
+  const projectionContainer = new Container() // holds one sprite per projection tile
+  world.addChild(projectionContainer)
+
+  // A tile is put together in "composeRoot": the white paper, then the tile of each visible layer, bottom to top
+  const composeRoot = new Container()
+  const paperTile = new Graphics().rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0xffffff)
+  const layerSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
+
+  function composeTile(column: number, row: number) {
+    const key = `${column},${row}`
+    composeRoot.removeChildren()
+    composeRoot.addChild(paperTile)
+    let count = 0
+    for (const layer of layers) {
+      const texture = layer.tiles.get(key)
+      if (!layer.visible || !texture) continue
+      let sprite = layerSprites[count]
+      if (!sprite) {
+        sprite = new Sprite()
+        layerSprites[count] = sprite
+      }
+      sprite.texture = texture
+      sprite.alpha = layer.opacity
+      sprite.blendMode = layer.blendMode
+      composeRoot.addChild(sprite)
+      count++
+    }
+    app.renderer.render({ container: composeRoot, target: projection.get(key)!, clear: true })
+  }
+
+  // Put the whole projection together again (after changing a layer's visibility, opacity or blend mode)
+  function composeAll() {
+    const start = performance.now()
+    for (let column = 0; column < COLUMNS; column++) {
+      for (let row = 0; row < ROWS; row++) composeTile(column, row)
+    }
+    console.log(`Composed the whole projection in ${Math.round(performance.now() - start)} ms`)
+  }
+
+  // Create the projection's tiles with one sprite each, and show the empty paper
+  for (let column = 0; column < COLUMNS; column++) {
+    for (let row = 0; row < ROWS; row++) {
+      const texture = createTile(column, row)
+      projection.set(`${column},${row}`, texture)
+      const sprite = new Sprite(texture)
+      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
+      projectionContainer.addChild(sprite)
+    }
+  }
+  composeAll()
 
   // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
   let tileScaleMode: 'nearest' | 'linear' = 'linear'
@@ -138,31 +215,11 @@ async function main() {
     const scaleMode = world.scale.x >= 1 ? 'nearest' : 'linear'
     if (scaleMode === tileScaleMode) return
     tileScaleMode = scaleMode
-    for (const layer of layers) {
-      for (const texture of layer.tiles.values()) {
-        texture.source.scaleMode = scaleMode
-        texture.source.style.update() // tell PixiJS the setting changed, so the graphics card uses it
-      }
+    for (const texture of projection.values()) {
+      texture.source.scaleMode = scaleMode
+      texture.source.style.update() // tell PixiJS the setting changed, so the graphics card uses it
     }
   })
-
-  // Get the tile of this layer at this column and row, creating it (transparent) the first time it is painted on
-  function getTile(layer: Layer, column: number, row: number) {
-    const key = `${column},${row}`
-    let texture = layer.tiles.get(key)
-    if (!texture) {
-      // The last column and row are cut at the edge of the paper (10000 is not a multiple of 256)
-      const width = Math.min(TILE_SIZE, PROJECT_WIDTH - column * TILE_SIZE)
-      const height = Math.min(TILE_SIZE, PROJECT_HEIGHT - row * TILE_SIZE)
-      texture = RenderTexture.create({ width, height, scaleMode: tileScaleMode })
-      app.renderer.render({ container: new Container(), target: texture, clear: true }) // start fully transparent
-      const sprite = new Sprite(texture)
-      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
-      layer.container.addChild(sprite)
-      layer.tiles.set(key, texture)
-    }
-    return texture
-  }
 
   // ----- Undo -----
 
@@ -220,6 +277,7 @@ async function main() {
         app.renderer.render({ container: new Container(), target: tile, clear: true }) // the tile didn't exist: empty it
       }
       step.tiles.set(key, current)
+      composeTile(column, row)
     }
     console.log(`Swapped ${step.tiles.size} tiles in ${Math.round(performance.now() - start)} ms`)
   }
@@ -313,6 +371,7 @@ async function main() {
       backUpTile(key) // must come before getTile, which would create the tile and hide that it didn't exist
       stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
       app.renderer.render({ container: stampRoot, target: getTile(activeLayer, column, row), clear: false })
+      composeTile(column, row)
     }
   }
 
@@ -404,17 +463,17 @@ async function main() {
     let tileCount = 0
     const lines = layers.map((layer, i) => {
       tileCount += layer.tiles.size
-      const { alpha, visible } = layer.container
-      const blendMode = layer.container.blendMode === 'multiply' ? 'multiply' : 'normal' // new layers start as "inherit"
+      const { opacity, blendMode, visible } = layer
       const marker = layer === activeLayer ? '>' : ' '
-      return `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, opacity ${alpha}, ${blendMode}${visible ? '' : ', hidden'}`
+      return `${marker} Layer ${i + 1}: ${layer.tiles.size} tiles, opacity ${opacity}, ${blendMode}${visible ? '' : ', hidden'}`
     })
     let copyCount = 0
     for (const step of [...undoStack, ...redoStack]) copyCount += countCopies(step)
     // Each tile is 256 × 256 pixels × 4 bytes = 256 KB, so 4 tiles are about 1 MB
     console.log(
       `${lines.reverse().join('\n')}\n` +
-        `Tiles: ${tileCount} (~${Math.round(tileCount / 4)} MB), undo copies: ${copyCount} (~${Math.round(copyCount / 4)} MB)`,
+        `Tiles: ${tileCount} (~${Math.round(tileCount / 4)} MB), undo copies: ${copyCount} (~${Math.round(copyCount / 4)} MB), ` +
+        `projection: ${projection.size} (~${Math.round(projection.size / 4)} MB)`,
     )
   }
   logLayers()
@@ -426,10 +485,11 @@ async function main() {
     const start = performance.now()
     fillRect.tint = brushColor
     strokeBackup = { layer: activeLayer, tiles: new Map() } // filling can be undone like a stroke
-    for (let column = 0; column < Math.ceil(PROJECT_WIDTH / TILE_SIZE); column++) {
-      for (let row = 0; row < Math.ceil(PROJECT_HEIGHT / TILE_SIZE); row++) {
+    for (let column = 0; column < COLUMNS; column++) {
+      for (let row = 0; row < ROWS; row++) {
         backUpTile(`${column},${row}`)
         app.renderer.render({ container: fillRect, target: getTile(activeLayer, column, row), clear: false })
+        composeTile(column, row)
       }
     }
     addUndoStep(strokeBackup)
@@ -442,23 +502,28 @@ async function main() {
   // M switches it between normal and multiply; F fills it (to test many full layers)
   window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || drawingPointerId !== null) return
-    const layer = activeLayer.container
+    const layer = activeLayer
     if (e.key === 'n') activeLayer = addLayer()
     else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const index = layers.indexOf(activeLayer) + (e.key === 'ArrowUp' ? 1 : -1)
       if (index < 0 || index >= layers.length) return // already at the top or bottom
       activeLayer = layers[index]
-    } else if (e.key === 'h') layer.visible = !layer.visible
-    else if (e.key === 'o') layer.alpha = layer.alpha === 1 ? 0.5 : layer.alpha === 0.5 ? 0.25 : 1
-    else if (e.key === 'm') layer.blendMode = layer.blendMode === 'multiply' ? 'normal' : 'multiply'
-    else if (e.key === 'f') return fillActiveLayer()
-    else return // not a layer key
+    } else if (e.key === 'f') return fillActiveLayer()
+    else {
+      // These change how the layer looks, so the whole projection must be put together again
+      if (e.key === 'h') layer.visible = !layer.visible
+      else if (e.key === 'o') layer.opacity = layer.opacity === 1 ? 0.5 : layer.opacity === 0.5 ? 0.25 : 1
+      else if (e.key === 'm') layer.blendMode = layer.blendMode === 'multiply' ? 'normal' : 'multiply'
+      else return // not a layer key
+      composeAll()
+    }
     logLayers()
   })
 
   // ----- Export -----
 
-  // Put all the tiles together on a white background, at the full size of the project, and encode it as PNG
+  // Put the image together at the full size of the project and encode it as PNG. The projection already has the paper
+  // and all the visible layers put together, so only its tiles need to be copied
   async function renderPng() {
     const assembleStart = performance.now()
     const canvas = document.createElement('canvas')
@@ -466,23 +531,14 @@ async function main() {
     canvas.height = PROJECT_HEIGHT
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('This image is too big for this browser.')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, PROJECT_WIDTH, PROJECT_HEIGHT)
 
-    // Copy each tile from the graphics card back to a normal canvas, at its place in the image,
-    // layer by layer from the bottom to the top, with the layer's visibility, opacity and blend mode
-    let tileCount = 0
-    for (const layer of layers) {
-      if (!layer.container.visible) continue
-      ctx.globalAlpha = layer.container.alpha
-      ctx.globalCompositeOperation = layer.container.blendMode === 'multiply' ? 'multiply' : 'source-over'
-      for (const [key, texture] of layer.tiles) {
-        const [column, row] = key.split(',').map(Number)
-        const tileCanvas = app.renderer.extract.canvas(texture) as HTMLCanvasElement
-        ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE)
-        tileCount++
-      }
+    // Copy each projection tile from the graphics card back to a normal canvas, at its place in the image
+    for (const [key, texture] of projection) {
+      const [column, row] = key.split(',').map(Number)
+      const tileCanvas = app.renderer.extract.canvas(texture) as HTMLCanvasElement
+      ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE)
     }
+    const tileCount = projection.size
 
     const encodeStart = performance.now()
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
