@@ -6,6 +6,11 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
+Complete layers, and layer changes that are fast on big drawings
+([decisions 25 to 27](docs/decisions.md#25-every-layer-change-can-be-undone)).
+
 ### Added
 
 - Delete the active layer with the new **Delete layer** button; the layer under it becomes active.
@@ -88,7 +93,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/NiercoElectron/Lydia/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/NiercoElectron/Lydia/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/NiercoElectron/Lydia/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/NiercoElectron/Lydia/compare/v0.1.0...v0.2.0
