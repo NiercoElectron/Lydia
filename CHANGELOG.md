@@ -6,6 +6,20 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A brushes panel on the left, with six brushes: Soft round, Hard round, Airbrush, Chalk, Calligraphy and Dashes. Each
+  one shows a sample stroke, and the browser remembers the chosen one.
+- Brushes are `.lydbrush` files ([decision 29](docs/decisions.md#29-brushes-are-files)). Add brushes with
+  **Import…** or by dropping their files on the window, and the browser keeps them. **Export** saves the chosen brush
+  as a file, to share it, and **Delete** removes a brush that was added.
+- Brushes can turn their tip (at a fixed angle, with the stroke or at random), scatter it, and put down less paint
+  with each dab, also following the pen's pressure.
+
+### Changed
+
+- The eraser erases with the chosen brush's tip.
+
 ## [0.3.1] - 2026-10-22
 
 ### Added

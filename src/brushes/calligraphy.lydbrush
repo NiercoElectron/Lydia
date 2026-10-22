@@ -1,0 +1,14 @@
+{
+  "format": "lydia-brush",
+  "version": 1,
+  "name": "Calligraphy",
+  "spacing": 0.02,
+  "angle": 315,
+  "followStroke": false,
+  "angleJitter": 0,
+  "scatter": 0,
+  "flow": 1,
+  "pressureSize": true,
+  "pressureFlow": false,
+  "tip": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAAAAADmVT4XAAABP0lEQVR42u3Xv8tBURjA8YeUQbGw6C5K+bFZyWS3GGTSHWwWNpvFHSk7ZTVYTTd/w10oVou/QCzvW6+UJPHGfc7w/c5n+NQ595znyo9yAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAa8uOe2+1mA773VajWikWcqlkIhYJh4IBkUAwFI7EEslUrlCsVButbn84Xay8/fEDgNPWnTntWikdlX8UTZdqbWfmbk/vA87efGCXLflQVtkezL3za4DD0qnn5Svl687y8BSwm9gZ+XIZe7J7DHA7WfGpbMe9B2x6lvia1dvcANZNUai5vgLGotT4AhiJWqM/QFwPEDcDoL4F6odQ/zPUv4gMuIpNeIxMeI6NGEjMGMlMGUr5LwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgR7+pxmv29TGI5AAAAABJRU5ErkJggg=="
+}

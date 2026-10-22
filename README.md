@@ -7,7 +7,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 ## Features
 
 - Canvases up to 10000×10000 pixels, drawn by the graphics card
-- Soft brush and eraser, with mouse or pen; the pen's pressure changes the brush size
+- Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
+- Brushes are `.lydbrush` files: six come with Lydia, and more can be added (Import…, or drop the files on the window),
+  exported to share them, and deleted
 - Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
@@ -35,6 +37,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   - [x] Choose canvas size
   - [ ] Choose background color or transparent background
 - [x] Color and brush size selection
+- [x] Brushes as files (`.lydbrush`): a brush list, import, export
+- [ ] Brush Designer: draw a brush tip and save it as a brush
+- [ ] Brush grain (a paper texture, for pencils)
 - [x] Undo and redo (painting, clearing a layer and every layer change)
 - [x] Layers: add, delete, choose, reorder, rename, hide, opacity
 - [ ] Layers: blend modes
@@ -71,12 +76,16 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 
 ```
 src/
-├── engine/       The drawing engine (tiles, layers, brush, undo, project files), no React
-├── components/   UI pieces (drawing area, toolbar, layers panel)
-├── screens/      Full screens (start screen, editor)
-├── files.ts      Downloading files
-├── settings.ts   Settings remembered by the browser
-└── App.tsx       Chooses which screen to show
+├── engine/          The drawing engine (tiles, layers, brush, undo, project and brush files), no React
+├── components/      UI pieces (drawing area, toolbar, brushes and layers panels)
+├── screens/         Full screens (start screen, editor)
+├── brushes/         The brushes that come with Lydia (.lydbrush files)
+├── brushLibrary.ts  The brush list: the brushes above and the ones the user added
+├── files.ts         Downloading files
+├── settings.ts      Settings remembered by the browser
+└── App.tsx          Chooses which screen to show
+scripts/
+└── make-brushes.mjs Makes the files in src/brushes (node scripts/make-brushes.mjs)
 ```
 
 Dependencies only go one way: `screens` → `components` → `engine`. Code in `engine/` must not import React.

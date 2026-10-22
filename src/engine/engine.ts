@@ -1,6 +1,9 @@
 import { Application, Container } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
+import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createBrush, type BrushSettings } from './brush'
+import { parseBrushFile, type BrushShape } from './brushFile'
+import { decodeTip, type BrushTip } from './brushTip'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
@@ -72,7 +75,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const gpu = createGpuTiles(renderer, grid, memory, tilesInGigabytes(gpuMemory))
   const projection = createProjection(renderer, grid, stack, gpu)
   const history = createHistory(stack, gpu, projection)
-  const brush = createBrush(renderer, grid, stack, gpu, projection, history)
+  // The brush starts as the Soft round brush, until the screen chooses one
+  const startBrush = parseBrushFile(softRound, 'Soft round')
+  const brush = createBrush(
+    renderer,
+    grid,
+    stack,
+    gpu,
+    projection,
+    history,
+    await decodeTip(startBrush.tip),
+    startBrush,
+  )
 
   const world = new Container() // everything that belongs to the drawing; zoom and pan move this container
   world.addChild(projection.container)
@@ -326,6 +340,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     Object.assign(brush.settings, settings)
   }
 
+  // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes
+  function setBrushTip(tip: BrushTip, shape: BrushShape) {
+    brush.setTip(tip, shape)
+  }
+
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
@@ -345,6 +364,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       return () => listeners.delete(listener)
     },
     setBrush,
+    setBrushTip,
     undo,
     redo,
     clearLayer,

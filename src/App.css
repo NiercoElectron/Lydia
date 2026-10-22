@@ -44,7 +44,8 @@ button[aria-pressed='true'] {
   color: #c00000;
 }
 
-/* The editor fills the window: the bar on top, the drawing in the middle and the layers on the right */
+/* The editor fills the window: the bar on top, the brushes on the left, the drawing in the middle and the layers on
+   the right */
 .editor {
   display: flex;
   flex-direction: column;
@@ -91,9 +92,81 @@ button[aria-pressed='true'] {
   overflow-y: auto;
 }
 
-.layers-panel h2 {
+.brushes-panel {
+  width: 190px;
+  padding: 8px;
+  border-right: 1px solid #ccc;
+  overflow-y: auto;
+}
+
+.layers-panel h2,
+.brushes-panel h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.brushes-actions {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.brushes-actions button {
+  flex: 1;
+  min-width: 0;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.brushes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button.brush {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+}
+
+button.brush[aria-pressed='true'] {
+  font-weight: normal;
+  outline: none;
+  border-color: #2f6fde;
+  background: #e6efff;
+}
+
+.brush-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 160 / 44;
+}
+
+.brush-name {
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+/* Shown over everything while files are dragged over the window */
+.drop-hint {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px dashed #2f6fde;
+  background: rgb(230 239 255 / 85%);
+  color: #1d3f7a;
+  font-size: 1.5rem;
+  pointer-events: none; /* the drop goes to the window underneath */
 }
 
 .layers-actions {

@@ -137,7 +137,7 @@ export function createView(
   function prepareUnderBrush() {
     if (!hoverPoint || drawingPointerId !== null) return
     const start = performance.now()
-    const radius = brush.settings.size / 2
+    const radius = brush.reach()
     const area = tilesInRect(
       grid,
       hoverPoint.x - radius,

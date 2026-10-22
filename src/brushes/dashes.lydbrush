@@ -1,0 +1,14 @@
+{
+  "format": "lydia-brush",
+  "version": 1,
+  "name": "Dashes",
+  "spacing": 1.6,
+  "angle": 0,
+  "followStroke": true,
+  "angleJitter": 0,
+  "scatter": 0,
+  "flow": 1,
+  "pressureSize": false,
+  "pressureFlow": false,
+  "tip": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAAAAADmVT4XAAAA+UlEQVR42u3Yuw2DMBRG4Su3LpnFJStQZgWXrJDSY1DSMgZjUFJSUiWSkygojzL+LeWcCT4JsO/FLuIMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAZYB7S+aelYf4OmE7eCuRP00fAFKxYYXoHRCtafAGsrRWuXY+ALVjxwnYAdCaoewKSSUoPwOI0ALfcAb2J6m+A3asAfs+A0WSNGRB1gJgBQQcIGdDoAE0GOB3A1QGQPwL5Syj/DOUHkfwoll9G+utYPpDoRzL9UCofy/WLSQWrmX45rWA95w8JAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8J+AK9BUnCR74Ew/AAAAAElFTkSuQmCC"
+}

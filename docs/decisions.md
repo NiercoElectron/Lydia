@@ -318,7 +318,7 @@ for the history) or **open** (not decided yet).
   picture appears, in a single step, 2.0–2.6 s later. The longest frame meanwhile takes 13–34 ms (49 ms when the
   opacity slider is let go).
 - **Why:** the goal is 20 or more layers at 10000×10000 (decision 9). That many pixels don't fit in the graphics card,
-  so a change to all of them can't be instant, but the screen must never freeze, and the user prefers a change that
+  so a change to all of them can't be instant, but the screen must never freeze, and Enrico prefers a change that
   appears at once. Sending fewer tiles is still open: unpacking in workers (decision 14), batches (decision 18), a
   bigger cache on cards with more memory.
 
@@ -326,8 +326,8 @@ for the history) or **open** (not decided yet).
 
 - **Date:** 2026-10-22
 - **Status:** adopted
-- **Problem:** even prepared in the background (decision 26), a layer change on the user's drawing (4 full layers)
-  took 0.7–1 s to appear, which they found too slow. With 4 full layers of 10000×10000 (6,400 tiles), each change
+- **Problem:** even prepared in the background (decision 26), a layer change on Enrico's drawing (4 full layers) took
+  0.7–1 s to appear, which Enrico found too slow. With 4 full layers of 10000×10000 (6,400 tiles), each change
   sent ~6,000 tiles from RAM to the graphics card again, because it kept only 2,000 (decision 11). Measured on the RTX
   4060 Ti: 1.3 s to move a layer.
 - **Decision:** the graphics card keeps up to 8,000 tiles that are not painted (about 2 GB, so ~3 GB in all with the
@@ -338,7 +338,7 @@ for the history) or **open** (not decided yet).
   → 80–90 ms, hiding or showing 30–313 ms → 38–46 ms, first step of the opacity slider 290 ms → 51 ms, all without
   sending a tile. 8 full layers (12,800 tiles, more than it keeps): 2.0–2.9 s → 1.1–1.4 s for most changes, ~4,700
   tiles sent instead of ~12,700; showing a layer again or undoing a delete still takes ~2.3 s.
-- **Why:** the user's card has 8 GB, and so does the friend's RTX 3050. Cards with 4 GB or less may get slower, since
+- **Why:** Enrico's card has 8 GB, and so does the friend's RTX 3050. Cards with 4 GB or less may get slower, since
   Windows then keeps part of the textures in the computer's RAM. Browsers don't tell how much memory the graphics card
   has; the desktop app (1.0) can find out and choose the size from it.
 
@@ -358,6 +358,48 @@ for the history) or **open** (not decided yet).
   The desktop app (1.0) will read the graphics card's memory and the real RAM from the system and choose by itself,
   keeping this as an option in its preferences, like Photoshop.
 
+## 29. Brushes are files
+
+- **Date:** 2026-10-22
+- **Status:** adopted (the brushes folder: planned for the desktop app)
+- **Decision:**
+  - A brush is a `.lydbrush` file. It is JSON text with three things in it:
+    - a name;
+    - the picture of its tip, a PNG inside the file (black paints, white doesn't);
+    - how copies of the tip are placed along a stroke: the spacing, the angle, turning with the stroke, turning at
+      random, scattering, how much paint each copy puts down (flow), and what the pen's pressure changes.
+  - The brushes that come with Lydia are files of the same kind, in `src/brushes`, made by `scripts/make-brushes.mjs`.
+  - In the browser:
+    - brushes are added with **Import…** or by dropping their files on the window, and the browser keeps them
+      (IndexedDB);
+    - **Export** saves the chosen brush as a file;
+    - **Delete** removes an added brush.
+  - The desktop app (1.0) will read a real folder of brushes, where adding a brush is just copying its file there.
+  - A Brush Designer, for drawing a tip and saving it as a brush, comes in 0.5.0.
+- **Why:**
+  - It was Enrico's idea: brushes that can be shared and added just by moving a file, like the brushes of Krita
+    and Procreate.
+  - **Only data, never code.** Brush files will come from anywhere, so nothing in a file is ever run. Before using a
+    file, Lydia checks it: the tip must be a PNG of up to 1024×1024 with some paint in it, the numbers must be within
+    limits, and the version must be one Lydia knows.
+  - JSON keeps the settings readable, and lets the format grow: a missing field takes its usual value, and an unknown
+    one is left alone.
+  - A web page can't look into a folder of the computer by itself. Chrome and Edge can open a folder the user picks,
+    but they ask for permission again at every visit, and Firefox and Safari can't do it at all. Importing works in
+    every browser, so Enrico chose it for the web version.
+- **How:**
+  - The tip is a texture with mipmaps (smaller copies of itself), so a big tip full of detail stays smooth when the
+    brush is small.
+  - Dabs can be turned, so the tiles a dab touches come from how far the tip's paint reaches from its center: √2 times
+    half the size for a square tip, not just half the size.
+  - Where the dabs go (`dabs.ts`) is the same code for the engine and for the sample strokes in the brush list.
+  - The eraser uses the chosen brush's tip too.
+- **Measured (RTX 4060 Ti):** a 9000 px stroke at size 500 on a 10000×10000 drawing takes 18–25 ms with any of the
+  brushes, the same as with the soft brush before.
+- **Left for later:** a "grain": a texture fixed to the paper that shows through the strokes, which pencils need. A
+  grain inside the tip averages out where the dabs overlap, so a Pencil brush tried for this version looked like a
+  soft round brush and was left out.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
@@ -370,7 +412,7 @@ for the history) or **open** (not decided yet).
   into two triangles.
 - **What was tried:** big and fast strokes, changing pressure, undo and redo, moving the layer, the opacity slider,
   sending the layer to RAM and back, and zoom levels from 0.3× to 2.5×, on the same graphics card, headless and in a
-  visible window: no lines. The user couldn't make them appear again either.
+  visible window: no lines. Enrico couldn't make them appear again either.
 - **Next time:** save the project with the lines on screen (to see whether they are in the layer's pixels or only on
   the screen), and write down what was done just before.
 
