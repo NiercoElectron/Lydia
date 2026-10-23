@@ -9,6 +9,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Canvases up to 10000×10000 pixels, drawn by the graphics card, with common sizes (A4, US Letter, Full HD…) to
   choose from
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
+- A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - Brushes are `.lydbrush` files: six come with Lydia, and more can be added (Import…, or drop the files on the window),
   exported to share them, and deleted

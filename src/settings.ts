@@ -1,4 +1,4 @@
-import { isColor, MAX_SIZE, MIN_SIZE } from './engine/projectFile'
+import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MIN_SIZE } from './engine/projectFile'
 
 // Choices remembered by this browser between visits
 
@@ -25,8 +25,8 @@ export function saveGpuMemory(gigabytes: number) {
   }
 }
 
-// The size and background chosen last for a new drawing (see NewProjectDialog)
-export type NewProjectChoice = { width: number; height: number; background: string | null }
+// The size, background and resolution chosen last for a new drawing (see NewProjectDialog)
+export type NewProjectChoice = { width: number; height: number; background: string | null; dpi: number }
 const NEW_PROJECT_KEY = 'lydia.newProject'
 
 export function loadNewProjectChoice(): NewProjectChoice | null {
@@ -35,7 +35,10 @@ export function loadNewProjectChoice(): NewProjectChoice | null {
     const saved = JSON.parse(localStorage.getItem(NEW_PROJECT_KEY) ?? 'null')
     const isValid =
       isSize(saved?.width) && isSize(saved?.height) && (saved.background === null || isColor(saved.background))
-    return isValid ? { width: saved.width, height: saved.height, background: saved.background } : null
+    if (!isValid) return null
+    // A choice remembered before resolutions could be chosen has none
+    const dpi = isDpi(saved.dpi) ? saved.dpi : DEFAULT_DPI
+    return { width: saved.width, height: saved.height, background: saved.background, dpi }
   } catch {
     return null // nothing remembered, or the browser doesn't let this page keep anything
   }
