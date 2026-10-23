@@ -45,8 +45,8 @@ background color or transparency, `.lyd` projects, PNG and JPEG export. What cha
 
 Next, roughly in this order:
 
-- [ ] Painting: eyedropper, brush opacity per stroke, stabilizer (smoother strokes), tapered stroke ends, rotate and
-      flip the view
+- [ ] Painting: a Pixel brush (exact pixels, from 1 pixel up, for pixel art and fine lines), eyedropper, brush opacity
+      per stroke, stabilizer (smoother strokes), tapered stroke ends, rotate and flip the view
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
 - [ ] Selections: rectangle, lasso and magic wand; move, scale and rotate; fill bucket
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools; in the Brush Designer, edit existing
