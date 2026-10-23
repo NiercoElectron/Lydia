@@ -464,6 +464,46 @@ for the history) or **open** (not decided yet).
   - A JPEG has no transparency, so a transparent background becomes white in it.
 - **Measured (RTX 4060 Ti):** exporting a painted 10000×10000 drawing takes as long with a transparent background as
   with white paper: 3.2 s instead of 3.5 s for PNG, about 2.4 s for JPEG.
+- **Changed by decision 32:** paper sizes follow each drawing's resolution, chosen in the same window, instead of
+  always 300 DPI.
+
+## 32. Each drawing has a resolution (DPI)
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Problem:** Enrico printed an A4 drawing (2480×3508 pixels, made with the A4 size of decision 31) on an A4 sheet,
+  and it came out smaller than the sheet, with white margins. The image itself was right: A4 at 300 DPI, painted to
+  the edges.
+- **Why it happens:**
+  - Exported images didn't say their resolution: browsers write PNG and JPEG files without it. Programs then guess 72
+    or 96 DPI, so an A4 drawing looks like a poster of 66×93 cm to them, and each program shrinks it to the page in its
+    own way.
+  - Printers can't print the last 3–5 mm of the sheet, and print programs shrink the image to fit inside that by
+    default. A print setting for Letter paper, 1.8 cm shorter than A4, shrinks it more and leaves margins on the
+    sides. Lydia can't change this: borderless printing, or "Fill" instead of "Fit", is chosen when printing.
+- **Decision:**
+  - Each drawing has a resolution, chosen in the New project window: 300 DPI at first, with buttons for 72, 150, 300
+    and 600, and any other typed in (from 1 to 2400). The `.lyd` header keeps it (`"dpi"`); projects saved before
+    are 300 DPI.
+  - Exported PNG and JPEG images say the drawing's resolution, so printers and other programs (Word, Photoshop,
+    GIMP) know its size on paper: an A4 drawing is 21×29.7 cm at any resolution.
+  - Paper sizes follow the resolution: A4 is 2480×3508 pixels at 300 DPI and 1240×1754 at 150. A paper chosen from
+    the list stays that paper when the resolution changes; a size typed in keeps its pixels, and only its size on
+    paper changes. The window shows the size on paper, in centimeters and inches. A paper that would be bigger than
+    10000 pixels at the chosen resolution (Tabloid at 600 DPI) can't be chosen.
+- **Why:** at first every image was going to say 300 DPI, the resolution of the paper sizes, which Enrico chose over
+  a resolution for each drawing. Then it showed that a size typed in for another resolution (an A4 at 150 DPI) would
+  print at half its size, and Enrico chose to add the resolution right away. The screen ignores it: it only matters
+  on paper.
+- **How:**
+  - PNG files get a "pHYs" chunk (pixels per meter: 11,811 for 300 DPI) before the image data; in JPEG files, the
+    "JFIF" part that browsers already write says the dots per inch.
+  - The paper sizes are kept in millimeters or inches and worked out in pixels at the chosen resolution, so the sizes
+    and the exported resolution always agree.
+  - The common resolutions are buttons, not a list of suggestions under the field: in the browser Lydia is tested
+    with, that list took the keys typed into the field.
+- **Checked:** Pillow, a Python library for images, reads exported PNG and JPEG files of an A4 drawing as 21×29.7 cm,
+  at 300 DPI and at 150 DPI, also after saving and opening the project.
 
 ## Open questions
 
@@ -495,3 +535,17 @@ for the history) or **open** (not decided yet).
 - **Status:** open
 - **Question:** how big are the friend's canvases, and how many layers does a typical drawing have? The memory Lydia
   needs grows with both (decisions 9 and 11).
+
+### Margins when printing
+
+- **Date:** 2026-10-22
+- **Status:** open
+- **What was seen:** an A4 drawing printed on an A4 sheet still comes out with white margins, even after exported
+  images got their resolution (decision 32).
+- **Most likely cause:** the printer. Most printers can't print the last 3–5 mm of the sheet, and print programs
+  shrink the image to fit inside what the printer can reach. Only borderless printing avoids it, and not every
+  printer has it (it often needs photo paper; laser printers rarely have it).
+- **Next time:** measure the drawing's width on the printed sheet. About 20 cm with white on all four sides means the
+  print program shrank it; 21 cm with the drawing's edges cut off means it printed at its size and the printer just
+  can't reach the edges. Then look for a borderless option in the printer's settings, and write down the printer's
+  model and the program used to print.

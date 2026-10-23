@@ -10,6 +10,7 @@ import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
 import { createTileMemory, type StoredTile } from './memory'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
+import { withResolution } from './resolution'
 import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes } from './tiles'
 import { createView } from './view'
 
@@ -359,7 +360,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
     if (!blob) throw new Error('This image is too big for this browser.')
-    return blob
+    return withResolution(blob, project.dpi)
   }
 
   // The drawing as the contents of a .lyd file
@@ -381,7 +382,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         ),
       })),
     )
-    const file = serializeProject(grid.width, grid.height, project.background, activeIndex(stack), layersToSave)
+    const file = serializeProject(project, activeIndex(stack), layersToSave)
     isModified = false
     changed(false)
     return file

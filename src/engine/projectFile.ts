@@ -6,6 +6,14 @@ export const PROJECT_EXTENSION = '.lyd'
 export const MIN_SIZE = 16
 export const MAX_SIZE = 10000 // the biggest paper Lydia is made to handle well
 export const DEFAULT_BACKGROUND = '#ffffff'
+// How many pixels make an inch on paper: the drawing's resolution, in DPI. Each drawing has its own, chosen when it is
+// created; exported images say it, so printers and other programs know their size on paper. The screen ignores it
+// (decision 32). 300 DPI is the usual resolution for printing
+export const DEFAULT_DPI = 300
+export const MIN_DPI = 1
+export const MAX_DPI = 2400
+export const isDpi = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) >= MIN_DPI && (value as number) <= MAX_DPI
 
 export type LayerData = {
   name: string
@@ -15,17 +23,26 @@ export type LayerData = {
   tiles: Map<string, StoredTile> // "column,row" -> tile
 }
 
-// A drawing, as it is opened or created: its size, its background and its layers, from the bottom to the top
+// A drawing, as it is opened or created: its paper (size, background and resolution) and its layers, from the bottom
+// to the top
 export type ProjectData = {
   width: number
   height: number
   background: string | null // the paper's color ("#rrggbb"), or null for a transparent background
+  dpi: number // pixels in an inch on paper
   layers: LayerData[] // empty for a new drawing (it starts with one empty layer)
   activeLayer: number // the position of the layer the brush paints on
 }
 
-export function newProject(width: number, height: number, background: string | null = DEFAULT_BACKGROUND): ProjectData {
-  return { width, height, background, layers: [], activeLayer: 0 }
+export type Paper = Pick<ProjectData, 'width' | 'height' | 'background' | 'dpi'>
+
+export function newProject(
+  width: number,
+  height: number,
+  background: string | null = DEFAULT_BACKGROUND,
+  dpi = DEFAULT_DPI,
+): ProjectData {
+  return { width, height, background, dpi, layers: [], activeLayer: 0 }
 }
 
 export const isColor = (value: unknown): value is string => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
@@ -47,8 +64,9 @@ export type LayerToSave = Omit<LayerData, 'tiles'> & {
 // alpha, with the color already multiplied by the alpha), rows from the top to the bottom. Tiles of a single color
 // have no data: the header has their color instead. Tiles without paint are not in the file
 //
-// The header's "background" is the paper's color, or null when it is transparent. Files saved before Lydia 0.5.1
-// don't have it: their paper is white
+// The header's "background" is the paper's color, or null when it is transparent, and "dpi" is the drawing's
+// resolution. Files saved before Lydia 0.5.1 have no background (their paper is white), and files saved before 0.5.2
+// have no resolution (they are 300 DPI)
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -63,15 +81,14 @@ type FileHeader = {
   height: number
   tileSize: number
   background: string | null
+  dpi: number
   activeLayer: number
   layers: (Omit<LayerData, 'tiles'> & { tiles: TileEntry[] })[]
 }
 
 // Turn a drawing into the contents of a .lyd file
 export function serializeProject(
-  width: number,
-  height: number,
-  background: string | null,
+  { width, height, background, dpi }: Paper,
   activeLayer: number,
   layers: LayerToSave[],
 ) {
@@ -84,6 +101,7 @@ export function serializeProject(
     height,
     tileSize: TILE_SIZE,
     background,
+    dpi,
     activeLayer,
     layers: layers.map(({ tiles, ...layer }) => ({
       ...layer,
@@ -134,7 +152,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new Error('This project was made with a newer version of Lydia. Update Lydia to open it.')
   }
 
-  const { width, height, tileSize, background, activeLayer, layers } = header
+  const { width, height, tileSize, background, dpi, activeLayer, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -143,6 +161,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     width: grid.width,
     height: grid.height,
     background: background === null ? null : isColor(background) ? background : DEFAULT_BACKGROUND,
+    dpi: isDpi(dpi) ? dpi : DEFAULT_DPI,
     layers: layers.map(layer => {
       if (
         !isObject(layer) ||

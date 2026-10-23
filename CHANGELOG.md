@@ -6,6 +6,19 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A resolution (DPI) for each drawing, chosen in the New project window (300 DPI at first, with buttons for 72, 150,
+  300 and 600). Paper sizes follow it, and the window shows the drawing's size on paper. Projects keep it when they
+  are saved; older projects are 300 DPI.
+
+### Fixed
+
+- Exported PNG and JPEG images say the drawing's resolution, so a drawing made with a paper size prints at that size
+  (an A4 drawing is 21×29.7 cm) and other programs open it at its size on paper
+  ([decision 32](docs/decisions.md#32-each-drawing-has-a-resolution-dpi)). Before, programs had to guess, and shrank
+  the drawing to the page in their own way.
+
 ## [0.5.1] - 2026-10-22
 
 ### Added

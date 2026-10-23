@@ -1,33 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
-import { DEFAULT_BACKGROUND, MAX_SIZE, MIN_SIZE, newProject, type ProjectData } from '../engine/projectFile'
+import {
+  DEFAULT_BACKGROUND,
+  DEFAULT_DPI,
+  isDpi,
+  MAX_DPI,
+  MAX_SIZE,
+  MIN_DPI,
+  MIN_SIZE,
+  newProject,
+  type ProjectData,
+} from '../engine/projectFile'
 import { loadNewProjectChoice, saveNewProjectChoice } from '../settings'
 
-// Common sizes for a new drawing. Paper sizes are at 300 DPI, the usual resolution for printing; another resolution
-// can be typed in
-const PRESET_GROUPS = [
-  {
-    label: 'Paper, 300 DPI',
-    presets: [
-      { name: 'A5', width: 1748, height: 2480 },
-      { name: 'A4', width: 2480, height: 3508 },
-      { name: 'A3', width: 3508, height: 4961 },
-      { name: 'US Letter', width: 2550, height: 3300 },
-      { name: 'US Legal', width: 2550, height: 4200 },
-      { name: 'Tabloid', width: 3300, height: 5100 },
-    ],
-  },
-  {
-    label: 'Screen',
-    presets: [
-      { name: 'Full HD', width: 1920, height: 1080 },
-      { name: '4K UHD', width: 3840, height: 2160 },
-      { name: 'Square', width: 2048, height: 2048 },
-    ],
-  },
+type Size = { name: string; width: number; height: number }
+
+const MM = 1 / 25.4 // inches in a millimeter
+const CM_PER_INCH = 2.54
+
+// Paper sizes, in inches. In pixels they depend on the resolution: A4 is 2480×3508 at 300 DPI and 1240×1754 at 150
+const PAPERS: Size[] = [
+  { name: 'A5', width: 148 * MM, height: 210 * MM },
+  { name: 'A4', width: 210 * MM, height: 297 * MM },
+  { name: 'A3', width: 297 * MM, height: 420 * MM },
+  { name: 'US Letter', width: 8.5, height: 11 },
+  { name: 'US Legal', width: 8.5, height: 14 },
+  { name: 'Tabloid', width: 11, height: 17 },
 ]
-const PRESETS = PRESET_GROUPS.flatMap(group => group.presets)
+// Screen sizes, in pixels at any resolution
+const SCREENS: Size[] = [
+  { name: 'Full HD', width: 1920, height: 1080 },
+  { name: '4K UHD', width: 3840, height: 2160 },
+  { name: 'Square', width: 2048, height: 2048 },
+]
+const COMMON_DPIS = [72, 150, 300, 600] // a button for each; any other resolution can be typed in
 const CUSTOM = 'custom'
 const PREVIEW_SIZE = 72 // the longer side of the small picture of the paper, in pixels of the screen
+
+// A paper size in pixels at a resolution
+function paperInPixels(name: string, dpi: number): Size {
+  const paper = PAPERS.find(p => p.name === name)!
+  return { name, width: Math.round(paper.width * dpi), height: Math.round(paper.height * dpi) }
+}
 
 // Input values are text; a valid size is a whole number within the limits
 function isValidSize(value: string) {
@@ -40,15 +53,24 @@ type Props = {
   onCancel: () => void
 }
 
-// The window for a new drawing: its size, from a list of common sizes or typed in, and its background, a color or
-// transparent. It opens with the choices made the last time
+// The window for a new drawing: its size, from a list of common sizes or typed in, its resolution on paper, and its
+// background, a color or transparent. It opens with the choices made the last time
 export function NewProjectDialog({ onCreate, onCancel }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [last] = useState(loadNewProjectChoice)
   const [width, setWidth] = useState(String(last?.width ?? 800))
   const [height, setHeight] = useState(String(last?.height ?? 600))
+  const [dpi, setDpi] = useState(String(last?.dpi ?? DEFAULT_DPI))
   const [color, setColor] = useState(last?.background ?? DEFAULT_BACKGROUND)
   const [isTransparent, setIsTransparent] = useState(last?.background === null)
+  // The paper chosen from the list, if any: it stays the same paper when the resolution changes, so its pixels change
+  const [paperName, setPaperName] = useState<string | null>(() => {
+    if (!last) return null
+    const paper = PAPERS.map(p => paperInPixels(p.name, last.dpi)).find(
+      p => p.width === last.width && p.height === last.height,
+    )
+    return paper?.name ?? null
+  })
 
   // Open as a modal window: the page behind it can't be used until it closes, and Escape closes it. Taking it out of
   // the page closes it too, so there is nothing to undo here
@@ -57,23 +79,50 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
     if (!dialog.open) dialog.showModal()
   }, [])
 
-  const isValid = isValidSize(width) && isValidSize(height)
-  const preset = PRESETS.find(p => p.width === Number(width) && p.height === Number(height))
+  const dpiValue = isDpi(Number(dpi)) ? Number(dpi) : null
+  const isValid = isValidSize(width) && isValidSize(height) && dpiValue !== null
+  const papers = PAPERS.map(p => paperInPixels(p.name, dpiValue ?? DEFAULT_DPI))
+  const chosen =
+    paperName ?? [...papers, ...SCREENS].find(s => s.width === Number(width) && s.height === Number(height))?.name
 
-  function choosePreset(name: string) {
-    const chosen = PRESETS.find(p => p.name === name)
-    if (!chosen) return
-    setWidth(String(chosen.width))
-    setHeight(String(chosen.height))
+  function chooseSize(name: string) {
+    const size = papers.find(p => p.name === name) ?? SCREENS.find(s => s.name === name)
+    if (!size) return // "Custom": the size stays as it is, to be typed in
+    setPaperName(PAPERS.some(p => p.name === name) ? name : null)
+    setWidth(String(size.width))
+    setHeight(String(size.height))
+  }
+
+  // Typing a size leaves the paper chosen from the list
+  function typeSize(setter: (value: string) => void, value: string) {
+    setPaperName(null)
+    setter(value)
+  }
+
+  function changeDpi(value: string) {
+    setDpi(value)
+    if (!paperName || !isDpi(Number(value))) return
+    const paper = paperInPixels(paperName, Number(value))
+    setWidth(String(paper.width))
+    setHeight(String(paper.height))
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault() // stop the browser from reloading the page
     if (!isValid) return
     const background = isTransparent ? null : color
-    saveNewProjectChoice({ width: Number(width), height: Number(height), background })
-    onCreate(newProject(Number(width), Number(height), background))
+    const choice = { width: Number(width), height: Number(height), background, dpi: dpiValue }
+    saveNewProjectChoice(choice)
+    onCreate(newProject(choice.width, choice.height, background, dpiValue))
   }
+
+  // The size on paper, at the chosen resolution
+  const onPaper = (pixels: string, unit: number, digits: number) =>
+    ((Number(pixels) / dpiValue!) * unit).toFixed(digits)
+  const paperSize = isValid
+    ? `On paper: ${onPaper(width, CM_PER_INCH, 1)} × ${onPaper(height, CM_PER_INCH, 1)} cm ` +
+      `(${onPaper(width, 1, 2)} × ${onPaper(height, 1, 2)} in).`
+    : ''
 
   // A small picture of the paper, with its proportions and its background
   const scale = isValid ? PREVIEW_SIZE / Math.max(Number(width), Number(height)) : 0
@@ -89,23 +138,37 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         <h2>New project</h2>
         <label className="new-project-row">
           Size
-          <select value={preset?.name ?? CUSTOM} onChange={e => choosePreset(e.target.value)}>
+          <select value={chosen ?? CUSTOM} onChange={e => chooseSize(e.target.value)}>
             <option value={CUSTOM}>Custom</option>
-            {PRESET_GROUPS.map(group => (
-              <optgroup key={group.label} label={group.label}>
-                {group.presets.map(p => (
-                  <option key={p.name} value={p.name}>
-                    {p.name} ({p.width}×{p.height})
+            <optgroup label={`Paper, at ${dpiValue ?? DEFAULT_DPI} DPI`}>
+              {papers.map(p => {
+                const fits = p.width <= MAX_SIZE && p.height <= MAX_SIZE
+                return (
+                  <option key={p.name} value={p.name} disabled={!fits}>
+                    {p.name} ({p.width}×{p.height}){fits ? '' : ', too big at this resolution'}
                   </option>
-                ))}
-              </optgroup>
-            ))}
+                )
+              })}
+            </optgroup>
+            <optgroup label="Screen">
+              {SCREENS.map(s => (
+                <option key={s.name} value={s.name}>
+                  {s.name} ({s.width}×{s.height})
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <div className="new-project-row">
           <label>
             Width
-            <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={width} onChange={e => setWidth(e.target.value)} />
+            <input
+              type="number"
+              min={MIN_SIZE}
+              max={MAX_SIZE}
+              value={width}
+              onChange={e => typeSize(setWidth, e.target.value)}
+            />
           </label>
           <label>
             Height
@@ -114,12 +177,29 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
               min={MIN_SIZE}
               max={MAX_SIZE}
               value={height}
-              onChange={e => setHeight(e.target.value)}
+              onChange={e => typeSize(setHeight, e.target.value)}
             />
           </label>
         </div>
+        <div className="new-project-row">
+          <label title="How many pixels make an inch on paper. It matters for printing; the screen ignores it">
+            Resolution
+            <input type="number" min={MIN_DPI} max={MAX_DPI} value={dpi} onChange={e => changeDpi(e.target.value)} />
+            DPI
+          </label>
+          {COMMON_DPIS.map(common => (
+            <button
+              key={common}
+              type="button"
+              aria-pressed={dpiValue === common}
+              onClick={() => changeDpi(String(common))}
+            >
+              {common}
+            </button>
+          ))}
+        </div>
         <p className="hint">
-          From {MIN_SIZE} to {MAX_SIZE} pixels on each side.
+          From {MIN_SIZE} to {MAX_SIZE} pixels on each side. {paperSize}
         </p>
         <fieldset className="new-project-row">
           <legend>Background</legend>
