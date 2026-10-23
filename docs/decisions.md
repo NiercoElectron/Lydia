@@ -593,6 +593,89 @@ for the history) or **open** (not decided yet).
   from the screen; each line exactly between two pixels and one pixel of the display wide, also at a display scale of
   150%.
 
+## 35. Brushes with filtered noise
+
+- **Date:** 2026-10-23
+- **Status:** adopted on the `filtered-noise` branch (not in `main` yet)
+- **Decision:**
+  - A brush can have "filtered noise" in its dabs: random numbers filtered so that no two dabs are alike, but all of
+    them keep the brush's character. It was Enrico's idea: a sequence of numbers filtered in a way that brings
+    randomness to the stamp without losing what it looks like.
+  - The noise goes over any tip: drawn in the Brush Designer, imported, or worked out (the Pixel brush's tips are not
+    used with noise). Its settings, in the Brush Designer and in the `.lydbrush` file:
+    - **Amount:** how much of the paint the noise decides; at 0 there is no noise.
+    - **Grain:** how many grains fit across the tip.
+    - **Layers:** layers of finer grains added on top (up to 4), for a more natural texture.
+    - **Stretch:** how many times longer than tall the grains are: streaks across the tip.
+    - **Contrast:** soft noise, or sharp specks.
+    - **New noise for each stroke, not each dab:** each brush chooses. New noise for each dab gives rough edges and
+      blotches all different; the same noise along a stroke gives streaks that run along it, like bristles.
+  - Two brushes that come with Lydia use it: **Bristles** (the same noise along the stroke, stretched into streaks
+    that turn with the stroke, washed: see decision 36) and **Sponge** (new noise for each dab, dabs far apart, turned
+    and scattered).
+- **Why:**
+  - Enrico chose to have the graphics card work the noise out, for each pixel of each dab, while painting it: nothing
+    has to be prepared, every dab is truly different, and it is sharp at any size. Pictures of noise made beforehand
+    and picked at random would repeat.
+  - Painting the noise over the tip's picture costs the same as over a tip worked out by numbers, so the noise goes
+    over any tip.
+  - New noise for each dab mostly shows at the edges of a stroke: where the dabs overlap, their different noises
+    average out, as the grain inside the Pencil brush did (decision 29). Inside a stroke, the noise only shows when
+    it is the same along the stroke and the stroke is washed (decision 36).
+- **How:**
+  - The noise: random numbers at the corners of a grid (the sequence), blended smoothly between the corners (the
+    filter). The size of the grid's cells is the grain; finer grids are added for the layers; a grid longer one way
+    than the other gives the stretch; a curve at the end gives the contrast. Each dab has its own seed (`dabs.ts`),
+    so a dab across 4 tiles has the same noise in all 4.
+  - All the dabs of a tile are drawn at once, one square copied for each dab ("instances"), by a shader of its own
+    (`noiseDabs.ts`). It needs WebGL 2's shading language: PixiJS only uses it when the shader starts with
+    `#version 300 es`.
+  - The code that paints dabs (`dabPainter.ts`) is shared by the drawing and the brush previews (the list, the Brush
+    Designer's test area). The previews are painted by the graphics card too, on a small renderer of their own, and
+    copied to their canvases: a preview always looks like the drawing, noise included, and the noise exists only once.
+- **Measured (RTX 4060 Ti):** a 9000 px stroke at size 500 on a 10000×10000 drawing takes 70–100 ms with noise of 4
+  layers, against about 45 ms without noise (the numbers vary by ±20% between runs): about 0.3 ms for each movement of
+  the pen. One layer costs about the same as none. At size 100 and below there is little difference.
+- **Left for later:** the measurements still use two switches in `noiseDabs.ts` (a worked-out round tip, and no
+  noise), to be taken out before the branch goes into `main`.
+
+## 36. Strokes are painted in tiles of their own
+
+- **Date:** 2026-10-23
+- **Status:** adopted on the `filtered-noise` branch (not in `main` yet)
+- **Decision:**
+  - A stroke is painted first into tiles of its own, white, with the paint in their alpha. When it ends, it is put
+    into the layer with the stroke's color and opacity, or taken out of it with the eraser. Meanwhile the screen shows
+    the layer with the stroke on it, as it will be.
+  - This brings:
+    - **Opacity for each stroke** (the Opacity slider): a stroke never covers more than its opacity, however many
+      times it passes over a place; two strokes add up as usual.
+    - **Wash**, a setting of each brush, like Krita's painting mode of that name: the stroke doesn't pile up over
+      itself, each place keeps the most paint one dab gave it. A brush with 30% flow stays at 30%. With noise that is
+      the same along the stroke, its streaks show inside the stroke (Bristles).
+    - The eraser no longer leaves empty tiles where there was no paint.
+- **Why:**
+  - Without it, the dabs pile up: a place that gets 30% of paint from 25 dabs in a row ends up almost fully painted,
+    which hid the noise inside the strokes. Enrico chose to do it now, as it also brings the opacity for each stroke
+    from the roadmap.
+- **How:**
+  - The stroke's tiles come from a pool (64 kept), with the size of the layer's tiles. Dabs go into them with the
+    normal blend, or with "max" for a washed brush.
+  - When the screen puts a tile together, the active layer's tile and the stroke are first put together in a
+    texture of their own, which then gets the layer's opacity and blend mode: on a half-transparent layer, the stroke
+    doesn't show twice where it covers paint.
+  - At the end of the stroke, each tile of the layer is kept for undo and then gets the stroke. The screen is not put
+    together again: it already shows exactly that.
+  - PixiJS ignores the blend mode of the object it is asked to render, so the stroke's sprite goes inside a container
+    (the eraser at 50% erased nothing until then).
+- **Measured (RTX 4060 Ti):** the same 9000 px stroke at size 500 takes about 20–55 ms more than painting straight
+  into the layer (each touched tile is put together in two steps): about 0.2 ms for each movement of the pen. At size
+  100 and below there is no difference. A big stroke also uses a texture of 256 KB for each tile it touches, until it
+  ends.
+- **Checked:** opacity (a stroke at 50% that crosses itself stays at 50%, a second one adds up to 75%), wash (30% flow
+  stays at 30%), the screen during and after a stroke against putting it all together again, also on a layer at 50%,
+  the eraser on empty paper (no tiles, no undo step), and undo.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

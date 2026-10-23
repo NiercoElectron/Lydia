@@ -6,6 +6,24 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- Brushes with filtered noise ([decision 35](docs/decisions.md#35-brushes-with-filtered-noise)): random numbers,
+  filtered the same way, make every dab different while the brush keeps its character. In the Brush Designer: the
+  amount, the grain, layers of finer grains, the stretch, the contrast, and whether the noise changes with each dab
+  or each stroke. Two new brushes use it: Bristles and Sponge.
+- An Opacity slider for each stroke, and brushes that "wash" (a setting in the Brush Designer): a stroke doesn't pile
+  up over itself ([decision 36](docs/decisions.md#36-strokes-are-painted-in-tiles-of-their-own)).
+
+### Changed
+
+- The brush previews, in the list and in the Brush Designer's test area, are painted by the graphics card with the
+  same code as the drawing.
+
+### Fixed
+
+- The eraser no longer leaves empty tiles where there was no paint.
+
 ## [0.6.0] - 2026-10-23
 
 ### Added

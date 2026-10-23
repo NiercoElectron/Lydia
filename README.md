@@ -11,7 +11,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
-- Brushes are `.lydbrush` files: seven come with Lydia, and more can be added (Import…, or drop the files on the
+- An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
+- Brushes with filtered noise: every dab different, with the brush's own character (Bristles, Sponge)
+- Brushes are `.lydbrush` files: nine come with Lydia, and more can be added (Import…, or drop the files on the
   window), exported to share them, and deleted
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
 - A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
@@ -42,15 +44,15 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 ## Roadmap
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
-everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, new drawings with common
-sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export. What changed
-in each version is in [CHANGELOG.md](CHANGELOG.md).
+everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
+stroke opacity, new drawings with common sizes, a resolution (DPI) and a background color or transparency, `.lyd`
+projects, PNG and JPEG export. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, brush opacity per stroke, the brush's outline
-      under the pen, pen tilt (the brush follows how the pen leans, like a pencil), stabilizer (smoother strokes),
-      tapered stroke ends, rotate and flip the view
+- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, the brush's outline under the pen, pen tilt (the
+      brush follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends, rotate and
+      flip the view
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
