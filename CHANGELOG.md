@@ -6,6 +6,10 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-23
+
+Brushes with filtered noise, and strokes painted in tiles of their own.
+
 ### Added
 
 - Brushes with filtered noise ([decision 35](docs/decisions.md#35-brushes-with-filtered-noise)): random numbers,
@@ -202,7 +206,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/NiercoElectron/Lydia/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/NiercoElectron/Lydia/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/NiercoElectron/Lydia/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...v0.5.1
