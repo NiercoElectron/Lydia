@@ -4,11 +4,13 @@ import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
 import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
 import { LayersPanel } from '../components/LayersPanel'
+import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
-import type { Tool } from '../engine/brush'
+import { ALL_TOOLS } from '../components/toolList'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
+import type { Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
 import { loadBrushId, saveBrushId } from '../settings'
 
@@ -33,8 +35,23 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const brush = brushes.find(b => b.id === brushId) ?? brushes.find(b => b.id === DEFAULT_BRUSH_ID)
 
   useEffect(() => {
-    engine?.setBrush({ tool, color, size, opacity: opacity / 100 })
-  }, [engine, tool, color, size, opacity])
+    engine?.setTool(tool)
+  }, [engine, tool])
+
+  useEffect(() => {
+    engine?.setBrush({ color, size, opacity: opacity / 100 })
+  }, [engine, color, size, opacity])
+
+  // Colors picked with the eyedropper become the brush's color, at full opacity: the picked color is the one the screen
+  // shows, and painting it at a lower opacity would come out lighter
+  useEffect(
+    () =>
+      engine?.onColorPick(picked => {
+        setColor(picked)
+        setOpacity(100)
+      }),
+    [engine],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -139,7 +156,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   }, [importBrushes])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
-  useDrawingShortcuts(engine, setTool, setSize, toggleGrid)
+  useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {
@@ -191,7 +208,6 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           size={size}
           opacity={opacity}
           isGridOn={isGridOn}
-          onToolChange={setTool}
           onColorChange={setColor}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
@@ -224,6 +240,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
         </div>
       </header>
       <div className="editor-main">
+        <ToolColumn tool={tool} onToolChange={setTool} />
         <BrushesPanel
           brushes={brushes}
           selectedId={brush?.id ?? brushId}

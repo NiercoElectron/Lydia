@@ -10,11 +10,10 @@ import type { LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
 import type { Projection, ShownStroke } from './projection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
-
-export type Tool = 'brush' | 'eraser'
+import type { PaintTool } from './tools'
 
 export type BrushSettings = {
-  tool: Tool
+  tool: PaintTool
   color: string
   size: number // the tip's longer side, in pixels of the paper, at full pressure
   opacity: number // how much the whole stroke covers, from 0 to 1

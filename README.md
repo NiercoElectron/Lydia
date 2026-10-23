@@ -10,7 +10,10 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   choose from
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
+- Tools in a column at the left, like in Photoshop and Krita: brush, eraser and eyedropper
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
+- An eyedropper that picks the color the screen shows, by clicking or dragging over the drawing (or holding Alt while
+  painting)
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
@@ -30,34 +33,37 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 
 ### Shortcuts
 
-| Shortcut                                     | Action                 |
-| -------------------------------------------- | ---------------------- |
-| Ctrl/Cmd + Z                                 | Undo                   |
-| Ctrl/Cmd + Shift + Z, Ctrl + Y               | Redo                   |
-| B / E                                        | Brush / eraser         |
-| [ / ]                                        | Smaller / bigger brush |
-| G                                            | Pixel grid on / off    |
-| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                   |
-| Mouse wheel, or two fingers on a trackpad    | Move around            |
-| Space + drag, or drag with the middle button | Move around            |
-| Ctrl/Cmd + 0                                 | Show the whole drawing |
+| Shortcut                                     | Action                      |
+| -------------------------------------------- | --------------------------- |
+| Ctrl/Cmd + Z                                 | Undo                        |
+| Ctrl/Cmd + Shift + Z, Ctrl + Y               | Redo                        |
+| B / E / I                                    | Brush / eraser / eyedropper |
+| Alt (hold), with the brush or the eraser     | Pick a color                |
+| [ / ]                                        | Smaller / bigger brush      |
+| G                                            | Pixel grid on / off         |
+| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                        |
+| Mouse wheel, or two fingers on a trackpad    | Move around                 |
+| Space + drag, or drag with the middle button | Move around                 |
+| Ctrl/Cmd + 0                                 | Show the whole drawing      |
 
 ## Roadmap
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
-stroke opacity, new drawings with common sizes, a resolution (DPI) and a background color or transparency, `.lyd`
-projects, PNG and JPEG export. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+stroke opacity, a tool column and the eyedropper, new drawings with common sizes, a resolution (DPI) and a background
+color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
+[CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, the brush's outline under the pen, pen tilt (the
-      brush follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends, rotate and
-      flip the view
+- [ ] Tools (now): hand, zoom and rotate tools (and flipping the view), fill bucket, rectangle and lasso selections,
+      and moving, scaling and rotating what is selected
+- [ ] Painting: pixel brushes drawn in the Brush Designer, the brush's outline under the pen, pen tilt (the brush
+      follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
-- [ ] Selections: rectangle, lasso and magic wand; move, scale and rotate; fill bucket
+- [ ] Selections: magic wand
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools; in the Brush Designer, edit existing
       brushes and use an image as the tip
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
@@ -95,7 +101,7 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 ```
 src/
 ├── engine/          The drawing engine (tiles, layers, brush, undo, project and brush files), no React
-├── components/      UI pieces (drawing area, toolbar, brushes and layers panels, the Brush Designer's parts)
+├── components/      UI pieces (drawing area, tool column, toolbar, brushes and layers panels, Designer parts)
 ├── screens/         Full screens (start screen, editor, Brush Designer)
 ├── brushes/         The brushes that come with Lydia (.lydbrush files)
 ├── brushLibrary.ts  The brush list: the brushes above and the ones the user added

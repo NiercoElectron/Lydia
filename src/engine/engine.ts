@@ -13,6 +13,7 @@ import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
 import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes } from './tiles'
+import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
 
 // What the screen needs to know about the drawing. A new object every time something changes, so React can tell
@@ -74,7 +75,6 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
   app.canvas.style.display = 'block'
   app.canvas.style.touchAction = 'none' // the pen and the fingers paint instead of scrolling the page
-  app.canvas.style.cursor = 'crosshair'
   host.appendChild(app.canvas)
   // PixiJS only follows the size of the window; follow the host's own size too (when panels around it change)
   const resizeObserver = new ResizeObserver(() => app.resize())
@@ -125,7 +125,22 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   app.stage.addChild(scene)
   app.ticker.add(followPaper)
   const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
-  const view = createView(app, world, grid, brush, projection, gpu, () => changed())
+  // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
+  // its own and doesn't listen, so there holding Alt doesn't pick colors
+  const colorListeners = new Set<(color: string) => void>()
+  const view = createView(
+    app,
+    world,
+    grid,
+    brush,
+    projection,
+    gpu,
+    () => changed(),
+    color => {
+      for (const listener of colorListeners) listener(color)
+    },
+    () => colorListeners.size > 0,
+  )
 
   // ----- Telling React about changes -----
 
@@ -393,7 +408,21 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     return file
   }
 
-  // ----- Brush -----
+  // ----- Tools and brush -----
+
+  // Choose what the left button does on the paper (see tools.ts)
+  function setTool(tool: Tool) {
+    view.setTool(tool)
+    if (isPaintTool(tool)) brush.settings.tool = tool
+  }
+
+  // Tell "listener" every color picked with the eyedropper. Returns a function that stops it
+  function onColorPick(listener: (color: string) => void) {
+    colorListeners.add(listener)
+    return () => {
+      colorListeners.delete(listener)
+    }
+  }
 
   function setBrush(settings: Partial<BrushSettings>) {
     Object.assign(brush.settings, settings)
@@ -432,6 +461,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
+    setTool,
+    onColorPick,
     setBrush,
     setBrushTip,
     setPixelGrid,

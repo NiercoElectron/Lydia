@@ -6,6 +6,17 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A column of tools at the left edge of the editor, with icons, like in Photoshop and Krita
+  ([decision 37](docs/decisions.md#37-a-tool-column-and-the-eyedropper)).
+- An eyedropper (I): it picks the color the screen shows, with every visible layer, by clicking or dragging over the
+  drawing, and sets the stroke's Opacity back to 100%. Holding Alt with the brush or the eraser picks colors too.
+
+### Changed
+
+- The Brush and Eraser buttons moved from the bar on top to the tool column.
+
 ## [0.7.0] - 2026-10-23
 
 Brushes with filtered noise, and strokes painted in tiles of their own.

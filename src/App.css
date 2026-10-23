@@ -158,6 +158,39 @@ fieldset.new-project-row {
   min-height: 0; /* let the drawing area shrink instead of pushing the window bigger */
 }
 
+/* The tools, in a narrow column at the left edge, like in Photoshop and Krita */
+.tool-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+  border-right: 1px solid #ccc;
+}
+
+.tool-column button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: #222;
+}
+
+.tool-column button:hover {
+  background: #eee;
+}
+
+.tool-column button[aria-pressed='true'] {
+  outline: none;
+  border-color: #2f6fde;
+  background: #e6efff;
+  color: #1a4fb0;
+}
+
 .draw-space {
   flex: 1;
   min-width: 0;

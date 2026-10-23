@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import type { Tool } from '../engine/brush'
 import type { Engine, EngineSnapshot } from '../engine/engine'
+import type { Tool } from '../engine/tools'
 import { isTyping } from '../engine/view'
 import { loadPixelGrid, savePixelGrid } from '../settings'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
+import { TOOLS } from './toolList'
 
 // What the screen shows while the engine is starting
 const startingSnapshot: EngineSnapshot = {
@@ -35,11 +36,13 @@ export function usePixelGrid(engine: Engine | null) {
   return [isOn, toggle] as const
 }
 
-// Shortcuts, like in Photoshop and Krita: Ctrl/Cmd + Z undoes, Ctrl/Cmd + Shift + Z or Ctrl + Y redoes; B is the
-// brush, E the eraser; [ and ] change the brush size; G turns the pixel grid on and off
-export function useDrawingShortcuts(
+// Shortcuts, like in Photoshop and Krita: Ctrl/Cmd + Z undoes, Ctrl/Cmd + Shift + Z or Ctrl + Y redoes; a letter
+// chooses each of the screen's "tools" (B is the brush, E the eraser, I the eyedropper: see ToolColumn); [ and ]
+// change the brush size; G turns the pixel grid on and off
+export function useDrawingShortcuts<T extends Tool>(
   engine: Engine | null,
-  setTool: (tool: Tool) => void,
+  tools: readonly T[],
+  setTool: (tool: T) => void,
   setSize: (change: (size: number) => number) => void,
   toggleGrid: () => void,
 ) {
@@ -58,13 +61,13 @@ export function useDrawingShortcuts(
         }
         return
       }
-      if (key === 'b') setTool('brush')
-      else if (key === 'e') setTool('eraser')
+      const chosen = tools.find(tool => TOOLS[tool].key === key)
+      if (chosen) setTool(chosen)
       else if (key === '[') setSize(s => Math.max(MIN_BRUSH_SIZE, Math.min(s - 1, Math.round(s / 1.25))))
       else if (key === ']') setSize(s => Math.min(MAX_BRUSH_SIZE, Math.max(s + 1, Math.round(s * 1.25))))
       else if (key === 'g') toggleGrid()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [engine, setTool, setSize, toggleGrid])
+  }, [engine, tools, setTool, setSize, toggleGrid])
 }

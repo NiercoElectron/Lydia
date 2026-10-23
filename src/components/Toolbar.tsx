@@ -1,5 +1,5 @@
-import type { Tool } from '../engine/brush'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
+import type { Tool } from '../engine/tools'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
@@ -10,7 +10,6 @@ type Props = {
   size: number
   opacity: number // in percent
   isGridOn: boolean
-  onToolChange: (tool: Tool) => void
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
@@ -23,7 +22,6 @@ export function Toolbar({
   size,
   opacity,
   isGridOn,
-  onToolChange,
   onColorChange,
   onSizeChange,
   onOpacityChange,
@@ -31,12 +29,6 @@ export function Toolbar({
 }: Props) {
   return (
     <div className="toolbar">
-      <button aria-pressed={tool === 'brush'} onClick={() => onToolChange('brush')} title="Brush (B)">
-        Brush
-      </button>
-      <button aria-pressed={tool === 'eraser'} onClick={() => onToolChange('eraser')} title="Eraser (E)">
-        Eraser
-      </button>
       <label>
         Color
         <input type="color" value={color} disabled={tool === 'eraser'} onChange={e => onColorChange(e.target.value)} />

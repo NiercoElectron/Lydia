@@ -693,6 +693,48 @@ for the history) or **open** (not decided yet).
   stays at 30%), the screen during and after a stroke against putting it all together again, also on a layer at 50%,
   the eraser on empty paper (no tiles, no undo step), and undo.
 
+## 37. A tool column, and the eyedropper
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - The tools are in a narrow column at the left edge of the editor, like in Photoshop and Krita, with icons from
+    [Lucide](https://lucide.dev) (`lucide-react`, ISC license). Resting the pointer on a button shows the tool's name
+    and shortcut. The bar on top keeps the brush's settings (color, size, opacity) and the grid. The Brush Designer
+    keeps its own Brush and Eraser buttons.
+  - The tools of this stage, in this order (Enrico's choice): the eyedropper; the hand, zoom and rotate tools; the fill
+    bucket; rectangle and lasso selections, with moving, scaling and rotating what is selected.
+  - The eyedropper (I) picks the color the screen shows: the paper and every visible layer, with their opacities.
+    Clicking picks a color, and dragging keeps picking as it moves. Outside the paper, and where nothing is painted on
+    a transparent paper, the color stays as it was. It stays the chosen tool after picking, as in Photoshop and Krita.
+  - Picking a color sets the stroke's opacity back to 100% (Enrico's choice): the picked color is the one the screen
+    shows, and painting it at a lower opacity would come out lighter than what was picked.
+  - Holding Alt with the brush or the eraser picks colors too, as in Photoshop.
+- **Why:**
+  - A column has room for the tools still to come, where the bar on top would run out of space, and painters know
+    those icons from other programs.
+  - Picking what the screen shows is what Photoshop and Krita do at first, and what the painter expects: the color
+    they see. Picking from the active layer only can come later, if it is missed.
+  - Alt is the key of Photoshop and Clip Studio Paint. Krita uses Ctrl, which Lydia already uses for undo, zoom and
+    Ctrl+0.
+- **How:**
+  - `tools.ts` lists the tools. The engine knows the chosen one, and the view sends the left button to it.
+  - The color comes from the screen's tile at that point (the projection): one pixel read from the graphics card, which
+    waits for it. That works right after painting, before the painted tiles are saved in RAM. The graphics card keeps
+    colors multiplied by their alpha, so they are divided back, as when exporting: on a transparent paper, half
+    see-through paint gives its own color (within 1, from rounding).
+  - The cursor is Lucide's pipette, black with a white edge so it shows on any color, picking at its tip. PixiJS sets
+    the canvas's cursor to its "default" style when the pointer first moves over it, so that style changes too.
+  - Alt alone moves the keyboard to the browser's menu in some browsers, so Lydia stops that. Whether Alt is down is
+    also read from every pointer event, so Alt let go in another window (after Alt+Tab) doesn't leave the eyedropper
+    on.
+  - The Brush Designer paints in grays of its own and doesn't listen for colors, so there Alt and I do nothing.
+  - Known limit: while a layer's opacity slider moves, and for a moment after, its tiles are read as they were before.
+- **Measured (RTX 4060 Ti):** reading a pixel takes 0.2 ms, up to about 3 ms when the graphics card is busy.
+- **Checked:** the column, its titles and keys (B, E, I); the cursor; clicking and dragging; white paper, outside the
+  paper and a transparent paper; a layer at 50% (half the color over white); Alt with the brush and the eraser, which
+  paint and erase nothing then; Alt let go elsewhere; and the Brush Designer, where Alt and I do nothing.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

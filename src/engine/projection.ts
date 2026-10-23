@@ -1,5 +1,5 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
-import type { Texture, WebGLRenderer } from 'pixi.js'
+import type { GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
 import type { GpuTiles } from './gpuTiles'
 import { activeIndex, type Layer, type LayerStack } from './layers'
 import { forEachTile, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
@@ -390,6 +390,36 @@ export function createProjection(
     releaseLiveLayerIfDone()
   }
 
+  // ----- Reading colors -----
+
+  const pixel = new Uint8Array(4)
+
+  // The color the screen shows at this point of the paper, as "#rrggbb": the paper and every visible layer, put
+  // together. Null outside the paper and where nothing is painted on a transparent paper. (Tiles shown live while a
+  // layer's opacity changes are read as they were before it, until they are put together again a moment later)
+  function colorAt(x: number, y: number) {
+    const paperX = Math.floor(x)
+    const paperY = Math.floor(y)
+    if (paperX < 0 || paperY < 0 || paperX >= grid.width || paperY >= grid.height) return null
+    const column = Math.floor(paperX / TILE_SIZE)
+    const row = Math.floor(paperY / TILE_SIZE)
+    // Read one pixel of the tile, the way PixiJS reads pixels itself. It waits for the graphics card, which takes
+    // a moment for one pixel
+    const renderTarget = renderer.renderTarget.getRenderTarget(projection.get(tileKey(column, row))!)
+    const glRenderTarget = renderer.renderTarget.getGpuRenderTarget(renderTarget) as GlRenderTarget
+    ;(renderer.renderTarget.adaptor as GlRenderTargetAdaptor).bindFramebuffer(glRenderTarget.resolveTargetFramebuffer)
+    const gl = renderer.gl
+    gl.readPixels(paperX - column * TILE_SIZE, paperY - row * TILE_SIZE, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
+    const alpha = pixel[3]
+    if (alpha === 0) return null
+    // The graphics card keeps colors multiplied by their alpha (see exportImage in engine.ts): undo that
+    const hex = (value: number) =>
+      Math.min(255, Math.round((value * 255) / alpha))
+        .toString(16)
+        .padStart(2, '0')
+    return `#${hex(pixel[0])}${hex(pixel[1])}${hex(pixel[2])}`
+  }
+
   // ----- Zoom -----
 
   // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
@@ -455,6 +485,7 @@ export function createProjection(
     showStroke,
     finishLive,
     finishLiveLater,
+    colorAt,
     setZoom,
     destroy,
   }

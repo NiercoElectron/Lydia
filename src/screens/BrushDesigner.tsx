@@ -5,11 +5,11 @@ import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
 import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
 import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
-import type { Tool } from '../engine/brush'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
 import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
 import type { Engine } from '../engine/engine'
 import { newProject } from '../engine/projectFile'
+import type { PaintTool } from '../engine/tools'
 import { downloadBlob } from '../files'
 import { saveBrushId } from '../settings'
 
@@ -19,6 +19,9 @@ const MAX_NAME_LENGTH = 100
 // The paper is painted with one of Lydia's own round brushes: soft or hard edge
 type Edge = 'soft' | 'hard'
 const ROUND_BRUSHES: Record<Edge, string> = { soft: 'soft-round', hard: 'hard-round' }
+
+// The tip is drawn with the brush and the eraser only
+const DESIGNER_TOOLS: readonly PaintTool[] = ['brush', 'eraser']
 
 // The color that paints this much (in percent): black paints fully, white not at all
 function grayFor(strength: number) {
@@ -40,7 +43,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
   const [paper] = useState(() => newProject(tipSize, tipSize))
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
-  const [tool, setTool] = useState<Tool>('brush')
+  const [tool, setTool] = useState<PaintTool>('brush')
   const [edge, setEdge] = useState<Edge>('hard')
   const [strength, setStrength] = useState(100)
   const [size, setSize] = useState(Math.round(tipSize / 8))
@@ -69,7 +72,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
   }, [engine, edge])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
-  useDrawingShortcuts(engine, setTool, setSize, toggleGrid)
+  useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
 
   // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it
   useEffect(() => {
