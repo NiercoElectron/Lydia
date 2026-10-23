@@ -1,4 +1,4 @@
-import { Application, Container } from 'pixi.js'
+import { Application, CanvasSource, Container, Texture, TilingSprite } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createBrush, type BrushSettings } from './brush'
@@ -28,10 +28,27 @@ export type EngineSnapshot = {
 const ramGigabytes = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4
 const RAW_BUDGET = Math.max(0.5, ramGigabytes / 4) * 1024 ** 3
 
-// PNG keeps every pixel exactly; JPEG makes much smaller files by leaving out details the eye hardly notices, and has
-// no transparency (the paper is always white, so nothing is lost)
+// PNG keeps every pixel exactly, and the transparency of a transparent background; JPEG makes much smaller files by
+// leaving out details the eye hardly notices, and has no transparency (a transparent background becomes white)
 export type ImageType = 'png' | 'jpeg'
 const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
+
+// Under a transparent background, the screen shows gray and white squares, like Photoshop and Krita, of this many
+// pixels of the screen at any zoom
+const CHECKER_SIZE = 8
+
+function createCheckers() {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = CHECKER_SIZE * 2
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.fillStyle = '#cccccc'
+  ctx.fillRect(0, 0, CHECKER_SIZE, CHECKER_SIZE)
+  ctx.fillRect(CHECKER_SIZE, CHECKER_SIZE, CHECKER_SIZE, CHECKER_SIZE)
+  const source = new CanvasSource({ resource: canvas, resolution: 1, scaleMode: 'nearest' })
+  return new TilingSprite({ texture: new Texture({ source }) })
+}
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
@@ -73,7 +90,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   const memory = createTileMemory(RAW_BUDGET)
   const gpu = createGpuTiles(renderer, grid, memory, tilesInGigabytes(gpuMemory))
-  const projection = createProjection(renderer, grid, stack, gpu)
+  const projection = createProjection(renderer, grid, stack, gpu, project.background)
   const history = createHistory(stack, gpu, projection)
   // The brush starts as the Soft round brush, until the screen chooses one
   const startBrush = parseBrushFile(softRound, 'Soft round')
@@ -90,7 +107,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   const world = new Container() // everything that belongs to the drawing; zoom and pan move this container
   world.addChild(projection.container)
+  // The squares under a transparent background keep their size on the screen, so instead of zooming with the
+  // drawing they follow where the paper is on the screen, every frame
+  const checkers = project.background === null ? createCheckers() : null
+  const followPaper = () => {
+    if (!checkers) return
+    checkers.position.copyFrom(world.position)
+    checkers.width = grid.width * world.scale.x
+    checkers.height = grid.height * world.scale.y
+  }
+  if (checkers) app.stage.addChild(checkers)
   app.stage.addChild(world)
+  app.ticker.add(followPaper)
   const view = createView(app, world, grid, brush, projection, gpu, () => changed())
 
   // ----- Telling React about changes -----
@@ -288,8 +316,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // ----- Files -----
 
-  // The drawing as an image at its full size. The projection already has the white paper and all the visible layers
-  // put together, so only its tiles need to be copied
+  // The drawing as an image at its full size. The projection already has the paper and all the visible layers put
+  // together, so only its tiles need to be copied
   async function exportImage(type: ImageType) {
     await nextFrame() // let the screen show that the export started before the slow part
     // Tiles still shown live, or waiting after a layer change, are not in the projection yet
@@ -300,9 +328,34 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canvas.height = grid.height
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('This image is too big for this browser.')
+    if (project.background === null && type === 'jpeg') {
+      // Where a JPEG would be transparent, browsers make it black
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    const tileCanvas = document.createElement('canvas') // for one tile at a time, on a transparent background
+    const tileCtx = tileCanvas.getContext('2d')!
     for (const [key, texture] of projection.tiles) {
       const { column, row } = parseTileKey(key)
-      ctx.drawImage(renderer.extract.canvas(texture) as HTMLCanvasElement, column * TILE_SIZE, row * TILE_SIZE)
+      if (project.background !== null) {
+        ctx.drawImage(renderer.extract.canvas(texture) as HTMLCanvasElement, column * TILE_SIZE, row * TILE_SIZE)
+        continue
+      }
+      // The graphics card keeps colors already multiplied by their alpha, and an image needs them as they are: copied
+      // directly, half see-through red (128, 0, 0, 128) would come out as dark red, and every soft edge would get a
+      // dark rim. With a colored paper every pixel is opaque, so nothing changes there
+      const { pixels, width, height } = renderer.extract.pixels(texture)
+      for (let i = 0; i < pixels.length; i += 4) {
+        const alpha = pixels[i + 3]
+        if (alpha === 0 || alpha === 255) continue
+        pixels[i] = (pixels[i] * 255) / alpha // Uint8ClampedArray rounds and keeps it within 0–255
+        pixels[i + 1] = (pixels[i + 1] * 255) / alpha
+        pixels[i + 2] = (pixels[i + 2] * 255) / alpha
+      }
+      tileCanvas.width = width
+      tileCanvas.height = height
+      tileCtx.putImageData(new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, width, height), 0, 0)
+      ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE) // over white paper for a JPEG
     }
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
     if (!blob) throw new Error('This image is too big for this browser.')
@@ -328,7 +381,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         ),
       })),
     )
-    const file = serializeProject(grid.width, grid.height, activeIndex(stack), layersToSave)
+    const file = serializeProject(grid.width, grid.height, project.background, activeIndex(stack), layersToSave)
     isModified = false
     changed(false)
     return file
@@ -348,6 +401,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
+    app.ticker.remove(followPaper)
+    checkers?.texture.destroy(true)
     view.destroy()
     brush.destroy()
     projection.destroy()

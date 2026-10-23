@@ -5,6 +5,7 @@ import { createGrid, TILE_SIZE, tileKey } from './tiles'
 export const PROJECT_EXTENSION = '.lyd'
 export const MIN_SIZE = 16
 export const MAX_SIZE = 10000 // the biggest paper Lydia is made to handle well
+export const DEFAULT_BACKGROUND = '#ffffff'
 
 export type LayerData = {
   name: string
@@ -14,17 +15,20 @@ export type LayerData = {
   tiles: Map<string, StoredTile> // "column,row" -> tile
 }
 
-// A drawing, as it is opened or created: its size and its layers, from the bottom to the top
+// A drawing, as it is opened or created: its size, its background and its layers, from the bottom to the top
 export type ProjectData = {
   width: number
   height: number
+  background: string | null // the paper's color ("#rrggbb"), or null for a transparent background
   layers: LayerData[] // empty for a new drawing (it starts with one empty layer)
   activeLayer: number // the position of the layer the brush paints on
 }
 
-export function newProject(width: number, height: number): ProjectData {
-  return { width, height, layers: [], activeLayer: 0 }
+export function newProject(width: number, height: number, background: string | null = DEFAULT_BACKGROUND): ProjectData {
+  return { width, height, background, layers: [], activeLayer: 0 }
 }
+
+export const isColor = (value: unknown): value is string => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
 
 // A layer ready to be written: each tile is either a single color or its compressed bytes
 export type LayerToSave = Omit<LayerData, 'tiles'> & {
@@ -42,6 +46,9 @@ export type LayerToSave = Omit<LayerData, 'tiles'> & {
 // Each compressed tile is in the LZ4 block format (see lz4.ts). Unpacked, it has 4 bytes per pixel (red, green, blue,
 // alpha, with the color already multiplied by the alpha), rows from the top to the bottom. Tiles of a single color
 // have no data: the header has their color instead. Tiles without paint are not in the file
+//
+// The header's "background" is the paper's color, or null when it is transparent. Files saved before Lydia 0.5.1
+// don't have it: their paper is white
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -55,12 +62,19 @@ type FileHeader = {
   width: number
   height: number
   tileSize: number
+  background: string | null
   activeLayer: number
   layers: (Omit<LayerData, 'tiles'> & { tiles: TileEntry[] })[]
 }
 
 // Turn a drawing into the contents of a .lyd file
-export function serializeProject(width: number, height: number, activeLayer: number, layers: LayerToSave[]) {
+export function serializeProject(
+  width: number,
+  height: number,
+  background: string | null,
+  activeLayer: number,
+  layers: LayerToSave[],
+) {
   const data: Uint8Array[] = []
   let offset = 0
   const header: FileHeader = {
@@ -69,6 +83,7 @@ export function serializeProject(width: number, height: number, activeLayer: num
     width,
     height,
     tileSize: TILE_SIZE,
+    background,
     activeLayer,
     layers: layers.map(({ tiles, ...layer }) => ({
       ...layer,
@@ -119,7 +134,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new Error('This project was made with a newer version of Lydia. Update Lydia to open it.')
   }
 
-  const { width, height, tileSize, activeLayer, layers } = header
+  const { width, height, tileSize, background, activeLayer, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -127,6 +142,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   const project: ProjectData = {
     width: grid.width,
     height: grid.height,
+    background: background === null ? null : isColor(background) ? background : DEFAULT_BACKGROUND,
     layers: layers.map(layer => {
       if (
         !isObject(layer) ||

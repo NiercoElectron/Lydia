@@ -1,21 +1,9 @@
 import { useRef, useState } from 'react'
+import { NewProjectDialog } from '../components/NewProjectDialog'
 import { DEFAULT_TIP_SIZE, TIP_SIZES } from '../engine/brushFile'
-import {
-  MAX_SIZE,
-  MIN_SIZE,
-  newProject,
-  parseProject,
-  PROJECT_EXTENSION,
-  type ProjectData,
-} from '../engine/projectFile'
+import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { tilesInGigabytes } from '../engine/tiles'
 import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES } from '../settings'
-
-// Input values are text; a valid size is a whole number within the limits
-function isValidSize(value: string) {
-  const n = Number(value)
-  return Number.isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
-}
 
 type Props = {
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
@@ -26,8 +14,7 @@ type Props = {
 }
 
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
-  const [width, setWidth] = useState('800')
-  const [height, setHeight] = useState('600')
+  const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
   const [isOpening, setIsOpening] = useState(false)
   const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -47,37 +34,17 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
     }
   }
 
-  const isValid = isValidSize(width) && isValidSize(height)
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault() // stop the browser from reloading the page
-    if (!isValid) return
-    onNewProject(newProject(Number(width), Number(height)))
-  }
-
   return (
     <main className="home">
       <h1>Lydia</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Width
-          <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={width} onChange={e => setWidth(e.target.value)} />
-        </label>
-        <label>
-          Height
-          <input type="number" min={MIN_SIZE} max={MAX_SIZE} value={height} onChange={e => setHeight(e.target.value)} />
-        </label>
-        <button type="submit" disabled={!isValid}>
-          New project
+      <div className="home-actions">
+        <button onClick={() => setIsChoosingNew(true)}>New project…</button>
+        <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
+          {isOpening ? 'Opening…' : 'Open project'}
         </button>
-      </form>
-      <p className="hint">
-        From {MIN_SIZE} to {MAX_SIZE} pixels on each side.
-      </p>
-      <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
-        {isOpening ? 'Opening…' : 'Open project'}
-      </button>
+      </div>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+      {isChoosingNew && <NewProjectDialog onCreate={onNewProject} onCancel={() => setIsChoosingNew(false)} />}
 
       <section className="designer-start">
         <h2>Brush Designer</h2>

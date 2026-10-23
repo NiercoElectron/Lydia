@@ -11,6 +11,78 @@ button[aria-pressed='true'] {
   color: #666;
 }
 
+.home-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The window for a new drawing */
+.new-project {
+  min-width: 340px;
+  padding: 16px 20px;
+  border: 1px solid #999;
+  border-radius: 8px;
+}
+
+.new-project::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.new-project h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.new-project-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.new-project-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-project-row input[type='number'] {
+  width: 7ch;
+}
+
+fieldset.new-project-row {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* The small picture of the paper: its proportions and its background */
+.paper-preview-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88px;
+  margin: 8px 0;
+}
+
+.paper-preview {
+  border: 1px solid #999;
+}
+
+.paper-preview.transparent {
+  background-color: #fff;
+  background-image: conic-gradient(#ccc 25%, #fff 0 50%, #ccc 0 75%, #fff 0);
+  background-size: 16px 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .designer-start,
 .gpu-memory {
   max-width: 640px;

@@ -6,6 +6,19 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A background color for new drawings, or a transparent background ([decision 31](docs/decisions.md#31-a-window-for-new-drawings-with-a-background-color-or-none)).
+  A transparent background shows gray and white squares on the screen, and exports as a transparent PNG (a JPEG gets
+  white instead). Projects keep their background when they are saved; older projects open on white paper, as before.
+- Common sizes for new drawings: A5, A4, A3, US Letter, US Legal and Tabloid at 300 DPI, Full HD, 4K UHD and a
+  2048×2048 square.
+
+### Changed
+
+- **New project…** opens a window with the size, the common sizes and the background, which remembers the last
+  choices.
+
 ## [0.5.0] - 2026-10-22
 
 The Brush Designer: make new brushes in Lydia itself.

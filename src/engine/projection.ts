@@ -4,11 +4,18 @@ import type { GpuTiles } from './gpuTiles'
 import { activeIndex, type Layer, type LayerStack } from './layers'
 import { forEachTile, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
-// The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the white
-// paper and all the visible layers already put together, like Krita does. To put a tile together quickly while
+// The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the paper's
+// color and all the visible layers already put together, like Krita does. To put a tile together quickly while
 // painting, "below" keeps the paper and every layer under the active one already put together as well, so only the
-// active layer and the layers above it need to be added
-export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: LayerStack, gpu: GpuTiles) {
+// active layer and the layers above it need to be added. "background" is the paper's color, or null when the paper is
+// transparent: then the tiles are transparent where nothing is painted
+export function createProjection(
+  renderer: WebGLRenderer,
+  grid: Grid,
+  stack: LayerStack,
+  gpu: GpuTiles,
+  background: string | null,
+) {
   const projection = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
   const below = new Map<string, RenderTexture>()
   const container = new Container() // holds one sprite per projection tile; this is what the screen shows
@@ -30,7 +37,8 @@ export function createProjection(renderer: WebGLRenderer, grid: Grid, stack: Lay
   let waitingOrder: string[] | null = null
 
   const composeRoot = new Container()
-  const paperTile = new Graphics().rect(0, 0, TILE_SIZE, TILE_SIZE).fill(0xffffff)
+  const paperTile = new Graphics()
+  if (background !== null) paperTile.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(background)
   const belowSprite = new Sprite()
   const layerSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
 

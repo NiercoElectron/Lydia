@@ -434,6 +434,37 @@ for the history) or **open** (not decided yet).
 - **Measured (RTX 4060 Ti):** the tip is ready 18–35 ms after a stroke on papers of 256 and 512 pixels, and
   73–97 ms on a paper of 1024.
 
+## 31. A window for new drawings, with a background color or none
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:**
+  - **New project…** on the start screen opens a window with the size of the drawing and its background.
+  - The size can be typed in or chosen from common sizes: papers at 300 DPI (A5, A4, A3, US Letter, US Legal,
+    Tabloid) and screens (Full HD, 4K UHD, a 2048 square). The list shows "Custom" when the size typed in is not one
+    of them.
+  - The background is a color (white at first) or transparent. **Transparent** turns the color off.
+  - The window opens with the last choices, remembered by the browser.
+  - The background is part of the drawing: the `.lyd` header has it (`"background": "#rrggbb"`, or `null` when it is
+    transparent). Files saved before have no background and open on white paper, as before; Lydia 0.5.0 opens a
+    transparent file on white paper.
+- **Why:**
+  - It was Enrico's request, and so was remembering the last choice. A choice of resolution (DPI) and a button to
+    swap width and height were left out, also by Enrico's choice: another resolution can be typed in.
+  - 300 DPI is the usual resolution for printing, and A3 at 300 DPI (3508×4961) is still well within Lydia's
+    10000×10000.
+- **How:**
+  - The paper the projection puts under the layers (decision 10) is the background's color, or nothing when it is
+    transparent.
+  - Under a transparent background, the screen shows gray and white squares, like Photoshop and Krita. They keep
+    their size on the screen at any zoom: they follow where the paper is, every frame, instead of zooming with it.
+  - The graphics card keeps colors already multiplied by their alpha. On a transparent background, the export divides
+    them back. Copied as they were, every soft edge would get a dark rim in the PNG (a half see-through red came out
+    as dark red: 209, 0, 0 instead of 255, 0, 0, at alpha 209).
+  - A JPEG has no transparency, so a transparent background becomes white in it.
+- **Measured (RTX 4060 Ti):** exporting a painted 10000×10000 drawing takes as long with a transparent background as
+  with white paper: 3.2 s instead of 3.5 s for PNG, about 2.4 s for JPEG.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
