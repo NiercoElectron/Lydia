@@ -1,4 +1,4 @@
-import { CanvasSource, Container, Sprite, Texture } from 'pixi.js'
+import { CanvasSource, Container, RenderTexture, Sprite, Texture } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import type { BrushShape } from './brushFile'
 import type { BrushTip } from './brushTip'
@@ -6,9 +6,10 @@ import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
+import { createNoiseDabs } from './noiseDabs'
 import { roundTipRows } from './pixelTip'
-import type { Projection } from './projection'
-import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, type Grid } from './tiles'
+import type { Projection, ShownStroke } from './projection'
+import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
 
 export type Tool = 'brush' | 'eraser'
 
@@ -16,6 +17,7 @@ export type BrushSettings = {
   tool: Tool
   color: string
   size: number // the tip's longer side, in pixels of the paper, at full pressure
+  opacity: number // how much the whole stroke covers, from 0 to 1
 }
 
 // The tip on the graphics card, with smaller copies of itself (mipmaps), so that a big tip full of detail still looks
@@ -40,6 +42,9 @@ function createPixelTipTexture(size: number) {
 // needed, and the ones unused for the longest time are forgotten once they add up to more than this many pixels
 const PIXEL_TIPS_BUDGET = 4 * 1024 ** 2
 
+// Tiles of finished strokes kept for the next ones, instead of creating and deleting textures at every stroke
+const SPARE_STROKE_TILES = 64
+
 export function createBrush(
   renderer: WebGLRenderer,
   grid: Grid,
@@ -50,10 +55,11 @@ export function createBrush(
   startTip: BrushTip,
   startShape: BrushShape,
 ) {
-  const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20 }
+  const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20, opacity: 1 }
   let tip = startTip
   let shape = startShape
   let texture = createTipTexture(tip)
+  const noiseDabs = createNoiseDabs(renderer, texture, tip)
 
   // The dabs that touch a tile are put in "stamp" and rendered into that tile at once
   const stampRoot = new Container()
@@ -88,6 +94,54 @@ export function createBrush(
     }
   }
 
+  // The stroke being painted goes into tiles of its own first, white, with the paint in their alpha. Only when it ends
+  // is it put into the layer, with the color and the opacity of the stroke (or taken out of it, with the eraser), so
+  // that a stroke never covers more than its opacity, however many times it passes over a place. Meanwhile the
+  // projection shows the layer with the stroke on it. A brush that "washes" keeps, at each pixel, the most paint one
+  // dab gave it, instead of piling the dabs up: then its texture shows inside the stroke too
+  const strokeTiles = new Map<string, RenderTexture>()
+  const spareStrokeTiles: RenderTexture[] = []
+  const nothing = new Container()
+  // PixiJS ignores the blend mode of what it is asked to render, so the stroke's sprite goes inside a container
+  const mergeRoot = new Container()
+  const mergeSprite = new Sprite()
+  mergeRoot.addChild(mergeSprite)
+  let stroke: ShownStroke | null = null
+
+  function strokeTile(key: string, column: number, row: number) {
+    let strokeTexture = strokeTiles.get(key)
+    if (strokeTexture) return strokeTexture
+    const { width, height } = tileSize(grid, column, row)
+    const isFull = width === TILE_SIZE && height === TILE_SIZE
+    strokeTexture = (isFull && spareStrokeTiles.pop()) || RenderTexture.create({ width, height })
+    renderer.render({ container: nothing, target: strokeTexture, clear: true, clearColor: [0, 0, 0, 0] })
+    strokeTiles.set(key, strokeTexture)
+    return strokeTexture
+  }
+
+  // Put the finished stroke into the active layer, tile by tile, keeping each tile's pixels for undo first. The
+  // projection already shows these tiles as they now are
+  function mergeStroke(shown: ShownStroke) {
+    const layer = stack.active
+    mergeSprite.tint = shown.color
+    mergeSprite.alpha = shown.opacity
+    mergeSprite.blendMode = shown.erase ? 'erase' : 'normal'
+    for (const [key, strokeTexture] of strokeTiles) {
+      const { column, row } = parseTileKey(key)
+      // The eraser has nothing to take away where the layer has no paint, and mustn't leave an empty tile there
+      if (!shown.erase || gpu.getTexture(layer, column, row, false)) {
+        history.backUpTile(key)
+        mergeSprite.texture = strokeTexture
+        renderer.render({ container: mergeRoot, target: gpu.getTexture(layer, column, row, true)!, clear: false })
+        gpu.markDirty(layer, key)
+      }
+      const isFull = strokeTexture.width === TILE_SIZE && strokeTexture.height === TILE_SIZE
+      if (isFull && spareStrokeTiles.length < SPARE_STROKE_TILES) spareStrokeTiles.push(strokeTexture)
+      else strokeTexture.destroy(true)
+    }
+    strokeTiles.clear()
+  }
+
   // Paint with another brush from now on
   function setTip(newTip: BrushTip, newShape: BrushShape) {
     const oldTexture = texture
@@ -95,11 +149,13 @@ export function createBrush(
     shape = newShape
     texture = createTipTexture(tip)
     for (const sprite of dabSprites) sprite.texture = texture
+    noiseDabs.setTip(texture, tip)
     oldTexture.destroy(true)
   }
 
   function paintDabs(dabs: Dab[]) {
     const isPixel = shape.pixel !== 'none'
+    const hasNoise = !isPixel && shape.noiseAmount > 0
     // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
     const dabsByTile = new Map<string, Dab[]>()
     for (const dab of dabs) {
@@ -119,39 +175,40 @@ export function createBrush(
       }
     }
 
-    // Render into each touched tile only the dabs that touch it, shifted so that the tile's corner is at (0, 0)
-    const layer = stack.active
+    // Render into each touched tile of the stroke only the dabs that touch it, shifted so that the tile's corner is at
+    // (0, 0)
     const tipSide = Math.max(tip.image.width, tip.image.height)
+    const blendMode = shape.wash ? 'max' : 'normal'
     for (const [key, tileDabs] of dabsByTile) {
       const { column, row } = parseTileKey(key)
-      history.backUpTile(key)
-      stamp.removeChildren()
-      tileDabs.forEach((dab, i) => {
-        let sprite = dabSprites[i]
-        if (!sprite) {
-          sprite = new Sprite(texture)
-          sprite.anchor.set(0.5) // position and turn the dab around its center
-          dabSprites[i] = sprite
-        }
-        sprite.position.set(dab.x, dab.y)
-        sprite.rotation = dab.angle
-        if (isPixel) {
-          sprite.texture = pixelTip(dab.size)
-          sprite.scale.set(1)
-        } else {
-          sprite.texture = texture
-          sprite.scale.set(dab.size / tipSide)
-        }
-        sprite.alpha = dab.alpha
-        sprite.tint = settings.color
-        // The eraser removes paint from the tile instead of adding it
-        sprite.blendMode = settings.tool === 'eraser' ? 'erase' : 'normal'
-        stamp.addChild(sprite)
-      })
-      stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
-      const target = gpu.getTexture(layer, column, row, true)!
-      renderer.render({ container: stampRoot, target, clear: false })
-      gpu.markDirty(layer, key)
+      const target = strokeTile(key, column, row)
+      if (hasNoise) {
+        noiseDabs.paint(target, tileDabs, column * TILE_SIZE, row * TILE_SIZE, blendMode, shape)
+      } else {
+        stamp.removeChildren()
+        tileDabs.forEach((dab, i) => {
+          let sprite = dabSprites[i]
+          if (!sprite) {
+            sprite = new Sprite(texture)
+            sprite.anchor.set(0.5) // position and turn the dab around its center
+            dabSprites[i] = sprite
+          }
+          sprite.position.set(dab.x, dab.y)
+          sprite.rotation = dab.angle
+          if (isPixel) {
+            sprite.texture = pixelTip(dab.size)
+            sprite.scale.set(1)
+          } else {
+            sprite.texture = texture
+            sprite.scale.set(dab.size / tipSide)
+          }
+          sprite.alpha = dab.alpha
+          sprite.blendMode = blendMode
+          stamp.addChild(sprite)
+        })
+        stamp.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
+        renderer.render({ container: stampRoot, target, clear: false })
+      }
       projection.composeTile(column, row)
     }
     if (isPixel) trimPixelTips()
@@ -163,6 +220,8 @@ export function createBrush(
   // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1
   function startStroke(x: number, y: number, pressure: number) {
     history.begin(stack.active)
+    stroke = { tiles: strokeTiles, color: settings.color, opacity: settings.opacity, erase: settings.tool === 'eraser' }
+    projection.showStroke(stroke)
     path = createDabPath(shape, settings.size)
     paintDabs(path.start({ x, y, pressure }))
   }
@@ -176,6 +235,9 @@ export function createBrush(
   function endStroke() {
     if (path) paintDabs(path.end())
     path = null
+    if (stroke) mergeStroke(stroke)
+    projection.showStroke(null)
+    stroke = null
     return history.end()
   }
 
@@ -189,6 +251,9 @@ export function createBrush(
   function destroy() {
     stampRoot.destroy({ children: true })
     for (const sprite of dabSprites) sprite.destroy()
+    noiseDabs.destroy()
+    mergeRoot.destroy({ children: true })
+    for (const strokeTexture of [...strokeTiles.values(), ...spareStrokeTiles]) strokeTexture.destroy(true)
     texture.destroy(true)
     for (const pixelTexture of pixelTips.values()) pixelTexture.destroy(true)
   }
@@ -201,6 +266,7 @@ export function createBrush(
     endStroke,
     reach,
     isPainting: () => path !== null,
+    noiseDabs, // for measuring, on the filtered-noise branch
     destroy,
   }
 }

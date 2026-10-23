@@ -8,10 +8,12 @@ type Props = {
   tool: Tool
   color: string
   size: number
+  opacity: number // in percent
   isGridOn: boolean
   onToolChange: (tool: Tool) => void
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
+  onOpacityChange: (opacity: number) => void
   onGridToggle: () => void
 }
 
@@ -19,10 +21,12 @@ export function Toolbar({
   tool,
   color,
   size,
+  opacity,
   isGridOn,
   onToolChange,
   onColorChange,
   onSizeChange,
+  onOpacityChange,
   onGridToggle,
 }: Props) {
   return (
@@ -47,6 +51,11 @@ export function Toolbar({
           onChange={e => onSizeChange(Number(e.target.value))}
         />
         {size}
+      </label>
+      <label title="How much the whole stroke covers, however many times it passes over a place">
+        Opacity
+        <input type="range" min={1} max={100} value={opacity} onChange={e => onOpacityChange(Number(e.target.value))} />
+        <span className="slider-value">{opacity}%</span>
       </label>
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
     </div>

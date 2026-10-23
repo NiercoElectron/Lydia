@@ -24,6 +24,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState('#000000')
   const [size, setSize] = useState(20)
+  const [opacity, setOpacity] = useState(100) // in percent
   const [busy, setBusy] = useState<string | null>(null) // what is being done right now ("Saving…"), if anything
   const [brushes, setBrushes] = useState<LibraryBrush[]>([])
   const [brushId, setBrushId] = useState(() => loadBrushId() ?? DEFAULT_BRUSH_ID)
@@ -32,8 +33,8 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const brush = brushes.find(b => b.id === brushId) ?? brushes.find(b => b.id === DEFAULT_BRUSH_ID)
 
   useEffect(() => {
-    engine?.setBrush({ tool, color, size })
-  }, [engine, tool, color, size])
+    engine?.setBrush({ tool, color, size, opacity: opacity / 100 })
+  }, [engine, tool, color, size, opacity])
 
   useEffect(() => {
     let cancelled = false
@@ -188,10 +189,12 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           tool={tool}
           color={color}
           size={size}
+          opacity={opacity}
           isGridOn={isGridOn}
           onToolChange={setTool}
           onColorChange={setColor}
           onSizeChange={setSize}
+          onOpacityChange={setOpacity}
           onGridToggle={toggleGrid}
         />
         <div className="actions">

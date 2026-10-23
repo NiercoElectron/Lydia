@@ -9,6 +9,7 @@ export type Dab = {
   size: number // the tip's longer side, in pixels of the paper
   angle: number // how much the tip is turned, in radians, clockwise
   alpha: number // how much paint it puts down, from 0 to 1
+  seed: number // the dab's own random numbers, for brushes with noise (see noiseDabs.ts)
 }
 
 export type StrokePoint = { x: number; y: number; pressure: number }
@@ -17,6 +18,8 @@ const FULL_TURN = Math.PI * 2
 const DEGREES = Math.PI / 180
 // How much of the earlier direction is kept at each new point, so that a shaky hand doesn't make the tip wobble
 const DIRECTION_MEMORY = 0.6
+// Seeds are whole numbers below this, small enough for the graphics card to get them exactly
+const SEEDS = 65536
 
 // Where the dabs of one stroke go, as the pointer passes through its points. "size" is the brush size at full
 // pressure. Shared by the brush, which paints the dabs into the tiles, and the brush previews, which draw them on a
@@ -30,6 +33,7 @@ export function createDabPath(shape: BrushShape, size: number) {
   // With "followStroke", the first dab waits until the stroke has a direction
   let waitingDab: StrokePoint | null = null
   let lastDab: Dab | null = null // the latest dab placed
+  const strokeSeed = Math.floor(Math.random() * SEEDS) // for brushes whose noise changes once per stroke
 
   // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time
   const sizeAt = (pressure: number) => {
@@ -40,6 +44,7 @@ export function createDabPath(shape: BrushShape, size: number) {
   function dabAt(x: number, y: number, pressure: number, direction: number): Dab {
     const dabSize = sizeAt(pressure)
     const alpha = shape.pressureFlow ? shape.flow * pressure : shape.flow
+    const seed = shape.noisePerStroke ? strokeSeed : Math.floor(Math.random() * SEEDS)
     let angle = shape.angle * DEGREES + (shape.followStroke ? direction : 0)
     if (shape.angleJitter > 0) angle += (Math.random() - 0.5) * shape.angleJitter * FULL_TURN
     if (shape.scatter > 0) {
@@ -54,9 +59,9 @@ export function createDabPath(shape: BrushShape, size: number) {
       // odd size is centered on the pixel under the pen, and an even size on the corner nearest to it
       const left = Math.round(x - dabSize / 2)
       const top = Math.round(y - dabSize / 2)
-      return { x: left + dabSize / 2, y: top + dabSize / 2, size: dabSize, angle: 0, alpha }
+      return { x: left + dabSize / 2, y: top + dabSize / 2, size: dabSize, angle: 0, alpha, seed }
     }
-    return { x, y, size: dabSize, angle, alpha }
+    return { x, y, size: dabSize, angle, alpha, seed }
   }
 
   // Add a dab to the stroke, unless it would paint the same pixels as the one before (a pixel brush that moved less

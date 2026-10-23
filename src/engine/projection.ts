@@ -9,6 +9,11 @@ import { forEachTile, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } fr
 // painting, "below" keeps the paper and every layer under the active one already put together as well, so only the
 // active layer and the layers above it need to be added. "background" is the paper's color, or null when the paper is
 // transparent: then the tiles are transparent where nothing is painted
+
+// A stroke being painted, shown on the active layer before it is put into it (see brush.ts): its own tiles of paint
+// ("column,row" -> texture, white with the paint in its alpha), and how they go onto the layer
+export type ShownStroke = { tiles: Map<string, Texture>; color: string; opacity: number; erase: boolean }
+
 export function createProjection(
   renderer: WebGLRenderer,
   grid: Grid,
@@ -42,6 +47,32 @@ export function createProjection(
   const belowSprite = new Sprite()
   const layerSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
 
+  let stroke: ShownStroke | null = null
+  // The active layer's tile with the stroke on it, as it will be once the stroke is put into the layer. One tile at a
+  // time: it is used right away by the tile being put together
+  let withStrokeTexture: RenderTexture | null = null
+  const withStrokeRoot = new Container()
+  const withStrokeLayer = new Sprite()
+  const withStrokePaint = new Sprite()
+  withStrokeRoot.addChild(withStrokeLayer, withStrokePaint)
+
+  function withStroke(layerTexture: Texture | null, strokeTexture: Texture, shown: ShownStroke) {
+    withStrokeTexture ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    withStrokeLayer.visible = layerTexture !== null
+    if (layerTexture) withStrokeLayer.texture = layerTexture
+    withStrokePaint.texture = strokeTexture
+    withStrokePaint.tint = shown.color
+    withStrokePaint.alpha = shown.opacity
+    withStrokePaint.blendMode = shown.erase ? 'erase' : 'normal'
+    renderer.render({ container: withStrokeRoot, target: withStrokeTexture, clear: true, clearColor: [0, 0, 0, 0] })
+    return withStrokeTexture
+  }
+
+  // Show this stroke on the active layer from now on, or none
+  function showStroke(shown: ShownStroke | null) {
+    stroke = shown
+  }
+
   // Put the tiles at this column and row of the layers from "first" to "last" (not included) on top of "base",
   // into "target"
   function composeLayers(
@@ -58,7 +89,9 @@ export function createProjection(
     for (let i = first; i < last; i++) {
       const layer = stack.layers[i]
       if (!layer.visible) continue
-      const texture = gpu.getTexture(layer, column, row, false)
+      let texture = gpu.getTexture(layer, column, row, false)
+      const strokeTexture = layer === stack.active ? stroke?.tiles.get(tileKey(column, row)) : undefined
+      if (stroke && strokeTexture) texture = withStroke(texture, strokeTexture, stroke)
       if (!texture) continue // no paint on this layer here
       let sprite = layerSprites[count]
       if (!sprite) {
@@ -400,6 +433,8 @@ export function createProjection(
     for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
     container.destroy({ children: true })
     composeRoot.destroy()
+    withStrokeRoot.destroy({ children: true })
+    withStrokeTexture?.destroy(true)
     paperTile.destroy()
     emptyBase.destroy()
   }
@@ -417,6 +452,7 @@ export function createProjection(
     markBelowStale,
     prepareTile,
     showOpacityLive,
+    showStroke,
     finishLive,
     finishLiveLater,
     setZoom,

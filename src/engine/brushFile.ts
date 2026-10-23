@@ -13,8 +13,18 @@ export type BrushShape = {
   angleJitter: number // each dab is turned by a random amount: 0 = never, 1 = any angle
   scatter: number // each dab is moved by a random amount, up to this fraction of the brush size
   flow: number // how much paint each dab puts down, from 0 to 1
+  wash: boolean // the stroke doesn't pile up over itself: each pixel keeps the most paint one dab gave it
   pressureSize: boolean // the pen's pressure changes the size of the dabs
   pressureFlow: boolean // the pen's pressure changes how much paint each dab puts down
+  // Filtered noise in each dab (see noiseDabs.ts): how much of the paint it decides (0 = no noise), how many grains
+  // fit across the tip, how many layers of finer grains are added, how many times longer than tall the grains are
+  // (streaks across the tip), and its contrast
+  noiseAmount: number
+  noiseGrain: number
+  noiseLayers: number
+  noiseStretch: number
+  noiseContrast: number
+  noisePerStroke: boolean // the noise changes with each stroke, not each dab, so its streaks run along the stroke
   pixel: PixelTip // whether the brush paints whole pixels of the paper
 }
 
@@ -33,8 +43,15 @@ export const DEFAULT_SHAPE: BrushShape = {
   angleJitter: 0,
   scatter: 0,
   flow: 1,
+  wash: false,
   pressureSize: true,
   pressureFlow: false,
+  noiseAmount: 0,
+  noiseGrain: 8,
+  noiseLayers: 3,
+  noiseStretch: 1,
+  noiseContrast: 1,
+  noisePerStroke: false,
   pixel: 'none',
 }
 
@@ -44,6 +61,11 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
   angleJitter: [0, 1],
   scatter: [0, 5],
   flow: [0, 1],
+  noiseAmount: [0, 1],
+  noiseGrain: [1, 64],
+  noiseLayers: [1, 4],
+  noiseStretch: [1, 16],
+  noiseContrast: [0.1, 10],
 }
 
 // ----- The .lydbrush file (version 1) -----
@@ -106,6 +128,7 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
     }
   }
   shape.angle = ((shape.angle % 360) + 360) % 360
+  shape.noiseLayers = Math.round(shape.noiseLayers)
   shape.pixel = PIXEL_TIPS.find(pixelTip => pixelTip === data.pixel) ?? DEFAULT_SHAPE.pixel
 
   const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : fallbackName
