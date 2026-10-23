@@ -6,6 +6,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-22
+
 ### Added
 
 - A background color for new drawings, or a transparent background ([decision 31](docs/decisions.md#31-a-window-for-new-drawings-with-a-background-color-or-none)).
@@ -150,7 +152,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/NiercoElectron/Lydia/compare/v0.3.0...v0.3.1
