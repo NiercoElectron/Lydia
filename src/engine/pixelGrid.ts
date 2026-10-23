@@ -1,5 +1,6 @@
 import {
   GlProgram,
+  Matrix,
   Mesh,
   MeshGeometry,
   RenderTexture,
@@ -48,21 +49,24 @@ in vec2 vScreen;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
-uniform float uZoom; // pixels of the screen for each pixel of the paper
-uniform vec2 uOrigin; // where the paper's top left corner is on the screen
+uniform mat3 uToPaper; // from a point of the screen to a point of the paper (the view may be turned and flipped)
 uniform vec2 uPaperSize; // in pixels of the paper
 uniform float uPixelRatio; // pixels of the display for each pixel of the screen
 uniform float uStrength;
 
 void main(void) {
   vec4 color = texture(uTexture, vUV);
-  // This pixel of the display, and where its two edges are on the paper
+  // This pixel of the display, where its four corners are on the paper, and the box around them
   vec2 pixel = floor(vScreen * uPixelRatio);
-  float scale = uZoom * uPixelRatio;
-  vec2 from = (pixel - uOrigin * uPixelRatio) / scale;
-  vec2 to = (pixel + 1.0 - uOrigin * uPixelRatio) / scale;
-  // A line between pixels of the paper goes through this pixel of the display when a whole number lies between its
-  // two edges, so each line is one pixel of the display wide. Only the lines inside the paper are drawn
+  vec2 a = (uToPaper * vec3(pixel / uPixelRatio, 1.0)).xy;
+  vec2 b = (uToPaper * vec3((pixel + vec2(1.0, 0.0)) / uPixelRatio, 1.0)).xy;
+  vec2 c = (uToPaper * vec3((pixel + vec2(0.0, 1.0)) / uPixelRatio, 1.0)).xy;
+  vec2 d = (uToPaper * vec3((pixel + 1.0) / uPixelRatio, 1.0)).xy;
+  vec2 from = min(min(a, b), min(c, d));
+  vec2 to = max(max(a, b), max(c, d));
+  // A line between pixels of the paper goes through this pixel of the display when a whole number lies within that
+  // box, so each line is one pixel of the display wide (a little more when the view is turned). Only the lines inside
+  // the paper are drawn
   vec2 line = ceil(from);
   bool across = line.x < to.x && line.x > 0.0 && line.x < uPaperSize.x;
   bool down = line.y < to.y && line.y > 0.0 && line.y < uPaperSize.y;
@@ -89,9 +93,9 @@ export function createPixelGrid(
   screen: Rectangle,
 ) {
   let picture = createPicture()
+  const toPaper = new Matrix()
   const uniforms = new UniformGroup({
-    uZoom: { value: 1, type: 'f32' },
-    uOrigin: { value: new Float32Array(2), type: 'vec2<f32>' },
+    uToPaper: { value: toPaper, type: 'mat3x3<f32>' },
     uPaperSize: { value: new Float32Array([grid.width, grid.height]), type: 'vec2<f32>' },
     uPixelRatio: { value: 1, type: 'f32' },
     uStrength: { value: STRENGTH, type: 'f32' },
@@ -114,9 +118,10 @@ export function createPixelGrid(
     return RenderTexture.create({ width: screen.width, height: screen.height, resolution: renderer.resolution })
   }
 
-  // Every frame, before the screen is drawn: the grid shows when it is on and the view is zoomed in enough
+  // Every frame, before the screen is drawn: the grid shows when it is on and the view is zoomed in enough (the zoom
+  // is the world's scale down; across, it is negative when the view is flipped)
   function update() {
-    const show = isOn && world.scale.x >= PIXEL_GRID_ZOOM
+    const show = isOn && world.scale.y >= PIXEL_GRID_ZOOM
     if (show !== isShown) {
       const index = stage.getChildIndex(show ? scene : mesh)
       stage.removeChildAt(index)
@@ -134,9 +139,9 @@ export function createPixelGrid(
       old.destroy(true)
     }
     mesh.scale.set(screen.width, screen.height)
-    uniforms.uniforms.uZoom = world.scale.x
-    uniforms.uniforms.uOrigin[0] = world.position.x
-    uniforms.uniforms.uOrigin[1] = world.position.y
+    // The world is on the screen as it is (nothing around it moves), so its own transform takes the paper to the screen
+    world.updateLocalTransform()
+    toPaper.copyFrom(world.localTransform).invert()
     uniforms.uniforms.uPixelRatio = renderer.resolution
     renderer.render({ container: scene, target: picture, clear: true, clearColor: [0, 0, 0, 0] })
   }

@@ -12,10 +12,18 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   ([decision 37](docs/decisions.md#37-a-tool-column-and-the-eyedropper)).
 - An eyedropper (I): it picks the color the screen shows, with every visible layer, by clicking or dragging over the
   drawing, and sets the stroke's Opacity back to 100%. Holding Alt with the brush or the eraser picks colors too.
+- Hand (H), zoom (Z) and rotate view (R) tools ([decision 38](docs/decisions.md#38-turning-and-flipping-the-view)).
+  The zoom tool zooms in with a click, out with Alt + click, and smoothly by dragging to the right or the left. The
+  rotate tool turns the view by dragging around the middle of the screen, in steps of 15° with Shift. Holding
+  Shift + Space turns the view with any tool, as in Krita.
+- Flipping the view like in a mirror, with M or the **Flip** button. The drawing itself doesn't change.
+- The bar on top shows the view's zoom and angle, with **Straighten** (back to 0°) and **Flip** next to **Fit**.
 
 ### Changed
 
 - The Brush and Eraser buttons moved from the bar on top to the tool column.
+- **Fit** (Ctrl+0) keeps the view turned and flipped, and fits the turned paper on the screen.
+- While Space is held, the cursor is a hand.
 
 ## [0.7.0] - 2026-10-23
 

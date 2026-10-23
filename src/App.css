@@ -152,6 +152,19 @@ fieldset.new-project-row {
   color: #666;
 }
 
+/* The view's zoom and rotation, with its buttons */
+.view-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-value {
+  min-width: 5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .editor-main {
   display: flex;
   flex: 1;

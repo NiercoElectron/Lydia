@@ -7,6 +7,7 @@ import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
 import { ALL_TOOLS } from '../components/toolList'
+import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
@@ -223,9 +224,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           <button onClick={() => engine?.clearLayer()} disabled={!engine}>
             Clear layer
           </button>
-          <button onClick={() => engine?.fitToScreen()} disabled={!engine} title="Show the whole drawing (Ctrl+0)">
-            Fit
-          </button>
+          <ViewControls engine={engine} />
           <button onClick={() => handleExport('png')} disabled={!engine || busy !== null}>
             Export PNG
           </button>

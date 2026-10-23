@@ -1,5 +1,6 @@
 import type { Application, Container } from 'pixi.js'
 import type { Brush } from './brush'
+import { EYEDROPPER_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { Projection } from './projection'
 import { tilesInRect, type Grid } from './tiles'
@@ -7,30 +8,39 @@ import { isPaintTool, type Tool } from './tools'
 
 const MIN_ZOOM = 0.01 // 1% (zoomed far out)
 const MAX_ZOOM = 32 // 3200% (each pixel of the paper is 32 pixels of the screen)
+const ZOOM_STEP = 2 // a click with the zoom tool zooms in this many times (out with Alt)
+const SCRUB_ZOOM = 0.01 // dragging with the zoom tool: how fast it zooms, for each pixel of the screen
+const CLICK_DISTANCE = 4 // pixels of the screen a click may move before it counts as dragging
+const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of this many degrees
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
 
-// The eyedropper's cursor: Lucide's pipette icon (the one on its button), black with a white edge so it shows on any
-// color. It picks the color under its tip, at (2, 22)
-const PIPETTE_PATHS = [
-  'm12 9-8.414 8.414A2 2 0 0 0 3 18.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 3.828 21h1.344a2 2 0 0 0 1.414-.586L15 12',
-  'm18 9 .4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4 3.4-3.4a1 1 0 1 1 3 3z',
-  'm2 22 .414-.414',
-]
-const pipette = (color: string, width: number) =>
-  `<g stroke="${color}" stroke-width="${width}">${PIPETTE_PATHS.map(d => `<path d="${d}"/>`).join('')}</g>`
-const EYEDROPPER_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" ' +
-  `stroke-linejoin="round">${pipette('#fff', 4)}${pipette('#000', 2)}</svg>`
-const EYEDROPPER_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(EYEDROPPER_SVG)}") 2 22, crosshair`
+// The cursor of each tool over the drawing
+const CURSORS: Record<Tool, string> = {
+  brush: 'crosshair',
+  eraser: 'crosshair',
+  eyedropper: EYEDROPPER_CURSOR,
+  hand: 'grab',
+  zoom: 'zoom-in',
+  rotate: ROTATE_CURSOR,
+}
+
+// How the drawing is shown: its zoom (1 = 100%), how far it is turned (in degrees, clockwise, from -180 to 180) and
+// whether it is flipped like in a mirror. A new object every time one of them changes
+export type ViewState = { zoom: number; rotation: number; flipped: boolean }
+
+type Point = { x: number; y: number }
+
+// What a pointer that went down on the drawing does while it moves and when it comes up, depending on its tool
+type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
 export function isTyping(target: EventTarget | null) {
   return target instanceof HTMLInputElement && (target.type === 'text' || target.type === 'number')
 }
 
-// What the user does with the mouse, the pen and the keyboard on the drawing: zoom, move the view, and use the chosen
-// tool (see tools.ts). "onColorPick" gets the colors picked with the eyedropper; "canPickColors" tells whether anyone
-// wants them: if not, holding Alt doesn't turn the brush into an eyedropper
+// What the user does with the mouse, the pen and the keyboard on the drawing: zoom, move, turn and flip the view, and
+// use the chosen tool (see tools.ts). "onColorPick" gets the colors picked with the eyedropper; "canPickColors" tells
+// whether anyone wants them: if not, holding Alt doesn't turn the brush into an eyedropper
 export function createView(
   app: Application,
   world: Container,
@@ -44,64 +54,92 @@ export function createView(
 ) {
   const canvas = app.canvas
 
-  function setZoom(zoom: number) {
-    world.scale.set(zoom)
+  // ----- The view: zoom, rotation and flip -----
+
+  // "world" holds the drawing: the paper's top left corner is at its position on the screen, and the paper is zoomed,
+  // flipped and turned around that corner. Its scale is negative across when the view is flipped
+  const currentZoom = () => world.scale.y
+  const isFlipped = () => world.scale.x < 0
+  const middle = (): Point => ({ x: app.screen.width / 2, y: app.screen.height / 2 })
+
+  let state: ViewState = { zoom: 1, rotation: 0, flipped: false }
+  const listeners = new Set<() => void>()
+
+  // Zoom, turn (in radians) and flip the drawing, and tell whoever is listening if that changed anything
+  function setView(zoom: number, rotation: number, flipped: boolean) {
+    zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
+    rotation = Math.atan2(Math.sin(rotation), Math.cos(rotation)) // from -180° to 180°
+    world.scale.set(flipped ? -zoom : zoom, zoom)
+    world.rotation = rotation
     projection.setZoom(zoom)
+    const degrees = (rotation * 180) / Math.PI
+    if (zoom === state.zoom && degrees === state.rotation && flipped === state.flipped) return
+    state = { zoom, rotation: degrees, flipped }
+    for (const listener of listeners) listener()
   }
 
-  // Show the whole paper, centered, with a small margin around it
+  // Where a point of the screen is on the paper: turn it back, then undo the zoom and the flip
+  function paperAt(screen: Point): Point {
+    const cos = Math.cos(world.rotation)
+    const sin = Math.sin(world.rotation)
+    const dx = screen.x - world.position.x
+    const dy = screen.y - world.position.y
+    return { x: (cos * dx + sin * dy) / world.scale.x, y: (cos * dy - sin * dx) / world.scale.y }
+  }
+
+  // Move the view so that this point of the paper is at this point of the screen
+  function placeAt(paper: Point, screen: Point) {
+    const cos = Math.cos(world.rotation)
+    const sin = Math.sin(world.rotation)
+    const x = paper.x * world.scale.x
+    const y = paper.y * world.scale.y
+    world.position.set(screen.x - (cos * x - sin * y), screen.y - (sin * x + cos * y))
+  }
+
+  // Change the view keeping the point of the paper under this point of the screen where it is
+  function setViewAround(screen: Point, zoom: number, rotation: number, flipped: boolean) {
+    const paper = paperAt(screen)
+    setView(zoom, rotation, flipped)
+    placeAt(paper, screen)
+  }
+
+  function zoomAt(screen: Point, zoom: number) {
+    setViewAround(screen, zoom, world.rotation, isFlipped())
+  }
+
+  // Show the whole paper in the middle of the screen, with a small margin around it, turned and flipped as it is
   function fitToScreen() {
-    const zoom = Math.min(app.screen.width / grid.width, app.screen.height / grid.height) * 0.9
-    setZoom(zoom)
-    world.position.set((app.screen.width - grid.width * zoom) / 2, (app.screen.height - grid.height * zoom) / 2)
+    const cos = Math.abs(Math.cos(world.rotation))
+    const sin = Math.abs(Math.sin(world.rotation))
+    // The size of the turned paper on the screen at 100%
+    const width = cos * grid.width + sin * grid.height
+    const height = sin * grid.width + cos * grid.height
+    setView(Math.min(app.screen.width / width, app.screen.height / height) * 0.9, world.rotation, isFlipped())
+    placeAt({ x: grid.width / 2, y: grid.height / 2 }, middle())
   }
 
-  // Zoom keeping the point under the cursor in the same place on the screen
-  function zoomAt(screenX: number, screenY: number, factor: number) {
-    const oldZoom = world.scale.x
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, oldZoom * factor))
-    // Which point of the paper is under the cursor right now
-    const paperX = (screenX - world.position.x) / oldZoom
-    const paperY = (screenY - world.position.y) / oldZoom
-    // After zooming, move the paper so that the same point is under the cursor again
-    setZoom(newZoom)
-    world.position.set(screenX - paperX * newZoom, screenY - paperY * newZoom)
+  // Turn the view back to 0°, around the middle of the screen
+  function straighten() {
+    setViewAround(middle(), currentZoom(), 0, isFlipped())
   }
 
-  // Convert a position on the screen into a position on the paper, taking zoom and pan into account
-  function toPaper(e: PointerEvent) {
+  // Flip the view like in a mirror, around the middle of the screen; the drawing itself doesn't change. In a mirror a
+  // view turned one way looks turned the other way, so the rotation changes sign
+  function flip() {
+    setViewAround(middle(), currentZoom(), -world.rotation, !isFlipped())
+  }
+
+  // ----- The pointer -----
+
+  // Where the pointer is on the screen (on the canvas), and on the paper
+  function onScreen(e: PointerEvent): Point {
     const rect = canvas.getBoundingClientRect()
-    return world.toLocal({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
+  const toPaper = (e: PointerEvent) => paperAt(onScreen(e))
 
   // The pen's pressure makes the brush smaller or bigger; the mouse always paints at full size
   const pressureOf = (e: PointerEvent) => (e.pointerType === 'pen' ? e.pressure : 1)
-
-  // ----- Tools -----
-
-  let tool: Tool = 'brush'
-  let isAltDown = false // as the last key or pointer event said
-  let shownCursor = ''
-
-  // The tool the left button uses right now: holding Alt picks colors with the brush or the eraser, like in Photoshop
-  function currentTool(): Tool {
-    return isAltDown && isPaintTool(tool) && canPickColors() ? 'eyedropper' : tool
-  }
-
-  // Choose what the left button does from now on
-  function setTool(newTool: Tool) {
-    tool = newTool
-    showCursor()
-  }
-
-  function showCursor() {
-    const cursor = currentTool() === 'eyedropper' ? EYEDROPPER_CURSOR : 'crosshair'
-    if (cursor === shownCursor) return
-    shownCursor = cursor
-    // PixiJS sets the canvas's cursor too, to its "default" style, when the pointer first moves over it
-    app.renderer.events.cursorStyles.default = cursor
-    canvas.style.cursor = cursor
-  }
 
   // Pick the color the screen shows under the pointer. Where there is none (outside the paper, or nothing painted on a
   // transparent paper), the color stays as it was
@@ -111,6 +149,127 @@ export function createView(
     if (color) onColorPick(color)
   }
 
+  // ----- What each tool does with the pointer -----
+
+  function paint(e: PointerEvent): Gesture {
+    hoverPoint = null
+    const point = toPaper(e)
+    brush.startStroke(point.x, point.y, pressureOf(e))
+    return {
+      move(e) {
+        // The browser groups fast movements into one event; get all the points in between
+        const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
+        brush.continueStroke(points)
+      },
+      up() {
+        if (brush.endStroke()) onStrokeEnd()
+      },
+    }
+  }
+
+  function pick(e: PointerEvent): Gesture {
+    pickColor(e)
+    return { move: pickColor, up() {} }
+  }
+
+  // The view follows the pointer
+  function pan(e: PointerEvent): Gesture {
+    const grab = { x: e.clientX - world.position.x, y: e.clientY - world.position.y }
+    return {
+      move(e) {
+        world.position.set(e.clientX - grab.x, e.clientY - grab.y)
+      },
+      up() {},
+    }
+  }
+
+  // A click zooms in around the point clicked (out with Alt). Dragging zooms smoothly around the point where it
+  // started, in to the right and out to the left, like Photoshop's "scrubby zoom"
+  function zoom(e: PointerEvent): Gesture {
+    const start = onScreen(e)
+    const startZoom = currentZoom()
+    let isDragging = false
+    return {
+      move(e) {
+        const now = onScreen(e)
+        isDragging ||= Math.hypot(now.x - start.x, now.y - start.y) >= CLICK_DISTANCE
+        if (isDragging) zoomAt(start, startZoom * Math.exp((now.x - start.x) * SCRUB_ZOOM))
+      },
+      up(e) {
+        if (!isDragging && e.type === 'pointerup')
+          zoomAt(start, e.altKey ? startZoom / ZOOM_STEP : startZoom * ZOOM_STEP)
+      },
+    }
+  }
+
+  // The view turns around the middle of the screen as far as the pointer goes around it. With the rotate tool (not
+  // with Shift + Space, which holds Shift down), Shift turns it in steps of 15°
+  function rotate(e: PointerEvent, canSnap: boolean): Gesture {
+    const center = middle()
+    const angleOf = (e: PointerEvent) => {
+      const point = onScreen(e)
+      return Math.atan2(point.y - center.y, point.x - center.x)
+    }
+    const startAngle = angleOf(e)
+    const startRotation = world.rotation
+    return {
+      move(e) {
+        let rotation = startRotation + angleOf(e) - startAngle
+        if (canSnap && e.shiftKey) {
+          const step = (ROTATE_STEP * Math.PI) / 180
+          rotation = Math.round(rotation / step) * step
+        }
+        setViewAround(center, currentZoom(), rotation, isFlipped())
+      },
+      up() {},
+    }
+  }
+
+  const startGesture: Record<Tool, (e: PointerEvent) => Gesture> = {
+    brush: paint,
+    eraser: paint,
+    eyedropper: pick,
+    hand: pan,
+    zoom,
+    rotate: e => rotate(e, !isSpaceDown),
+  }
+
+  // ----- The chosen tool, the keys held and the cursor -----
+
+  let tool: Tool = 'brush'
+  let isSpaceDown = false
+  let isShiftDown = false // Shift and Alt as the last key or pointer event said
+  let isAltDown = false
+  let gesture: (Gesture & { pointerId: number; tool: Tool }) | null = null // the pointer that is down, if any
+  let hoverPoint: Point | null = null // where the brush is waiting, or null when all is ready
+  let shownCursor = ''
+
+  // The tool the left button uses right now. Space moves the view and Shift + Space turns it, like in Krita; Alt picks
+  // colors with the brush or the eraser, like in Photoshop
+  function currentTool(): Tool {
+    if (isSpaceDown) return isShiftDown ? 'rotate' : 'hand'
+    if (isAltDown && isPaintTool(tool) && canPickColors()) return 'eyedropper'
+    return tool
+  }
+
+  // Choose what the left button does from now on
+  function setTool(newTool: Tool) {
+    tool = newTool
+    showCursor()
+  }
+
+  function showCursor() {
+    const shown = gesture?.tool ?? currentTool()
+    let cursor = CURSORS[shown]
+    if (shown === 'hand' && gesture) cursor = 'grabbing'
+    else if (shown === 'zoom' && isAltDown && !gesture) cursor = 'zoom-out'
+    if (cursor === shownCursor) return
+    shownCursor = cursor
+    // PixiJS sets the canvas's cursor too, to its "default" style, when the pointer first moves over it
+    app.renderer.events.cursorStyles.default = cursor
+    canvas.style.cursor = cursor
+  }
+
   // ----- Mouse, pen and keyboard -----
 
   // Mouse wheel / trackpad: Ctrl + wheel (or pinch on a trackpad) zooms, the wheel alone moves the view
@@ -118,18 +277,12 @@ export function createView(
     e.preventDefault() // stop the browser from scrolling or zooming the page itself
     const pixels = e.deltaMode === 1 ? 16 : 1 // some browsers report the wheel in lines instead of pixels
     if (e.ctrlKey) {
-      zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * pixels * 0.002))
+      zoomAt({ x: e.offsetX, y: e.offsetY }, currentZoom() * Math.exp(-e.deltaY * pixels * 0.002))
     } else {
       world.position.x -= e.deltaX * pixels
       world.position.y -= e.deltaY * pixels
     }
   }
-
-  let isSpaceDown = false
-  let panStart: { x: number; y: number } | null = null // where the view was grabbed, while moving it
-  let drawingPointerId: number | null = null // the pointer that is painting, if any
-  let pickingPointerId: number | null = null // the pointer picking colors with the eyedropper, if any
-  let hoverPoint: { x: number; y: number } | null = null // where the brush is waiting, or null when all is ready
 
   function handleKeyDown(e: KeyboardEvent) {
     if (isTyping(e.target)) return
@@ -137,88 +290,74 @@ export function createView(
       e.preventDefault() // stop the page from scrolling, and a focused button from being pressed
       isSpaceDown = true
     }
-    if (e.key === 'Alt') {
-      e.preventDefault() // in some browsers, Alt alone moves the keyboard to the browser's menu
-      isAltDown = true
-      showCursor()
-    }
+    if (e.key === 'Alt') e.preventDefault() // in some browsers, Alt alone moves the keyboard to the browser's menu
+    isShiftDown = e.shiftKey
+    isAltDown = e.altKey
+    showCursor()
     // Ctrl/Cmd + 0 shows the whole paper again, like in Photoshop
     if ((e.ctrlKey || e.metaKey) && e.key === '0') {
       e.preventDefault()
       fitToScreen()
     }
+    // M flips the view, like in Krita
+    if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) flip()
   }
 
   function handleKeyUp(e: KeyboardEvent) {
     if (e.code === 'Space') isSpaceDown = false
-    if (e.key === 'Alt') {
-      e.preventDefault()
-      isAltDown = false
-      showCursor()
-    }
+    if (e.key === 'Alt') e.preventDefault()
+    isShiftDown = e.shiftKey
+    isAltDown = e.altKey
+    showCursor()
   }
 
-  // Move the view by dragging with the middle mouse button, or with the left button while holding Space; use the tool
-  // with the left button (or the pen tip)
+  // Keys let go in another window never come here
+  function handleBlur() {
+    isSpaceDown = isShiftDown = isAltDown = false
+    showCursor()
+  }
+
+  // The left button (or the pen tip) uses the tool; the middle button always moves the view
   function handlePointerDown(e: PointerEvent) {
-    if (drawingPointerId !== null || pickingPointerId !== null || panStart) return // already busy with another pointer
-    const isPan = e.button === 1 || (e.button === 0 && isSpaceDown)
-    if (!isPan && e.button !== 0) return
+    if (gesture) return // already busy with another pointer
+    if (e.button !== 0 && e.button !== 1) return
     e.preventDefault() // the middle button would otherwise start the browser's auto-scroll
     // That also keeps the keyboard where it was, so take it away from a text field (like the brush name) as any other
     // click would: otherwise shortcuts like Ctrl+Z keep going to the field instead of the drawing
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     canvas.setPointerCapture(e.pointerId) // keep receiving the moves even if the pointer leaves the canvas
-    if (isPan) {
-      panStart = { x: e.clientX - world.position.x, y: e.clientY - world.position.y }
-      return
-    }
     // The keys may have changed while the window was in the background (Alt+Tab leaves Alt "down" here)
+    isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    const used = e.button === 1 ? 'hand' : currentTool()
+    gesture = { ...startGesture[used](e), pointerId: e.pointerId, tool: used }
     showCursor()
-    if (currentTool() === 'eyedropper') {
-      pickingPointerId = e.pointerId
-      pickColor(e)
-      return
-    }
-    drawingPointerId = e.pointerId
-    hoverPoint = null
-    const point = toPaper(e)
-    brush.startStroke(point.x, point.y, pressureOf(e))
   }
 
   function handlePointerMove(e: PointerEvent) {
-    if (panStart) {
-      world.position.set(e.clientX - panStart.x, e.clientY - panStart.y)
-    } else if (e.pointerId === drawingPointerId) {
-      // The browser groups fast movements into one event; get all the points in between
-      const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
-      brush.continueStroke(points)
-    } else if (e.pointerId === pickingPointerId) {
-      pickColor(e)
-    } else if (drawingPointerId === null && pickingPointerId === null) {
-      isAltDown = e.altKey
-      showCursor()
-      if (isPaintTool(currentTool())) hoverPoint = toPaper(e)
+    if (gesture) {
+      if (e.pointerId === gesture.pointerId) gesture.move(e)
+      return
     }
+    isShiftDown = e.shiftKey
+    isAltDown = e.altKey
+    showCursor()
+    if (isPaintTool(currentTool())) hoverPoint = toPaper(e)
   }
 
   function handlePointerUp(e: PointerEvent) {
-    if (panStart) {
-      panStart = null
-    } else if (e.pointerId === drawingPointerId) {
-      drawingPointerId = null
-      if (brush.endStroke()) onStrokeEnd()
-    } else if (e.pointerId === pickingPointerId) {
-      pickingPointerId = null
-    }
+    if (!gesture || e.pointerId !== gesture.pointerId) return
+    const ended = gesture
+    gesture = null // first, so that what the gesture does at its end sees the pointer free
+    ended.up(e)
+    showCursor()
   }
 
   // The first dab of a stroke can cover dozens of tiles at once, and each of them needs every layer at that place on
   // the graphics card, which would freeze the screen for a moment. So while the pointer moves over the paper without
   // painting, the tiles under the brush are made ready, a few per frame
   function prepareUnderBrush() {
-    if (!hoverPoint || drawingPointerId !== null) return
+    if (!hoverPoint || gesture) return
     const start = performance.now()
     const radius = brush.reach()
     const area = tilesInRect(
@@ -247,6 +386,7 @@ export function createView(
   canvas.addEventListener('pointercancel', handlePointerUp)
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
+  window.addEventListener('blur', handleBlur)
   app.ticker.add(prepareUnderBrush)
   showCursor()
   fitToScreen()
@@ -259,10 +399,26 @@ export function createView(
     canvas.removeEventListener('pointercancel', handlePointerUp)
     window.removeEventListener('keydown', handleKeyDown)
     window.removeEventListener('keyup', handleKeyUp)
+    window.removeEventListener('blur', handleBlur)
     app.ticker.remove(prepareUnderBrush)
+    listeners.clear()
   }
 
-  return { fitToScreen, setTool, isPainting: () => drawingPointerId !== null, destroy }
+  return {
+    fitToScreen,
+    straighten,
+    flip,
+    setTool,
+    getState: () => state,
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    isPainting: () => gesture !== null && isPaintTool(gesture.tool),
+    destroy,
+  }
 }
 
 export type View = ReturnType<typeof createView>

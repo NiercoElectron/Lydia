@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import type { Tool } from '../engine/tools'
-import { isTyping } from '../engine/view'
+import { isTyping, type ViewState } from '../engine/view'
 import { loadPixelGrid, savePixelGrid } from '../settings'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
 import { TOOLS } from './toolList'
@@ -15,12 +15,20 @@ const startingSnapshot: EngineSnapshot = {
   isModified: false,
   isUpdating: false,
 }
+const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}
 const getStartingSnapshot = () => startingSnapshot
+const getStartingView = () => startingView
 
 // The engine's latest state; the screen updates whenever it changes
 export function useEngineSnapshot(engine: Engine | null) {
   return useSyncExternalStore(engine?.subscribe ?? subscribeToNothing, engine?.getSnapshot ?? getStartingSnapshot)
+}
+
+// The view's zoom, rotation and flip. Kept apart from the snapshot because the zoom changes many times a second while
+// zooming, and only what shows it needs to update then
+export function useViewState(engine: Engine | null) {
+  return useSyncExternalStore(engine?.subscribeView ?? subscribeToNothing, engine?.getView ?? getStartingView)
 }
 
 // The pixel grid, on or off as chosen last time. The engine shows it when the view is zoomed in enough

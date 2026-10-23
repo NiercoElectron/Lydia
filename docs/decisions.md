@@ -735,6 +735,49 @@ for the history) or **open** (not decided yet).
   paper and a transparent paper; a layer at 50% (half the color over white); Alt with the brush and the eraser, which
   paint and erase nothing then; Alt let go elsewhere; and the Brush Designer, where Alt and I do nothing.
 
+## 38. Turning and flipping the view
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - Three tools for the view:
+    - **Hand** (H): dragging moves the view, like holding Space.
+    - **Zoom** (Z): a click zooms in 2× around the point clicked, Alt + click zooms out. Dragging zooms smoothly
+      around the point where the drag started: in to the right, out to the left, like Photoshop's "scrubby zoom".
+    - **Rotate view** (R): dragging around the middle of the screen turns the view as far as the pointer goes around
+      it. With Shift, it turns in steps of 15°.
+  - Holding Shift + Space turns the view with any tool, as in Krita (Enrico's choice). There it turns freely, since
+    Shift is already held.
+  - M flips the view, as in Krita (Enrico's choice); the rectangle selection will get another key. The flip is a
+    mirror of the screen, around its middle: a view turned one way looks turned the other way in a mirror, so the
+    angle changes sign. The drawing itself never changes.
+  - The bar on top shows the zoom and the angle, with **Straighten** (back to 0°), **Flip** and **Fit** (Enrico's
+    choice). **Fit** keeps the view turned and flipped and fits the turned paper, as in Photoshop (Enrico's choice).
+- **Why:**
+  - Painters turn the paper like a sheet on a desk, to draw each line at the angle their hand draws best. Looking at
+    a drawing in a mirror shows mistakes in its proportions that the eye got used to.
+  - Before, there was no way to see the zoom.
+- **How:**
+  - The view is the transform of the container that holds the drawing ("world"): its position, rotation and scale,
+    negative across when flipped. Going from the screen to the paper and back uses the same numbers, and the test
+    checks them against PixiJS's own transform.
+  - Each tool is a gesture: what the pointer does as it goes down, moves and comes up. The fill bucket and the
+    selections will fit in the same way.
+  - The pixel grid gets the transform from the screen to the paper, and finds the lines from the four corners of each
+    pixel of the display. With the view straight that is the same as before; turned, the lines are a little wider and
+    stepped.
+  - The squares under a transparent paper are now part of the drawing, so they turn and flip with it. They get
+    smaller as the view zooms in, to keep their size on the screen.
+  - The zoom changes many times a second while zooming, so the bar listens for it apart from the rest of the screen,
+    and only the bar updates then.
+  - Space, Shift and Alt count as let go when the window loses the keyboard, since letting them go in another window
+    never reaches Lydia.
+- **Checked:** the tools' keys and cursors; the hand; the zoom tool's click, Alt + click and drag, around the right
+  point; turning a quarter turn, in steps of 15° with Shift, and back with **Straighten**; Shift + Space and Space with
+  the brush (nothing painted); flipping with M and **Flip**, a mirror of the screen; painting and picking exactly under
+  the pointer on a turned and flipped view; **Fit** and Ctrl + wheel on a turned view; the pixel grid and the
+  transparent paper's squares on a turned view.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

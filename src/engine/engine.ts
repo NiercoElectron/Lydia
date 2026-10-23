@@ -12,7 +12,7 @@ import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
-import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes } from './tiles'
+import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
 
@@ -40,7 +40,7 @@ const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
 // pixels of the screen at any zoom
 const CHECKER_SIZE = 8
 
-function createCheckers() {
+function createCheckers(grid: Grid) {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = CHECKER_SIZE * 2
   const ctx = canvas.getContext('2d')!
@@ -50,7 +50,7 @@ function createCheckers() {
   ctx.fillRect(0, 0, CHECKER_SIZE, CHECKER_SIZE)
   ctx.fillRect(CHECKER_SIZE, CHECKER_SIZE, CHECKER_SIZE, CHECKER_SIZE)
   const source = new CanvasSource({ resource: canvas, resolution: 1, scaleMode: 'nearest' })
-  return new TilingSprite({ texture: new Texture({ source }) })
+  return new TilingSprite({ texture: new Texture({ source }), width: grid.width, height: grid.height })
 }
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -107,23 +107,19 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     startBrush,
   )
 
-  const world = new Container() // everything that belongs to the drawing; zoom and pan move this container
+  // Everything that belongs to the drawing: zooming, moving, turning and flipping the view change this container (see
+  // view.ts). Under a transparent background, the squares go first: they move, turn and flip with the drawing, but
+  // keep their size on the screen, so they get smaller as the view zooms in, every frame
+  const world = new Container()
+  const checkers = project.background === null ? createCheckers(grid) : null
+  if (checkers) world.addChild(checkers)
   world.addChild(projection.container)
-  // The squares under a transparent background keep their size on the screen, so instead of zooming with the
-  // drawing they follow where the paper is on the screen, every frame
-  const checkers = project.background === null ? createCheckers() : null
-  const followPaper = () => {
-    if (!checkers) return
-    checkers.position.copyFrom(world.position)
-    checkers.width = grid.width * world.scale.x
-    checkers.height = grid.height * world.scale.y
-  }
-  // Everything the screen shows of the drawing: the squares, then the drawing itself. The pixel grid goes over both
+  const followZoom = () => checkers?.tileScale.set(1 / world.scale.y) // the zoom (see view.ts)
+  // Everything the screen shows of the drawing. The pixel grid goes over it
   const scene = new Container()
-  if (checkers) scene.addChild(checkers)
   scene.addChild(world)
   app.stage.addChild(scene)
-  app.ticker.add(followPaper)
+  app.ticker.add(followZoom)
   const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
   // its own and doesn't listen, so there holding Alt doesn't pick colors
@@ -443,7 +439,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
-    app.ticker.remove(followPaper)
+    app.ticker.remove(followZoom)
     pixelGrid.destroy()
     checkers?.texture.destroy(true)
     view.destroy()
@@ -477,7 +473,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setLayerVisible,
     setLayerOpacity,
     finishLayerOpacity,
+    // The view: its zoom, rotation and flip (see view.ts)
+    getView: view.getState,
+    subscribeView: view.subscribe,
     fitToScreen: view.fitToScreen,
+    straightenView: view.straighten,
+    flipView: view.flip,
     exportImage,
     saveProject,
     destroy,
