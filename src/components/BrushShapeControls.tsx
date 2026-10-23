@@ -1,4 +1,11 @@
-import type { BrushShape } from '../engine/brushFile'
+import type { BrushShape, NoiseMode } from '../engine/brushFile'
+
+// How the noise can form each copy of the tip (see noiseDabs.ts)
+const NOISE_MODES: [NoiseMode, string, string][] = [
+  ['mix', 'Mix', 'The noise takes paint away from the tip, softly, following its edge'],
+  ['drops', 'Drops', "Whole drops of paint where the tip has paint: the tip's edge never cuts one"],
+  ['worn', 'Worn', 'The tip worn away from its edge in: full in the middle, with growing holes toward the edge'],
+]
 
 type Props = {
   shape: BrushShape
@@ -81,13 +88,29 @@ export function BrushShapeControls({ shape, onChange }: Props) {
       <h3>Noise</h3>
       <Slider
         label="Amount"
-        hint="How much of the paint the noise decides: at 0% there is no noise"
+        hint="How much of the paint the noise decides (with Drops: how many drops there are). At 0% there is no noise"
         min={0}
         max={100}
         value={percent(shape.noiseAmount)}
         unit="%"
         onChange={value => change({ noiseAmount: value / 100 })}
       />
+      <div className="slider-row" title="How the noise forms each copy of the tip">
+        <span>Kind</span>
+        <span className="button-group">
+          {NOISE_MODES.map(([mode, label, hint]) => (
+            <button
+              key={mode}
+              title={hint}
+              aria-pressed={shape.noiseMode === mode}
+              disabled={!hasNoise}
+              onClick={() => change({ noiseMode: mode })}
+            >
+              {label}
+            </button>
+          ))}
+        </span>
+      </div>
       <Slider
         label="Grain"
         hint="How many grains fit across the tip: fewer are bigger"
@@ -100,7 +123,7 @@ export function BrushShapeControls({ shape, onChange }: Props) {
       />
       <Slider
         label="Layers"
-        hint="Layers of finer grains added on top, for a more natural texture"
+        hint="Layers of finer grains added on top, for a more natural texture (with Drops: rougher edges)"
         min={1}
         max={4}
         value={shape.noiseLayers}
@@ -126,7 +149,7 @@ export function BrushShapeControls({ shape, onChange }: Props) {
         step={10}
         value={percent(shape.noiseContrast)}
         unit="%"
-        disabled={!hasNoise}
+        disabled={!hasNoise || shape.noiseMode === 'drops'}
         onChange={value => change({ noiseContrast: value / 100 })}
       />
       <Check

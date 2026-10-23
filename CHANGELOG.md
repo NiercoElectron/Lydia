@@ -10,8 +10,9 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 - Brushes with filtered noise ([decision 35](docs/decisions.md#35-brushes-with-filtered-noise)): random numbers,
   filtered the same way, make every dab different while the brush keeps its character. In the Brush Designer: the
-  amount, the grain, layers of finer grains, the stretch, the contrast, and whether the noise changes with each dab
-  or each stroke. Two new brushes use it: Bristles and Sponge.
+  amount, the grain, layers of finer grains, the stretch, the contrast, whether the noise changes with each dab or
+  each stroke, and how it forms each dab: mixed with the tip, as whole drops of paint, or wearing the tip away from
+  its edge. Two new brushes use it: Bristles and Sponge.
 - An Opacity slider for each stroke, and brushes that "wash" (a setting in the Brush Designer): a stroke doesn't pile
   up over itself ([decision 36](docs/decisions.md#36-strokes-are-painted-in-tiles-of-their-own)).
 

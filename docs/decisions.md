@@ -610,6 +610,12 @@ for the history) or **open** (not decided yet).
     - **Contrast:** soft noise, or sharp specks.
     - **New noise for each stroke, not each dab:** each brush chooses. New noise for each dab gives rough edges and
       blotches all different; the same noise along a stroke gives streaks that run along it, like bristles.
+  - The noise forms each dab in one of three ways, chosen for each brush ("Kind"):
+    - **Mix:** the noise takes paint away from the tip, softly, following the tip's own edge.
+    - **Drops:** whole drops of paint, with hard and ragged edges, where the tip has paint: many where it has a lot,
+      few where it has little. A drop is painted whole or not at all, so the tip's edge never cuts one. The amount
+      sets how many drops there are, and the layers how ragged their edges are.
+    - **Worn:** the tip worn away from its edge in: full in the middle, with a hard and ragged edge.
   - Two brushes that come with Lydia use it: **Bristles** (the same noise along the stroke, stretched into streaks
     that turn with the stroke, washed: see decision 36) and **Sponge** (new noise for each dab, dabs far apart, turned
     and scattered).
@@ -619,6 +625,9 @@ for the history) or **open** (not decided yet).
     and picked at random would repeat.
   - Painting the noise over the tip's picture costs the same as over a tip worked out by numbers, so the noise goes
     over any tip.
+  - With Mix alone, the tip's edge cut the grains in two, with a sharp circle on a hard tip or a fade on a soft one.
+    Enrico wanted whole grains, like drops of paint, and no fade; Drops and Worn do that in two ways, and he chose to
+    keep the three.
   - New noise for each dab mostly shows at the edges of a stroke: where the dabs overlap, their different noises
     average out, as the grain inside the Pencil brush did (decision 29). Inside a stroke, the noise only shows when
     it is the same along the stroke and the stroke is washed (decision 36).
@@ -627,6 +636,14 @@ for the history) or **open** (not decided yet).
     filter). The size of the grid's cells is the grain; finer grids are added for the layers; a grid longer one way
     than the other gives the stretch; a curve at the end gives the contrast. Each dab has its own seed (`dabs.ts`),
     so a dab across 4 tiles has the same noise in all 4.
+  - Drops: each cell of the noise's grid may hold a drop, with a random center, size and ragged edge. It is there
+    when a random number is under the tip's paint at its center. A drop reaches less than a cell from its own cell,
+    so each pixel only looks at the 3×3 cells around it, and the dab's square is a cell bigger on every side. The edge
+    is smoothed over one pixel measured on the grid: measured on the distance to a drop, which jumps where two
+    neighboring pixels measure to different drops, it drew thin lines along the cells.
+  - Worn: the shader blurs the tip (the average of points on two rings around each point, with nothing outside the
+    tip's square), and only the inner half of the blur is worn away, so the shape stays inside the tip's own edge.
+    The tip's smaller copies alone, and a blur over a square, flattened round tips on four sides.
   - All the dabs of a tile are drawn at once, one square copied for each dab ("instances"), by a shader of its own
     (`noiseDabs.ts`). It needs WebGL 2's shading language: PixiJS only uses it when the shader starts with
     `#version 300 es`.
@@ -635,7 +652,8 @@ for the history) or **open** (not decided yet).
     copied to their canvases: a preview always looks like the drawing, noise included, and the noise exists only once.
 - **Measured (RTX 4060 Ti):** a 9000 px stroke at size 500 on a 10000×10000 drawing takes 70–100 ms with noise of 4
   layers, against about 45 ms without noise (the numbers vary by ±20% between runs): about 0.3 ms for each movement of
-  the pen. One layer costs about the same as none. At size 100 and below there is little difference.
+  the pen. One layer costs about the same as none. At size 100 and below there is little difference. Drops and Worn
+  cost about as much as Mix (76 and 62 ms).
 
 ## 36. Strokes are painted in tiles of their own
 

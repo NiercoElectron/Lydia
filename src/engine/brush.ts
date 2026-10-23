@@ -7,6 +7,7 @@ import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
+import { noiseReach } from './noiseDabs'
 import type { Projection, ShownStroke } from './projection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
 
@@ -96,7 +97,8 @@ export function createBrush(
     // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
     const dabsByTile = new Map<string, Dab[]>()
     for (const dab of dabs) {
-      const radius = isPixel ? dab.size / 2 : (dab.size / 2) * tip.reach // a pixel tip is a square that never turns
+      // A pixel tip is a square that never turns; drops of noise can stick out of the tip a little
+      const radius = isPixel ? dab.size / 2 : dab.size * (tip.reach / 2 + noiseReach(shape))
       const area = tilesInRect(grid, dab.x - radius, dab.y - radius, dab.x + radius, dab.y + radius)
       if (!area) continue // the dab is entirely outside the paper
       for (let column = area.firstColumn; column <= area.lastColumn; column++) {
@@ -151,7 +153,8 @@ export function createBrush(
   // How far from the pointer the brush can paint, in pixels of the paper. A pixel brush's tip can be up to a pixel
   // further, as it moves to the nearest pixels
   const reach = () => {
-    const tipReach = shape.pixel === 'none' ? (settings.size / 2) * tip.reach : settings.size / 2 + 1
+    const tipReach =
+      shape.pixel === 'none' ? settings.size * (tip.reach / 2 + noiseReach(shape)) : settings.size / 2 + 1
     return tipReach + shape.scatter * settings.size
   }
 

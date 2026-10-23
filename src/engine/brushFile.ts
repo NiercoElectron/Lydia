@@ -19,6 +19,7 @@ export type BrushShape = {
   // Filtered noise in each dab (see noiseDabs.ts): how much of the paint it decides (0 = no noise), how many grains
   // fit across the tip, how many layers of finer grains are added, how many times longer than tall the grains are
   // (streaks across the tip), and its contrast
+  noiseMode: NoiseMode // how the noise forms the dabs: "mix", "drops" or "worn" (see noiseDabs.ts)
   noiseAmount: number
   noiseGrain: number
   noiseLayers: number
@@ -33,6 +34,9 @@ export type BrushShape = {
 const PIXEL_TIPS = ['none', 'round'] as const
 export type PixelTip = (typeof PIXEL_TIPS)[number]
 
+const NOISE_MODES = ['mix', 'drops', 'worn'] as const
+export type NoiseMode = (typeof NOISE_MODES)[number]
+
 // A brush, as it is in its file: a name, the picture of its tip (a PNG image) and its shape
 export type BrushPreset = BrushShape & { name: string; tip: Uint8Array }
 
@@ -46,6 +50,7 @@ export const DEFAULT_SHAPE: BrushShape = {
   wash: false,
   pressureSize: true,
   pressureFlow: false,
+  noiseMode: 'mix',
   noiseAmount: 0,
   noiseGrain: 8,
   noiseLayers: 3,
@@ -129,6 +134,7 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   }
   shape.angle = ((shape.angle % 360) + 360) % 360
   shape.noiseLayers = Math.round(shape.noiseLayers)
+  shape.noiseMode = NOISE_MODES.find(mode => mode === data.noiseMode) ?? DEFAULT_SHAPE.noiseMode
   shape.pixel = PIXEL_TIPS.find(pixelTip => pixelTip === data.pixel) ?? DEFAULT_SHAPE.pixel
 
   const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : fallbackName

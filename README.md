@@ -12,7 +12,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
-- Brushes with filtered noise: every dab different, with the brush's own character (Bristles, Sponge)
+- Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
+  drops of paint or wearing the tip away (Bristles, Sponge)
 - Brushes are `.lydbrush` files: nine come with Lydia, and more can be added (Import…, or drop the files on the
   window), exported to share them, and deleted
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
