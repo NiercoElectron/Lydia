@@ -13,6 +13,17 @@ import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
+import {
+  combine,
+  cutOut,
+  invert,
+  polygonTiles,
+  selectEverything,
+  type Point,
+  type Selection,
+  type SelectionMode,
+} from './selection'
+import { createSelectionView } from './selectionView'
 import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, tileSize, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
@@ -25,7 +36,8 @@ export type EngineSnapshot = {
   canRedo: boolean
   isModified: boolean // changed since it was opened or last saved
   isUpdating: boolean // putting the picture together again after a layer change (see composeLayerTiles)
-  isFilling: boolean // working out where the fill bucket fills (see fillAt)
+  task: string | null // what is being worked out over several frames ("Filling…"), if anything (see runTask)
+  hasSelection: boolean
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -38,8 +50,9 @@ const RAW_BUDGET = Math.max(0.5, ramGigabytes / 4) * 1024 ** 3
 export type ImageType = 'png' | 'jpeg'
 const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
 
-// A fill of up to this many tiles shows right away; a bigger one is put together out of sight first (see fillAt)
-const FILL_SHOWN_AT_ONCE = 32
+// A change of up to this many tiles (a fill, Delete) shows right away; a bigger one is put together out of sight first
+// (see changeTiles)
+const SHOWN_AT_ONCE = 32
 
 // Under a transparent background, the screen shows gray and white squares, like Photoshop and Krita, of this many
 // pixels of the screen at any zoom
@@ -94,11 +107,34 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       : [createLayer('Layer 1')]
   const stack: LayerStack = { layers, active: layers[project.activeLayer] ?? layers[layers.length - 1] }
   let layersCreated = layers.length // for naming new layers
+  let selection: Selection | null = null // see selection.ts
 
   const memory = createTileMemory(RAW_BUDGET)
   const gpu = createGpuTiles(renderer, grid, memory, tilesInGigabytes(gpuMemory))
   const projection = createProjection(renderer, grid, stack, gpu, project.background)
-  const history = createHistory(stack, gpu, projection)
+  const history = createHistory(stack, gpu, projection, {
+    get: () => selection,
+    set: kept => {
+      selection = kept
+    },
+  })
+
+  // Everything that belongs to the drawing: zooming, moving, turning and flipping the view change this container (see
+  // view.ts). Under a transparent background, the squares go first: they move, turn and flip with the drawing, but
+  // keep their size on the screen, so they get smaller as the view zooms in, every frame
+  const world = new Container()
+  const checkers = project.background === null ? createCheckers(grid) : null
+  if (checkers) world.addChild(checkers)
+  world.addChild(projection.container)
+  const followZoom = () => checkers?.tileScale.set(1 / world.scale.y) // the zoom (see view.ts)
+  // Everything the screen shows of the drawing. The pixel grid goes over it, and the selection's edge over both
+  const scene = new Container()
+  scene.addChild(world)
+  app.stage.addChild(scene)
+  app.ticker.add(followZoom)
+  const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
+  const selectionView = createSelectionView(renderer, app.ticker, app.stage, world, grid, app.screen, () => selection)
+
   // The brush starts as the Soft round brush, until the screen chooses one
   const startBrush = parseBrushFile(softRound, 'Soft round')
   const brush = createBrush(
@@ -110,24 +146,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     history,
     await decodeTip(startBrush.tip),
     startBrush,
+    selectionView,
   )
   const fillSettings: FillSettings = { ...DEFAULT_FILL }
-  let isFilling = false
+  let hasHardSelectionEdges = false
+  let task: string | null = null // see runTask
 
-  // Everything that belongs to the drawing: zooming, moving, turning and flipping the view change this container (see
-  // view.ts). Under a transparent background, the squares go first: they move, turn and flip with the drawing, but
-  // keep their size on the screen, so they get smaller as the view zooms in, every frame
-  const world = new Container()
-  const checkers = project.background === null ? createCheckers(grid) : null
-  if (checkers) world.addChild(checkers)
-  world.addChild(projection.container)
-  const followZoom = () => checkers?.tileScale.set(1 / world.scale.y) // the zoom (see view.ts)
-  // Everything the screen shows of the drawing. The pixel grid goes over it
-  const scene = new Container()
-  scene.addChild(world)
-  app.stage.addChild(scene)
-  app.ticker.add(followZoom)
-  const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
   // its own and doesn't listen, so there holding Alt doesn't pick colors
   const colorListeners = new Set<(color: string) => void>()
@@ -138,10 +162,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     },
     canPickColors: () => colorListeners.size > 0,
     onFill: (x, y) => void fillAt(x, y),
-    isFilling: () => isFilling,
+    onSelect: (points, mode) => selectPolygon(points, mode),
+    isWorking: () => task !== null,
   })
   // Painting, filling, undoing and changing the layers wait for each other
-  const isBusy = () => view.isPainting() || isFilling
+  const isBusy = () => view.isPainting() || task !== null
 
   // ----- Telling React about changes -----
 
@@ -157,7 +182,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       canRedo: history.canRedo(),
       isModified,
       isUpdating: projection.isUpdating(),
-      isFilling,
+      task,
+      hasSelection: selection !== null,
     }
   }
 
@@ -195,6 +221,68 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function* storedTiles(): Generator<StoredTile> {
     for (const layer of stack.layers) yield* layer.tiles.values()
     yield* history.storedTiles()
+  }
+
+  // ----- Work over several frames -----
+
+  // Do some work that takes several frames on big drawings (filling, Delete), working from the tiles in RAM. The tiles
+  // just painted must get there first, so this waits for them. Meanwhile the bar shows "label", and painting, undoing
+  // and changing the layers wait. "work" says whether it changed the drawing
+  async function runTask(label: string, work: () => Promise<boolean>) {
+    if (isBusy()) return
+    task = label
+    changed(false)
+    let didChange = false
+    try {
+      while (gpu.hasUnsaved()) await nextFrame()
+      didChange = await work()
+    } finally {
+      task = null
+      changed(didChange)
+    }
+  }
+
+  // Change tiles of a layer in RAM, a few every frame, as one undo step: "change" gives a tile's new pixels (null = no
+  // paint), or undefined to leave it as it is. The new tiles are sent to the graphics card where it has a copy of
+  // them, so nothing has to be read back from it. Returns whether anything changed
+  async function changeTiles(
+    layer: Layer,
+    keys: Iterable<string>,
+    change: (key: string, tile: StoredTile | undefined, width: number, height: number) => StoredTile | null | undefined,
+  ) {
+    while (gpu.hasUnsaved()) await nextFrame() // every tile in RAM (nothing could paint since runTask waited)
+    const pace = createPacer()
+    const changedKeys: string[] = []
+    history.begin(layer)
+    for (const key of keys) {
+      await pace()
+      const { column, row } = parseTileKey(key)
+      const { width, height } = tileSize(grid, column, row)
+      const tile = change(key, layer.tiles.get(key), width, height)
+      if (tile === undefined) continue
+      history.backUpTile(key)
+      if (tile) layer.tiles.set(key, tile)
+      else layer.tiles.delete(key)
+      const cached = gpu.getCached(layer, key)
+      if (cached) {
+        if (tile) gpu.upload(tile, cached.texture)
+        else gpu.clearTexture(cached.texture)
+        gpu.markClean(cached)
+      }
+      changedKeys.push(key)
+    }
+    const didChange = history.end()
+    // A small change shows right away. A big one is put together out of sight and shown all at once, like a layer
+    // change, instead of spreading over the screen
+    if (changedKeys.length <= SHOWN_AT_ONCE) {
+      for (const key of changedKeys) {
+        const { column, row } = parseTileKey(key)
+        projection.composeTile(column, row)
+      }
+    } else {
+      projection.composeLater(changedKeys)
+    }
+    return didChange
   }
 
   // ----- Layers -----
@@ -434,18 +522,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     Object.assign(fillSettings, settings)
   }
 
-  // Fill the region around this point of the paper with the brush's color and opacity (see fill.ts). On big drawings
-  // that takes a moment: meanwhile the bar says so, and painting, undoing and changing the layers wait
-  async function fillAt(x: number, y: number) {
+  // Fill the region around this point of the paper with the brush's color and opacity (see fill.ts), only where it is
+  // selected when there is a selection
+  function fillAt(x: number, y: number) {
     const seedX = Math.floor(x)
     const seedY = Math.floor(y)
-    if (isBusy() || seedX < 0 || seedY < 0 || seedX >= grid.width || seedY >= grid.height) return
-    isFilling = true
-    changed(false)
-    let didChange = false
-    try {
-      // The region is worked out from the tiles in RAM, so the tiles just painted must get there first
-      while (gpu.hasUnsaved()) await nextFrame()
+    if (seedX < 0 || seedY < 0 || seedX >= grid.width || seedY >= grid.height) return
+    return runTask('Filling…', async () => {
       const layer = stack.active
       const reference =
         fillSettings.reference === 'layer'
@@ -453,47 +536,57 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           : stack.layers.filter(other => other.visible).map(({ tiles, opacity }) => ({ tiles, opacity }))
       const { tolerance, expand } = fillSettings
       const region = await findFillRegion(grid, reference, memory, seedX, seedY, tolerance, expand)
-      // The layer's new tiles are worked out in RAM too, a few every frame, and sent to the graphics card where it has
-      // a copy of them (see fillTile). Every tile is in RAM by now: nothing could paint while the region was found
-      while (gpu.hasUnsaved()) await nextFrame()
       const { color, opacity } = brush.settings
-      const pace = createPacer()
-      history.begin(layer)
-      for (const [key, mask] of region) {
-        await pace()
-        const { column, row } = parseTileKey(key)
-        const { width, height } = tileSize(grid, column, row)
-        history.backUpTile(key)
-        const filled = fillTile(layer.tiles.get(key), mask, color, opacity, width, height, memory)
-        if (filled) layer.tiles.set(key, filled)
-        else layer.tiles.delete(key)
-        const cached = gpu.getCached(layer, key)
-        if (cached) {
-          if (filled) gpu.upload(filled, cached.texture)
-          else gpu.clearTexture(cached.texture)
-          gpu.markClean(cached)
-        }
-      }
-      didChange = history.end()
-      // A small fill shows right away. A big one is put together out of sight and shown all at once, like a layer
-      // change, instead of spreading over the screen
-      if (region.size <= FILL_SHOWN_AT_ONCE) {
-        for (const key of region.keys()) {
-          const { column, row } = parseTileKey(key)
-          projection.composeTile(column, row)
-        }
-      } else {
-        projection.composeLater(region.keys())
-      }
-    } finally {
-      isFilling = false
-      changed(didChange)
-    }
+      return changeTiles(layer, region.keys(), (key, tile, width, height) => {
+        const selected = selection ? selection.get(key) : 'full'
+        if (!selected) return undefined // not selected at all
+        const amounts = selected === 'full' ? undefined : selected
+        return fillTile(tile, region.get(key)!, color, opacity, width, height, memory, amounts)
+      })
+    })
   }
 
   // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes
   function setBrushTip(tip: BrushTip, shape: BrushShape) {
     brush.setTip(tip, shape)
+  }
+
+  // ----- Selection -----
+
+  // Change the selection, as a step that can be undone (null: nothing selected)
+  function setSelection(next: Selection | null) {
+    if (isBusy() || next === selection) return
+    history.recordSelection()
+    selection = next
+    changed(false)
+  }
+
+  // Select inside a polygon drawn on the paper (see view.ts), or take it away from the selection, or add it. Fewer
+  // than 3 points is a click: in place of the selection, that selects nothing
+  function selectPolygon(points: Point[], mode: SelectionMode) {
+    if (points.length < 3) {
+      if (mode === 'replace') setSelection(null)
+      return
+    }
+    setSelection(combine(selection, polygonTiles(grid, points, hasHardSelectionEdges), mode))
+  }
+
+  // New selections get soft edges, or hard ones (whole pixels, for pixel art)
+  function setSelectionEdges(hard: boolean) {
+    hasHardSelectionEdges = hard
+  }
+
+  // Take the paint out of the selected part of the active layer (Delete)
+  function deleteSelected() {
+    const cut = selection
+    if (!cut) return
+    return runTask('Deleting…', () => {
+      const layer = stack.active
+      const keys = [...cut.keys()].filter(key => layer.tiles.has(key))
+      return changeTiles(layer, keys, (key, tile, width, height) =>
+        tile ? cutOut(tile, cut.get(key)!, width, height, memory) : undefined,
+      )
+    })
   }
 
   // ----- Pixel grid -----
@@ -508,6 +601,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     app.ticker.remove(backgroundWork)
     app.ticker.remove(followZoom)
     pixelGrid.destroy()
+    selectionView.destroy()
     checkers?.texture.destroy(true)
     view.destroy()
     brush.destroy()
@@ -541,6 +635,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setLayerVisible,
     setLayerOpacity,
     finishLayerOpacity,
+    // The selection (see selection.ts)
+    getSelection: () => selection,
+    selectAll: () => setSelection(selectEverything(grid)),
+    deselect: () => setSelection(null),
+    invertSelection: () => setSelection(invert(grid, selection)),
+    setSelectionEdges,
+    deleteSelected,
     // The view: its zoom, rotation and flip (see view.ts)
     getView: view.getState,
     subscribeView: view.subscribe,
@@ -551,7 +652,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     saveProject,
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)
-    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, world, pixelGrid }),
+    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, world, pixelGrid, selectionView }),
   }
 
   return engine

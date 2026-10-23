@@ -1,8 +1,9 @@
-import type { Application, Container } from 'pixi.js'
+import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { Projection } from './projection'
+import type { Point, SelectionMode } from './selection'
 import { tilesInRect, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 
@@ -20,6 +21,8 @@ const CURSORS: Record<Tool, string> = {
   eraser: 'crosshair',
   fill: FILL_CURSOR,
   eyedropper: EYEDROPPER_CURSOR,
+  select: 'crosshair',
+  lasso: 'crosshair',
   hand: 'grab',
   zoom: 'zoom-in',
   rotate: ROTATE_CURSOR,
@@ -28,8 +31,6 @@ const CURSORS: Record<Tool, string> = {
 // How the drawing is shown: its zoom (1 = 100%), how far it is turned (in degrees, clockwise, from -180 to 180) and
 // whether it is flipped like in a mirror. A new object every time one of them changes
 export type ViewState = { zoom: number; rotation: number; flipped: boolean }
-
-type Point = { x: number; y: number }
 
 // What a pointer that went down on the drawing does while it moves and when it comes up, depending on its tool
 type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void }
@@ -40,7 +41,8 @@ export type ViewActions = {
   onColorPick: (color: string) => void // a color picked with the eyedropper
   canPickColors: () => boolean // whether anyone wants those colors: if not, holding Alt doesn't pick them
   onFill: (x: number, y: number) => void // the fill bucket went down at this point of the paper
-  isFilling: () => boolean // while a fill is being worked out, the tools that change the drawing wait
+  onSelect: (points: Point[], mode: SelectionMode) => void // a polygon drawn with a selection tool (none: a click)
+  isWorking: () => boolean // while a fill or Delete is worked out, the tools that change the drawing wait
 }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
@@ -186,6 +188,67 @@ export function createView(
     return { move() {}, up() {} }
   }
 
+  // The outline of a selection while it is drawn: white, with a black line inside, as wide at any zoom
+  const outline = new Graphics()
+  world.addChild(outline)
+
+  function drawOutline(points: Point[], isClosed: boolean) {
+    const width = 1 / currentZoom()
+    outline.clear()
+    if (points.length < 2) return
+    outline.poly(points, isClosed).stroke({ width: 3 * width, color: 0xffffff })
+    outline.poly(points, isClosed).stroke({ width, color: 0x000000 })
+  }
+
+  // Shift adds to the selection and Alt takes away from it, as in Photoshop and Krita (see selection.ts)
+  const selectionMode = (e: PointerEvent): SelectionMode => (e.shiftKey ? 'add' : e.altKey ? 'subtract' : 'replace')
+
+  // A rectangle from where the pointer went down to where it is, along the sides of the paper, even with the view
+  // turned. A click selects nothing
+  function selectRectangle(e: PointerEvent): Gesture {
+    const mode = selectionMode(e)
+    const start = toPaper(e)
+    const startOnScreen = onScreen(e)
+    const corners = (e: PointerEvent) => {
+      const end = toPaper(e)
+      return [start, { x: end.x, y: start.y }, end, { x: start.x, y: end.y }]
+    }
+    return {
+      move(e) {
+        drawOutline(corners(e), true)
+      },
+      up(e) {
+        outline.clear()
+        if (e.type !== 'pointerup') return
+        const end = onScreen(e)
+        const isClick = Math.hypot(end.x - startOnScreen.x, end.y - startOnScreen.y) < CLICK_DISTANCE
+        actions.onSelect(isClick ? [] : corners(e), mode)
+      },
+    }
+  }
+
+  // The lasso: the outline follows the pointer, and goes back to where it started when the pointer comes up
+  function lasso(e: PointerEvent): Gesture {
+    const mode = selectionMode(e)
+    const points = [toPaper(e)]
+    let last = onScreen(e)
+    return {
+      move(e) {
+        for (const each of e.getCoalescedEvents?.() ?? [e]) {
+          const here = onScreen(each)
+          if (Math.hypot(here.x - last.x, here.y - last.y) < 1) continue // closer than a pixel of the screen
+          last = here
+          points.push(paperAt(here))
+        }
+        drawOutline(points, false)
+      },
+      up(e) {
+        outline.clear()
+        if (e.type === 'pointerup') actions.onSelect(points.length >= 3 ? points : [], mode)
+      },
+    }
+  }
+
   // The view follows the pointer
   function pan(e: PointerEvent): Gesture {
     const grab = { x: e.clientX - world.position.x, y: e.clientY - world.position.y }
@@ -244,6 +307,8 @@ export function createView(
     eraser: paint,
     fill,
     eyedropper: pick,
+    select: selectRectangle,
+    lasso,
     hand: pan,
     zoom,
     rotate: e => rotate(e, !isSpaceDown),
@@ -345,7 +410,9 @@ export function createView(
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
     const used = e.button === 1 ? 'hand' : currentTool()
-    if (actions.isFilling() && (isPaintTool(used) || used === 'fill')) return // the drawing is about to change
+    // While a fill or Delete is worked out, only the tools that just look can be used
+    const onlyLooks = used === 'hand' || used === 'zoom' || used === 'rotate' || used === 'eyedropper'
+    if (actions.isWorking() && !onlyLooks) return
     gesture = { ...startGesture[used](e), pointerId: e.pointerId, tool: used }
     showCursor()
   }
@@ -417,6 +484,7 @@ export function createView(
     window.removeEventListener('keyup', handleKeyUp)
     window.removeEventListener('blur', handleBlur)
     app.ticker.remove(prepareUnderBrush)
+    outline.destroy()
     listeners.clear()
   }
 

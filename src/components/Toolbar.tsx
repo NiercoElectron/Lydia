@@ -5,12 +5,23 @@ import type { Tool } from '../engine/tools'
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
 
+// The selection's settings and commands, shown with the selection tools
+export type SelectionControls = {
+  hasSelection: boolean
+  hardEdges: boolean // whether new selections get hard edges (whole pixels) instead of soft ones
+  onHardEdgesChange: (hard: boolean) => void
+  onSelectAll: () => void
+  onDeselect: () => void
+  onInvert: () => void
+}
+
 type Props = {
   tool: Tool
   color: string
   size: number
   opacity: number // in percent
   fill: FillSettings
+  selection: SelectionControls
   isGridOn: boolean
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
@@ -19,13 +30,15 @@ type Props = {
   onGridToggle: () => void
 }
 
-// The settings of the chosen tool: the color, the opacity, and the brush's size or the fill bucket's own settings
+// The settings of the chosen tool: the color, then the brush's size and opacity, the fill bucket's settings, or the
+// selection's
 export function Toolbar({
   tool,
   color,
   size,
   opacity,
   fill,
+  selection,
   isGridOn,
   onColorChange,
   onSizeChange,
@@ -33,47 +46,16 @@ export function Toolbar({
   onFillChange,
   onGridToggle,
 }: Props) {
+  const isSelecting = tool === 'select' || tool === 'lasso'
   return (
     <div className="toolbar">
       <label>
         Color
         <input type="color" value={color} disabled={tool === 'eraser'} onChange={e => onColorChange(e.target.value)} />
       </label>
-      {tool === 'fill' ? (
-        <>
-          <label title="How far a color can be from the one clicked and still be filled, from 0 to 255">
-            Tolerance
-            <input
-              type="range"
-              min={0}
-              max={255}
-              value={fill.tolerance}
-              onChange={e => onFillChange({ tolerance: Number(e.target.value) })}
-            />
-            <span className="slider-value">{fill.tolerance}</span>
-          </label>
-          <span className="button-group" title="What the fill looks at to find where to stop">
-            Look at
-            <button aria-pressed={fill.reference === 'all'} onClick={() => onFillChange({ reference: 'all' })}>
-              All layers
-            </button>
-            <button aria-pressed={fill.reference === 'layer'} onClick={() => onFillChange({ reference: 'layer' })}>
-              This layer
-            </button>
-          </span>
-          <label title="At most how many pixels the fill goes past its edge, behind the soft edge of the lines around it, up to where they are darkest">
-            Expand
-            <input
-              type="range"
-              min={0}
-              max={MAX_FILL_EXPAND}
-              value={fill.expand}
-              onChange={e => onFillChange({ expand: Number(e.target.value) })}
-            />
-            <span className="slider-value">{fill.expand} px</span>
-          </label>
-        </>
-      ) : (
+      {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
+      {isSelecting && <SelectionButtons selection={selection} />}
+      {tool !== 'fill' && !isSelecting && (
         <label title="Brush size ([ and ])">
           Size
           <input
@@ -86,13 +68,90 @@ export function Toolbar({
           {size}
         </label>
       )}
-      <label title="How much a stroke or a fill covers, however many times a stroke passes over a place">
-        Opacity
-        <input type="range" min={1} max={100} value={opacity} onChange={e => onOpacityChange(Number(e.target.value))} />
-        <span className="slider-value">{opacity}%</span>
-      </label>
+      {!isSelecting && (
+        <label title="How much a stroke or a fill covers, however many times a stroke passes over a place">
+          Opacity
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={opacity}
+            onChange={e => onOpacityChange(Number(e.target.value))}
+          />
+          <span className="slider-value">{opacity}%</span>
+        </label>
+      )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
     </div>
+  )
+}
+
+function FillControls({
+  fill,
+  onFillChange,
+}: {
+  fill: FillSettings
+  onFillChange: (change: Partial<FillSettings>) => void
+}) {
+  return (
+    <>
+      <label title="How far a color can be from the one clicked and still be filled, from 0 to 255">
+        Tolerance
+        <input
+          type="range"
+          min={0}
+          max={255}
+          value={fill.tolerance}
+          onChange={e => onFillChange({ tolerance: Number(e.target.value) })}
+        />
+        <span className="slider-value">{fill.tolerance}</span>
+      </label>
+      <span className="button-group" title="What the fill looks at to find where to stop">
+        Look at
+        <button aria-pressed={fill.reference === 'all'} onClick={() => onFillChange({ reference: 'all' })}>
+          All layers
+        </button>
+        <button aria-pressed={fill.reference === 'layer'} onClick={() => onFillChange({ reference: 'layer' })}>
+          This layer
+        </button>
+      </span>
+      <label title="At most how many pixels the fill goes past its edge, behind the soft edge of the lines around it, up to where they are darkest">
+        Expand
+        <input
+          type="range"
+          min={0}
+          max={MAX_FILL_EXPAND}
+          value={fill.expand}
+          onChange={e => onFillChange({ expand: Number(e.target.value) })}
+        />
+        <span className="slider-value">{fill.expand} px</span>
+      </label>
+    </>
+  )
+}
+
+function SelectionButtons({ selection }: { selection: SelectionControls }) {
+  return (
+    <>
+      <span className="button-group" title="Edges of new selections: soft, or whole pixels for pixel art">
+        Edges
+        <button aria-pressed={!selection.hardEdges} onClick={() => selection.onHardEdgesChange(false)}>
+          Soft
+        </button>
+        <button aria-pressed={selection.hardEdges} onClick={() => selection.onHardEdgesChange(true)}>
+          Hard
+        </button>
+      </span>
+      <button onClick={selection.onSelectAll} title="Select everything (Ctrl+A)">
+        Select all
+      </button>
+      <button onClick={selection.onDeselect} disabled={!selection.hasSelection} title="Select nothing (Ctrl+D)">
+        Deselect
+      </button>
+      <button onClick={selection.onInvert} title="Select what isn't selected, and the other way round (Ctrl+Shift+I)">
+        Invert
+      </button>
+    </>
   )
 }
 

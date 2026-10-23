@@ -1,5 +1,5 @@
 // The tools of the drawing: what the left mouse button (or the pen's tip) does on the paper
-export type Tool = 'brush' | 'eraser' | 'fill' | 'eyedropper' | 'hand' | 'zoom' | 'rotate'
+export type Tool = 'brush' | 'eraser' | 'fill' | 'eyedropper' | 'select' | 'lasso' | 'hand' | 'zoom' | 'rotate'
 
 // The tools that paint with the brush's tip: the brush puts paint down, the eraser takes it away
 export type PaintTool = 'brush' | 'eraser'

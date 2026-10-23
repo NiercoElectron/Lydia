@@ -24,6 +24,11 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   where they are darkest (at most **Expand** pixels): no light rim is left, and a line keeps its soft edge even on
   the same layer as the color. On big drawings it works for a moment in the background, with "Filling…" in the bar,
   while the screen keeps going. Holding Alt with it picks a color.
+- Selections ([decision 40](docs/decisions.md#40-selections)): **Rectangle select** (S) and **Lasso** (L), shown with
+  marching ants. Shift + drag adds to the selection, Alt + drag takes away from it, and a click selects nothing. Their
+  edges are soft, or hard (whole pixels, for pixel art) with a button in the bar. The brush, the eraser and the fill
+  bucket only work inside the selection, and Delete takes out what is inside it. Ctrl+A selects everything, Ctrl+D
+  nothing, and Ctrl+Shift+I or **Invert** what wasn't selected. Every change of the selection can be undone.
 
 ### Changed
 

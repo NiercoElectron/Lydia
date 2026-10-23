@@ -2,11 +2,12 @@ import type { GpuTiles, PendingPixels } from './gpuTiles'
 import { activeIndex, type Layer, type LayerStack } from './layers'
 import { bytesOf, type StoredTile } from './memory'
 import type { Projection } from './projection'
+import { selectionBytes, type Selection } from './selection'
 import { parseTileKey, TILE_SIZE } from './tiles'
 
 // Each undo step keeps what the drawing had before a change, and swapping it in takes the drawing back. The swap keeps
 // in the step what the drawing had instead, so the same step works in both directions: undo swaps it once, redo swaps
-// it back. There are three kinds of steps:
+// it back. There are four kinds of steps:
 // - "tiles": a change to a layer's pixels (a stroke, clearing the layer). For every tile the change touched, the step
 //   keeps the tile from before it (null = the tile had no paint). Pixels are never changed, so no copy is needed. If
 //   the tile's latest pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or
@@ -15,12 +16,18 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 //   (the same layers, not copies), and which layer it was about. A deleted layer stays in the step, with its tiles,
 //   so it can come back
 // - "layer": a layer was hidden or shown, or got another opacity or name. The step keeps the values from before
+// - "selection": the selection changed. The step keeps the selection from before (selections never change, see
+//   selection.ts)
 type TileBackup = StoredTile | null | PendingPixels
 export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'name'>
 type TilesStep = { kind: 'tiles'; layer: Layer; tiles: Map<string, TileBackup> }
 type OrderStep = { kind: 'order'; layers: Layer[]; active: Layer; layer: Layer }
 type LayerStep = { kind: 'layer'; layer: Layer; props: LayerProps }
-type UndoStep = TilesStep | OrderStep | LayerStep
+type SelectionStep = { kind: 'selection'; selection: Selection | null }
+type UndoStep = TilesStep | OrderStep | LayerStep | SelectionStep
+
+// Where the drawing's selection is kept, for undo to put one back
+export type SelectionHolder = { get: () => Selection | null; set: (selection: Selection | null) => void }
 
 const MAX_UNDO_BYTES = 500 * 1024 * 1024 // RAM kept for undo and redo
 
@@ -28,7 +35,7 @@ export function propsOf({ visible, opacity, name }: Layer): LayerProps {
   return { visible, opacity, name }
 }
 
-export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Projection) {
+export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Projection, selection: SelectionHolder) {
   const undoStack: UndoStep[] = []
   const redoStack: UndoStep[] = []
   let current: TilesStep | null = null // the step being recorded (while the user paints)
@@ -80,6 +87,11 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     add({ kind: 'layer', layer, props: { ...before } })
   }
 
+  // Call before the selection changes: keeps the selection as it is now
+  function recordSelection() {
+    add({ kind: 'selection', selection: selection.get() })
+  }
+
   function add(step: UndoStep) {
     undoStack.push(step)
     // After a new change, the steps that were undone can't be redone anymore
@@ -100,6 +112,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
 
   // The layers a step is about
   function layersOf(step: UndoStep) {
+    if (step.kind === 'selection') return []
     return step.kind === 'order' ? [...step.layers, step.layer] : [step.layer]
   }
 
@@ -142,6 +155,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
         else if (tile === undefined) bytes += TILE_SIZE * TILE_SIZE * 4 // an IOU not filled in yet counts as a whole tile
       }
     }
+    if (step.kind === 'selection') bytes += selectionBytes(step.selection)
     for (const layer of layersKeptBy(step)) {
       for (const tile of layer.tiles.values()) bytes += bytesOf(tile)
     }
@@ -204,10 +218,17 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     if (looksDifferent) projection.composeLayerTiles(layer)
   }
 
+  function swapSelection(step: SelectionStep) {
+    const now = selection.get()
+    selection.set(step.selection)
+    step.selection = now
+  }
+
   function swap(step: UndoStep) {
     if (step.kind === 'tiles') swapTiles(step)
     else if (step.kind === 'order') swapOrder(step)
-    else swapLayer(step)
+    else if (step.kind === 'layer') swapLayer(step)
+    else swapSelection(step)
   }
 
   function undo() {
@@ -244,6 +265,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     end,
     recordOrder,
     recordLayer,
+    recordSelection,
     undo,
     redo,
     storedTiles,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
-import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
+import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid, useSelectionShortcuts } from '../components/engineHooks'
 import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
@@ -30,6 +30,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const [size, setSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
   const [fill, setFill] = useState<FillSettings>(DEFAULT_FILL)
+  const [hardSelectionEdges, setHardSelectionEdges] = useState(false)
   const [busy, setBusy] = useState<string | null>(null) // what is being done right now ("Saving…"), if anything
   const [brushes, setBrushes] = useState<LibraryBrush[]>([])
   const [brushId, setBrushId] = useState(() => loadBrushId() ?? DEFAULT_BRUSH_ID)
@@ -48,6 +49,10 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   useEffect(() => {
     engine?.setFill(fill)
   }, [engine, fill])
+
+  useEffect(() => {
+    engine?.setSelectionEdges(hardSelectionEdges)
+  }, [engine, hardSelectionEdges])
 
   // Colors picked with the eyedropper become the brush's color, at full opacity: the picked color is the one the screen
   // shows, and painting it at a lower opacity would come out lighter
@@ -164,6 +169,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
+  useSelectionShortcuts(engine)
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {
@@ -215,6 +221,14 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           size={size}
           opacity={opacity}
           fill={fill}
+          selection={{
+            hasSelection: snapshot.hasSelection,
+            hardEdges: hardSelectionEdges,
+            onHardEdgesChange: setHardSelectionEdges,
+            onSelectAll: () => engine?.selectAll(),
+            onDeselect: () => engine?.deselect(),
+            onInvert: () => engine?.invertSelection(),
+          }}
           isGridOn={isGridOn}
           onColorChange={setColor}
           onSizeChange={setSize}
@@ -243,8 +257,8 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
             Save
           </button>
           <button onClick={handleBack}>Back</button>
-          {(busy || snapshot.isUpdating || snapshot.isFilling) && (
-            <span className="busy">{busy ?? (snapshot.isFilling ? 'Filling…' : 'Updating…')}</span>
+          {(busy || snapshot.task || snapshot.isUpdating) && (
+            <span className="busy">{busy ?? snapshot.task ?? 'Updating…'}</span>
           )}
         </div>
       </header>

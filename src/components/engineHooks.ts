@@ -14,7 +14,8 @@ const startingSnapshot: EngineSnapshot = {
   canRedo: false,
   isModified: false,
   isUpdating: false,
-  isFilling: false,
+  task: null,
+  hasSelection: false,
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}
@@ -43,6 +44,32 @@ export function usePixelGrid(engine: Engine | null) {
     setIsOn(!isOn)
   }, [isOn])
   return [isOn, toggle] as const
+}
+
+// The selection's shortcuts, as in Photoshop: Ctrl/Cmd + A selects everything, Ctrl/Cmd + D nothing, and
+// Ctrl/Cmd + Shift + I what isn't selected; Delete (or Backspace) takes the paint out of what is selected
+export function useSelectionShortcuts(engine: Engine | null) {
+  useEffect(() => {
+    if (!engine) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return
+      const key = e.key.toLowerCase()
+      if (e.ctrlKey || e.metaKey) {
+        if (key === 'a' && !e.shiftKey) engine.selectAll()
+        else if (key === 'd' && !e.shiftKey) engine.deselect()
+        else if (key === 'i' && e.shiftKey) engine.invertSelection()
+        else return
+        e.preventDefault() // stop the browser from using the shortcut itself (selecting the page, a bookmark…)
+        return
+      }
+      if (key === 'delete' || key === 'backspace') {
+        e.preventDefault()
+        engine.deleteSelected()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [engine])
 }
 
 // Shortcuts, like in Photoshop and Krita: Ctrl/Cmd + Z undoes, Ctrl/Cmd + Shift + Z or Ctrl + Y redoes; a letter

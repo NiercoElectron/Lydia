@@ -19,6 +19,13 @@ export type BrushSettings = {
   opacity: number // how much the whole stroke covers, from 0 to 1
 }
 
+// The selection, as the brush sees it (see selectionView.ts): whether a tile can be painted at all, and cutting a
+// stroke's tile to the selected part of it
+export type StrokeCutter = {
+  canPaint: (key: string) => boolean
+  cut: (strokeTexture: RenderTexture, key: string) => void
+}
+
 // Tiles of finished strokes kept for the next ones, instead of creating and deleting textures at every stroke
 const SPARE_STROKE_TILES = 64
 
@@ -31,6 +38,7 @@ export function createBrush(
   history: History,
   startTip: BrushTip,
   startShape: BrushShape,
+  selection: StrokeCutter,
 ) {
   const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20, opacity: 1 }
   let tip = startTip
@@ -114,10 +122,13 @@ export function createBrush(
     }
 
     // Paint into each touched tile of the stroke only the dabs that touch it, shifted so that the tile's corner is at
-    // (0, 0)
+    // (0, 0), and keep only what is selected
     for (const [key, tileDabs] of dabsByTile) {
+      if (!selection.canPaint(key)) continue
       const { column, row } = parseTileKey(key)
-      painter.paint(strokeTile(key, column, row), tileDabs, column * TILE_SIZE, row * TILE_SIZE)
+      const strokeTexture = strokeTile(key, column, row)
+      painter.paint(strokeTexture, tileDabs, column * TILE_SIZE, row * TILE_SIZE)
+      selection.cut(strokeTexture, key)
       projection.composeTile(column, row)
     }
   }

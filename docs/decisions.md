@@ -842,6 +842,51 @@ for the history) or **open** (not decided yet).
   **This layer**; Alt; 50% opacity on a transparent paper; 10000×10000, with undo and redo; and that tiles filled
   whole go into RAM as a single color, the same as on the graphics card.
 
+## 40. Selections
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - Two selection tools: **Rectangle select** (S) and **Lasso** (L). Their keys are Enrico's choice: M already flips
+    the view, as in Krita. The rectangle follows the sides of the paper, even with the view turned.
+  - Shift + drag adds to the selection and Alt + drag takes away from it, as in Photoshop and Krita (Enrico's choice).
+    Without a key, a new selection takes the place of the old one, and a click selects nothing.
+  - The edges are soft at first, and hard (whole pixels, for pixel art) with a button in the bar (Enrico's choice).
+  - The brush, the eraser and the fill bucket only work inside the selection, as much as each pixel is selected.
+    Delete takes out the paint inside it. Ctrl+A selects everything, Ctrl+D nothing, and Ctrl+Shift+I what wasn't
+    selected; the bar has the same as buttons. Every change of the selection is a step of undo.
+  - The selection's edge shows as "marching ants": black and white dashes that move.
+  - Next, in steps of their own: moving what is selected (V; without a selection, the whole layer, Enrico's choice),
+    then scaling and turning it.
+- **Why:**
+  - That is how selections work in Photoshop and Krita, so painters know it already. Soft edges keep the edge of what
+    is painted inside smooth; pixel art needs whole pixels.
+- **How:**
+  - A selection is kept like a layer: by tile, how much each pixel is selected, from 0 to 255, in RAM. A tile selected
+    whole is only marked so, and a tile not selected at all isn't kept. A selection never changes: every change makes
+    a new one, sharing the tiles that stay the same, so an undo step only keeps the old one.
+  - A rectangle or a lasso is a polygon. For each row of tiles, lines across it (four per row of pixels for soft
+    edges, one through the middle of the pixels for hard ones) find the stretches inside the polygon, and measure
+    exactly how much of each pixel they cover. A tile that every line covers whole is selected whole without looking
+    at its pixels. Where the outline crosses itself, a place is inside if the outline goes round it ("nonzero" rule).
+  - To show the edge, the selected tiles are drawn into a picture the size of the screen, placed like the drawing,
+    and a shader draws the dashes where a pixel is selected (half or more) and the next one isn't. That works at any
+    zoom and with the view turned or flipped, like the pixel grid (decision 34). Tiles selected whole side by side
+    are one rectangle: with everything selected on 10000×10000, 40 sprites instead of 1600.
+  - Strokes skip the tiles not selected at all, and in the others, the stroke's own tile (decision 36) is cut to the
+    selection after each step: what isn't selected is taken out of it with the "erase" blend, using a texture of the
+    part not selected (made from the selected one on the graphics card). The screen shows the stroke cut already,
+    and it goes into the layer cut.
+  - The fill bucket multiplies its fill by how much each pixel is selected. Delete works in RAM like the fill
+    (decision 39): both share the code that changes a layer's tiles a few every frame, as one step of undo.
+- **Measured (RTX 4060 Ti, 10000×10000):** a lasso of 2000 points round the whole paper is worked out in about
+  150 ms (1231 tiles, 1080 of them whole). With everything selected, a frame while the view moves takes 3.3 ms (7.8 ms
+  before tiles selected whole were joined into rectangles).
+- **Checked:** the tools, their keys and the bar; a rectangle, and a click that selects nothing; the ants on the edge
+  and not inside; soft and hard edges; adding and taking away; the lasso; the brush, the eraser and the fill bucket
+  only inside; everything selected; Delete and its undo; Invert and its undo; undoing a click that selected nothing;
+  a rectangle on a turned view.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

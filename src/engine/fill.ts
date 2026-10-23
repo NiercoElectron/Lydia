@@ -362,9 +362,10 @@ export async function findFillRegion(
 }
 
 // A layer's tile after the fill (null = no paint): the color, at this opacity, over its pixels where the mask says
-// FILL, and behind them where it says BEHIND. Worked out in RAM rather than painted on the graphics card, so nothing
-// has to be read back from it afterwards: with big fills, hundreds of tiles read back at once made the screen stop for
-// a moment
+// FILL, and behind them where it says BEHIND; with a selection, only as much as each pixel is selected ("selected",
+// from 0 to 255; all of it without one). Worked out in RAM rather than painted on the graphics card, so nothing has to
+// be read back from it afterwards: with big fills, hundreds of tiles read back at once made the screen stop for a
+// moment
 export function fillTile(
   tile: StoredTile | undefined,
   mask: FillMask,
@@ -373,8 +374,9 @@ export function fillTile(
   width: number,
   height: number,
   memory: TileMemory,
+  selected?: Uint8Array,
 ): StoredTile | null {
-  if (mask === 'full' && (!tile || tile.color !== undefined)) {
+  if (mask === 'full' && !selected && (!tile || tile.color !== undefined)) {
     return { color: filledColor(tile?.color ?? 0, color, opacity), lastUsed: performance.now() }
   }
   const pixels = new Uint8ClampedArray(width * height * 4) // it rounds and keeps within 0–255
@@ -385,15 +387,23 @@ export function fillTile(
   for (let i = 0; i < width * height; i++) {
     const what = mask === 'full' ? FILL : mask[i]
     if (!what) continue
+    const amount = selected ? selected[i] / 255 : 1
+    if (amount === 0) continue
     const j = i * 4
-    if (what === FILL) {
+    if (what === FILL && amount === 1) {
       pixels[j] = red + pixels[j] * keep
       pixels[j + 1] = green + pixels[j + 1] * keep
       pixels[j + 2] = blue + pixels[j + 2] * keep
       pixels[j + 3] = alpha + pixels[j + 3] * keep
+    } else if (what === FILL) {
+      const left = 1 - opacity * amount // how much of what was there still shows
+      pixels[j] = red * amount + pixels[j] * left
+      pixels[j + 1] = green * amount + pixels[j + 1] * left
+      pixels[j + 2] = blue * amount + pixels[j + 2] * left
+      pixels[j + 3] = alpha * amount + pixels[j + 3] * left
     } else {
       // The color shows only as much as the paint already there lets it through
-      const through = 1 - pixels[j + 3] / 255
+      const through = (1 - pixels[j + 3] / 255) * amount
       pixels[j] += red * through
       pixels[j + 1] += green * through
       pixels[j + 2] += blue * through
