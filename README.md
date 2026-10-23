@@ -38,20 +38,24 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 
 ## Roadmap
 
-- [x] Start screen (new project / open project)
-  - [x] Choose canvas size
-  - [x] Choose background color or transparent background
-- [x] Color and brush size selection
-- [x] Brushes as files (`.lydbrush`): a brush list, import, export
-- [x] Brush Designer: draw a brush tip and save it as a brush
-- [ ] Brush grain (a paper texture, for pencils)
-- [x] Undo and redo (painting, clearing a layer and every layer change)
-- [x] Layers: add, delete, choose, reorder, rename, hide, opacity
-- [ ] Layers: blend modes
-- [x] Eraser
-- [x] Save and open projects (.lyd files; projects from Lydia 0.1 can't be opened)
-- [x] Export drawings as PNG or JPEG
-- [ ] Desktop app for Windows, macOS and Linux (Electron)
+Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
+everything, brushes as files and the Brush Designer, new drawings with common sizes, a resolution (DPI) and a
+background color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
+[CHANGELOG.md](CHANGELOG.md).
+
+Next, roughly in this order:
+
+- [ ] Painting: eyedropper, brush opacity per stroke, stabilizer (smoother strokes), tapered stroke ends, rotate and
+      flip the view
+- [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
+- [ ] Selections: rectangle, lasso and magic wand; move, scale and rotate; fill bucket
+- [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools; in the Brush Designer, edit existing
+      brushes and use an image as the tip
+- [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
+- [ ] Guides: symmetry and rulers (straight lines, ellipses, perspective)
+- [ ] Text and filters (hue and saturation, levels, blur)
+- [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
+      from the computer
 
 ## Getting started
 
