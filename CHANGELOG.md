@@ -6,6 +6,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-22
+
 ### Added
 
 - A resolution (DPI) for each drawing, chosen in the New project window (300 DPI at first, with buttons for 72, 150,
@@ -165,7 +167,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/NiercoElectron/Lydia/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/NiercoElectron/Lydia/compare/v0.3.1...v0.4.0
