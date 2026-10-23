@@ -48,8 +48,9 @@ in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, brush opacity per stroke, stabilizer (smoother
-      strokes), tapered stroke ends, rotate and flip the view
+- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, brush opacity per stroke, the brush's outline
+      under the pen, pen tilt (the brush follows how the pen leans, like a pencil), stabilizer (smoother strokes),
+      tapered stroke ends, rotate and flip the view
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
