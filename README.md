@@ -42,15 +42,14 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 ## Roadmap
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
-everything, brushes as files and the Brush Designer, new drawings with common sizes, a resolution (DPI) and a
-background color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
-[CHANGELOG.md](CHANGELOG.md).
+everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, new drawings with common
+sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export. What changed
+in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Painting: a Pixel brush (exact pixels, from 1 pixel up, for pixel art and fine lines) and pixel brushes drawn in
-      the Brush Designer, eyedropper, brush opacity per stroke, stabilizer (smoother strokes), tapered stroke ends,
-      rotate and flip the view
+- [ ] Painting: pixel brushes drawn in the Brush Designer, eyedropper, brush opacity per stroke, stabilizer (smoother
+      strokes), tapered stroke ends, rotate and flip the view
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down

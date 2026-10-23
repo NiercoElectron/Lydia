@@ -6,6 +6,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-23
+
 ### Added
 
 - A **Pixel** brush, for pixel art ([decision 33](docs/decisions.md#33-the-pixel-brush)). It paints whole pixels with
@@ -181,7 +183,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/NiercoElectron/Lydia/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/NiercoElectron/Lydia/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/NiercoElectron/Lydia/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/NiercoElectron/Lydia/compare/v0.4.0...v0.5.0
