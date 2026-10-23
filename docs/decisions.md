@@ -596,7 +596,7 @@ for the history) or **open** (not decided yet).
 ## 35. Brushes with filtered noise
 
 - **Date:** 2026-10-23
-- **Status:** adopted on the `filtered-noise` branch (not in `main` yet)
+- **Status:** adopted
 - **Decision:**
   - A brush can have "filtered noise" in its dabs: random numbers filtered so that no two dabs are alike, but all of
     them keep the brush's character. It was Enrico's idea: a sequence of numbers filtered in a way that brings
@@ -636,13 +636,11 @@ for the history) or **open** (not decided yet).
 - **Measured (RTX 4060 Ti):** a 9000 px stroke at size 500 on a 10000×10000 drawing takes 70–100 ms with noise of 4
   layers, against about 45 ms without noise (the numbers vary by ±20% between runs): about 0.3 ms for each movement of
   the pen. One layer costs about the same as none. At size 100 and below there is little difference.
-- **Left for later:** the measurements still use two switches in `noiseDabs.ts` (a worked-out round tip, and no
-  noise), to be taken out before the branch goes into `main`.
 
 ## 36. Strokes are painted in tiles of their own
 
 - **Date:** 2026-10-23
-- **Status:** adopted on the `filtered-noise` branch (not in `main` yet)
+- **Status:** adopted
 - **Decision:**
   - A stroke is painted first into tiles of its own, white, with the paint in their alpha. When it ends, it is put
     into the layer with the stroke's color and opacity, or taken out of it with the eraser. Meanwhile the screen shows

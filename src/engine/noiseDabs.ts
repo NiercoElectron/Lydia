@@ -72,7 +72,6 @@ uniform float uGrain;
 uniform float uLayers;
 uniform float uStretch;
 uniform float uContrast;
-uniform float uComputedTip;
 
 // A random number for a corner of the grid, from 0 to 1: the same corner, seed and layer always give the same number
 float randomAt(ivec2 cell, uint layer) {
@@ -113,9 +112,7 @@ float filteredNoise(vec2 uv) {
 }
 
 void main(void) {
-  float tip = uComputedTip > 0.5
-    ? clamp((1.0 - length(vUV - 0.5) * 2.0) * 2.0, 0.0, 1.0)
-    : texture(uTip, vUV).a;
+  float tip = texture(uTip, vUV).a;
   float paint = tip;
   if (tip > 0.0 && uAmount > 0.0) {
     float noise = clamp((filteredNoise(vUV) - 0.5) * uContrast + 0.5, 0.0, 1.0);
@@ -153,7 +150,6 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
     uLayers: { value: 1, type: 'f32' },
     uStretch: { value: 1, type: 'f32' },
     uContrast: { value: 1, type: 'f32' },
-    uComputedTip: { value: 0, type: 'f32' },
   })
   const shader = new Shader({
     glProgram: GlProgram.from({ vertex, fragment, name: 'noise-dabs', preferredFragmentPrecision: 'highp' }),
@@ -162,10 +158,6 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
   const mesh = new Mesh({ geometry, shader })
   const root = new Container() // the mesh is moved inside it, so that the tile's corner is at (0, 0)
   root.addChild(mesh)
-
-  // For measuring only, on the filtered-noise branch: paint a computed round tip instead of the tip's picture, or
-  // leave the noise out, to see what each part costs
-  const debug = { computedTip: false, noNoise: false }
 
   // Paint with another tip
   function setTip(texture: Texture, tip: BrushTip) {
@@ -195,12 +187,11 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
     geometry.instanceCount = dabs.length
 
     const values = uniforms.uniforms
-    values.uAmount = debug.noNoise ? 0 : shape.noiseAmount
+    values.uAmount = shape.noiseAmount
     values.uGrain = shape.noiseGrain
     values.uLayers = shape.noiseLayers
     values.uStretch = shape.noiseStretch
     values.uContrast = shape.noiseContrast
-    values.uComputedTip = debug.computedTip ? 1 : 0
     mesh.blendMode = blendMode
     mesh.position.set(-left, -top)
     renderer.render({ container: root, target, clear: false })
@@ -212,7 +203,7 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
     shader.destroy()
   }
 
-  return { setTip, paint, debug, destroy }
+  return { setTip, paint, destroy }
 }
 
 export type NoiseDabs = ReturnType<typeof createNoiseDabs>

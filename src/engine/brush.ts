@@ -169,7 +169,6 @@ export function createBrush(
     endStroke,
     reach,
     isPainting: () => path !== null,
-    noiseDabs: painter.noiseDabs, // for measuring, on the filtered-noise branch
     destroy,
   }
 }

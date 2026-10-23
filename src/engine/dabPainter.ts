@@ -126,7 +126,7 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
     for (const pixelTexture of pixelTips.values()) pixelTexture.destroy(true)
   }
 
-  return { setTip, paint, noiseDabs, destroy }
+  return { setTip, paint, destroy }
 }
 
 export type DabPainter = ReturnType<typeof createDabPainter>
