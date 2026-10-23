@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { BrushShape } from '../engine/brushFile'
 import type { BrushTip } from '../engine/brushTip'
-import { drawStroke, resetCanvas, sampleWave } from './dabCanvas'
+import { paintSample, sampleWave } from '../engine/previewSurface'
 
 const WIDTH = 160
 const HEIGHT = 44
@@ -23,10 +23,10 @@ export function BrushPreview({ tip, shape }: Props) {
     let cancelled = false
     tip.then(
       decoded => {
-        if (cancelled || !canvasRef.current) return
+        const canvas = canvasRef.current
+        if (cancelled || !canvas) return
         const [width, height, size] = [WIDTH / zoom, HEIGHT / zoom, SIZE / zoom]
-        const ctx = resetCanvas(canvasRef.current, width, height)
-        drawStroke(ctx, decoded, shape, size, sampleWave(width, height, size * 0.6))
+        void paintSample(canvas, width, decoded, shape, size, sampleWave(width, height, size * 0.6))
       },
       () => {}, // a tip that can't be decoded shows no stroke; choosing the brush says why
     )

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BrushShape } from '../engine/brushFile'
 import type { BrushTip } from '../engine/brushTip'
-import { createDabPath, type DabPath, type StrokePoint } from '../engine/dabs'
-import { drawDabs, drawStroke, resetCanvas, sampleWave } from './dabCanvas'
+import type { StrokePoint } from '../engine/dabs'
+import { createPreviewSurface, sampleWave, type PreviewSurface } from '../engine/previewSurface'
 
 const WIDTH = 280
 const HEIGHT = 200
@@ -20,14 +20,39 @@ export function BrushTestArea({ tip, shape }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState(40)
   const [clears, setClears] = useState(0) // goes up when the area is cleared, to paint it again
+  const [surface, setSurface] = useState<PreviewSurface | null>(null)
   const strokes = useRef<StrokePoint[][]>([sampleWave(WIDTH, HEIGHT, 30)])
-  // The stroke being drawn right now: its pointer, where its dabs go, and its points so far
-  const drawing = useRef<{ pointerId: number; path: DabPath; points: StrokePoint[] } | null>(null)
+  // The stroke being drawn right now: its pointer and its points so far
+  const drawing = useRef<{ pointerId: number; points: StrokePoint[] } | null>(null)
+
+  // Its own place to paint on (see previewSurface.ts), freed when the area goes away
+  useEffect(() => {
+    let cancelled = false
+    let made: PreviewSurface | null = null
+    createPreviewSurface().then(created => {
+      if (cancelled) {
+        created.destroy()
+      } else {
+        made = created
+        setSurface(created)
+      }
+    })
+    return () => {
+      cancelled = true
+      made?.destroy()
+    }
+  }, [])
+
+  // Pixels of the canvas for each unit of the area
+  const unit = () => canvasRef.current!.width / WIDTH
 
   useEffect(() => {
-    const ctx = resetCanvas(canvasRef.current!, WIDTH, HEIGHT)
-    if (tip) for (const points of strokes.current) drawStroke(ctx, tip, shape, size, points)
-  }, [tip, shape, size, clears])
+    const canvas = canvasRef.current
+    if (!surface || !canvas) return
+    surface.setSize(canvas.width, canvas.height)
+    if (tip) for (const points of strokes.current) surface.paintStroke(tip, shape, size, points, unit())
+    surface.copyTo(canvas)
+  }, [surface, tip, shape, size, clears])
 
   // A point of the area, from where the pointer is. A mouse always paints at full pressure
   function pointOf(e: PointerEvent): StrokePoint {
@@ -39,31 +64,31 @@ export function BrushTestArea({ tip, shape }: Props) {
     }
   }
 
-  const context = () => canvasRef.current!.getContext('2d')!
-
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!tip || e.button !== 0 || drawing.current) return
+    if (!tip || !surface || e.button !== 0 || drawing.current) return
     e.currentTarget.setPointerCapture(e.pointerId) // keep receiving the moves even outside the area
     const point = pointOf(e.nativeEvent)
-    const path = createDabPath(shape, size)
-    drawing.current = { pointerId: e.pointerId, path, points: [point] }
-    drawDabs(context(), tip, shape, path.start(point))
+    drawing.current = { pointerId: e.pointerId, points: [point] }
+    surface.startStroke(tip, shape, size, point, unit())
+    surface.copyTo(e.currentTarget)
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
     const stroke = drawing.current
-    if (!stroke || stroke.pointerId !== e.pointerId || !tip) return
+    if (!stroke || stroke.pointerId !== e.pointerId || !surface) return
     // The browser groups fast movements into one event; get all the points in between
     const events = e.nativeEvent.getCoalescedEvents?.() ?? []
     const points = (events.length > 0 ? events : [e.nativeEvent]).map(pointOf)
     stroke.points.push(...points)
-    drawDabs(context(), tip, shape, stroke.path.moveTo(points))
+    surface.continueStroke(points)
+    surface.copyTo(e.currentTarget)
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     const stroke = drawing.current
     if (!stroke || stroke.pointerId !== e.pointerId) return
-    if (tip) drawDabs(context(), tip, shape, stroke.path.end())
+    surface?.endStroke()
+    surface?.copyTo(e.currentTarget)
     strokes.current.push(stroke.points)
     drawing.current = null
   }

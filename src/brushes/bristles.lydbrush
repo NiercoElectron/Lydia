@@ -1,0 +1,21 @@
+{
+  "format": "lydia-brush",
+  "version": 1,
+  "name": "Bristles",
+  "spacing": 0.04,
+  "angle": 0,
+  "followStroke": true,
+  "angleJitter": 0,
+  "scatter": 0,
+  "flow": 1,
+  "pressureSize": true,
+  "pressureFlow": false,
+  "wash": true,
+  "noiseAmount": 0.9,
+  "noiseGrain": 3,
+  "noiseLayers": 4,
+  "noiseStretch": 12,
+  "noiseContrast": 2,
+  "noisePerStroke": true,
+  "tip": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAAAAADmVT4XAAAChUlEQVR42s3bq5XCQBgF4BuBHIGMoAAEMhZBCYgICoiMGIFA0AAyBaSESAqIQCJSQAqIpIDZs+wuy5s8Zv4713POd06AzPwPGHLQ61P1PtPxfBqqURCMVDidxzrb1zKAplgvxnia8WJdNG4B5SbCh0Sb0hWgTCdolUla2gc0uxk6ZLZrrAKOSYCOCZKjNcAhRq/EByuAaoXeWVWDASeNQdGnYYA8xMCE+QBAvYSFLOu+gFzBSlTeD5DAWpIegCqCxURVV0ChYDWq6AbIYD1ZF8AWDrJtD9BwEt0WkMJR0nYADWfRbQBbOMz2MyCD02SfAAUcp3gPqJRrgKreAiI4T/QOkEAgyWtADpHkrwC1kgGo+gVgCaEsnwNyiCV/BjiFcoDw9ASgIRj9CKggmuoBsJIFrO4BBwjncAeIpQHxLeAI8RxvAIk8ILkGNIE8IGiuADsQsrsCzBiA2T+gBCXlBZByAOkFMOEAJn8A0hP4eQbfgA0LsPkFRCxA9ANoQEtzBhQ8QHEGrHmA9Rmw4AEWZ8CYBxh/A2oQUxuYPROwN3BdkfhUr4DsfeDxfgD54+jt0RRmzgTMDcyUCZgamJAJCA2MYgKUgRkxASMDEzABgQ8A+iOgfwnpP0P6HxH9r5j+MqK/jukHEvqRjH4opR/L+RcT+tWMfjmlX8/pBQp+iYZepKKX6fiFSnqpll6s5pfr6Q0LesuG37Sit+34jUt665bfvKa37/kDDPQRDv4QC3+Mhz7IxB/l4g+z8cf56AON/JFO/lArf6yXP9jMH+3mD7fzx/v5Cw78FQ/+kosHaz78RSf+qpcHy278dT8PFh49WPn0YOnVg7VfHxaffVj99mH53Xa+ADJAO4bzZwEfAAAAAElFTkSuQmCC"
+}

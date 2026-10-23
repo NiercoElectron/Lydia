@@ -15,7 +15,17 @@ export type LibraryBrush = {
 
 const builtInFiles = import.meta.glob<string>('./brushes/*.lydbrush', { query: '?raw', import: 'default', eager: true })
 // The order of the brushes that come with Lydia in the list (others go after them)
-const BUILT_IN_ORDER = ['soft-round', 'hard-round', 'pixel', 'airbrush', 'chalk', 'calligraphy', 'dashes']
+const BUILT_IN_ORDER = [
+  'soft-round',
+  'hard-round',
+  'pixel',
+  'airbrush',
+  'chalk',
+  'calligraphy',
+  'dashes',
+  'bristles',
+  'sponge',
+]
 export const DEFAULT_BRUSH_ID = 'built-in/soft-round'
 
 const builtInBrushes: LibraryBrush[] = Object.entries(builtInFiles)

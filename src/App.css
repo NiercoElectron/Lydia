@@ -305,6 +305,11 @@ button.brush[aria-pressed='true'] {
   gap: 6px;
 }
 
+.shape-controls h3 {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
 .test-canvas {
   display: block;
   width: 100%;

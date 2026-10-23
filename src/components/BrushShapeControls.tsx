@@ -8,6 +8,7 @@ type Props = {
 // The settings of a brush, in the Brush Designer. Fractions in the file are shown as percents
 export function BrushShapeControls({ shape, onChange }: Props) {
   const change = (changes: Partial<BrushShape>) => onChange({ ...shape, ...changes })
+  const hasNoise = shape.noiseAmount > 0
   return (
     <div className="shape-controls">
       <Slider
@@ -62,6 +63,12 @@ export function BrushShapeControls({ shape, onChange }: Props) {
         onChange={value => change({ flow: value / 100 })}
       />
       <Check
+        label="Wash"
+        hint="The stroke doesn't pile up over itself: each place keeps the most paint one copy gave it, so the texture of the tip shows inside the stroke too"
+        checked={shape.wash}
+        onChange={checked => change({ wash: checked })}
+      />
+      <Check
         label="Pen pressure changes the size"
         checked={shape.pressureSize}
         onChange={checked => change({ pressureSize: checked })}
@@ -70,6 +77,64 @@ export function BrushShapeControls({ shape, onChange }: Props) {
         label="Pen pressure changes the flow"
         checked={shape.pressureFlow}
         onChange={checked => change({ pressureFlow: checked })}
+      />
+      <h3>Noise</h3>
+      <Slider
+        label="Amount"
+        hint="How much of the paint the noise decides: at 0% there is no noise"
+        min={0}
+        max={100}
+        value={percent(shape.noiseAmount)}
+        unit="%"
+        onChange={value => change({ noiseAmount: value / 100 })}
+      />
+      <Slider
+        label="Grain"
+        hint="How many grains fit across the tip: fewer are bigger"
+        min={1}
+        max={64}
+        value={shape.noiseGrain}
+        unit=""
+        disabled={!hasNoise}
+        onChange={value => change({ noiseGrain: value })}
+      />
+      <Slider
+        label="Layers"
+        hint="Layers of finer grains added on top, for a more natural texture"
+        min={1}
+        max={4}
+        value={shape.noiseLayers}
+        unit=""
+        disabled={!hasNoise}
+        onChange={value => change({ noiseLayers: value })}
+      />
+      <Slider
+        label="Stretch"
+        hint="How many times longer than tall the grains are: streaks across the tip"
+        min={1}
+        max={16}
+        value={shape.noiseStretch}
+        unit="×"
+        disabled={!hasNoise}
+        onChange={value => change({ noiseStretch: value })}
+      />
+      <Slider
+        label="Contrast"
+        hint="Low keeps the noise soft, high turns it into sharp specks"
+        min={10}
+        max={1000}
+        step={10}
+        value={percent(shape.noiseContrast)}
+        unit="%"
+        disabled={!hasNoise}
+        onChange={value => change({ noiseContrast: value / 100 })}
+      />
+      <Check
+        label="New noise for each stroke, not each copy"
+        hint="The same noise all along a stroke, so its streaks run along it, like bristles (with Wash, they show inside the stroke)"
+        checked={shape.noisePerStroke}
+        disabled={!hasNoise}
+        onChange={checked => change({ noisePerStroke: checked })}
       />
     </div>
   )
@@ -85,10 +150,11 @@ type SliderProps = {
   step?: number
   value: number
   unit: string
+  disabled?: boolean
   onChange: (value: number) => void
 }
 
-function Slider({ label, hint, min, max, step = 1, value, unit, onChange }: SliderProps) {
+function Slider({ label, hint, min, max, step = 1, value, unit, disabled = false, onChange }: SliderProps) {
   return (
     <label className="slider-row" title={hint}>
       <span>{label}</span>
@@ -98,6 +164,7 @@ function Slider({ label, hint, min, max, step = 1, value, unit, onChange }: Slid
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={e => onChange(Number(e.target.value))}
       />
       <span className="slider-value">
@@ -110,14 +177,16 @@ function Slider({ label, hint, min, max, step = 1, value, unit, onChange }: Slid
 
 type CheckProps = {
   label: string
+  hint?: string
   checked: boolean
+  disabled?: boolean
   onChange: (checked: boolean) => void
 }
 
-function Check({ label, checked, onChange }: CheckProps) {
+function Check({ label, hint, checked, disabled = false, onChange }: CheckProps) {
   return (
-    <label className="check-row">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+    <label className="check-row" title={hint}>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
       {label}
     </label>
   )

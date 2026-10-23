@@ -163,6 +163,35 @@ const brushes = {
   chalk: { name: 'Chalk', spacing: 0.15, angleJitter: 1, scatter: 0.05, flow: 0.9, pressureFlow: true, tip: chalk },
   calligraphy: { name: 'Calligraphy', spacing: 0.02, angle: 315, tip: calligraphy },
   dashes: { name: 'Dashes', spacing: 1.6, followStroke: true, pressureSize: false, tip: dashes },
+  // Filtered noise (src/engine/noiseDabs.ts): the same noise all along the stroke, stretched into streaks that turn
+  // with the stroke, and washed so they show inside it
+  bristles: {
+    name: 'Bristles',
+    spacing: 0.04,
+    followStroke: true,
+    wash: true,
+    noiseAmount: 0.9,
+    noiseGrain: 3,
+    noiseLayers: 4,
+    noiseStretch: 12,
+    noiseContrast: 2,
+    noisePerStroke: true,
+    tip: hardRound,
+  },
+  // New noise for each dab, with dabs far apart, turned and scattered: blotches, each one different
+  sponge: {
+    name: 'Sponge',
+    spacing: 0.35,
+    angleJitter: 1,
+    scatter: 0.25,
+    pressureSize: false,
+    pressureFlow: true,
+    noiseAmount: 1,
+    noiseGrain: 6,
+    noiseLayers: 3,
+    noiseContrast: 2.5,
+    tip: softRound,
+  },
 }
 
 mkdirSync(OUT, { recursive: true })
