@@ -52,6 +52,25 @@ export function saveNewProjectChoice(choice: NewProjectChoice) {
   }
 }
 
+// Whether the pixel grid is on (see pixelGrid.ts). It is at first
+const PIXEL_GRID_KEY = 'lydia.pixelGrid'
+
+export function loadPixelGrid() {
+  try {
+    return localStorage.getItem(PIXEL_GRID_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function savePixelGrid(on: boolean) {
+  try {
+    localStorage.setItem(PIXEL_GRID_KEY, on ? 'on' : 'off')
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // The brush chosen last (its id in the brush library, see brushLibrary.ts)
 const BRUSH_KEY = 'lydia.brush'
 

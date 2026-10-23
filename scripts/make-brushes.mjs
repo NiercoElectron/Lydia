@@ -138,6 +138,10 @@ const dashes = drawTip(128, (x, y) => {
   return edge(Math.hypot(Math.max(Math.abs(x) - (62 - half), 0), y) - half)
 })
 
+// Lydia works out the Pixel brush's tip for each size (src/engine/pixelTip.ts). This picture is only for versions of
+// Lydia without pixel brushes, which paint with it as a hard round brush
+const pixelTip = drawTip(64, (x, y) => (Math.hypot(x, y) <= 32 ? 1 : 0))
+
 // ----- The brushes -----
 
 const usual = {
@@ -154,6 +158,7 @@ const usual = {
 const brushes = {
   'soft-round': { name: 'Soft round', tip: softRound },
   'hard-round': { name: 'Hard round', spacing: 0.08, tip: hardRound },
+  pixel: { name: 'Pixel', spacing: 0.01, pixel: 'round', tip: pixelTip },
   airbrush: { name: 'Airbrush', spacing: 0.05, flow: 0.1, pressureSize: false, pressureFlow: true, tip: airbrush },
   chalk: { name: 'Chalk', spacing: 0.15, angleJitter: 1, scatter: 0.05, flow: 0.9, pressureFlow: true, tip: chalk },
   calligraphy: { name: 'Calligraphy', spacing: 0.02, angle: 315, tip: calligraphy },

@@ -3,8 +3,8 @@ import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
 import { BrushShapeControls } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
-import { useDrawingShortcuts, useEngineSnapshot } from '../components/engineHooks'
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
+import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
+import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
 import type { Tool } from '../engine/brush'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
 import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
@@ -68,7 +68,8 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
     }
   }, [engine, edge])
 
-  useDrawingShortcuts(engine, setTool, setSize)
+  const [isGridOn, toggleGrid] = usePixelGrid(engine)
+  useDrawingShortcuts(engine, setTool, setSize, toggleGrid)
 
   // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it
   useEffect(() => {
@@ -169,6 +170,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
             />
             <span className="slider-value">{size}</span>
           </label>
+          <GridButton isOn={isGridOn} onToggle={toggleGrid} />
         </div>
         <div className="actions">
           <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">

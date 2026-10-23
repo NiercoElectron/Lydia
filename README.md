@@ -11,8 +11,10 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
-- Brushes are `.lydbrush` files: six come with Lydia, and more can be added (Import…, or drop the files on the window),
-  exported to share them, and deleted
+- Brushes are `.lydbrush` files: seven come with Lydia, and more can be added (Import…, or drop the files on the
+  window), exported to share them, and deleted
+- A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
+- A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
 - Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
   brush list or as a file
 - Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
@@ -31,6 +33,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 | Ctrl/Cmd + Shift + Z, Ctrl + Y               | Redo                   |
 | B / E                                        | Brush / eraser         |
 | [ / ]                                        | Smaller / bigger brush |
+| G                                            | Pixel grid on / off    |
 | Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                   |
 | Mouse wheel, or two fingers on a trackpad    | Move around            |
 | Space + drag, or drag with the middle button | Move around            |
@@ -48,8 +51,8 @@ Next, roughly in this order:
 - [ ] Painting: a Pixel brush (exact pixels, from 1 pixel up, for pixel art and fine lines) and pixel brushes drawn in
       the Brush Designer, eyedropper, brush opacity per stroke, stabilizer (smoother strokes), tapered stroke ends,
       rotate and flip the view
-- [ ] Pixel art: a pixel grid when zoomed in, pixel-perfect strokes (without the doubled corners of lines drawn by
-      hand), and exporting enlarged (2×, 4×) without blurring
+- [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
+      4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
 - [ ] Selections: rectangle, lasso and magic wand; move, scale and rotate; fill bucket
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools; in the Brush Designer, edit existing

@@ -229,6 +229,10 @@ button.brush[aria-pressed='true'] {
   aspect-ratio: 160 / 44;
 }
 
+.brush-preview.pixelated {
+  image-rendering: pixelated;
+}
+
 .brush-name {
   font-size: 0.85rem;
   text-align: left;

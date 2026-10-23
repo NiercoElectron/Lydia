@@ -15,7 +15,13 @@ export type BrushShape = {
   flow: number // how much paint each dab puts down, from 0 to 1
   pressureSize: boolean // the pen's pressure changes the size of the dabs
   pressureFlow: boolean // the pen's pressure changes how much paint each dab puts down
+  pixel: PixelTip // whether the brush paints whole pixels of the paper
 }
+
+// "none": a smooth brush, its tip's picture resized to any size. "round": a pixel brush with a round tip, worked out
+// for each size (see pixelTip.ts)
+const PIXEL_TIPS = ['none', 'round'] as const
+export type PixelTip = (typeof PIXEL_TIPS)[number]
 
 // A brush, as it is in its file: a name, the picture of its tip (a PNG image) and its shape
 export type BrushPreset = BrushShape & { name: string; tip: Uint8Array }
@@ -29,6 +35,7 @@ export const DEFAULT_SHAPE: BrushShape = {
   flow: 1,
   pressureSize: true,
   pressureFlow: false,
+  pixel: 'none',
 }
 
 // The smallest and biggest values of each number, so a file can't make Lydia place millions of dabs
@@ -53,9 +60,11 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
 // }
 //
 // "tip" is the picture of the brush tip, a PNG image of up to 1024×1024: black paints, white or transparent doesn't,
-// gray paints lightly. A missing field takes its usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left
-// alone, so a file from a newer version of the same format still opens. A brush file is only data: nothing in it is
-// ever run, so brushes downloaded from anywhere are safe to add
+// gray paints lightly. "pixel" is "round" for a pixel brush, which works out its tip for each size: its picture is then
+// only for versions of Lydia without pixel brushes, which paint with it as a smooth brush. A missing field takes its
+// usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left alone, so a file from a newer version of the
+// same format still opens. A brush file is only data: nothing in it is ever run, so brushes downloaded from anywhere
+// are safe to add
 
 const FORMAT = 'lydia-brush'
 const VERSION = 1
@@ -97,6 +106,7 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
     }
   }
   shape.angle = ((shape.angle % 360) + 360) % 360
+  shape.pixel = PIXEL_TIPS.find(pixelTip => pixelTip === data.pixel) ?? DEFAULT_SHAPE.pixel
 
   const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : fallbackName
   return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip }

@@ -1,4 +1,5 @@
 import type { Tool } from '../engine/brush'
+import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
@@ -7,12 +8,23 @@ type Props = {
   tool: Tool
   color: string
   size: number
+  isGridOn: boolean
   onToolChange: (tool: Tool) => void
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
+  onGridToggle: () => void
 }
 
-export function Toolbar({ tool, color, size, onToolChange, onColorChange, onSizeChange }: Props) {
+export function Toolbar({
+  tool,
+  color,
+  size,
+  isGridOn,
+  onToolChange,
+  onColorChange,
+  onSizeChange,
+  onGridToggle,
+}: Props) {
   return (
     <div className="toolbar">
       <button aria-pressed={tool === 'brush'} onClick={() => onToolChange('brush')} title="Brush (B)">
@@ -36,6 +48,16 @@ export function Toolbar({ tool, color, size, onToolChange, onColorChange, onSize
         />
         {size}
       </label>
+      <GridButton isOn={isGridOn} onToggle={onGridToggle} />
     </div>
+  )
+}
+
+// Turns the pixel grid on and off. Also used by the Brush Designer
+export function GridButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
+  return (
+    <button aria-pressed={isOn} onClick={onToggle} title={`Pixel grid, shown from ${PIXEL_GRID_ZOOM * 100}% zoom (G)`}>
+      Grid
+    </button>
   )
 }

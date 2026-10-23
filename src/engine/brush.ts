@@ -6,6 +6,7 @@ import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
+import { roundTipRows } from './pixelTip'
 import type { Projection } from './projection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, type Grid } from './tiles'
 
@@ -22,6 +23,22 @@ export type BrushSettings = {
 function createTipTexture(tip: BrushTip) {
   return new Texture({ source: new CanvasSource({ resource: tip.image, resolution: 1, autoGenerateMipmaps: true }) })
 }
+
+// The round tip of a pixel brush at one size (see pixelTip.ts). It is painted at its own size, each of its pixels on
+// one pixel of the paper, and "nearest" keeps the graphics card from blending them with their neighbors
+function createPixelTipTexture(size: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  roundTipRows(size).forEach((count, row) => ctx.fillRect((size - count) / 2, row, count, 1))
+  return new Texture({ source: new CanvasSource({ resource: canvas, resolution: 1, scaleMode: 'nearest' }) })
+}
+
+// A pixel brush needs a tip for each size it paints at, as the pen's pressure changes it. They are made when first
+// needed, and the ones unused for the longest time are forgotten once they add up to more than this many pixels
+const PIXEL_TIPS_BUDGET = 4 * 1024 ** 2
 
 export function createBrush(
   renderer: WebGLRenderer,
@@ -43,6 +60,33 @@ export function createBrush(
   const stamp = new Container()
   stampRoot.addChild(stamp)
   const dabSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
+  const pixelTips = new Map<number, Texture>() // by size, the most recently used last
+  let pixelTipsArea = 0 // their pixels, added up
+
+  function pixelTip(size: number) {
+    let pixelTexture = pixelTips.get(size)
+    if (pixelTexture) {
+      pixelTips.delete(size) // to put it last again
+    } else {
+      pixelTexture = createPixelTipTexture(size)
+      pixelTipsArea += size * size
+    }
+    pixelTips.set(size, pixelTexture)
+    return pixelTexture
+  }
+
+  // Forget the pixel tips unused for the longest time, once there are too many. The sprites get the brush's own tip
+  // first, so that none keeps a forgotten one
+  function trimPixelTips() {
+    if (pixelTipsArea <= PIXEL_TIPS_BUDGET) return
+    for (const sprite of dabSprites) sprite.texture = texture
+    for (const [size, pixelTexture] of pixelTips) {
+      if (pixelTipsArea <= PIXEL_TIPS_BUDGET) break
+      pixelTips.delete(size)
+      pixelTipsArea -= size * size
+      pixelTexture.destroy(true)
+    }
+  }
 
   // Paint with another brush from now on
   function setTip(newTip: BrushTip, newShape: BrushShape) {
@@ -55,10 +99,11 @@ export function createBrush(
   }
 
   function paintDabs(dabs: Dab[]) {
+    const isPixel = shape.pixel !== 'none'
     // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
     const dabsByTile = new Map<string, Dab[]>()
     for (const dab of dabs) {
-      const radius = (dab.size / 2) * tip.reach
+      const radius = isPixel ? dab.size / 2 : (dab.size / 2) * tip.reach // a pixel tip is a square that never turns
       const area = tilesInRect(grid, dab.x - radius, dab.y - radius, dab.x + radius, dab.y + radius)
       if (!area) continue // the dab is entirely outside the paper
       for (let column = area.firstColumn; column <= area.lastColumn; column++) {
@@ -90,7 +135,13 @@ export function createBrush(
         }
         sprite.position.set(dab.x, dab.y)
         sprite.rotation = dab.angle
-        sprite.scale.set(dab.size / tipSide)
+        if (isPixel) {
+          sprite.texture = pixelTip(dab.size)
+          sprite.scale.set(1)
+        } else {
+          sprite.texture = texture
+          sprite.scale.set(dab.size / tipSide)
+        }
         sprite.alpha = dab.alpha
         sprite.tint = settings.color
         // The eraser removes paint from the tile instead of adding it
@@ -103,6 +154,7 @@ export function createBrush(
       gpu.markDirty(layer, key)
       projection.composeTile(column, row)
     }
+    if (isPixel) trimPixelTips()
   }
 
   // Where the dabs of the stroke being painted go, or null when not painting
@@ -127,13 +179,18 @@ export function createBrush(
     return history.end()
   }
 
-  // How far from the pointer the brush can paint, in pixels of the paper
-  const reach = () => (settings.size / 2) * tip.reach + shape.scatter * settings.size
+  // How far from the pointer the brush can paint, in pixels of the paper. A pixel brush's tip can be up to a pixel
+  // further, as it moves to the nearest pixels
+  const reach = () => {
+    const tipReach = shape.pixel === 'none' ? (settings.size / 2) * tip.reach : settings.size / 2 + 1
+    return tipReach + shape.scatter * settings.size
+  }
 
   function destroy() {
     stampRoot.destroy({ children: true })
     for (const sprite of dabSprites) sprite.destroy()
     texture.destroy(true)
+    for (const pixelTexture of pixelTips.values()) pixelTexture.destroy(true)
   }
 
   return {

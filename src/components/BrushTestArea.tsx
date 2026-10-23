@@ -47,7 +47,7 @@ export function BrushTestArea({ tip, shape }: Props) {
     const point = pointOf(e.nativeEvent)
     const path = createDabPath(shape, size)
     drawing.current = { pointerId: e.pointerId, path, points: [point] }
-    drawDabs(context(), tip, path.start(point))
+    drawDabs(context(), tip, shape, path.start(point))
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -57,13 +57,13 @@ export function BrushTestArea({ tip, shape }: Props) {
     const events = e.nativeEvent.getCoalescedEvents?.() ?? []
     const points = (events.length > 0 ? events : [e.nativeEvent]).map(pointOf)
     stroke.points.push(...points)
-    drawDabs(context(), tip, stroke.path.moveTo(points))
+    drawDabs(context(), tip, shape, stroke.path.moveTo(points))
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     const stroke = drawing.current
     if (!stroke || stroke.pointerId !== e.pointerId) return
-    if (tip) drawDabs(context(), tip, stroke.path.end())
+    if (tip) drawDabs(context(), tip, shape, stroke.path.end())
     strokes.current.push(stroke.points)
     drawing.current = null
   }

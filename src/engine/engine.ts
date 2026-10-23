@@ -8,6 +8,7 @@ import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
 import { createTileMemory, type StoredTile } from './memory'
+import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
@@ -117,9 +118,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     checkers.width = grid.width * world.scale.x
     checkers.height = grid.height * world.scale.y
   }
-  if (checkers) app.stage.addChild(checkers)
-  app.stage.addChild(world)
+  // Everything the screen shows of the drawing: the squares, then the drawing itself. The pixel grid goes over both
+  const scene = new Container()
+  if (checkers) scene.addChild(checkers)
+  scene.addChild(world)
+  app.stage.addChild(scene)
   app.ticker.add(followPaper)
+  const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
   const view = createView(app, world, grid, brush, projection, gpu, () => changed())
 
   // ----- Telling React about changes -----
@@ -399,10 +404,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     brush.setTip(tip, shape)
   }
 
+  // ----- Pixel grid -----
+
+  // Turn the pixel grid on or off. When on, it shows from 800% zoom (see pixelGrid.ts)
+  function setPixelGrid(on: boolean) {
+    pixelGrid.setOn(on)
+  }
+
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
     app.ticker.remove(followPaper)
+    pixelGrid.destroy()
     checkers?.texture.destroy(true)
     view.destroy()
     brush.destroy()
@@ -421,6 +434,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     },
     setBrush,
     setBrushTip,
+    setPixelGrid,
     undo,
     redo,
     clearLayer,
@@ -437,7 +451,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     saveProject,
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)
-    inspect: () => ({ app, stack, gpu, projection, history, memory, brush }),
+    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, world, pixelGrid }),
   }
 
   return engine

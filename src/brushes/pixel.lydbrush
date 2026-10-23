@@ -1,0 +1,15 @@
+{
+  "format": "lydia-brush",
+  "version": 1,
+  "name": "Pixel",
+  "spacing": 0.01,
+  "angle": 0,
+  "followStroke": false,
+  "angleJitter": 0,
+  "scatter": 0,
+  "flow": 1,
+  "pressureSize": true,
+  "pressureFlow": false,
+  "pixel": "round",
+  "tip": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAAAAACPAi4CAAAAm0lEQVR42u2XQQrAIAwE5/+fbqGUNihakw1UxD07c1N3OZrBpHPqG+5LGMVbCobphgMfXxvw4bUCN18YcOOFgghvDYR4YyDGvwaC/GPIEkDUQJi/DTkCiBsQ+MswhQAUQ4IAKUsIdnZ2Um7DGg/K/6/yCl+b/r1P0FD0kjVBT9Srrl629bqvDw598iSMLn32JQxPffpmjG/P/D8Bn25gyuHMyUAAAAAASUVORK5CYII="
+}

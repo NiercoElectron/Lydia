@@ -1,7 +1,8 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Tool } from '../engine/brush'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import { isTyping } from '../engine/view'
+import { loadPixelGrid, savePixelGrid } from '../settings'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
 
 // What the screen shows while the engine is starting
@@ -21,12 +22,26 @@ export function useEngineSnapshot(engine: Engine | null) {
   return useSyncExternalStore(engine?.subscribe ?? subscribeToNothing, engine?.getSnapshot ?? getStartingSnapshot)
 }
 
+// The pixel grid, on or off as chosen last time. The engine shows it when the view is zoomed in enough
+export function usePixelGrid(engine: Engine | null) {
+  const [isOn, setIsOn] = useState(loadPixelGrid)
+  useEffect(() => {
+    engine?.setPixelGrid(isOn)
+  }, [engine, isOn])
+  const toggle = useCallback(() => {
+    savePixelGrid(!isOn)
+    setIsOn(!isOn)
+  }, [isOn])
+  return [isOn, toggle] as const
+}
+
 // Shortcuts, like in Photoshop and Krita: Ctrl/Cmd + Z undoes, Ctrl/Cmd + Shift + Z or Ctrl + Y redoes; B is the
-// brush, E the eraser; [ and ] change the brush size
+// brush, E the eraser; [ and ] change the brush size; G turns the pixel grid on and off
 export function useDrawingShortcuts(
   engine: Engine | null,
   setTool: (tool: Tool) => void,
   setSize: (change: (size: number) => number) => void,
+  toggleGrid: () => void,
 ) {
   useEffect(() => {
     if (!engine) return
@@ -45,10 +60,11 @@ export function useDrawingShortcuts(
       }
       if (key === 'b') setTool('brush')
       else if (key === 'e') setTool('eraser')
-      else if (key === '[') setSize(s => Math.max(MIN_BRUSH_SIZE, Math.round(s / 1.25)))
+      else if (key === '[') setSize(s => Math.max(MIN_BRUSH_SIZE, Math.min(s - 1, Math.round(s / 1.25))))
       else if (key === ']') setSize(s => Math.min(MAX_BRUSH_SIZE, Math.max(s + 1, Math.round(s * 1.25))))
+      else if (key === 'g') toggleGrid()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [engine, setTool, setSize])
+  }, [engine, setTool, setSize, toggleGrid])
 }

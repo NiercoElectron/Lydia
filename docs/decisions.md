@@ -505,6 +505,93 @@ for the history) or **open** (not decided yet).
 - **Checked:** Pillow, a Python library for images, reads exported PNG and JPEG files of an A4 drawing as 21×29.7 cm,
   at 300 DPI and at 150 DPI, also after saving and opening the project.
 
+## 33. The Pixel brush
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:**
+  - A new brush that comes with Lydia, **Pixel**, paints whole pixels of the paper with hard edges, for pixel art. The
+    other brushes stay smooth at every size.
+  - Its size is its width in pixels, as with the other brushes, from 1 pixel up. Its tip is round and worked out for
+    each size: it paints the pixels whose centers are within half the size from the tip's center. At size 3 that
+    would be a full square, so there the tip is a plus. The smallest sizes, as Enrico drew them:
+
+    ```
+    1  #     2  ##    3  .#.    4  .##.    5  .###.
+                ##       ###       ####       #####
+                         .#.       ####       #####
+                                   .##.       #####
+                                              .###.
+    ```
+
+  - An odd size is centered on the pixel under the pen, and an even size on the corner between pixels nearest to it.
+  - Strokes have no gaps: a straight line paints one pixel in each column (or row), and the pixels under the pen when
+    the stroke ends are always painted.
+  - The pen's pressure changes the size a pixel at a time, and the lightest touch paints one pixel.
+  - The `.lydbrush` file says `"pixel": "round"`. Versions of Lydia without pixel brushes ignore that and paint with
+    the tip's picture, a hard circle, as a smooth brush.
+- **Why:**
+  - Enrico wants Lydia to appeal to pixel artists too. A smooth brush at 1 or 2 pixels blurs its edges and can't
+    paint one exact pixel.
+  - The shapes are the ones pixel artists draw by hand. Enrico chose the size as the width, like the other brushes,
+    and a new brush instead of a pixel mode for every brush.
+- **How:**
+  - Each size has its own texture of the tip, made the first time it is used. It is painted at its own size with
+    "nearest" sampling, so each pixel of the tip is exactly one pixel of the paper. The textures unused for the longest
+    time are forgotten once they add up to more than 4 million pixels (16 MB).
+  - The dabs are placed by the same code as for the other brushes (`dabs.ts`), with whole sizes, moved to the nearest
+    pixels and never turned. The spacing is 1% of the size, and at least 1 pixel: a dab on every pixel up to size
+    149, and on bigger tips, a few pixels apart, where it makes no difference.
+  - For a pixel brush, the spacing is measured along the longer side (the larger of the distances across and down).
+    Measured in a straight line, a sloped line got extra pixels at its steps.
+  - A dab that would paint the same pixels as the one before is skipped.
+  - The brush list shows the Pixel brush's sample stroke 4 times smaller, enlarged, so that its pixels show.
+- **Measured (RTX 4060 Ti):**
+  - A 9000 px stroke on a 10000×10000 drawing, waiting until the graphics card has painted it, takes as long as with
+    Hard round measured the same way: 70 ms at size 500, 24–29 ms at sizes 1 to 100.
+  - With the pen's pressure going up and down all along a stroke at size 500, it takes about 520 ms instead of 74,
+    about 1.3 ms per movement of the pen: each new size makes its tip, about 1.2 ms for a tip of 500 pixels, mostly
+    to send it to the graphics card. That still fits in a frame, and a tip of 100 pixels takes 25 times less.
+- **Next:** pixel brushes drawn in the Brush Designer (also in 0.6), then the pixel art stage of the roadmap: a pixel
+  grid (done next, decision 34), pixel-perfect strokes and exporting enlarged.
+
+## 34. A pixel grid
+
+- **Date:** 2026-10-22
+- **Status:** adopted
+- **Decision:**
+  - From 800% zoom, lines show between the pixels of the paper, like the pixel grids of Photoshop and Aseprite. The
+    **Grid** button (or G) turns it off and on, and Lydia remembers the choice. It is on at first, and the Brush
+    Designer has it too.
+  - Each line takes its color from what the screen shows under it: each of red, green and blue moves half the way
+    across (a value under the middle goes up by half, one above it goes down by half), and the line goes halfway to
+    that color. So a line is light gray (191) on white, dark gray (64) on black and on middle gray, and a duller red
+    (191, 64, 64) on red: always the same contrast, 64 out of 255, on any color, also on the squares of a transparent
+    background.
+  - The lines are one pixel of the display wide at any zoom and display scale, and only inside the paper.
+- **Why:**
+  - Enrico couldn't tell the pixels apart when drawing with the Pixel brush. His idea was lines in the inverse color
+    of what is under them, so that they always contrast. But the inverse of middle gray (128) is the same gray (127),
+    so the lines disappeared there and were weak on the grays near it. Moving each color half the way across keeps
+    Enrico's idea and gives every color the same contrast; Enrico chose it, and the grid showing on its own from 800%
+    with a button to turn it off.
+  - From 800% each pixel is at least 8 pixels of the screen; closer lines would cover the drawing.
+  - Halfway to the line color shows the lines without covering the drawing, about as strong as Aseprite's grid (black
+    at a quarter of opacity). It is one number to change (`STRENGTH` in `pixelGrid.ts`).
+- **How:**
+  - While the grid shows, the drawing (with the squares of a transparent background) is drawn into a picture the size
+    of the screen, and the screen shows that picture through a shader that changes the pixels the lines go through.
+    Where the lines go is worked out for each pixel of the display, so they are never blurred or doubled.
+  - PixiJS's filters do the same, but in PixiJS 8.22 a filter makes PixiJS warn whenever the window changes size or
+    the drawing is closed: PixiJS throws away its own picture of the last frame while the filter still points at it.
+    So Lydia keeps its own picture.
+  - Under 800%, or with the grid off, the drawing goes to the screen directly, as before.
+- **Measured (RTX 4060 Ti):** a frame of a 10000×10000 drawing at 800% takes 1.85 ms with the grid and 1.88 ms
+  without: no difference that can be measured.
+- **Checked:** the colors of the lines on white, black, the two middle grays (127 and 128), red and the squares, read
+  from the screen; each line exactly between two pixels and one pixel of the display wide, also at a display scale of
+  150%.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
-import { useDrawingShortcuts, useEngineSnapshot } from '../components/engineHooks'
+import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
 import { LayersPanel } from '../components/LayersPanel'
 import { Toolbar } from '../components/Toolbar'
 import type { Tool } from '../engine/brush'
@@ -137,7 +137,8 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
     }
   }, [importBrushes])
 
-  useDrawingShortcuts(engine, setTool, setSize)
+  const [isGridOn, toggleGrid] = usePixelGrid(engine)
+  useDrawingShortcuts(engine, setTool, setSize, toggleGrid)
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {
@@ -187,9 +188,11 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           tool={tool}
           color={color}
           size={size}
+          isGridOn={isGridOn}
           onToolChange={setTool}
           onColorChange={setColor}
           onSizeChange={setSize}
+          onGridToggle={toggleGrid}
         />
         <div className="actions">
           <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">

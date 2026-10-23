@@ -6,6 +6,20 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A **Pixel** brush, for pixel art ([decision 33](docs/decisions.md#33-the-pixel-brush)). It paints whole pixels with
+  hard edges, from 1 pixel up, with a round tip worked out for each size (a plus at size 3). A straight line paints
+  one pixel in each column, and the pen's pressure changes the size a pixel at a time. Its sample stroke in the brush
+  list shows its pixels.
+- A pixel grid ([decision 34](docs/decisions.md#34-a-pixel-grid)): from 800% zoom, lines between the pixels, in a
+  color worked out from what is under them, so they show on any color. The **Grid** button (or G) turns it off and
+  on, and Lydia remembers the choice.
+
+### Fixed
+
+- The `[` key makes the brush smaller down to size 1. Before, it stopped at 2.
+
 ## [0.5.2] - 2026-10-22
 
 ### Added

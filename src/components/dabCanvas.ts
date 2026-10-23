@@ -1,6 +1,7 @@
 import type { BrushShape } from '../engine/brushFile'
 import type { BrushTip } from '../engine/brushTip'
 import { createDabPath, type Dab, type StrokePoint } from '../engine/dabs'
+import { roundTipRows } from '../engine/pixelTip'
 
 // Drawing brush strokes on an ordinary canvas, in black, for the brush previews and the Brush Designer's test area.
 // The dabs are placed by the same code as on the drawing (dabs.ts)
@@ -23,7 +24,11 @@ function blackTip(tip: BrushTip) {
   return black
 }
 
-export function drawDabs(ctx: CanvasRenderingContext2D, tip: BrushTip, dabs: Dab[]) {
+export function drawDabs(ctx: CanvasRenderingContext2D, tip: BrushTip, shape: BrushShape, dabs: Dab[]) {
+  if (shape.pixel !== 'none') {
+    drawPixelDabs(ctx, dabs)
+    return
+  }
   const image = blackTip(tip)
   const side = Math.max(image.width, image.height)
   ctx.imageSmoothingQuality = 'high'
@@ -39,6 +44,19 @@ export function drawDabs(ctx: CanvasRenderingContext2D, tip: BrushTip, dabs: Dab
   }
 }
 
+// The dabs of a pixel brush, pixel by pixel. They are sharp on a canvas with one pixel for each pixel of the drawing,
+// as in the brush previews
+function drawPixelDabs(ctx: CanvasRenderingContext2D, dabs: Dab[]) {
+  ctx.fillStyle = '#000'
+  for (const dab of dabs) {
+    const left = dab.x - dab.size / 2
+    const top = dab.y - dab.size / 2
+    ctx.globalAlpha = dab.alpha
+    roundTipRows(dab.size).forEach((count, row) => ctx.fillRect(left + (dab.size - count) / 2, top + row, count, 1))
+  }
+  ctx.globalAlpha = 1
+}
+
 // A whole stroke through these points. "size" is the brush size at full pressure
 export function drawStroke(
   ctx: CanvasRenderingContext2D,
@@ -49,7 +67,7 @@ export function drawStroke(
 ) {
   if (points.length === 0) return
   const path = createDabPath(shape, size)
-  drawDabs(ctx, tip, [...path.start(points[0]), ...path.moveTo(points.slice(1)), ...path.end()])
+  drawDabs(ctx, tip, shape, [...path.start(points[0]), ...path.moveTo(points.slice(1)), ...path.end()])
 }
 
 // A sample stroke across a box: a wave pressed lightly at the ends and harder in the middle, like a pen
