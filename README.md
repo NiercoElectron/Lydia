@@ -48,6 +48,8 @@ Next, roughly in this order:
 - [ ] Painting: a Pixel brush (exact pixels, from 1 pixel up, for pixel art and fine lines) and pixel brushes drawn in
       the Brush Designer, eyedropper, brush opacity per stroke, stabilizer (smoother strokes), tapered stroke ends,
       rotate and flip the view
+- [ ] Pixel art: a pixel grid when zoomed in, pixel-perfect strokes (without the doubled corners of lines drawn by
+      hand), and exporting enlarged (2×, 4×) without blurring
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
 - [ ] Selections: rectangle, lasso and magic wand; move, scale and rotate; fill bucket
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools; in the Brush Designer, edit existing
