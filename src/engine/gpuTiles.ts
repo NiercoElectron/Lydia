@@ -64,6 +64,14 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
 
   // Send a tile from RAM to a texture on the graphics card
   function upload(tile: StoredTile, target: RenderTexture) {
+    // A tile of a single color needs no pixels sent: the graphics card fills the texture with it
+    if (tile.color !== undefined) {
+      tile.lastUsed = performance.now()
+      const color = [0, 1, 2, 3].map(i => ((tile.color! >>> (i * 8)) & 255) / 255)
+      renderer.render({ container: emptyContainer, target, clear: true, clearColor: color })
+      uploadCount++
+      return
+    }
     let pixels: Uint8ClampedArray
     try {
       pixels = memory.unpack(tile, target.width, target.height)

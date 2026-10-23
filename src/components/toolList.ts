@@ -1,4 +1,4 @@
-import { Brush, Eraser, Hand, Pipette, RotateCw, ZoomIn, type LucideIcon } from 'lucide-react'
+import { Brush, Eraser, Hand, PaintBucket, Pipette, RotateCw, ZoomIn, type LucideIcon } from 'lucide-react'
 import type { Tool } from '../engine/tools'
 
 // Each tool's button, in the order of the tool column: its icon (from Lucide), its name, its shortcut key and, for
@@ -6,6 +6,7 @@ import type { Tool } from '../engine/tools'
 export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; also?: string }> = {
   brush: { Icon: Brush, name: 'Brush', key: 'b' },
   eraser: { Icon: Eraser, name: 'Eraser', key: 'e' },
+  fill: { Icon: PaintBucket, name: 'Fill', key: 'f', also: 'Alt picks a color' },
   eyedropper: { Icon: Pipette, name: 'Eyedropper', key: 'i', also: 'or hold Alt while painting' },
   hand: { Icon: Hand, name: 'Hand', key: 'h', also: 'or hold Space' },
   zoom: { Icon: ZoomIn, name: 'Zoom', key: 'z', also: 'Alt + click zooms out, dragging zooms smoothly' },

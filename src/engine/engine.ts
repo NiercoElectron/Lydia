@@ -4,6 +4,7 @@ import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createBrush, type BrushSettings } from './brush'
 import { parseBrushFile, type BrushShape } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
+import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings } from './fill'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
@@ -12,7 +13,7 @@ import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
-import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, type Grid } from './tiles'
+import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, tileSize, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
 
@@ -24,6 +25,7 @@ export type EngineSnapshot = {
   canRedo: boolean
   isModified: boolean // changed since it was opened or last saved
   isUpdating: boolean // putting the picture together again after a layer change (see composeLayerTiles)
+  isFilling: boolean // working out where the fill bucket fills (see fillAt)
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -35,6 +37,9 @@ const RAW_BUDGET = Math.max(0.5, ramGigabytes / 4) * 1024 ** 3
 // leaving out details the eye hardly notices, and has no transparency (a transparent background becomes white)
 export type ImageType = 'png' | 'jpeg'
 const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
+
+// A fill of up to this many tiles shows right away; a bigger one is put together out of sight first (see fillAt)
+const FILL_SHOWN_AT_ONCE = 32
 
 // Under a transparent background, the screen shows gray and white squares, like Photoshop and Krita, of this many
 // pixels of the screen at any zoom
@@ -106,6 +111,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     await decodeTip(startBrush.tip),
     startBrush,
   )
+  const fillSettings: FillSettings = { ...DEFAULT_FILL }
+  let isFilling = false
 
   // Everything that belongs to the drawing: zooming, moving, turning and flipping the view change this container (see
   // view.ts). Under a transparent background, the squares go first: they move, turn and flip with the drawing, but
@@ -124,19 +131,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
   // its own and doesn't listen, so there holding Alt doesn't pick colors
   const colorListeners = new Set<(color: string) => void>()
-  const view = createView(
-    app,
-    world,
-    grid,
-    brush,
-    projection,
-    gpu,
-    () => changed(),
-    color => {
+  const view = createView(app, world, grid, brush, projection, gpu, {
+    onStrokeEnd: () => changed(),
+    onColorPick: color => {
       for (const listener of colorListeners) listener(color)
     },
-    () => colorListeners.size > 0,
-  )
+    canPickColors: () => colorListeners.size > 0,
+    onFill: (x, y) => void fillAt(x, y),
+    isFilling: () => isFilling,
+  })
+  // Painting, filling, undoing and changing the layers wait for each other
+  const isBusy = () => view.isPainting() || isFilling
 
   // ----- Telling React about changes -----
 
@@ -152,6 +157,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       canRedo: history.canRedo(),
       isModified,
       isUpdating: projection.isUpdating(),
+      isFilling,
     }
   }
 
@@ -199,7 +205,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // A new empty layer above the active one, which becomes the active layer
   function addLayer() {
-    if (view.isPainting()) return
+    if (isBusy()) return
     const layer = createLayer(`Layer ${++layersCreated}`)
     history.recordOrder(layer)
     stack.layers.splice(activeIndex(stack) + 1, 0, layer)
@@ -211,7 +217,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Delete the active layer; the one under it becomes the active layer, like in Photoshop. The last layer can't be
   // deleted
   function deleteLayer() {
-    if (view.isPainting() || stack.layers.length === 1) return
+    if (isBusy() || stack.layers.length === 1) return
     const layer = stack.active
     const index = activeIndex(stack)
     history.recordOrder(layer) // the layer stays in the undo step, with its tiles, so it can come back
@@ -225,7 +231,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Move a layer to another place in the list. "index" counts from the bottom (0 = the bottom layer)
   function moveLayer(id: number, index: number) {
     const layer = findLayer(id)
-    if (!layer || view.isPainting() || index < 0 || index >= stack.layers.length) return
+    if (!layer || isBusy() || index < 0 || index >= stack.layers.length) return
     const from = stack.layers.indexOf(layer)
     if (from === index) return
     history.recordOrder(layer)
@@ -247,7 +253,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   function selectLayer(id: number) {
     const layer = findLayer(id)
-    if (!layer || layer === stack.active || view.isPainting()) return
+    if (!layer || layer === stack.active || isBusy()) return
     stack.active = layer
     projection.markAllBelowStale() // "below" now has different layers
     changed(false) // the drawing itself didn't change
@@ -255,7 +261,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   function setLayerVisible(id: number, visible: boolean) {
     const layer = findLayer(id)
-    if (!layer || layer.visible === visible || view.isPainting()) return
+    if (!layer || layer.visible === visible || isBusy()) return
     history.recordLayer(layer, propsOf(layer))
     layer.visible = visible
     projection.composeLayerTiles(layer)
@@ -269,7 +275,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // projection.ts); its tiles are put together for good once the slider is let go (finishLayerOpacity)
   function setLayerOpacity(id: number, opacity: number) {
     const layer = findLayer(id)
-    if (!layer || layer.opacity === opacity || view.isPainting()) return
+    if (!layer || layer.opacity === opacity || isBusy()) return
     if (opacityChange?.layer !== layer) {
       finishLayerOpacity()
       opacityChange = { layer, before: propsOf(layer) }
@@ -296,7 +302,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Remove all the paint from the active layer. It can be undone like a stroke
   function clearLayer() {
-    if (view.isPainting()) return
+    if (isBusy()) return
     const layer = stack.active
     history.begin(layer)
     for (const key of gpu.tilesWithPaint(layer)) {
@@ -316,7 +322,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // ----- Undo -----
 
   function undo() {
-    if (view.isPainting()) return
+    if (isBusy()) return
     finishLayerOpacity() // an opacity change still on its way (Ctrl+Z while dragging) becomes a step first
     if (!history.canUndo()) return
     history.undo()
@@ -324,7 +330,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   function redo() {
-    if (view.isPainting()) return
+    if (isBusy()) return
     finishLayerOpacity()
     if (!history.canRedo()) return
     history.redo()
@@ -424,6 +430,67 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     Object.assign(brush.settings, settings)
   }
 
+  function setFill(settings: Partial<FillSettings>) {
+    Object.assign(fillSettings, settings)
+  }
+
+  // Fill the region around this point of the paper with the brush's color and opacity (see fill.ts). On big drawings
+  // that takes a moment: meanwhile the bar says so, and painting, undoing and changing the layers wait
+  async function fillAt(x: number, y: number) {
+    const seedX = Math.floor(x)
+    const seedY = Math.floor(y)
+    if (isBusy() || seedX < 0 || seedY < 0 || seedX >= grid.width || seedY >= grid.height) return
+    isFilling = true
+    changed(false)
+    let didChange = false
+    try {
+      // The region is worked out from the tiles in RAM, so the tiles just painted must get there first
+      while (gpu.hasUnsaved()) await nextFrame()
+      const layer = stack.active
+      const reference =
+        fillSettings.reference === 'layer'
+          ? [{ tiles: layer.tiles, opacity: 1 }]
+          : stack.layers.filter(other => other.visible).map(({ tiles, opacity }) => ({ tiles, opacity }))
+      const { tolerance, expand } = fillSettings
+      const region = await findFillRegion(grid, reference, memory, seedX, seedY, tolerance, expand)
+      // The layer's new tiles are worked out in RAM too, a few every frame, and sent to the graphics card where it has
+      // a copy of them (see fillTile). Every tile is in RAM by now: nothing could paint while the region was found
+      while (gpu.hasUnsaved()) await nextFrame()
+      const { color, opacity } = brush.settings
+      const pace = createPacer()
+      history.begin(layer)
+      for (const [key, mask] of region) {
+        await pace()
+        const { column, row } = parseTileKey(key)
+        const { width, height } = tileSize(grid, column, row)
+        history.backUpTile(key)
+        const filled = fillTile(layer.tiles.get(key), mask, color, opacity, width, height, memory)
+        if (filled) layer.tiles.set(key, filled)
+        else layer.tiles.delete(key)
+        const cached = gpu.getCached(layer, key)
+        if (cached) {
+          if (filled) gpu.upload(filled, cached.texture)
+          else gpu.clearTexture(cached.texture)
+          gpu.markClean(cached)
+        }
+      }
+      didChange = history.end()
+      // A small fill shows right away. A big one is put together out of sight and shown all at once, like a layer
+      // change, instead of spreading over the screen
+      if (region.size <= FILL_SHOWN_AT_ONCE) {
+        for (const key of region.keys()) {
+          const { column, row } = parseTileKey(key)
+          projection.composeTile(column, row)
+        }
+      } else {
+        projection.composeLater(region.keys())
+      }
+    } finally {
+      isFilling = false
+      changed(didChange)
+    }
+  }
+
   // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes
   function setBrushTip(tip: BrushTip, shape: BrushShape) {
     brush.setTip(tip, shape)
@@ -460,6 +527,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setTool,
     onColorPick,
     setBrush,
+    setFill,
     setBrushTip,
     setPixelGrid,
     undo,

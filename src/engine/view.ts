@@ -1,6 +1,6 @@
 import type { Application, Container } from 'pixi.js'
 import type { Brush } from './brush'
-import { EYEDROPPER_CURSOR, ROTATE_CURSOR } from './cursors'
+import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { Projection } from './projection'
 import { tilesInRect, type Grid } from './tiles'
@@ -18,6 +18,7 @@ const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting 
 const CURSORS: Record<Tool, string> = {
   brush: 'crosshair',
   eraser: 'crosshair',
+  fill: FILL_CURSOR,
   eyedropper: EYEDROPPER_CURSOR,
   hand: 'grab',
   zoom: 'zoom-in',
@@ -33,14 +34,22 @@ type Point = { x: number; y: number }
 // What a pointer that went down on the drawing does while it moves and when it comes up, depending on its tool
 type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void }
 
+// What the view asks of the rest of the engine
+export type ViewActions = {
+  onStrokeEnd: () => void
+  onColorPick: (color: string) => void // a color picked with the eyedropper
+  canPickColors: () => boolean // whether anyone wants those colors: if not, holding Alt doesn't pick them
+  onFill: (x: number, y: number) => void // the fill bucket went down at this point of the paper
+  isFilling: () => boolean // while a fill is being worked out, the tools that change the drawing wait
+}
+
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
 export function isTyping(target: EventTarget | null) {
   return target instanceof HTMLInputElement && (target.type === 'text' || target.type === 'number')
 }
 
 // What the user does with the mouse, the pen and the keyboard on the drawing: zoom, move, turn and flip the view, and
-// use the chosen tool (see tools.ts). "onColorPick" gets the colors picked with the eyedropper; "canPickColors" tells
-// whether anyone wants them: if not, holding Alt doesn't turn the brush into an eyedropper
+// use the chosen tool (see tools.ts)
 export function createView(
   app: Application,
   world: Container,
@@ -48,9 +57,7 @@ export function createView(
   brush: Brush,
   projection: Projection,
   gpu: GpuTiles,
-  onStrokeEnd: () => void,
-  onColorPick: (color: string) => void,
-  canPickColors: () => boolean,
+  actions: ViewActions,
 ) {
   const canvas = app.canvas
 
@@ -146,7 +153,7 @@ export function createView(
   function pickColor(e: PointerEvent) {
     const point = toPaper(e)
     const color = projection.colorAt(point.x, point.y)
-    if (color) onColorPick(color)
+    if (color) actions.onColorPick(color)
   }
 
   // ----- What each tool does with the pointer -----
@@ -162,7 +169,7 @@ export function createView(
         brush.continueStroke(points)
       },
       up() {
-        if (brush.endStroke()) onStrokeEnd()
+        if (brush.endStroke()) actions.onStrokeEnd()
       },
     }
   }
@@ -170,6 +177,13 @@ export function createView(
   function pick(e: PointerEvent): Gesture {
     pickColor(e)
     return { move: pickColor, up() {} }
+  }
+
+  // The fill bucket fills around the point where the pointer goes down (see fill.ts)
+  function fill(e: PointerEvent): Gesture {
+    const point = toPaper(e)
+    actions.onFill(point.x, point.y)
+    return { move() {}, up() {} }
   }
 
   // The view follows the pointer
@@ -228,6 +242,7 @@ export function createView(
   const startGesture: Record<Tool, (e: PointerEvent) => Gesture> = {
     brush: paint,
     eraser: paint,
+    fill,
     eyedropper: pick,
     hand: pan,
     zoom,
@@ -245,10 +260,10 @@ export function createView(
   let shownCursor = ''
 
   // The tool the left button uses right now. Space moves the view and Shift + Space turns it, like in Krita; Alt picks
-  // colors with the brush or the eraser, like in Photoshop
+  // colors with the brush, the eraser or the fill bucket, like in Photoshop
   function currentTool(): Tool {
     if (isSpaceDown) return isShiftDown ? 'rotate' : 'hand'
-    if (isAltDown && isPaintTool(tool) && canPickColors()) return 'eyedropper'
+    if (isAltDown && (isPaintTool(tool) || tool === 'fill') && actions.canPickColors()) return 'eyedropper'
     return tool
   }
 
@@ -330,6 +345,7 @@ export function createView(
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
     const used = e.button === 1 ? 'hand' : currentTool()
+    if (actions.isFilling() && (isPaintTool(used) || used === 'fill')) return // the drawing is about to change
     gesture = { ...startGesture[used](e), pointerId: e.pointerId, tool: used }
     showCursor()
   }

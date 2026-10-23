@@ -160,6 +160,15 @@ export function createProjection(
     }
   }
 
+  // Put these tiles together again like the tiles of a layer change: out of sight, a few every frame, and shown all at
+  // once when they are all ready (after a big fill)
+  function composeLater(keys: Iterable<string>) {
+    for (const key of keys) {
+      dropPrepared(key)
+      addWaiting(key)
+    }
+  }
+
   // Do the waiting work for at most "budget" milliseconds: first start the tiles to show live (while the opacity slider
   // moves), then prepare the new versions of the waiting tiles. Each group is shown all at once when it is complete
   function composeWaiting(budget: number) {
@@ -475,6 +484,7 @@ export function createProjection(
     composeTile,
     composeAll,
     composeLayerTiles,
+    composeLater,
     composeWaiting,
     finishWaiting,
     isUpdating: () => waiting.size > 0 || startingLive.size > 0 || prepared.size > 0,

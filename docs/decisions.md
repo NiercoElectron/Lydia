@@ -778,6 +778,70 @@ for the history) or **open** (not decided yet).
   the pointer on a turned and flipped view; **Fit** and Ctrl + wheel on a turned view; the pixel grid and the
   transparent paper's squares on a turned view.
 
+## 39. The fill bucket
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - The fill bucket (F) fills the region around the point clicked: the pixels connected to it, side by side or above
+    and below, whose colors are close to the color there. It fills with the color and the Opacity of the bar, as one
+    step of undo. Holding Alt with it picks a color, as with the brush.
+  - Its settings in the bar, chosen by Enrico:
+    - **Tolerance**, from 0 to 255, 32 at first as in Photoshop: how far each of red, green, blue and alpha may be
+      from the color clicked.
+    - **Look at**: **All layers**, the visible layers put together without the paper (at first, Enrico's choice), or
+      **This layer**.
+    - **Expand**, from 0 to 50 pixels, 20 at first: at most how far the fill goes past its edge, under the lines.
+  - Past the edge of the region, the fill goes on into the soft edge of the lines around it, as long as their color
+    keeps getting further from the one clicked: up to where the line is darkest, like Clip Studio Paint's "to the
+    darkest pixel". There it fills behind the paint already there, so the soft edge of the line stays on top of the
+    color (Enrico's choice). Inside the region it fills over the paint, so a flat color can be changed for another.
+  - It always fills only the region that touches the point clicked; Enrico left out the choice of filling every pixel
+    of that color.
+- **Why:**
+  - The most common way of coloring is lines on one layer and flat color under them on another: with **All layers**
+    that works without changing anything.
+  - Without **Expand**, the soft pixels at the edge of a line are too far from the color clicked and stay unfilled:
+    a light rim between the color and the line. Around a circle in the test, 124 such pixels without it, none with
+    it.
+  - At first **Expand** grew the region by a square of 2 pixels and filled over the paint. With the line on the same
+    layer, Enrico saw the fill cut into the soft edge of a line drawn with Soft round: hard and stepped on the side of
+    the color, while the other side stayed soft. Filling behind the paint, up to where the line is darkest, keeps the
+    line as it was on both sides, the same as with the line on a layer of its own. Since it stops at the line by
+    itself, **Expand** is now only a limit, and can be bigger.
+  - Then, zoomed in, Enrico saw a band of dark red between the red fill and a black Soft round line: the soft edge of
+    the line over the color. He chose to keep it rather than cut the line cleanly at its middle: it is the line's own
+    softness, as Photoshop and Krita show a soft line over a color. A narrower band comes from a harder brush.
+- **How:**
+  - The fill first waits until every painted tile is saved in RAM (decisions 12 and 15). Then the processor works
+    from RAM, 6 ms of every frame, so the screen keeps going: the bar says "Filling…", and painting, undoing and
+    changing the layers wait. The hand, zoom, rotate and eyedropper tools still work.
+  - A "scanline" fill that goes across tiles. The first time it reaches a tile, it marks which of its pixels are close
+    enough in one tight loop, and then only walks those marks. A tile of a single color (or empty) is filled whole at
+    once, so an empty layer of 10000×10000 fills in about half a second.
+  - The edge starts from the filled pixels next to one that isn't, and goes one pixel further at each step, into
+    the 8 pixels around, while the color there is at least as far from the one clicked as where it comes from. A pixel
+    already as far as can be (255, a fully opaque line on an empty layer) is the darkest, so the edge stops there
+    instead of crossing the whole line. Behind the paint, the color shows only where the paint lets it through:
+    paint + color × (1 − the paint's alpha).
+  - The layer's new pixels are worked out in RAM too, and sent to the graphics card only where it has a copy of the
+    tile. A first version painted the fill on the graphics card: then every filled tile had to be read back to RAM,
+    hundreds at once after a big fill, and the screen stopped for up to 300 ms.
+  - A tile of a single color is no longer sent to the graphics card as pixels: the graphics card fills its texture
+    with the color. That helps everywhere big flat areas are shown or undone.
+  - A fill of more than 32 tiles is put together out of sight and shown all at once, like a layer change
+    (decision 26); a smaller one shows right away.
+  - The layers are put together with the normal blend, the only one Lydia has on the screen so far.
+- **Measured (RTX 4060 Ti, 10000×10000):** an empty layer, about 0.5 s from the click until the fill is on the
+  screen; with six long lines across the paper, about 1.5 s. The longest frame meanwhile: 42 ms. Before the work was
+  spread over frames and done in RAM, the same fill took 3.6 s and stopped the screen for up to 300 ms.
+- **Checked:** the button, the key and the cursor; the settings in the bar; an empty layer, and undo; inside a circle
+  drawn on the layer above, with **All layers**, without and with **Expand**; the fill going into the active layer and
+  not the line's; a Soft round line with the fill on the same layer (with **Expand** at 0, white shows between them;
+  at 20, none, and the red fades into the black); **Tolerance** (two grays 20 apart: both with 32, one with 10);
+  **This layer**; Alt; 50% opacity on a transparent paper; 10000×10000, with undo and redo; and that tiles filled
+  whole go into RAM as a single color, the same as on the graphics card.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

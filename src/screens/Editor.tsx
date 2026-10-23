@@ -10,6 +10,7 @@ import { ALL_TOOLS } from '../components/toolList'
 import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
+import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import type { Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
@@ -28,6 +29,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const [color, setColor] = useState('#000000')
   const [size, setSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
+  const [fill, setFill] = useState<FillSettings>(DEFAULT_FILL)
   const [busy, setBusy] = useState<string | null>(null) // what is being done right now ("Saving…"), if anything
   const [brushes, setBrushes] = useState<LibraryBrush[]>([])
   const [brushId, setBrushId] = useState(() => loadBrushId() ?? DEFAULT_BRUSH_ID)
@@ -42,6 +44,10 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   useEffect(() => {
     engine?.setBrush({ color, size, opacity: opacity / 100 })
   }, [engine, color, size, opacity])
+
+  useEffect(() => {
+    engine?.setFill(fill)
+  }, [engine, fill])
 
   // Colors picked with the eyedropper become the brush's color, at full opacity: the picked color is the one the screen
   // shows, and painting it at a lower opacity would come out lighter
@@ -208,10 +214,12 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           color={color}
           size={size}
           opacity={opacity}
+          fill={fill}
           isGridOn={isGridOn}
           onColorChange={setColor}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
+          onFillChange={change => setFill(current => ({ ...current, ...change }))}
           onGridToggle={toggleGrid}
         />
         <div className="actions">
@@ -235,7 +243,9 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
             Save
           </button>
           <button onClick={handleBack}>Back</button>
-          {(busy || snapshot.isUpdating) && <span className="busy">{busy ?? 'Updating…'}</span>}
+          {(busy || snapshot.isUpdating || snapshot.isFilling) && (
+            <span className="busy">{busy ?? (snapshot.isFilling ? 'Filling…' : 'Updating…')}</span>
+          )}
         </div>
       </header>
       <div className="editor-main">

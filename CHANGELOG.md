@@ -18,12 +18,20 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   Shift + Space turns the view with any tool, as in Krita.
 - Flipping the view like in a mirror, with M or the **Flip** button. The drawing itself doesn't change.
 - The bar on top shows the view's zoom and angle, with **Straighten** (back to 0°) and **Flip** next to **Fit**.
+- A fill bucket (F) ([decision 39](docs/decisions.md#39-the-fill-bucket)): it fills the region around the point
+  clicked with the color and the Opacity. In the bar: **Tolerance**, whether it looks at **All layers** or only
+  **This layer**, and **Expand**. Past the region, the fill goes behind the soft edge of the lines around it, up to
+  where they are darkest (at most **Expand** pixels): no light rim is left, and a line keeps its soft edge even on
+  the same layer as the color. On big drawings it works for a moment in the background, with "Filling…" in the bar,
+  while the screen keeps going. Holding Alt with it picks a color.
 
 ### Changed
 
 - The Brush and Eraser buttons moved from the bar on top to the tool column.
 - **Fit** (Ctrl+0) keeps the view turned and flipped, and fits the turned paper on the screen.
 - While Space is held, the cursor is a hand.
+- Tiles of a single color are sent to the graphics card without their pixels: the graphics card fills them with the
+  color.
 
 ## [0.7.0] - 2026-10-23
 

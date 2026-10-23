@@ -14,6 +14,7 @@ const startingSnapshot: EngineSnapshot = {
   canRedo: false,
   isModified: false,
   isUpdating: false,
+  isFilling: false,
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}
