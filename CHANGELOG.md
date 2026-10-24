@@ -6,6 +6,10 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- The start screen shows Lydia's version next to its name.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added

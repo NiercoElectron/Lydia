@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+// Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
+import { version } from '../../package.json'
 import { NewProjectDialog } from '../components/NewProjectDialog'
 import { DEFAULT_TIP_SIZE, TIP_SIZES } from '../engine/brushFile'
 import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
@@ -36,7 +38,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
 
   return (
     <main className="home">
-      <h1>Lydia</h1>
+      <h1>Lydia v{version}</h1>
       <div className="home-actions">
         <button onClick={() => setIsChoosingNew(true)}>New project…</button>
         <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
