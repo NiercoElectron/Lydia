@@ -22,6 +22,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   inside
 - A move tool that drags what is selected, or the whole layer when nothing is, by whole pixels; the selection moves
   along
+- Smart objects, like Photoshop's: scale, turn, skew or distort what is selected or a whole layer with handles, again
+  and again without losing anything, smoothly or by whole pixels for pixel art (not saved in `.lyd` files yet)
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
@@ -51,6 +53,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 | Shift / Alt + drag, with S or L              | Add to / take away from the selection     |
 | V                                            | Move what is selected (or the layer)      |
 | Shift + drag, with V                         | Move only across, or only up and down     |
+| Ctrl/Cmd + T, or Transform in the bar        | Transform (a new tab, in browsers)        |
+| Enter / Esc, while transforming              | Apply / cancel                            |
+| Ctrl + drag a corner / a side                | Distort / skew                            |
 | Ctrl/Cmd + A / D / Shift + I                 | Select everything / nothing / invert      |
 | Delete                                       | Take out what is selected                 |
 | Alt (hold), with the brush, eraser or bucket | Pick a color                              |
@@ -69,12 +74,13 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
 stroke opacity, a tool column, the eyedropper, turning and flipping the view, the fill bucket, rectangle and lasso
-selections, the move tool, new drawings with common sizes, a resolution (DPI) and a background color or transparency,
-`.lyd` projects, PNG and JPEG export. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+selections, the move tool, smart objects and transforming, new drawings with common sizes, a resolution (DPI) and a
+background color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
+[CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Tools (now): scaling and rotating what is selected (or the whole layer)
+- [ ] Tools (now): saving smart objects in `.lyd` files
 - [ ] Painting: pixel brushes drawn in the Brush Designer, the brush's outline under the pen, pen tilt (the brush
       follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,

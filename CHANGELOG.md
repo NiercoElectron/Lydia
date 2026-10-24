@@ -33,6 +33,13 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   or the whole layer when nothing is selected, by whole pixels, and the selection moves along. Shift keeps it level or
   upright. While it is dragged, the screen shows it at its new place, under the layers above. Paint moved off the paper
   is lost. Each move is one step of undo, together with the selection.
+- Smart objects and transforming ([decision 42](docs/decisions.md#42-smart-objects-and-transforming)): Ctrl+T, or
+  **Transform** in the bar of the move and selection tools, turns the selected part into a new layer, or the whole
+  layer, into a smart object, which keeps its original pixels. Its handles scale it (Shift keeps the proportions, Alt
+  scales from the middle), turn it from outside (Shift: in steps of 15°) and move it from inside; with Ctrl, a corner
+  distorts it and a side skews it. Enter applies, Esc cancels. **Smooth** or **Whole** pixels (for pixel art) in the
+  bar. Transforming it again never loses anything, and the move tool moves it without loss. It can't be painted on
+  until **Convert to pixels**. Smart objects are not saved in `.lyd` files yet: they are saved as normal layers.
 
 ### Changed
 

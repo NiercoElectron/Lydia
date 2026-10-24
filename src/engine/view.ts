@@ -4,8 +4,10 @@ import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
+import type { Quad } from './smartObject'
 import { tilesInRect, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
+import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
 
 const MIN_ZOOM = 0.01 // 1% (zoomed far out)
 const MAX_ZOOM = 32 // 3200% (each pixel of the paper is 32 pixels of the screen)
@@ -33,8 +35,9 @@ const CURSORS: Record<Tool, string> = {
 // whether it is flipped like in a mirror. A new object every time one of them changes
 export type ViewState = { zoom: number; rotation: number; flipped: boolean }
 
-// What a pointer that went down on the drawing does while it moves and when it comes up, depending on its tool
-type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void }
+// What a pointer that went down on the drawing does while it moves and when it comes up, depending on its tool, and
+// the cursor it shows if not its tool's
+type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; cursor?: string }
 
 // What the view asks of the rest of the engine
 export type ViewActions = {
@@ -49,6 +52,10 @@ export type ViewActions = {
   onMove: (dx: number, dy: number) => void
   onMoveEnd: (keep: boolean) => void
   isWorking: () => boolean // while a fill or Delete is worked out, the tools that change the drawing wait
+  canUse: (tool: Tool) => boolean // whether a tool can change the active layer (a smart object can't be painted on)
+  // The transform being made, if any, and its handles dragged to new corners (see transformHandles.ts)
+  getTransform: () => TransformTarget | null
+  onTransform: (corners: Quad) => void
 }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
@@ -206,6 +213,32 @@ export function createView(
     outline.poly(points, isClosed).stroke({ width, color: 0x000000 })
   }
 
+  // The handles of a transform, over the drawing, drawn again every frame while it is made
+  const handles = new Graphics()
+  world.addChild(handles)
+
+  function showHandles() {
+    const target = actions.getTransform()
+    handles.visible = target !== null
+    if (target) drawHandles(handles, target, currentZoom())
+  }
+
+  const toScreen = (paper: Point) => world.toGlobal(paper)
+
+  // While a transform is made, the left button drags its handles
+  function transform(e: PointerEvent, target: TransformTarget): Gesture {
+    const from = toPaper(e)
+    const handle = handleAt(target, onScreen(e), from, toScreen)
+    return {
+      move(e) {
+        const keys = { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey }
+        actions.onTransform(transformed(target, handle, from, toPaper(e), keys))
+      },
+      up() {},
+      cursor: cursorFor(handle, target, toScreen, e.ctrlKey || e.metaKey),
+    }
+  }
+
   // Shift adds to the selection and Alt takes away from it, as in Photoshop and Krita (see selection.ts)
   const selectionMode = (e: PointerEvent): SelectionMode => (e.shiftKey ? 'add' : e.altKey ? 'subtract' : 'replace')
 
@@ -359,6 +392,7 @@ export function createView(
   let isAltDown = false
   let gesture: (Gesture & { pointerId: number; tool: Tool }) | null = null // the pointer that is down, if any
   let hoverPoint: Point | null = null // where the brush is waiting, or null when all is ready
+  let transformCursor: string | null = null // the cursor over a transform's handles, where the pointer is
   let shownCursor = ''
 
   // The tool the left button uses right now. Space moves the view and Shift + Space turns it, like in Krita; Alt picks
@@ -378,7 +412,9 @@ export function createView(
   function showCursor() {
     const shown = gesture?.tool ?? currentTool()
     let cursor = CURSORS[shown]
-    if (shown === 'hand' && gesture) cursor = 'grabbing'
+    if (gesture?.cursor) cursor = gesture.cursor
+    else if (!gesture && !isSpaceDown && transformCursor && actions.getTransform()) cursor = transformCursor
+    else if (shown === 'hand' && gesture) cursor = 'grabbing'
     else if (shown === 'zoom' && isAltDown && !gesture) cursor = 'zoom-out'
     if (cursor === shownCursor) return
     shownCursor = cursor
@@ -446,10 +482,16 @@ export function createView(
     // The keys may have changed while the window was in the background (Alt+Tab leaves Alt "down" here)
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    const target = actions.getTransform()
+    if (target && e.button === 0 && !isSpaceDown) {
+      gesture = { ...transform(e, target), pointerId: e.pointerId, tool: 'move' }
+      showCursor()
+      return
+    }
     const used = e.button === 1 ? 'hand' : currentTool()
     // While a fill or Delete is worked out, only the tools that just look can be used
     const onlyLooks = used === 'hand' || used === 'zoom' || used === 'rotate' || used === 'eyedropper'
-    if (actions.isWorking() && !onlyLooks) return
+    if ((actions.isWorking() && !onlyLooks) || !actions.canUse(used)) return
     gesture = { ...startGesture[used](e), pointerId: e.pointerId, tool: used }
     showCursor()
   }
@@ -461,6 +503,10 @@ export function createView(
     }
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    const target = actions.getTransform()
+    transformCursor = target
+      ? cursorFor(handleAt(target, onScreen(e), toPaper(e), toScreen), target, toScreen, e.ctrlKey || e.metaKey)
+      : null
     showCursor()
     if (isPaintTool(currentTool())) hoverPoint = toPaper(e)
   }
@@ -508,6 +554,7 @@ export function createView(
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('blur', handleBlur)
   app.ticker.add(prepareUnderBrush)
+  app.ticker.add(showHandles)
   showCursor()
   fitToScreen()
 
@@ -521,7 +568,9 @@ export function createView(
     window.removeEventListener('keyup', handleKeyUp)
     window.removeEventListener('blur', handleBlur)
     app.ticker.remove(prepareUnderBrush)
+    app.ticker.remove(showHandles)
     outline.destroy()
+    handles.destroy()
     listeners.clear()
   }
 

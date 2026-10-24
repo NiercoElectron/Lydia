@@ -15,6 +15,18 @@ export type SelectionControls = {
   onInvert: () => void
 }
 
+// Transforms and smart objects (see smartObject.ts): the transform being made, if any, and whether the active layer is
+// a smart object
+export type TransformControls = {
+  transform: { smooth: boolean } | null
+  isSmartLayer: boolean
+  onStart: () => void
+  onSmoothChange: (smooth: boolean) => void
+  onApply: () => void
+  onCancel: () => void
+  onConvertToPixels: () => void
+}
+
 type Props = {
   tool: Tool
   color: string
@@ -22,6 +34,7 @@ type Props = {
   opacity: number // in percent
   fill: FillSettings
   selection: SelectionControls
+  transform: TransformControls
   isGridOn: boolean
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
@@ -31,7 +44,7 @@ type Props = {
 }
 
 // The settings of the chosen tool: the color, then the brush's size and opacity, the fill bucket's settings, or the
-// selection's. The move tool has none
+// selection's. The move tool has none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
   color,
@@ -39,6 +52,7 @@ export function Toolbar({
   opacity,
   fill,
   selection,
+  transform,
   isGridOn,
   onColorChange,
   onSizeChange,
@@ -48,6 +62,15 @@ export function Toolbar({
 }: Props) {
   const isSelecting = tool === 'select' || tool === 'lasso'
   const isMoving = tool === 'move'
+  if (transform.transform) {
+    return (
+      <div className="toolbar">
+        <TransformButtons controls={transform} smooth={transform.transform.smooth} />
+        <GridButton isOn={isGridOn} onToggle={onGridToggle} />
+      </div>
+    )
+  }
+  const isBlocked = transform.isSmartLayer && (tool === 'brush' || tool === 'eraser' || tool === 'fill')
   return (
     <div className="toolbar">
       <label>
@@ -56,6 +79,22 @@ export function Toolbar({
       </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {isSelecting && <SelectionButtons selection={selection} />}
+      {(isSelecting || isMoving) && (
+        <button
+          onClick={transform.onStart}
+          title="Scale, turn, skew or distort what is selected, or the layer (Ctrl+T)"
+        >
+          Transform
+        </button>
+      )}
+      {isBlocked && (
+        <>
+          <span className="notice">This layer is a smart object: it can't be painted on.</span>
+          <button onClick={transform.onConvertToPixels} title="It keeps its pixels, but no longer its original">
+            Convert to pixels
+          </button>
+        </>
+      )}
       {tool !== 'fill' && !isSelecting && !isMoving && (
         <label title="Brush size ([ and ])">
           Size
@@ -151,6 +190,32 @@ function SelectionButtons({ selection }: { selection: SelectionControls }) {
       </button>
       <button onClick={selection.onInvert} title="Select what isn't selected, and the other way round (Ctrl+Shift+I)">
         Invert
+      </button>
+    </>
+  )
+}
+
+function TransformButtons({ controls, smooth }: { controls: TransformControls; smooth: boolean }) {
+  return (
+    <>
+      <span className="notice">
+        Drag the corners or the sides to scale (Shift keeps the proportions, Alt from the middle), outside to turn, with
+        Ctrl to distort or skew
+      </span>
+      <span className="button-group" title="How the pixels are worked out: smoothly, or as whole pixels for pixel art">
+        Pixels
+        <button aria-pressed={smooth} onClick={() => controls.onSmoothChange(true)}>
+          Smooth
+        </button>
+        <button aria-pressed={!smooth} onClick={() => controls.onSmoothChange(false)}>
+          Whole
+        </button>
+      </span>
+      <button onClick={controls.onApply} title="Apply (Enter)">
+        Apply
+      </button>
+      <button onClick={controls.onCancel} title="Cancel (Esc)">
+        Cancel
       </button>
     </>
   )

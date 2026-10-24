@@ -148,7 +148,8 @@ fieldset.new-project-row {
   gap: 8px;
 }
 
-.busy {
+.busy,
+.notice {
   color: #666;
 }
 
@@ -473,6 +474,12 @@ button.brush[aria-pressed='true'] {
   flex: 1;
   min-width: 0;
   text-align: left;
+}
+
+/* Marks a smart object in the list of layers */
+.smart-icon {
+  margin-right: 4px;
+  vertical-align: -2px;
 }
 
 button.layer-name {

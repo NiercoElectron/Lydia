@@ -1,3 +1,4 @@
+import { Box } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 
@@ -146,6 +147,7 @@ export function LayersPanel({
                   onPointerUp={handlePointerUp}
                   onPointerCancel={() => setDrag(null)}
                 >
+                  {layer.isSmart && <Box className="smart-icon" size={14} aria-label="Smart object" />}
                   {layer.name}
                 </button>
               )}

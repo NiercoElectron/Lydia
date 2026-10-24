@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
-import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid, useSelectionShortcuts } from '../components/engineHooks'
+import {
+  useDrawingShortcuts,
+  useEngineSnapshot,
+  usePixelGrid,
+  useSelectionShortcuts,
+  useTransformShortcuts,
+} from '../components/engineHooks'
 import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
@@ -170,6 +176,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
   useSelectionShortcuts(engine)
+  useTransformShortcuts(engine)
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {
@@ -228,6 +235,15 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
             onSelectAll: () => engine?.selectAll(),
             onDeselect: () => engine?.deselect(),
             onInvert: () => engine?.invertSelection(),
+          }}
+          transform={{
+            transform: snapshot.transform,
+            isSmartLayer: snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isSmart ?? false,
+            onStart: () => engine?.startTransform(),
+            onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
+            onApply: () => engine?.applyTransform(),
+            onCancel: () => engine?.cancelTransform(),
+            onConvertToPixels: () => engine?.convertToPixels(),
           }}
           isGridOn={isGridOn}
           onColorChange={setColor}

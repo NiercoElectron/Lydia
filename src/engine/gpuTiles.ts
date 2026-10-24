@@ -132,6 +132,22 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     return cached.texture
   }
 
+  // A texture for a layer's tile whose pixels are about to be replaced whole (a smart object drawn into its layer):
+  // like getTexture, but a tile that isn't on the graphics card yet isn't sent there from RAM first, for nothing
+  function getTextureToReplace(layer: Layer, column: number, row: number) {
+    const key = tileKey(column, row)
+    if (!getCached(layer, key))
+      cache.set(`${layer.id}/${key}`, {
+        layer,
+        key,
+        texture: createTexture(column, row),
+        dirty: false,
+        version: 0,
+        reading: null,
+      })
+    return getTexture(layer, column, row, true)!
+  }
+
   // Painting on a tile makes its copy on the graphics card newer than RAM
   function markDirty(layer: Layer, key: string) {
     const cached = getCached(layer, key)!
@@ -345,6 +361,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     upload,
     getCached,
     getTexture,
+    getTextureToReplace,
     markDirty,
     markClean,
     keep,

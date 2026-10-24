@@ -416,6 +416,7 @@ export function createProjection(
   const moved = new Container() // the moved part, at its tiles' places, moved along by the drag
   const moveAbove = new Container() // the layers above
   const moveParts = [moveUnder, moved, moveAbove]
+  let movedContent: Container | null = null // shown in place of the moved part's tiles (see setMoveContent)
   for (const part of moveParts) part.visible = false
 
   // The tiles where a visible layer above the active one has paint
@@ -471,6 +472,14 @@ export function createProjection(
     moved.position.set(x, y)
   }
 
+  // Show this in place of pictures of the moved part (a smart object being transformed draws itself: see
+  // smartObject.ts), or nothing
+  function setMoveContent(content: Container | null) {
+    if (movedContent) moved.removeChild(movedContent)
+    movedContent = content
+    if (content) moved.addChild(content)
+  }
+
   // Show the projection tiles again. The pictures' textures are freed later, a few every frame
   function endMove() {
     for (const [key, tile] of moveTiles) {
@@ -479,13 +488,14 @@ export function createProjection(
       spareTextures.push(...tile.textures)
     }
     moveTiles.clear()
+    setMoveContent(null)
     for (const part of moveParts) part.visible = false
     moved.position.set(0, 0)
   }
 
   function applyMoveScaleMode() {
     for (const part of moveParts) {
-      for (const sprite of part.children as Sprite[]) applyScaleMode(sprite.texture)
+      for (const child of part.children) if (child instanceof Sprite) applyScaleMode(child.texture)
     }
   }
 
@@ -592,6 +602,7 @@ export function createProjection(
     prepareMoveTile,
     showMove,
     setMoveOffset,
+    setMoveContent,
     endMove,
     colorAt,
     setZoom,

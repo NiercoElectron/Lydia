@@ -932,6 +932,62 @@ for the history) or **open** (not decided yet).
   layer above covering the moved part, while dragged and after; Shift; paint moved off the paper and back; a hidden
   layer; a whole 10000×10000 layer.
 
+## 42. Smart objects and transforming
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - Scaling, turning, skewing and distorting make **smart objects**, like Photoshop's: a layer that keeps its original
+    pixels and where its corners are, so transforming it again and again never loses anything. Enrico chose this over a
+    plain transform, which works out the pixels again from the last result every time.
+  - **Ctrl+T**, or **Transform** in the bar of the move and selection tools, starts a transform. On a smart object, it
+    transforms it. On a normal layer (Enrico's choice), the selected part goes into a new layer above as a smart
+    object, or, with nothing selected, the whole layer becomes one. Browsers keep Ctrl+T for a new tab, so there only
+    the button works; the desktop app will have the key.
+  - The handles (Enrico's choice, with skewing and distorting in this stage too): a corner scales both ways and a side
+    one way, from the opposite corner or side (Shift keeps the proportions, Alt scales from the middle); outside the
+    object turns it (Shift: in steps of 15°); inside moves it, by whole pixels. With Ctrl, a corner moves alone
+    (distort) and a side moves its two corners (skew). Enter applies it, Esc leaves everything as it was.
+  - **Smooth** (bicubic, for painting) or **Whole** pixels (for pixel art), in the bar while transforming (Enrico's
+    choice). Each smart object keeps its choice, and it can be changed again later without loss.
+  - A smart object can't be painted on, erased or filled, and Clear layer and Delete leave it alone. With those tools
+    the bar says so and offers **Convert to pixels**, which makes it a normal layer again (Enrico's choice). The move
+    tool moves a whole smart object, without loss; the selection doesn't matter on it.
+  - Smart objects are not saved in `.lyd` files yet: until the next step, a saved drawing keeps them as normal layers.
+- **Why:**
+  - Transforming the same thing several times is common (trying sizes, placing a piece), and each new working out of
+    the pixels blurs them a little more. Keeping the original avoids that for good, which is what Photoshop does with
+    smart objects and Krita with transform masks.
+- **How:**
+  - A smart object keeps its source (the layer's tiles when it was made, shared, since tiles never change), the
+    rectangle of the source with paint, and the four corners on the paper where that rectangle goes. A homography (a
+    3×3 matrix) maps the rectangle to the corners: with a parallelogram it is an ordinary affine map, and with any other
+    four corners it gives perspective. The layer's own tiles are the source drawn there, so everything else (the
+    screen, the eyedropper, the fill bucket, exporting) works with them as with any layer.
+  - The source is drawn on the graphics card in blocks of 4×4 tiles, each copied with a border of 2 pixels from the
+    blocks around it, so that blocks join without seams. A shader takes every pixel of the paper back to the source
+    through the inverse homography, which gets perspective exactly right, and works out its color from the 16 pixels
+    around that point (Catmull-Rom, kept from going past the colors around it) or from the one pixel there.
+  - While it is transformed, the screen shows it like a move (decision 41): the projection tiles where the layer has
+    paint, or where layers above have paint, are shown as their "below" tile and the layers above, with the object
+    drawn by the shader between them. A new position of the handles only changes the four corners of each block and
+    one matrix.
+  - Once applied, the object is drawn into the layer's tiles on the graphics card and read back into RAM in the
+    background, like a stroke (decision 15). The tiles are put together out of sight and shown all at once.
+  - An undo step of a layer's pixels can keep the layer's smart object from before. A selected part becoming a new
+    layer is a group of steps (the part taken out, the new layer, the selection gone, the object drawn), undone and
+    redone as one.
+  - Shrinking a lot can make fine details flicker into jagged ones, since each pixel only looks at the 16 source pixels
+    nearest to it. Smoothing those first is noted for later.
+- **Measured (RTX 4060 Ti, 10000×10000, a layer with pixels in all 1600 tiles):** the handles show 0.45 s after a
+  transform starts; a frame while the handles are dragged takes 3 ms (12 ms when each tile was drawn on its own, before
+  the blocks); applying takes 0.35 s; the longest frame on the way was 35–49 ms. Scaled to a quarter and back, a
+  smart object has its exact pixels again.
+- **Checked:** the button and the bar; making a smart object and scaling it, shown while dragged; moving it; undo and
+  redo; Esc; scaling it to a quarter and back without loss; whole pixels making no new soft edges; turning it; Ctrl on
+  a corner; the brush stopped on it, Convert to pixels and its undo; the move tool on it; a selected part going into a
+  new layer, and one undo putting everything back; a whole 10000×10000 layer.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

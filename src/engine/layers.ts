@@ -1,4 +1,5 @@
 import type { StoredTile } from './memory'
+import type { SmartObject } from './smartObject'
 
 export type BlendMode = 'normal' | 'multiply'
 
@@ -9,6 +10,7 @@ export type Layer = {
   visible: boolean
   opacity: number // from 0 (invisible) to 1
   blendMode: BlendMode
+  smart?: SmartObject // set when the layer is a smart object (see smartObject.ts): its tiles are then its source drawn
 }
 
 // The layers of the open drawing, from the bottom to the top, and the one the brush paints on

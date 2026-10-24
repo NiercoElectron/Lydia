@@ -16,6 +16,7 @@ const startingSnapshot: EngineSnapshot = {
   isUpdating: false,
   task: null,
   hasSelection: false,
+  transform: null,
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}
@@ -65,6 +66,29 @@ export function useSelectionShortcuts(engine: Engine | null) {
       if (key === 'delete' || key === 'backspace') {
         e.preventDefault()
         engine.deleteSelected()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [engine])
+}
+
+// Transforms, as in Photoshop: Ctrl/Cmd + T starts one, Enter applies it, and Escape leaves everything as it was.
+// Browsers keep Ctrl+T for a new tab, so there the bar's Transform button starts one (the desktop app will have the
+// key)
+export function useTransformShortcuts(engine: Engine | null) {
+  useEffect(() => {
+    if (!engine) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e.target)) return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        engine.startTransform()
+      } else if (e.key === 'Enter' && engine.getSnapshot().transform) {
+        e.preventDefault() // a focused button would be pressed too
+        engine.applyTransform()
+      } else if (e.key === 'Escape') {
+        engine.cancelTransform()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
