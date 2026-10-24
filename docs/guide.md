@@ -1,0 +1,219 @@
+# Using Lydia
+
+What each part of Lydia does, and its shortcuts. Every shortcut is also in the [table at the end](#all-shortcuts).
+On a Mac, Cmd works wherever Ctrl is written.
+
+- [The start screen](#the-start-screen)
+- [The editor](#the-editor)
+- [Brush and eraser](#brush-and-eraser)
+- [Eyedropper](#eyedropper)
+- [Fill bucket](#fill-bucket)
+- [Selections](#selections)
+- [Move](#move)
+- [Transforming and smart objects](#transforming-and-smart-objects)
+- [The tray: importing images](#the-tray-importing-images)
+- [Layers](#layers)
+- [The view](#the-view)
+- [Undo and redo](#undo-and-redo)
+- [Saving and exporting](#saving-and-exporting)
+- [The Brush Designer](#the-brush-designer)
+- [All shortcuts](#all-shortcuts)
+
+## The start screen
+
+- **New project…** opens a window to choose the paper:
+  - a size: paper sizes (A4, US Letter…) and screen sizes (Full HD…), or any width and height from 16 to 10000
+    pixels;
+  - a **Resolution** in DPI (72, 150, 300, 600, or typed in), which only matters for printing: exported images say it,
+    so they print at the size of their paper;
+  - a background color, or **Transparent**.
+
+  Lydia remembers the last choice.
+
+- **Open project** opens a `.lyd` file saved by Lydia.
+- **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Choose the size of the paper for its tip
+  first: 256, 512 or 1024 pixels.
+- **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes
+  switching layers and undoing faster, but choosing more than the card has makes everything very slow or loses the
+  drawing. Choose at most half of your card's memory; if you're not sure, keep the default.
+
+## The editor
+
+- **At the top:** the settings of the chosen tool, then Undo, Redo, Clear layer, the view (zoom, angle, Straighten,
+  Flip, Fit), Export PNG, Export JPEG, Save and Back. What Lydia is busy with ("Saving…", "Filling…") shows at the
+  end.
+- **At the left:** the tools, with the **Tray** button at their foot, then the brushes.
+- **At the right:** the layers.
+
+Back goes to the start screen, and asks first when there are changes that weren't saved. So does closing the tab.
+
+## Brush and eraser
+
+**Brush (B)** paints with the chosen brush and color; **Eraser (E)** takes paint away with the same brush.
+
+- **Color**, **Size** (1 to 500 pixels; **[** and **]** make it smaller and bigger) and **Opacity** in the bar.
+  Opacity is how much a stroke covers, however many times it passes over the same place.
+- With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
+- Hold **Alt** to pick a color from the drawing while painting.
+- **The brushes:** nine come with Lydia (Soft round, Hard round, Pixel, Airbrush, Chalk, Calligraphy, Dashes, Bristles,
+  Sponge). Click one to paint with it.
+  - **Import…** adds brushes from `.lydbrush` files; dropping the files on the window does the same.
+  - **Export** saves the chosen brush as a file, to share it.
+  - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
+- **The Pixel brush** is for pixel art: whole pixels with hard edges, from 1 pixel up. While it is chosen, new
+  selections get hard edges (see [Selections](#selections)).
+- **The pixel grid** shows the pixels from 800% zoom: the **Grid** button, or **G**, turns it on and off.
+- With a selection, the brush and the eraser only work inside it. A smart object can't be painted on (see
+  [Transforming](#transforming-and-smart-objects)).
+
+## Eyedropper
+
+**Eyedropper (I)**: click, or drag over the drawing, to pick the color the screen shows there, with every visible
+layer. The brush's Opacity goes back to 100%, so it paints that same color. Holding **Alt** with the brush, the eraser
+or the fill bucket does the same.
+
+## Fill bucket
+
+**Fill (F)**: click to fill an area of one color with the brush's color.
+
+- **Tolerance** (0 to 255): how different a color can be from the one clicked and still be filled.
+- **Look at:** **All layers** finds the area in what the screen shows; **This layer** only in the active layer. The
+  fill always goes into the active layer.
+- **Expand** (0 to 50 pixels): how far the fill goes past its edge, behind the soft edge of the lines around it, up to
+  where they are darkest, so that no light rim is left between the color and the line.
+- With a selection, only what is selected is filled. Hold **Alt** to pick a color.
+
+## Selections
+
+**Rectangle select (S)** drags a rectangle; **Lasso (L)** draws around any shape.
+
+- Hold **Shift** to add to the selection, or **Alt** to take away from it.
+- **Edges:** **Soft** or **Hard** (whole pixels, for pixel art) for new selections.
+- **Select all** (Ctrl+A), **Deselect** (Ctrl+D) and **Invert** (Ctrl+Shift+I) in the bar.
+- **Delete** (or Backspace) takes the paint out of what is selected, in the active layer.
+- The brush, the eraser and the fill bucket only work inside a selection.
+
+## Move
+
+**Move (V)**: drag to move what is selected, or the whole layer when nothing is selected, by whole pixels. The
+selection moves along.
+
+- Hold **Shift** to move only across, or only up and down.
+- On a smart object, it moves the whole object, without losing anything.
+- Paint moved off the paper is lost.
+
+## Transforming and smart objects
+
+Transforming scales, turns, skews or distorts. **Ctrl+T** starts it, or **Transform** in the bar of the selection and
+move tools (in a browser, Ctrl+T opens a new tab instead, so use the button there).
+
+- With a selection, the selected part goes into a new layer above as a **smart object**. Without one, the whole layer
+  becomes one. On a smart object, it transforms it.
+- **The handles:**
+  - drag a **corner** to scale, keeping the proportions; with **Shift**, the proportions change;
+  - drag a **side** to scale one way;
+  - hold **Alt** to scale from the middle;
+  - drag **inside** to move it, and **outside** to turn it (**Shift**: in steps of 15°);
+  - **Ctrl** + drag a corner distorts it, and Ctrl + drag a side skews it.
+- **Pixels:** **Smooth** for painting, or **Whole** for pixel art.
+- **Enter** (or Apply) applies it; **Esc** (or Cancel) leaves everything as it was.
+
+A smart object keeps its original pixels, so transforming it again and again never loses anything, even scaled down
+and up again. It shows a box icon in the layers. It can't be painted on, erased or filled, and Clear layer and Delete
+leave it alone: **Convert to pixels**, in the bar of those tools, makes it a normal layer again (it can be undone).
+
+## The tray: importing images
+
+The **Tray** button, at the foot of the tool column, opens the tray over the drawing, and closes it again.
+
+- **Import…** in the tray adds images. Dropping image files anywhere on the window adds them too, and opens the tray;
+  an image dropped right onto the drawing also goes into it there.
+- **Drag an image from the tray onto the drawing**, as often as needed. It goes in as a smart object, centered where
+  it was dropped, with the handles showing: move it, scale it or turn it, then **Enter** puts it into a new layer
+  above the active one, named after the file, and **Esc** leaves it out.
+- An image bigger than the paper is made smaller to fit it.
+- Pointing at an image in the tray shows a **×** that takes it out of the tray.
+- The tray stays the same from one drawing to the next while Lydia is open, and is empty again after the page is
+  closed or reloaded.
+
+## Layers
+
+- **New layer** adds an empty layer above the active one; **Delete layer** deletes the active one (the last layer
+  stays).
+- Click a layer to paint on it. **Drag** it up or down to move it in the list.
+- **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
+- The box at the left of each layer hides it or shows it.
+- **Opacity**, above the list, is the active layer's.
+- **Clear layer**, in the top bar, takes all the paint out of the active layer.
+
+## The view
+
+Changing the view never changes the drawing.
+
+- **Move around:** the **Hand (H)**, or hold **Space** and drag, or drag with the middle mouse button, or the mouse
+  wheel (two fingers on a trackpad).
+- **Zoom**, from 1% to 3200%: **Ctrl** + mouse wheel (or pinch on a trackpad), or the **Zoom (Z)** tool: click to zoom
+  in, **Alt** + click to zoom out, and drag right or left to zoom smoothly.
+- **Turn:** the **Rotate view (R)** tool (**Shift**: in steps of 15°), or hold **Shift + Space** and drag with any
+  tool. **Straighten** turns it back.
+- **Flip** like in a mirror, to check a drawing with fresh eyes: **M**, or the Flip button.
+- **Fit**, or **Ctrl+0**, shows the whole drawing.
+- The bar shows the zoom and the angle.
+
+## Undo and redo
+
+**Ctrl+Z** undoes; **Ctrl+Shift+Z** or **Ctrl+Y** redoes. Everything can be undone: strokes, fills, selections, moves,
+transforms and every change to the layers. Lydia keeps up to 500 MB of undo; past that, the oldest steps are
+forgotten.
+
+## Saving and exporting
+
+- **Save** downloads the drawing as a `.lyd` file, with its layers and smart objects, to open it again later.
+- **Export PNG** saves the picture at full size, keeping a transparent background transparent.
+- **Export JPEG** makes a much smaller file, without transparency (a transparent background becomes white).
+
+Exported images carry the drawing's resolution, so they print at the size of their paper.
+
+## The Brush Designer
+
+Opened from the start screen, it draws the tip of a new brush.
+
+- Paint the tip on the paper: black paints fully, gray paints lightly, white doesn't paint. **Brush** and **Eraser**,
+  with **Edge** (Soft or Hard), **Strength** and **Size** in the bar; **Clear paper** starts again.
+- Give it a **Name**, and choose how it paints: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow,
+  Wash (the stroke doesn't pile up over itself) and the pen's pressure. **Noise** gives every copy of the tip a
+  texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
+- **Try it** paints with the brush as it is now, at any size; **Clear** wipes the test area.
+- **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file.
+
+## All shortcuts
+
+| Shortcut                                     | What it does                                       |
+| -------------------------------------------- | -------------------------------------------------- |
+| B / E                                        | Brush / eraser                                     |
+| F / I                                        | Fill bucket / eyedropper                           |
+| S / L                                        | Rectangle select / lasso                           |
+| V                                            | Move                                               |
+| H / Z / R                                    | Hand / zoom / rotate view                          |
+| [ / ]                                        | Smaller / bigger brush                             |
+| Alt (hold), with the brush, eraser or bucket | Pick a color                                       |
+| G                                            | Pixel grid on / off                                |
+| Ctrl + Z                                     | Undo                                               |
+| Ctrl + Shift + Z, Ctrl + Y                   | Redo                                               |
+| Shift / Alt + drag, with S or L              | Add to / take away from the selection              |
+| Ctrl + A / Ctrl + D / Ctrl + Shift + I       | Select everything / nothing / invert the selection |
+| Delete, Backspace                            | Take out what is selected                          |
+| Shift + drag, with V                         | Move only across, or only up and down              |
+| Ctrl + T, or Transform in the bar            | Transform (in a browser, use the button)           |
+| Enter / Esc, while transforming              | Apply / cancel                                     |
+| Shift + drag a corner                        | Scale without keeping the proportions              |
+| Alt + drag a handle                          | Scale from the middle                              |
+| Ctrl + drag a corner / a side                | Distort / skew                                     |
+| Shift + drag outside, or with R              | Turn in steps of 15°                               |
+| Space + drag, or drag with the middle button | Move around                                        |
+| Mouse wheel, or two fingers on a trackpad    | Move around                                        |
+| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                                               |
+| Alt + click, with Z                          | Zoom out                                           |
+| Shift + Space + drag                         | Turn the view                                      |
+| M                                            | Flip the view                                      |
+| Ctrl + 0                                     | Show the whole drawing                             |

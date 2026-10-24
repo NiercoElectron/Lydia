@@ -43,33 +43,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Save and open projects as `.lyd` files
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)
 
-### Shortcuts
-
-| Shortcut                                     | Action                                    |
-| -------------------------------------------- | ----------------------------------------- |
-| Ctrl/Cmd + Z                                 | Undo                                      |
-| Ctrl/Cmd + Shift + Z, Ctrl + Y               | Redo                                      |
-| B / E / F / I                                | Brush / eraser / fill bucket / eyedropper |
-| H / Z / R                                    | Hand / zoom / rotate view                 |
-| S / L                                        | Rectangle select / lasso                  |
-| Shift / Alt + drag, with S or L              | Add to / take away from the selection     |
-| V                                            | Move what is selected (or the layer)      |
-| Shift + drag, with V                         | Move only across, or only up and down     |
-| Ctrl/Cmd + T, or Transform in the bar        | Transform (a new tab, in browsers)        |
-| Enter / Esc, while transforming              | Apply / cancel                            |
-| Ctrl + drag a corner / a side                | Distort / skew                            |
-| Ctrl/Cmd + A / D / Shift + I                 | Select everything / nothing / invert      |
-| Delete                                       | Take out what is selected                 |
-| Alt (hold), with the brush, eraser or bucket | Pick a color                              |
-| Alt + click, with the zoom tool              | Zoom out                                  |
-| [ / ]                                        | Smaller / bigger brush                    |
-| G                                            | Pixel grid on / off                       |
-| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                                      |
-| Mouse wheel, or two fingers on a trackpad    | Move around                               |
-| Space + drag, or drag with the middle button | Move around                               |
-| Shift + Space + drag                         | Turn the view                             |
-| M                                            | Flip the view                             |
-| Ctrl/Cmd + 0                                 | Show the whole drawing                    |
+How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 ## Roadmap
 
