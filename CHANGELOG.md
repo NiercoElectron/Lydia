@@ -6,6 +6,13 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-23
+
+### Fixed
+
+- The Pixel brush paints the next pixel as soon as the pen enters it, wherever in its pixel a stroke started. Before,
+  depending on that, the pen sometimes had to go past the middle of the next pixel before it was painted.
+
 ## [0.8.0] - 2026-10-23
 
 The basic tools: a tool column, the eyedropper, turning and flipping the view, the fill bucket, selections, the move
@@ -257,7 +264,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/NiercoElectron/Lydia/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/NiercoElectron/Lydia/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/NiercoElectron/Lydia/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/NiercoElectron/Lydia/compare/v0.5.2...v0.6.0
