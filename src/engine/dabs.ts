@@ -33,6 +33,7 @@ export function createDabPath(shape: BrushShape, size: number) {
   // With "followStroke", the first dab waits until the stroke has a direction
   let waitingDab: StrokePoint | null = null
   let lastDab: Dab | null = null // the latest dab placed
+  let isFirstMove = false // a pixel brush's stroke hasn't moved yet (see pastEdge)
   const strokeSeed = Math.floor(Math.random() * SEEDS) // for brushes whose noise changes once per stroke
 
   // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time
@@ -72,10 +73,20 @@ export function createDabPath(shape: BrushShape, size: number) {
     lastDab = dab
   }
 
+  // A pixel brush's dabs are counted from the edge of the pixel the pen was in, so that a dab comes just as the pen
+  // enters the next pixel, wherever in its pixel the stroke started. How far the pen at "along" (the place along the
+  // longer side, going the way "sign" says) is past the edge of its pixel, for a tip of this size: its corner moves to
+  // the next pixel at k + 0.5 + size / 2 (see dabAt)
+  function pastEdge(along: number, sign: number, size: number) {
+    const corner = along - size / 2 - 0.5
+    return sign > 0 ? corner - Math.floor(corner) : Math.ceil(corner) - corner
+  }
+
   // The stroke starts at this point
   function start(point: StrokePoint): Dab[] {
     last = point
     distanceSinceLastDab = 0
+    isFirstMove = true
     lastDab = null
     const dabs: Dab[] = []
     if (shape.followStroke) waitingDab = point
@@ -103,9 +114,21 @@ export function createDabPath(shape: BrushShape, size: number) {
       }
 
       const spacing = Math.max(1, sizeAt(point.pressure) * shape.spacing)
+      // A pixel brush starts counting from the edge of the pixel the stroke started in, along the longer side of its
+      // first move
+      if (isPixel && isFirstMove) {
+        const isAcross = Math.abs(dx) >= Math.abs(dy)
+        distanceSinceLastDab = pastEdge(
+          isAcross ? last.x : last.y,
+          Math.sign(isAcross ? dx : dy),
+          sizeAt(last.pressure),
+        )
+      }
+      isFirstMove = false
       let along = spacing - distanceSinceLastDab // how far along the line the next dab goes
       while (along <= distance) {
-        const t = along / distance
+        // A pixel brush's dab is worked out a hair further, inside the pixel the pen enters there
+        const t = isPixel ? Math.min(1, (along + 1e-6) / distance) : along / distance
         const pressure = last.pressure + (point.pressure - last.pressure) * t
         place(dabs, dabAt(last.x + dx * t, last.y + dy * t, pressure, direction))
         along += spacing

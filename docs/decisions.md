@@ -548,6 +548,13 @@ for the history) or **open** (not decided yet).
     149, and on bigger tips, a few pixels apart, where it makes no difference.
   - For a pixel brush, the spacing is measured along the longer side (the larger of the distances across and down).
     Measured in a straight line, a sloped line got extra pixels at its steps.
+  - Since 0.8.1, a pixel brush counts the spacing from the edge of the pixel the stroke started in, not from the pen:
+    counted from the pen, depending on where in its pixel the stroke started, the pen sometimes had to go past the
+    middle of the next pixel before it was painted (Enrico noticed it). Now, going straight, each pixel is painted as
+    the pen enters it. A dab at every edge the pen crosses, across and down, was tried first: it left holes where a
+    line turns between mostly across and mostly down and, filled, about twice as many doubled corners near 45° (220
+    instead of 95 in 208 simulated strokes; 126 with the start counted from the edge). Painting every pixel at once
+    and taking the doubled corners out afterwards is the pixel-perfect mode, planned with the pixel art stage.
   - A dab that would paint the same pixels as the one before is skipped.
   - The brush list shows the Pixel brush's sample stroke 4 times smaller, enlarged, so that its pixels show.
 - **Measured (RTX 4060 Ti):**
