@@ -1,5 +1,5 @@
 import { Application, CanvasSource, Container, Texture, TilingSprite } from 'pixi.js'
-import type { WebGLRenderer } from 'pixi.js'
+import type { RenderTexture, WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createBrush, type BrushSettings } from './brush'
 import { parseBrushFile, type BrushShape } from './brushFile'
@@ -9,6 +9,7 @@ import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
 import { createTileMemory, type StoredTile } from './memory'
+import { movedKeys, movedTile, shiftSelection } from './move'
 import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
 import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
@@ -151,6 +152,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const fillSettings: FillSettings = { ...DEFAULT_FILL }
   let hasHardSelectionEdges = false
   let task: string | null = null // see runTask
+  let isMoveEnding = false // a move waits for the tiles it changed to be put together (see moveLifted)
 
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
   // its own and doesn't listen, so there holding Alt doesn't pick colors
@@ -163,6 +165,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canPickColors: () => colorListeners.size > 0,
     onFill: (x, y) => void fillAt(x, y),
     onSelect: (points, mode) => selectPolygon(points, mode),
+    onMoveStart: () => startMove(),
+    onMove: (dx, dy) => dragMove(dx, dy),
+    onMoveEnd: keep => releaseMove(keep),
     isWorking: () => task !== null,
   })
   // Painting, filling, undoing and changing the layers wait for each other
@@ -203,6 +208,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function backgroundWork() {
     const isPainting = view.isPainting()
     projection.composeWaiting(isPainting ? 2 : 5)
+    // A move stops showing once the tiles it changed are put together, in the same frame (see moveLifted)
+    if (isMoveEnding && !projection.isUpdating()) {
+      projection.endMove()
+      isMoveEnding = false
+    }
     if (projection.isUpdating() !== snapshot.isUpdating) changed(false) // show or hide "Updating…"
     if (gpu.hasUnsaved()) {
       gpu.finishReads(isPainting ? 2 : 4)
@@ -244,16 +254,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Change tiles of a layer in RAM, a few every frame, as one undo step: "change" gives a tile's new pixels (null = no
   // paint), or undefined to leave it as it is. The new tiles are sent to the graphics card where it has a copy of
-  // them, so nothing has to be read back from it. Returns whether anything changed
+  // them, so nothing has to be read back from it. "withSelection": the selection changes too, right afterwards, as part
+  // of the same step (a move). Returns whether anything changed
   async function changeTiles(
     layer: Layer,
     keys: Iterable<string>,
     change: (key: string, tile: StoredTile | undefined, width: number, height: number) => StoredTile | null | undefined,
+    withSelection = false,
   ) {
     while (gpu.hasUnsaved()) await nextFrame() // every tile in RAM (nothing could paint since runTask waited)
     const pace = createPacer()
     const changedKeys: string[] = []
-    history.begin(layer)
+    history.begin(layer, withSelection)
     for (const key of keys) {
       await pace()
       const { column, row } = parseTileKey(key)
@@ -587,6 +599,95 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         tile ? cutOut(tile, cut.get(key)!, width, height, memory) : undefined,
       )
     })
+  }
+
+  // ----- Moving -----
+
+  // The move tool's drag, from when the pointer goes down: how far it has gone on the paper, whether the move shows yet
+  // and, once the pointer has moved, how to tell the move that it came up
+  type MoveDrag = { dx: number; dy: number; isShown: boolean; release: ((keep: boolean) => void) | null }
+  let moveDrag: MoveDrag | null = null
+
+  // A hidden layer doesn't show, so it isn't moved
+  function startMove() {
+    if (isBusy() || !stack.active.visible) return
+    moveDrag = { dx: 0, dy: 0, isShown: false, release: null }
+  }
+
+  // The move starts the first time the pointer moves, so a click with the move tool does nothing
+  function dragMove(dx: number, dy: number) {
+    const drag = moveDrag
+    if (!drag) return
+    drag.dx = dx
+    drag.dy = dy
+    if (drag.isShown) {
+      projection.setMoveOffset(dx, dy)
+      selectionView.setOffset(dx, dy)
+    }
+    if (!drag.release && (dx !== 0 || dy !== 0)) {
+      const released = new Promise<boolean>(resolve => {
+        drag.release = resolve
+      })
+      void runTask('Moving…', () => moveLifted(drag, released))
+    }
+  }
+
+  function releaseMove(keep: boolean) {
+    moveDrag?.release?.(keep)
+    moveDrag = null
+  }
+
+  // Lift the selected part of the active layer, or all of it when nothing is selected, show it on its own while it is
+  // dragged (see showMove in projection.ts), and put it down where the pointer comes up (see move.ts), as one undo
+  // step together with the selection, which moves along
+  async function moveLifted(drag: MoveDrag, released: Promise<boolean>) {
+    const layer = stack.active
+    const cut = selection
+    const lifted = [...gpu.tilesWithPaint(layer)].filter(key => !cut || cut.has(key))
+    if (lifted.length === 0) return released.then(() => false) // nothing to move
+    try {
+      // The pictures to show it with, a few tiles every frame: what moves and what is left of the layer, where it has
+      // paint to move, and the layers above, where they have paint. Tiles shown live would show through them
+      projection.finishLive()
+      const isLifted = new Set(lifted)
+      const pace = createPacer()
+      for (const key of new Set([...lifted, ...projection.paintedAbove()])) {
+        await pace()
+        const { column, row } = parseTileKey(key)
+        const texture = gpu.getTexture(layer, column, row, false)
+        const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
+        let moving: RenderTexture | null = null
+        let left: RenderTexture | null = null
+        if (texture && selected) {
+          moving = projection.moveTexture(column, row)
+          gpu.copyInto(texture, moving)
+          selectionView.cut(moving, key)
+        }
+        if (texture && selected !== 'full') {
+          left = projection.moveTexture(column, row)
+          gpu.copyInto(texture, left)
+          if (selected) selectionView.cutAway(left, key)
+        }
+        projection.prepareMoveTile(key, moving, left)
+      }
+      projection.showMove(drag.dx, drag.dy)
+      selectionView.setOffset(drag.dx, drag.dy)
+      drag.isShown = true
+
+      const keep = await released
+      const { dx, dy } = drag
+      if (!keep || (dx === 0 && dy === 0)) return false
+      const before = new Map(layer.tiles) // the tiles change one by one, and each new one needs the old ones
+      const keys = movedKeys(grid, lifted, dx, dy)
+      const didChange = await changeTiles(layer, keys, key => movedTile(grid, before, cut, key, dx, dy, memory), true)
+      if (didChange && cut) selection = shiftSelection(grid, cut, dx, dy)
+      return didChange
+    } finally {
+      // The move stays on the screen until the tiles it changed are put together (see backgroundWork)
+      selectionView.setOffset(0, 0)
+      isMoveEnding = true
+      while (isMoveEnding) await nextFrame()
+    }
   }
 
   // ----- Pixel grid -----

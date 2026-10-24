@@ -887,6 +887,51 @@ for the history) or **open** (not decided yet).
   only inside; everything selected; Delete and its undo; Invert and its undo; undoing a click that selected nothing;
   a rectangle on a turned view.
 
+## 41. Moving paint
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - The **Move** tool (V, as in Photoshop) drags the selected part of the active layer, as much as each pixel is
+    selected; when nothing is selected, the whole layer (Enrico's choice). It moves by whole pixels of the paper, and
+    Shift keeps it level or upright. The selection moves along with the paint, and the move is one step of undo
+    together with the selection. A click without dragging does nothing.
+  - Paint moved off the paper is lost: the layers only have tiles over the paper. Photoshop and Krita keep it, with
+    layers that can be bigger than the paper; that would be a stage of its own.
+  - A hidden layer isn't moved, since nothing of it shows.
+  - Next, in a step of its own: scaling and turning what is selected.
+- **Why:**
+  - That is how the move tool works in Photoshop and Krita. Whole pixels keep hard edges and pixel art sharp; scaling
+    and turning, which can't keep them, come with the transform step.
+- **How:**
+  - While it is dragged, the screen shows the moved part on its own, between what is under it and what is over it.
+    Tiles where the layer loses paint, or where layers above have paint, are shown with three pictures instead of
+    their projection tile: the "below" tile (decision 10) with what is left of the active layer, the moved part, and
+    the layers above put together. Elsewhere the projection tile already has everything under the moved part, and
+    nothing goes over it. A new position only moves the moved part's container, so a frame costs about the same as
+    without a move.
+  - The pictures are copies, made on the graphics card once the pointer starts moving, a few tiles every frame, with
+    "Moving…" in the bar; they are shown all at once when they are ready. What is left of a tile, and its moved part,
+    are cut with the selection like strokes (decision 40).
+  - Once it is let go, the layer's new tiles are worked out in RAM, like the fill (decision 39), from its tiles as they
+    were before: what is left of each tile, with the moved part that lands on it over that. Tiles moved whole onto
+    places where nothing is left are copied row by row. The screen keeps showing the move until the new tiles are put
+    together, and changes over to them in the same frame.
+  - An undo step of a layer's pixels can also keep the selection from before, so undoing a move brings both back.
+  - Until it is let go, two things look a little different from the result: layers above with a blend mode other than
+    normal (they are put together on their own, as with the live opacity, decision 23), and the moved part over what
+    is left of a layer at less than full opacity.
+  - Making the pictures of a selection's edge for the marching ants was slow (each pixel's four bytes were written one
+    by one): it now writes each pixel as one number, about 9 times faster, for every new selection.
+- **Measured (RTX 4060 Ti, 10000×10000, a layer with pixels in all 1600 tiles):** the moved layer shows about 0.2 s
+  after the drag starts, a frame while it is dragged takes 6.5 ms, and putting it down takes about 0.55 s (0.4 s for a
+  soft lasso 6000 pixels wide, inside the layer); the longest frame on the way was 42–56 ms, as with the fill. The
+  marching ants of a selection with 96 tiles on its edge went from 167 ms to 19 ms.
+- **Checked:** the button, the key and the bar; the whole layer, shown at its new place while dragged and put there
+  once let go; undo and redo; a click; the selected part only, with the selection moving along, and undoing both; a
+  layer above covering the moved part, while dragged and after; Shift; paint moved off the paper and back; a hidden
+  layer; a whole 10000×10000 layer.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

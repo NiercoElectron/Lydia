@@ -31,7 +31,7 @@ type Props = {
 }
 
 // The settings of the chosen tool: the color, then the brush's size and opacity, the fill bucket's settings, or the
-// selection's
+// selection's. The move tool has none
 export function Toolbar({
   tool,
   color,
@@ -47,6 +47,7 @@ export function Toolbar({
   onGridToggle,
 }: Props) {
   const isSelecting = tool === 'select' || tool === 'lasso'
+  const isMoving = tool === 'move'
   return (
     <div className="toolbar">
       <label>
@@ -55,7 +56,7 @@ export function Toolbar({
       </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {isSelecting && <SelectionButtons selection={selection} />}
-      {tool !== 'fill' && !isSelecting && (
+      {tool !== 'fill' && !isSelecting && !isMoving && (
         <label title="Brush size ([ and ])">
           Size
           <input
@@ -68,7 +69,7 @@ export function Toolbar({
           {size}
         </label>
       )}
-      {!isSelecting && (
+      {!isSelecting && !isMoving && (
         <label title="How much a stroke or a fill covers, however many times a stroke passes over a place">
           Opacity
           <input

@@ -3,6 +3,7 @@ import {
   Eraser,
   Hand,
   Lasso,
+  Move,
   PaintBucket,
   Pipette,
   RotateCw,
@@ -21,6 +22,12 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
   eyedropper: { Icon: Pipette, name: 'Eyedropper', key: 'i', also: 'or hold Alt while painting' },
   select: { Icon: SquareDashed, name: 'Rectangle select', key: 's', also: 'Shift adds, Alt takes away' },
   lasso: { Icon: Lasso, name: 'Lasso', key: 'l', also: 'Shift adds, Alt takes away' },
+  move: {
+    Icon: Move,
+    name: 'Move',
+    key: 'v',
+    also: 'the whole layer when nothing is selected; Shift keeps it straight',
+  },
   hand: { Icon: Hand, name: 'Hand', key: 'h', also: 'or hold Space' },
   zoom: { Icon: ZoomIn, name: 'Zoom', key: 'z', also: 'Alt + click zooms out, dragging zooms smoothly' },
   rotate: {

@@ -23,6 +23,7 @@ const CURSORS: Record<Tool, string> = {
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
   lasso: 'crosshair',
+  move: 'move',
   hand: 'grab',
   zoom: 'zoom-in',
   rotate: ROTATE_CURSOR,
@@ -42,6 +43,11 @@ export type ViewActions = {
   canPickColors: () => boolean // whether anyone wants those colors: if not, holding Alt doesn't pick them
   onFill: (x: number, y: number) => void // the fill bucket went down at this point of the paper
   onSelect: (points: Point[], mode: SelectionMode) => void // a polygon drawn with a selection tool (none: a click)
+  // The move tool went down, was dragged this many pixels of the paper from there, and came up ("keep": false when the
+  // browser took the pointer away)
+  onMoveStart: () => void
+  onMove: (dx: number, dy: number) => void
+  onMoveEnd: (keep: boolean) => void
   isWorking: () => boolean // while a fill or Delete is worked out, the tools that change the drawing wait
 }
 
@@ -249,6 +255,28 @@ export function createView(
     }
   }
 
+  // The move tool drags the selected part of the active layer, or all of it when nothing is selected, by whole pixels
+  // of the paper. Shift keeps it level or upright
+  function movePaint(e: PointerEvent): Gesture {
+    const start = toPaper(e)
+    actions.onMoveStart()
+    return {
+      move(e) {
+        const now = toPaper(e)
+        let dx = Math.round(now.x - start.x)
+        let dy = Math.round(now.y - start.y)
+        if (e.shiftKey) {
+          if (Math.abs(dx) > Math.abs(dy)) dy = 0
+          else dx = 0
+        }
+        actions.onMove(dx, dy)
+      },
+      up(e) {
+        actions.onMoveEnd(e.type === 'pointerup')
+      },
+    }
+  }
+
   // The view follows the pointer
   function pan(e: PointerEvent): Gesture {
     const grab = { x: e.clientX - world.position.x, y: e.clientY - world.position.y }
@@ -309,6 +337,7 @@ export function createView(
     eyedropper: pick,
     select: selectRectangle,
     lasso,
+    move: movePaint,
     hand: pan,
     zoom,
     rotate: e => rotate(e, !isSpaceDown),

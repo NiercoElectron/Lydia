@@ -11,7 +11,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Tools in a column at the left, like in Photoshop and Krita: brush, eraser, fill bucket, eyedropper, rectangle select,
-  lasso, hand, zoom and rotate view
+  lasso, move, hand, zoom and rotate view
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - A fill bucket, with a tolerance, looking at all the visible layers or only the active one, and expanding under the
   soft edge of the lines, so that no light rim is left between the color and the line
@@ -20,6 +20,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Selections with the rectangle and the lasso, shown with marching ants: added to (Shift) or taken away from (Alt),
   with soft or hard edges; the brush, the eraser and the fill bucket only work inside, and Delete takes out what is
   inside
+- A move tool that drags what is selected, or the whole layer when nothing is, by whole pixels; the selection moves
+  along
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
@@ -47,6 +49,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 | H / Z / R                                    | Hand / zoom / rotate view                 |
 | S / L                                        | Rectangle select / lasso                  |
 | Shift / Alt + drag, with S or L              | Add to / take away from the selection     |
+| V                                            | Move what is selected (or the layer)      |
+| Shift + drag, with V                         | Move only across, or only up and down     |
 | Ctrl/Cmd + A / D / Shift + I                 | Select everything / nothing / invert      |
 | Delete                                       | Take out what is selected                 |
 | Alt (hold), with the brush, eraser or bucket | Pick a color                              |
@@ -65,12 +69,12 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
 stroke opacity, a tool column, the eyedropper, turning and flipping the view, the fill bucket, rectangle and lasso
-selections, new drawings with common sizes, a resolution (DPI) and a background color or transparency, `.lyd`
-projects, PNG and JPEG export. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
+selections, the move tool, new drawings with common sizes, a resolution (DPI) and a background color or transparency,
+`.lyd` projects, PNG and JPEG export. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Tools (now): moving, scaling and rotating what is selected (or the whole layer)
+- [ ] Tools (now): scaling and rotating what is selected (or the whole layer)
 - [ ] Painting: pixel brushes drawn in the Brush Designer, the brush's outline under the pen, pen tilt (the brush
       follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,

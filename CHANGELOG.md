@@ -29,6 +29,10 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   edges are soft, or hard (whole pixels, for pixel art) with a button in the bar. The brush, the eraser and the fill
   bucket only work inside the selection, and Delete takes out what is inside it. Ctrl+A selects everything, Ctrl+D
   nothing, and Ctrl+Shift+I or **Invert** what wasn't selected. Every change of the selection can be undone.
+- A move tool (V) ([decision 41](docs/decisions.md#41-moving-paint)): it drags the selected part of the active layer,
+  or the whole layer when nothing is selected, by whole pixels, and the selection moves along. Shift keeps it level or
+  upright. While it is dragged, the screen shows it at its new place, under the layers above. Paint moved off the paper
+  is lost. Each move is one step of undo, together with the selection.
 
 ### Changed
 
@@ -37,6 +41,7 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 - While Space is held, the cursor is a hand.
 - Tiles of a single color are sent to the graphics card without their pixels: the graphics card fills them with the
   color.
+- The marching ants of a new selection show sooner: the pictures of its edge are made about 9 times faster.
 
 ## [0.7.0] - 2026-10-23
 

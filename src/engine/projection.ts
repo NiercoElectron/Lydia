@@ -399,6 +399,96 @@ export function createProjection(
     releaseLiveLayerIfDone()
   }
 
+  // ----- Showing a move -----
+
+  // While the move tool drags a part of the active layer (see move.ts), the moved part is shown on its own, over what
+  // is left of the layer and under the layers above, so each new position costs nothing to show. Tiles where the layer
+  // loses paint, or where layers above have paint, are shown with three pictures instead of their projection tile: the
+  // "below" tile with what is left of the active layer on it, the moved part, and the layers above put together.
+  // Elsewhere the projection tile already has everything under the moved part, and nothing goes over it.
+  // The pictures are copies, so the layer's tiles can change under them once the move is let go. Like the live
+  // opacity, the layers above are put together on their own, so a blend mode other than normal among them looks a
+  // little different until the move is done, and so does the moved part over what is left of a layer at less than full
+  // opacity
+  type MoveTile = { sprites: Sprite[]; textures: RenderTexture[] }
+  const moveTiles = new Map<string, MoveTile>() // "column,row" -> the tile's pictures
+  const moveUnder = new Container() // "below" and what is left of the active layer
+  const moved = new Container() // the moved part, at its tiles' places, moved along by the drag
+  const moveAbove = new Container() // the layers above
+  const moveParts = [moveUnder, moved, moveAbove]
+  for (const part of moveParts) part.visible = false
+
+  // The tiles where a visible layer above the active one has paint
+  function paintedAbove() {
+    const keys = new Set<string>()
+    for (const layer of stack.layers.slice(activeIndex(stack) + 1)) {
+      if (layer.visible) for (const key of gpu.tilesWithPaint(layer)) keys.add(key)
+    }
+    return keys
+  }
+
+  // Get a tile ready for showing a move, out of sight until showMove: "lifted" is the part of the active layer's tile
+  // that moves (null: none), and "left" what is left of the tile (null: nothing). Both are copies made in textures from
+  // moveTexture, and belong to the move from now on
+  function prepareMoveTile(key: string, lifted: RenderTexture | null, left: RenderTexture | null) {
+    const { column, row } = parseTileKey(key)
+    const layer = stack.active
+    if (staleBelow.delete(key)) composeBelowTile(column, row)
+    const tile: MoveTile = { sprites: [], textures: [] }
+    const add = (part: Container, texture: Texture, isActiveLayer: boolean) => {
+      const sprite = new Sprite(texture)
+      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
+      if (isActiveLayer) {
+        sprite.alpha = layer.opacity
+        sprite.blendMode = layer.blendMode
+      }
+      part.addChild(sprite)
+      tile.sprites.push(sprite)
+    }
+    add(moveUnder, below.get(key)!, false)
+    if (left) add(moveUnder, left, true)
+    if (lifted) add(moved, lifted, true)
+    const first = activeIndex(stack) + 1
+    let above: RenderTexture | null = null
+    if (stack.layers.slice(first).some(other => other.visible && hasPaint(other, key))) {
+      above = takeTexture(column, row)
+      composeLayers(emptyBase, first, stack.layers.length, column, row, above)
+      add(moveAbove, above, false)
+    }
+    for (const texture of [left, lifted, above]) if (texture) tile.textures.push(texture)
+    moveTiles.set(key, tile)
+  }
+
+  // Show the prepared tiles instead of their projection tiles, with the moved part this far from where it was
+  function showMove(x: number, y: number) {
+    moved.position.set(x, y)
+    for (const key of moveTiles.keys()) tileSprites.get(key)!.visible = false
+    for (const part of moveParts) part.visible = true
+    applyMoveScaleMode()
+  }
+
+  function setMoveOffset(x: number, y: number) {
+    moved.position.set(x, y)
+  }
+
+  // Show the projection tiles again. The pictures' textures are freed later, a few every frame
+  function endMove() {
+    for (const [key, tile] of moveTiles) {
+      tileSprites.get(key)!.visible = true
+      for (const sprite of tile.sprites) sprite.destroy()
+      spareTextures.push(...tile.textures)
+    }
+    moveTiles.clear()
+    for (const part of moveParts) part.visible = false
+    moved.position.set(0, 0)
+  }
+
+  function applyMoveScaleMode() {
+    for (const part of moveParts) {
+      for (const sprite of part.children as Sprite[]) applyScaleMode(sprite.texture)
+    }
+  }
+
   // ----- Reading colors -----
 
   const pixel = new Uint8Array(4)
@@ -441,6 +531,7 @@ export function createProjection(
     for (const { sprites } of live.values()) {
       for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
     }
+    applyMoveScaleMode()
   }
 
   // Tiles are put together with every texture at its own size, where both modes give the same result, so the
@@ -463,10 +554,11 @@ export function createProjection(
     container.addChild(sprite)
     tileSprites.set(key, sprite)
   })
-  container.addChild(liveContainer)
+  container.addChild(liveContainer, ...moveParts)
   composeAll()
 
   function destroy() {
+    endMove()
     for (const tile of live.values()) tile.above?.destroy(true)
     for (const texture of [...prepared.values(), ...spareTextures]) texture.destroy(true)
     for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
@@ -495,6 +587,12 @@ export function createProjection(
     showStroke,
     finishLive,
     finishLiveLater,
+    paintedAbove,
+    moveTexture: takeTexture,
+    prepareMoveTile,
+    showMove,
+    setMoveOffset,
+    endMove,
     colorAt,
     setZoom,
     destroy,

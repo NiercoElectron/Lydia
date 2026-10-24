@@ -85,7 +85,9 @@ export function createSelectionView(
     let texture = selectedTextures.get(mask)
     if (!texture) {
       const pixels = new Uint8Array(mask.length * 4)
-      for (let i = 0; i < mask.length; i++) pixels.fill(mask[i], i * 4, i * 4 + 4) // white, multiplied by its alpha
+      // White, multiplied by its alpha: the same value in all four bytes, written as one number
+      const colors = new Uint32Array(pixels.buffer)
+      for (let i = 0; i < mask.length; i++) colors[i] = mask[i] * 0x01010101
       const source = new BufferImageSource({
         resource: pixels,
         width,
@@ -131,16 +133,30 @@ export function createSelectionView(
   function cut(strokeTexture: RenderTexture, key: string) {
     const tile = getSelection()?.get(key)
     if (!tile || tile === 'full') return
+    // First, since making it the first time shows "whole"
+    const outside = outsideTexture(tile, strokeTexture.width, strokeTexture.height)
     whole.visible = false
-    cutter.texture = outsideTexture(tile, strokeTexture.width, strokeTexture.height)
+    cutter.texture = outside
     renderer.render({ container: cutRoot, target: strokeTexture, clear: false })
+  }
+
+  // The other way round: take the selected part out of a layer's tile partly selected, keeping what isn't selected
+  // (for what is left of a layer while the move tool drags its selected part away)
+  function cutAway(texture: RenderTexture, key: string) {
+    const tile = getSelection()?.get(key)
+    if (!tile || tile === 'full') return
+    whole.visible = false
+    cutter.texture = selectedTexture(tile, texture.width, texture.height)
+    renderer.render({ container: cutRoot, target: texture, clear: false })
   }
 
   // ----- Showing it -----
 
   const shownRoot = new Container() // drawn at the screen's corner, like the stage
-  const shown = new Container() // the selected tiles, placed like the drawing
+  const shown = new Container() // placed like the drawing
+  const shownTiles = new Container() // the selected tiles, moved along while the move tool drags them (see setOffset)
   shownRoot.addChild(shown)
+  shown.addChild(shownTiles)
   const sprites: Sprite[] = [] // reused between selections
 
   let picture = createPicture()
@@ -169,7 +185,7 @@ export function createSelectionView(
   // Put sprites for the selected tiles into "shown", and let go of the textures of tiles no longer selected. Tiles
   // selected whole side by side in a row are one white rectangle: with everything selected, 40 instead of 1600 sprites
   function placeTiles(selection: Selection) {
-    shown.removeChildren()
+    shownTiles.removeChildren()
     let count = 0
     const place = (texture: Texture, x: number, y: number, width: number, height: number) => {
       let sprite = sprites[count]
@@ -181,7 +197,7 @@ export function createSelectionView(
       sprite.width = width
       sprite.height = height
       sprite.position.set(x, y)
-      shown.addChild(sprite)
+      shownTiles.addChild(sprite)
       count++
     }
     for (let row = 0; row < grid.rows; row++) {
@@ -231,7 +247,8 @@ export function createSelectionView(
       old.destroy(true)
       drawnView = ''
     }
-    const view = [world.position.x, world.position.y, world.scale.x, world.scale.y, world.rotation].join()
+    const { x, y } = shownTiles.position
+    const view = [world.position.x, world.position.y, world.scale.x, world.scale.y, world.rotation, x, y].join()
     if (selection !== drawnSelection || view !== drawnView) {
       shown.position.copyFrom(world.position)
       shown.scale.copyFrom(world.scale)
@@ -248,6 +265,11 @@ export function createSelectionView(
   // After everything else that changes the drawing in a frame, just before PixiJS draws the screen
   ticker.add(update, undefined, UPDATE_PRIORITY.LOW + 1)
 
+  // Show the edge this far from where the selection is, on the paper, while the move tool drags what is selected
+  function setOffset(x: number, y: number) {
+    shownTiles.position.set(x, y)
+  }
+
   function destroy() {
     ticker.remove(update)
     stage.removeChild(mesh)
@@ -257,13 +279,13 @@ export function createSelectionView(
     picture.destroy(true)
     for (const texture of selectedTextures.values()) texture.destroy(true)
     for (const texture of outsideTextures.values()) texture.destroy(true)
-    shown.removeChildren()
+    shownTiles.removeChildren()
     shownRoot.destroy({ children: true })
     for (const sprite of sprites) sprite.destroy()
     cutRoot.destroy({ children: true })
   }
 
-  return { canPaint, cut, update, destroy }
+  return { canPaint, cut, cutAway, setOffset, update, destroy }
 }
 
 export type SelectionView = ReturnType<typeof createSelectionView>

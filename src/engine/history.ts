@@ -11,7 +11,7 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 // - "tiles": a change to a layer's pixels (a stroke, clearing the layer). For every tile the change touched, the step
 //   keeps the tile from before it (null = the tile had no paint). Pixels are never changed, so no copy is needed. If
 //   the tile's latest pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or
-//   two later
+//   two later. A move also keeps the selection from before, since the selection moves along with the paint
 // - "order": a layer was added, deleted or moved. The step keeps the list of layers and the active layer from before
 //   (the same layers, not copies), and which layer it was about. A deleted layer stays in the step, with its tiles,
 //   so it can come back
@@ -20,7 +20,7 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 //   selection.ts)
 type TileBackup = StoredTile | null | PendingPixels
 export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'name'>
-type TilesStep = { kind: 'tiles'; layer: Layer; tiles: Map<string, TileBackup> }
+type TilesStep = { kind: 'tiles'; layer: Layer; tiles: Map<string, TileBackup>; selection?: Selection | null }
 type OrderStep = { kind: 'order'; layers: Layer[]; active: Layer; layer: Layer }
 type LayerStep = { kind: 'layer'; layer: Layer; props: LayerProps }
 type SelectionStep = { kind: 'selection'; selection: Selection | null }
@@ -51,9 +51,11 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     return gpu.readLater(cached)
   }
 
-  // Start recording a change to a layer's pixels (a stroke, clearing the layer...)
-  function begin(layer: Layer) {
+  // Start recording a change to a layer's pixels (a stroke, clearing the layer...). "withSelection": the change
+  // changes the selection too (a move), so keep the selection as it is now
+  function begin(layer: Layer, withSelection = false) {
     current = { kind: 'tiles', layer, tiles: new Map() }
+    if (withSelection) current.selection = selection.get()
   }
 
   // Before a change touches a tile for the first time, keep what the tile had before it
@@ -155,7 +157,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
         else if (tile === undefined) bytes += TILE_SIZE * TILE_SIZE * 4 // an IOU not filled in yet counts as a whole tile
       }
     }
-    if (step.kind === 'selection') bytes += selectionBytes(step.selection)
+    if (step.kind === 'selection' || step.kind === 'tiles') bytes += selectionBytes(step.selection ?? null)
     for (const layer of layersKeptBy(step)) {
       for (const tile of layer.tiles.values()) bytes += bytesOf(tile)
     }
@@ -194,6 +196,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
       if (isBelowActive) projection.markBelowStale(key)
       projection.composeTile(column, row)
     }
+    if (step.selection !== undefined) swapSelection(step)
   }
 
   // Put the kept list of layers and active layer back, and keep the current ones in the step instead
@@ -218,9 +221,9 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     if (looksDifferent) projection.composeLayerTiles(layer)
   }
 
-  function swapSelection(step: SelectionStep) {
+  function swapSelection(step: { selection?: Selection | null }) {
     const now = selection.get()
-    selection.set(step.selection)
+    selection.set(step.selection ?? null)
     step.selection = now
   }
 
