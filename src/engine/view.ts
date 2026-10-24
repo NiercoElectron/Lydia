@@ -256,18 +256,26 @@ export function createView(
   }
 
   // The move tool drags the selected part of the active layer, or all of it when nothing is selected, by whole pixels
-  // of the paper. Shift keeps it level or upright
+  // of the paper. Shift keeps it level or upright: the direction is chosen once the pointer is far enough from where it
+  // went down to tell, and kept until Shift is let go, so a path that wanders doesn't make it jump from one to the other
   function movePaint(e: PointerEvent): Gesture {
     const start = toPaper(e)
+    const startOnScreen = onScreen(e)
+    let axis: 'across' | 'down' | null = null
     actions.onMoveStart()
     return {
       move(e) {
         const now = toPaper(e)
         let dx = Math.round(now.x - start.x)
         let dy = Math.round(now.y - start.y)
-        if (e.shiftKey) {
-          if (Math.abs(dx) > Math.abs(dy)) dy = 0
-          else dx = 0
+        if (!e.shiftKey) axis = null
+        else {
+          const here = onScreen(e)
+          if (!axis && Math.hypot(here.x - startOnScreen.x, here.y - startOnScreen.y) >= CLICK_DISTANCE) {
+            axis = Math.abs(dx) >= Math.abs(dy) ? 'across' : 'down'
+          }
+          if (axis !== 'across') dx = 0
+          if (axis !== 'down') dy = 0
         }
         actions.onMove(dx, dy)
       },
