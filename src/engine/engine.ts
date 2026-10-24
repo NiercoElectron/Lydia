@@ -27,6 +27,7 @@ import {
 import { createSelectionView } from './selectionView'
 import {
   createSmartView,
+  imageTiles,
   isValidQuad,
   paintBounds,
   rectQuad,
@@ -694,7 +695,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     for (const key of new Set([...lifted, ...projection.paintedAbove()])) {
       await pace()
       const { column, row } = parseTileKey(key)
-      const texture = gpu.getTexture(layer, column, row, false)
+      const texture = layer.visible ? gpu.getTexture(layer, column, row, false) : null
       const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
       let moving: RenderTexture | null = null
       let left: RenderTexture | null = null
@@ -771,16 +772,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // ----- Transforming: smart objects -----
 
   // The transform being made (see smartObject.ts): the layer, and what it transforms: its smart object; the whole
-  // layer, which becomes one; or the selected part of it, which goes into a new layer above as one. "corners" are where
-  // the handles have it now (see view.ts)
+  // layer, which becomes one; the selected part of it, which goes into a new layer above as one; or an image being put
+  // into the drawing, which goes into a new layer above as one too (see placeImage). "corners" are where the handles
+  // have it now (see view.ts)
   type Transform = {
     layer: Layer
-    kind: 'object' | 'layer' | 'part'
+    kind: 'object' | 'layer' | 'part' | 'image'
     object: SmartObject // as it was when the transform started
     corners: Quad
     smooth: boolean
     view: SmartView
     cut: Selection | null
+    name?: string // the new layer's name, for an image
   }
   let smoothTransforms = true // smooth or whole pixels, as chosen last, for new smart objects
 
@@ -810,23 +813,70 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         const source = createLayer(`${layer.name} (source)`, tiles)
         object = { source, bounds, corners: rectQuad(bounds), smooth: smoothTransforms }
       }
-      const view = createSmartView(renderer, grid, gpu, object)
-      for (const key of view.blocks) {
-        await pace()
-        view.addBlock(key)
-      }
-      await prepareLift(
-        layer,
-        cut,
-        [...layer.tiles.keys()].filter(key => !cut || cut.has(key)),
-        false,
-      )
-      projection.setMoveContent(view.container)
-      projection.showMove(0, 0)
-      const kind = layer.smart ? 'object' : cut ? 'part' : 'layer'
-      transform = { layer, kind, object, corners: object.corners, smooth: object.smooth, view, cut }
+      const lifted = [...layer.tiles.keys()].filter(key => !cut || cut.has(key))
+      await showTransform({ layer, kind: layer.smart ? 'object' : cut ? 'part' : 'layer', object, cut }, lifted, pace)
       return false
     })
+  }
+
+  // Put an image into the drawing as a smart object, centered at this point of the paper, with the handles showing:
+  // Enter puts it into a new layer above the active one, named after it, and Esc leaves it out. An image bigger than
+  // the paper is made smaller to fit it, since a source is on the paper's grid. The image is closed afterwards
+  function placeImage(image: ImageBitmap, name: string, at: Point) {
+    if (isBusy()) {
+      image.close()
+      return
+    }
+    const layer = stack.active
+    return runTask('Placing…', async () => {
+      let fitted = image
+      try {
+        const scale = Math.min(1, grid.width / image.width, grid.height / image.height)
+        if (scale < 1) {
+          fitted = await createImageBitmap(image, {
+            resizeWidth: Math.max(1, Math.min(grid.width, Math.round(image.width * scale))),
+            resizeHeight: Math.max(1, Math.min(grid.height, Math.round(image.height * scale))),
+            resizeQuality: 'high',
+          })
+        }
+        const pace = createPacer()
+        const tiles = await imageTiles(grid, fitted, pace)
+        const { width, height } = fitted
+        // On whole pixels, so that at 100% its pixels are the image's own
+        const x = Math.round(at.x - width / 2)
+        const y = Math.round(at.y - height / 2)
+        const object: SmartObject = {
+          source: createLayer(`${name} (source)`, tiles),
+          bounds: { x: 0, y: 0, width, height },
+          corners: rectQuad({ x, y, width, height }),
+          smooth: smoothTransforms,
+        }
+        await showTransform({ layer, kind: 'image', object, cut: null, name }, [], pace)
+      } finally {
+        image.close()
+        fitted.close()
+      }
+      return false
+    })
+  }
+
+  // Show a smart object with the handles, in place of the tiles of its layer that it takes the paint of ("lifted"), a
+  // few blocks every frame ("pace": the caller's, so the frame it is in isn't given a new share of time)
+  async function showTransform(
+    started: Omit<Transform, 'corners' | 'smooth' | 'view'>,
+    lifted: string[],
+    pace: () => Promise<void>,
+  ) {
+    const { object } = started
+    const view = createSmartView(renderer, grid, gpu, object)
+    for (const key of view.blocks) {
+      await pace()
+      view.addBlock(key)
+    }
+    await prepareLift(started.layer, started.cut, lifted, false)
+    projection.setMoveContent(view.container)
+    projection.showMove(0, 0)
+    transform = { ...started, corners: object.corners, smooth: object.smooth, view }
   }
 
   // The handles moved (see view.ts). Corners that would fold the object over itself are left out
@@ -855,7 +905,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   // Enter: draw the object at its new corners into its layer, as one undo step. A layer becomes a smart object; a
-  // selected part leaves its layer and goes into a new layer above it as one, which becomes the active layer
+  // selected part leaves its layer and goes into a new layer above it as one, which becomes the active layer, and so
+  // does an image
   function applyTransform() {
     const done = transform
     if (!done) return
@@ -871,13 +922,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           await changeTiles(layer, keys, (key, tile, width, height) =>
             tile ? cutOut(tile, cut.get(key)!, width, height, memory) : undefined,
           )
-          // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
-          // the projection keeps putting tiles together with the same layers under the active one as what it shows
-          target = createLayer(`Layer ${++layersCreated}`)
-          history.recordOrder(target)
-          stack.layers.splice(stack.layers.indexOf(layer) + 1, 0, target)
           history.recordSelection()
           selection = null
+        }
+        if (kind === 'part' || kind === 'image') {
+          // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
+          // the projection keeps putting tiles together with the same layers under the active one as what it shows
+          target = createLayer(done.name ?? `Layer ${++layersCreated}`)
+          history.recordOrder(target)
+          stack.layers.splice(stack.layers.indexOf(layer) + 1, 0, target)
         }
         await drawObject(target, object, view)
         return true
@@ -988,12 +1041,14 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     deleteSelected,
     // Transforms and smart objects (see smartObject.ts)
     startTransform,
+    placeImage,
     applyTransform,
     cancelTransform,
     setTransformSmooth,
     convertToPixels,
     // The view: its zoom, rotation and flip (see view.ts)
     getView: view.getState,
+    paperAtWindow: view.paperAtWindow,
     subscribeView: view.subscribe,
     fitToScreen: view.fitToScreen,
     straightenView: view.straighten,

@@ -24,6 +24,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   along
 - Smart objects, like Photoshop's: scale, turn, skew or distort what is selected or a whole layer with handles, again
   and again without losing anything, smoothly or by whole pixels for pixel art
+- Import images into a tray (the Tray button, at the foot of the tool column) and drag them onto the drawing as often
+  as needed, as smart objects; the tray stays while Lydia is open
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
@@ -74,7 +76,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
 stroke opacity, a tool column, the eyedropper, turning and flipping the view, the fill bucket, rectangle and lasso
-selections, the move tool, smart objects and transforming, new drawings with common sizes, a resolution (DPI) and a
+selections, the move tool, smart objects and transforming, importing images with a tray, new drawings with common sizes, a resolution (DPI) and a
 background color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
 [CHANGELOG.md](CHANGELOG.md).
 

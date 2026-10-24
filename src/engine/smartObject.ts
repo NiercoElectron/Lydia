@@ -210,6 +210,34 @@ export function selectedPart(
   return toStoredTile(pixels)
 }
 
+// An image's pixels as the tiles of a smart object's source, with its top left corner at the paper's (it is no bigger
+// than the paper). A canvas's pixels aren't premultiplied, so they are made so here. A few tiles every frame
+export async function imageTiles(grid: Grid, image: ImageBitmap, pace: () => Promise<void>) {
+  const canvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE)
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  ctx.imageSmoothingEnabled = false // copied pixel for pixel
+  const tiles = new Map<string, StoredTile>()
+  for (let row = 0; row * TILE_SIZE < image.height; row++) {
+    for (let column = 0; column * TILE_SIZE < image.width; column++) {
+      await pace()
+      const { width, height } = tileSize(grid, column, row)
+      ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE)
+      ctx.drawImage(image, -column * TILE_SIZE, -row * TILE_SIZE)
+      const pixels = ctx.getImageData(0, 0, width, height).data // it rounds and keeps within 0–255
+      for (let i = 0; i < pixels.length; i += 4) {
+        const alpha = pixels[i + 3]
+        if (alpha === 255) continue
+        pixels[i] = (pixels[i] * alpha) / 255
+        pixels[i + 1] = (pixels[i + 1] * alpha) / 255
+        pixels[i + 2] = (pixels[i + 2] * alpha) / 255
+      }
+      const tile = toStoredTile(pixels)
+      if (tile) tiles.set(tileKey(column, row), tile)
+    }
+  }
+  return tiles
+}
+
 // ----- Drawing one on the graphics card -----
 
 // The source is drawn in blocks of tiles (see BLOCK_TILES), each as the four-sided shape its rectangle becomes on the

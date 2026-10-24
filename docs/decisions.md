@@ -1005,6 +1005,48 @@ for the history) or **open** (not decided yet).
   smart object and version 2 without; the smart object, its whole pixels and the image the same once opened; its exact
   original pixels back at its first size; a file from before; corners folded over themselves.
 
+## 43. Importing images: the tray
+
+- **Date:** 2026-10-23
+- **Status:** adopted
+- **Decision:**
+  - Images are imported into a **tray**: a panel that the **Tray** button, at the foot of the tool column, opens
+    floating over the drawing and closes again (Enrico's choice). Images are added with Import… in it, or by dropping
+    their files anywhere on the window, which opens it. From there, an image is dragged onto the drawing as often as
+    needed, without importing it again.
+  - An image dragged onto the drawing goes in as a **smart object** (decision 42), centered where it was dropped,
+    with the handles already showing (Enrico's choice), like Photoshop's Place: it can be moved, scaled, turned or
+    distorted right away. Enter puts it into a new layer above the active one, named after the file, as one undo
+    step; Esc leaves it out. An image file dropped straight onto the drawing also goes into it there.
+  - The tray is kept **only while Lydia is open** (Enrico's choice): it stays the same from one drawing to the next,
+    and is empty again after the page is closed or reloaded. It isn't saved in `.lyd` files.
+  - An image bigger than the paper is **made smaller to fit it** (Enrico's choice), keeping its proportions.
+- **Why:**
+  - Reference pictures, textures and pieces used again and again are common in drawing, and finding the file each time
+    is slow. Going in as a smart object keeps the image's pixels however it is scaled while placing it.
+- **How:**
+  - The tray keeps each image's file, which is compressed and small, and a small picture of it to show (160 pixels on
+    its longer side). The image is decoded again each time it goes into a drawing, so the tray never holds big images
+    in memory.
+  - Dragging uses the browser's own drag and drop, carrying only the image's number in the tray. Only the drawing
+    takes it, and not the tray itself, which floats over the drawing.
+  - The image's pixels become its source's tiles, with its top left corner at the paper's, made premultiplied (canvas
+    pixels aren't), a few tiles every frame; the corners put it where it was dropped, on whole pixels, so at 100% its
+    pixels are its own. It is shown like any transform (decision 42), between the active layer and the layers above,
+    which is where it goes; a hidden active layer stays hidden meanwhile.
+  - A smart object's source is on the paper's grid of tiles, so it can't be bigger than the paper: that is why a
+    bigger image is made smaller first (by the browser, at its best quality). Scaling it up past the paper's size later
+    is softer than the file. Letting layers go past the edge of the paper, noted for later (paint moved off the paper
+    is lost too), would remove this limit.
+- **Measured (headless browser, 10000×10000):** a 6000×6000 image shows with its handles 0.8 s after it is dropped and
+  is put in 0.25 s after Enter.
+- **Checked:** the button opening and closing the tray; images dropped on the window going into it, and one dropped on
+  the drawing also going into it; dragging from the tray, centered where dropped, with its own pixels (also half
+  transparent ones) once in, in a new smart object layer above named after the file; one undo taking it out, and redo;
+  the same image going in again; Esc; scaling it with a corner before Enter; an image bigger than the paper; a hidden
+  active layer; a second image waiting for the first; taking an image out of the tray; a file that isn't an image; the
+  tray staying for the next drawing.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

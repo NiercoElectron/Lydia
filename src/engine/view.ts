@@ -160,6 +160,13 @@ export function createView(
   }
   const toPaper = (e: PointerEvent) => paperAt(onScreen(e))
 
+  // Where a point of the window is on the paper (an image dropped there), or null when it isn't over the drawing area
+  function paperAtWindow(x: number, y: number): Point | null {
+    const rect = canvas.getBoundingClientRect()
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) return null
+    return paperAt({ x: x - rect.left, y: y - rect.top })
+  }
+
   // The pen's pressure makes the brush smaller or bigger; the mouse always paints at full size
   const pressureOf = (e: PointerEvent) => (e.pointerType === 'pen' ? e.pressure : 1)
 
@@ -580,6 +587,7 @@ export function createView(
     flip,
     setTool,
     getState: () => state,
+    paperAtWindow,
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => {

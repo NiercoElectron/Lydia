@@ -12,23 +12,28 @@ import {
 import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
+import { TrayPanel } from '../components/TrayPanel'
 import { ALL_TOOLS } from '../components/toolList'
 import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
+import type { Point } from '../engine/selection'
 import type { Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
 import { loadBrushId, saveBrushId } from '../settings'
+import { freeTrayImage, isImageFile, makeTrayImages, TRAY_DRAG_TYPE, type TrayImage } from '../tray'
 
 type Props = {
   project: ProjectData
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
+  tray: TrayImage[] // see tray.ts
+  onTrayChange: (change: (tray: TrayImage[]) => TrayImage[]) => void
   onBack: () => void
 }
 
-export function Editor({ project, gpuMemory, onBack }: Props) {
+export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props) {
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<Tool>('brush')
@@ -41,6 +46,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   const [brushes, setBrushes] = useState<LibraryBrush[]>([])
   const [brushId, setBrushId] = useState(() => loadBrushId() ?? DEFAULT_BRUSH_ID)
   const [isDroppingFiles, setIsDroppingFiles] = useState(false)
+  const [isTrayOpen, setIsTrayOpen] = useState(false)
   // The chosen brush. One that is no longer in the list (deleted in another tab) falls back to Soft round
   const brush = brushes.find(b => b.id === brushId) ?? brushes.find(b => b.id === DEFAULT_BRUSH_ID)
 
@@ -144,10 +150,54 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
     if (chosen.id === brushId) selectBrush(brushes.find(b => b.id === DEFAULT_BRUSH_ID)!)
   }
 
-  // Brush files dropped anywhere on the window are imported. Without this, the browser would open a dropped file in
-  // place of Lydia
+  // Images go into the tray, which opens to show them. Returns the ones added
+  const addToTray = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return []
+      const { added, problems } = await makeTrayImages(files)
+      if (added.length > 0) {
+        onTrayChange(images => [...images, ...added])
+        setIsTrayOpen(true)
+      }
+      if (problems.length > 0) {
+        const title = added.length === 0 ? 'No image was added.' : 'Some files were not added.'
+        alert(`${title}\n\n${problems.join('\n')}`)
+      }
+      return added
+    },
+    [onTrayChange],
+  )
+
+  function removeFromTray(image: TrayImage) {
+    onTrayChange(images => images.filter(other => other !== image))
+    freeTrayImage(image)
+  }
+
+  // Put a tray image into the drawing at this point of the paper, with the handles showing (see placeImage in
+  // engine.ts)
+  const placeImage = useCallback(
+    async (image: TrayImage, at: Point) => {
+      if (!engine) return
+      try {
+        await engine.placeImage(await createImageBitmap(image.file), image.name, at)
+      } catch (error) {
+        alert(error instanceof Error ? error.message : `Could not put ${image.name} into the drawing.`)
+      }
+    },
+    [engine],
+  )
+
+  // Brush files dropped anywhere on the window are imported, and images go into the tray; an image dropped on the
+  // drawing also goes into it there. Without this, the browser would open a dropped file in place of Lydia. Tray images
+  // dragged onto the drawing go into it
   useEffect(() => {
     const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files') ?? false
+    const isFromTray = (e: DragEvent) => e.dataTransfer?.types.includes(TRAY_DRAG_TYPE) ?? false
+    // Where on the paper something dropped here would go: null away from the drawing, and over the tray itself
+    const dropPoint = (e: DragEvent) => {
+      const isOverTray = e.target instanceof Element && e.target.closest('.tray-panel') !== null
+      return isOverTray ? null : (engine?.paperAtWindow(e.clientX, e.clientY) ?? null)
+    }
     let depth = 0 // the drag enters and leaves every element on its way, so count how deep inside the window it is
     const handleDragEnter = (e: DragEvent) => {
       if (!hasFiles(e)) return
@@ -160,16 +210,32 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
       if (depth === 0) setIsDroppingFiles(false)
     }
     const handleDragOver = (e: DragEvent) => {
+      if (isFromTray(e)) {
+        e.preventDefault()
+        e.dataTransfer!.dropEffect = dropPoint(e) ? 'copy' : 'none' // only the drawing takes it
+        return
+      }
       if (!hasFiles(e)) return
       e.preventDefault() // allow dropping here
       e.dataTransfer!.dropEffect = 'copy'
     }
     const handleDrop = (e: DragEvent) => {
+      const at = dropPoint(e)
+      if (isFromTray(e)) {
+        e.preventDefault()
+        const image = tray.find(each => String(each.id) === e.dataTransfer!.getData(TRAY_DRAG_TYPE))
+        if (image && at) placeImage(image, at)
+        return
+      }
       if (!hasFiles(e)) return
       e.preventDefault()
       depth = 0
       setIsDroppingFiles(false)
-      importBrushes([...e.dataTransfer!.files])
+      const files = [...e.dataTransfer!.files]
+      importBrushes(files.filter(file => !isImageFile(file)))
+      addToTray(files.filter(isImageFile)).then(added => {
+        if (added.length > 0 && at) placeImage(added[0], at)
+      })
     }
     window.addEventListener('dragenter', handleDragEnter)
     window.addEventListener('dragleave', handleDragLeave)
@@ -181,7 +247,7 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
       window.removeEventListener('dragover', handleDragOver)
       window.removeEventListener('drop', handleDrop)
     }
-  }, [importBrushes])
+  }, [importBrushes, addToTray, placeImage, tray, engine])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
@@ -289,7 +355,12 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
         </div>
       </header>
       <div className="editor-main">
-        <ToolColumn tool={tool} onToolChange={setTool} />
+        <ToolColumn
+          tool={tool}
+          onToolChange={setTool}
+          isTrayOpen={isTrayOpen}
+          onTrayToggle={() => setIsTrayOpen(open => !open)}
+        />
         <BrushesPanel
           brushes={brushes}
           selectedId={brush?.id ?? brushId}
@@ -298,7 +369,10 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           onExport={exportBrush}
           onDelete={deleteBrush}
         />
-        <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine} />
+        <div className="draw-area">
+          <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine} />
+          {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
+        </div>
         <LayersPanel
           layers={snapshot.layers}
           activeLayerId={snapshot.activeLayerId}
@@ -312,7 +386,11 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
           onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
         />
       </div>
-      {isDroppingFiles && <div className="drop-hint">Drop brush files to add them to Lydia</div>}
+      {isDroppingFiles && (
+        <div className="drop-hint">
+          Drop brush files or images to add them to Lydia (an image dropped on the drawing goes into it)
+        </div>
+      )}
     </div>
   )
 }

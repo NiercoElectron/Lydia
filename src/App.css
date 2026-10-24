@@ -198,6 +198,11 @@ fieldset.new-project-row {
   background: #eee;
 }
 
+/* The tray's button, at the foot of the column, apart from the tools */
+.tool-column .tray-button {
+  margin-top: auto;
+}
+
 .tool-column button[aria-pressed='true'] {
   outline: none;
   border-color: #2f6fde;
@@ -205,10 +210,99 @@ fieldset.new-project-row {
   color: #1a4fb0;
 }
 
+/* The drawing, with the tray floating over it */
+.draw-area {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
 .draw-space {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+.tray-panel {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 264px;
+  max-height: calc(100% - 16px);
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+  box-sizing: border-box;
+}
+
+.tray-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tray-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tray-panel .notice {
+  margin: 0;
+}
+
+.tray-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tray-images li {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f2f2f2;
+  cursor: grab;
+}
+
+.tray-images li:hover {
+  border-color: #2f6fde;
+}
+
+.tray-images img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Shown over the image while the pointer is on it */
+.tray-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.tray-images li:hover .tray-remove,
+.tray-remove:focus-visible {
+  display: flex;
 }
 
 .layers-panel {

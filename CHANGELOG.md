@@ -6,6 +6,15 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- Importing images, with a tray to keep them in ([decision 43](docs/decisions.md#43-importing-images-the-tray)). The
+  Tray button, at the foot of the tool column, opens it over the drawing and closes it again. Images go into it with
+  Import… or by dropping their files on the window, and are dragged from there onto the drawing as often as needed.
+  An image goes in as a smart object where it was dropped, with the handles showing: Enter puts it into a new layer
+  above, named after the file, and Esc leaves it out. An image bigger than the paper is made smaller to fit it. The
+  tray stays while Lydia is open, from one drawing to the next.
+
 ## [0.8.1] - 2026-10-23
 
 ### Fixed
