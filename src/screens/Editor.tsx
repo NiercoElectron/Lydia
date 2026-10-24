@@ -44,6 +44,16 @@ export function Editor({ project, gpuMemory, onBack }: Props) {
   // The chosen brush. One that is no longer in the list (deleted in another tab) falls back to Soft round
   const brush = brushes.find(b => b.id === brushId) ?? brushes.find(b => b.id === DEFAULT_BRUSH_ID)
 
+  // Pixel art needs selections of whole pixels: a soft edge across a line would cut it in part, leaving a gray row. So
+  // choosing a pixel brush makes new selections hard, and choosing another brush makes them soft again; they can still
+  // be changed by hand in between
+  const isPixelBrush = brush !== undefined && brush.preset.pixel !== 'none'
+  const [edgesFollow, setEdgesFollow] = useState(isPixelBrush) // the kind of brush the edges were last set for
+  if (edgesFollow !== isPixelBrush) {
+    setEdgesFollow(isPixelBrush)
+    setHardSelectionEdges(isPixelBrush)
+  }
+
   useEffect(() => {
     engine?.setTool(tool)
   }, [engine, tool])

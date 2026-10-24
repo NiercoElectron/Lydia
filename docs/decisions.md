@@ -852,6 +852,8 @@ for the history) or **open** (not decided yet).
   - Shift + drag adds to the selection and Alt + drag takes away from it, as in Photoshop and Krita (Enrico's choice).
     Without a key, a new selection takes the place of the old one, and a click selects nothing.
   - The edges are soft at first, and hard (whole pixels, for pixel art) with a button in the bar (Enrico's choice).
+    Choosing a pixel brush makes them hard, and choosing another brush soft again (Enrico's choice, after a soft edge
+    across a line of pixel art left a gray row in a transformed part of it: see decision 42).
   - The brush, the eraser and the fill bucket only work inside the selection, as much as each pixel is selected.
     Delete takes out the paint inside it. Ctrl+A selects everything, Ctrl+D nothing, and Ctrl+Shift+I what wasn't
     selected; the bar has the same as buttons. Every change of the selection is a step of undo.
@@ -953,7 +955,7 @@ for the history) or **open** (not decided yet).
   - A smart object can't be painted on, erased or filled, and Clear layer and Delete leave it alone. With those tools
     the bar says so and offers **Convert to pixels**, which makes it a normal layer again (Enrico's choice). The move
     tool moves a whole smart object, without loss; the selection doesn't matter on it.
-  - Smart objects are not saved in `.lyd` files yet: until the next step, a saved drawing keeps them as normal layers.
+  - Smart objects are saved in `.lyd` files with their original, so they stay smart objects when opened again.
 - **Why:**
   - Transforming the same thing several times is common (trying sizes, placing a piece), and each new working out of
     the pixels blurs them a little more. Keeping the original avoids that for good, which is what Photoshop does with
@@ -974,6 +976,10 @@ for the history) or **open** (not decided yet).
     one matrix.
   - Once applied, the object is drawn into the layer's tiles on the graphics card and read back into RAM in the
     background, like a stroke (decision 15). The tiles are put together out of sight and shown all at once.
+  - In a `.lyd` file (version 3), a smart object's layer also has its source's tiles, the rectangle with paint, the
+    corners and whether it is smooth. A tile that the layer and its source share is stored once. Drawings without smart
+    objects are still saved as version 2, which Lydia 0.7 can open. A file whose corners would fold the object over
+    itself is a damaged file.
   - An undo step of a layer's pixels can keep the layer's smart object from before. A selected part becoming a new
     layer is a group of steps (the part taken out, the new layer, the selection gone, the object drawn), undone and
     redone as one.
@@ -986,7 +992,9 @@ for the history) or **open** (not decided yet).
 - **Checked:** the button and the bar; making a smart object and scaling it, shown while dragged; moving it; undo and
   redo; Esc; scaling it to a quarter and back without loss; whole pixels making no new soft edges; turning it; Ctrl on
   a corner; the brush stopped on it, Convert to pixels and its undo; the move tool on it; a selected part going into a
-  new layer, and one undo putting everything back; a whole 10000×10000 layer.
+  new layer, and one undo putting everything back; a whole 10000×10000 layer. Saving and opening: version 3 with a
+  smart object and version 2 without; the smart object, its whole pixels and the image the same once opened; its exact
+  original pixels back at its first size; a file from before; corners folded over themselves.
 
 ## Open questions
 

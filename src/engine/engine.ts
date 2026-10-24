@@ -115,7 +115,14 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const grid = createGrid(project.width, project.height)
   const layers =
     project.layers.length > 0
-      ? project.layers.map(data => ({ ...createLayer(data.name, data.tiles), ...data, tiles: data.tiles }))
+      ? project.layers.map(({ smart, ...data }) => {
+          const layer: Layer = { ...createLayer(data.name, data.tiles), ...data }
+          if (smart) {
+            const { tiles, bounds, corners, smooth } = smart
+            layer.smart = { source: createLayer(`${data.name} (source)`, tiles), bounds, corners, smooth }
+          }
+          return layer
+        })
       : [createLayer('Layer 1')]
   const stack: LayerStack = { layers, active: layers[project.activeLayer] ?? layers[layers.length - 1] }
   let layersCreated = layers.length // for naming new layers
@@ -515,19 +522,28 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   async function saveProject() {
     // Every painted tile must be in RAM first
     while (gpu.hasUnsaved()) await nextFrame()
+    const pack = (tiles: Map<string, StoredTile>) =>
+      Promise.all(
+        [...tiles].map(async ([key, tile]) => {
+          const { column, row } = parseTileKey(key)
+          if (tile.color !== undefined) return { column, row, color: tile.color }
+          return { column, row, packed: await memory.pack(tile) }
+        }),
+      )
+    // A smart object also keeps its source (see smartObject.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
-      stack.layers.map(async ({ name, visible, opacity, blendMode, tiles }) => ({
+      stack.layers.map(async ({ name, visible, opacity, blendMode, tiles, smart }) => ({
         name,
         visible,
         opacity,
         blendMode,
-        tiles: await Promise.all(
-          [...tiles].map(async ([key, tile]) => {
-            const { column, row } = parseTileKey(key)
-            if (tile.color !== undefined) return { column, row, color: tile.color }
-            return { column, row, packed: await memory.pack(tile) }
-          }),
-        ),
+        tiles: await pack(tiles),
+        smart: smart && {
+          tiles: await pack(smart.source.tiles),
+          bounds: smart.bounds,
+          corners: smart.corners,
+          smooth: smart.smooth,
+        },
       })),
     )
     const file = serializeProject(project, activeIndex(stack), layersToSave)

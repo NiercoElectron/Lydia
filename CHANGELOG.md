@@ -26,9 +26,10 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   while the screen keeps going. Holding Alt with it picks a color.
 - Selections ([decision 40](docs/decisions.md#40-selections)): **Rectangle select** (S) and **Lasso** (L), shown with
   marching ants. Shift + drag adds to the selection, Alt + drag takes away from it, and a click selects nothing. Their
-  edges are soft, or hard (whole pixels, for pixel art) with a button in the bar. The brush, the eraser and the fill
-  bucket only work inside the selection, and Delete takes out what is inside it. Ctrl+A selects everything, Ctrl+D
-  nothing, and Ctrl+Shift+I or **Invert** what wasn't selected. Every change of the selection can be undone.
+  edges are soft, or hard (whole pixels, for pixel art) with a button in the bar; choosing a pixel brush makes them
+  hard, and another brush soft again. The brush, the eraser and the fill bucket only work inside the selection, and
+  Delete takes out what is inside it. Ctrl+A selects everything, Ctrl+D nothing, and Ctrl+Shift+I or **Invert** what
+  wasn't selected. Every change of the selection can be undone.
 - A move tool (V) ([decision 41](docs/decisions.md#41-moving-paint)): it drags the selected part of the active layer,
   or the whole layer when nothing is selected, by whole pixels, and the selection moves along. Shift keeps it level or
   upright. While it is dragged, the screen shows it at its new place, under the layers above. Paint moved off the paper
@@ -39,7 +40,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   scales from the middle), turn it from outside (Shift: in steps of 15°) and move it from inside; with Ctrl, a corner
   distorts it and a side skews it. Enter applies, Esc cancels. **Smooth** or **Whole** pixels (for pixel art) in the
   bar. Transforming it again never loses anything, and the move tool moves it without loss. It can't be painted on
-  until **Convert to pixels**. Smart objects are not saved in `.lyd` files yet: they are saved as normal layers.
+  until **Convert to pixels**. Smart objects are saved in `.lyd` files with their original; drawings without them are
+  still saved so that Lydia 0.7 can open them.
 
 ### Changed
 

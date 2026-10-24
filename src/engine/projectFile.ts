@@ -1,6 +1,7 @@
 import type { BlendMode } from './layers'
 import type { StoredTile } from './memory'
-import { createGrid, TILE_SIZE, tileKey } from './tiles'
+import { isValidQuad, type Quad, type Rect } from './smartObject'
+import { createGrid, TILE_SIZE, tileKey, type Grid } from './tiles'
 
 export const PROJECT_EXTENSION = '.lyd'
 export const MIN_SIZE = 16
@@ -15,12 +16,17 @@ export const MAX_DPI = 2400
 export const isDpi = (value: unknown): value is number =>
   Number.isInteger(value) && (value as number) >= MIN_DPI && (value as number) <= MAX_DPI
 
+// A smart object as it is opened or saved (see smartObject.ts): its source's tiles, the part of the source with paint,
+// where that part's corners are on the paper, and how its pixels are worked out
+export type SmartData<Tiles> = { tiles: Tiles; bounds: Rect; corners: Quad; smooth: boolean }
+
 export type LayerData = {
   name: string
   visible: boolean
   opacity: number
   blendMode: BlendMode
   tiles: Map<string, StoredTile> // "column,row" -> tile
+  smart?: SmartData<Map<string, StoredTile>> // for a smart object
 }
 
 // A drawing, as it is opened or created: its paper (size, background and resolution) and its layers, from the bottom
@@ -48,11 +54,10 @@ export function newProject(
 export const isColor = (value: unknown): value is string => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
 
 // A layer ready to be written: each tile is either a single color or its compressed bytes
-export type LayerToSave = Omit<LayerData, 'tiles'> & {
-  tiles: { column: number; row: number; color?: number; packed?: Uint8Array }[]
-}
+type TileToSave = { column: number; row: number; color?: number; packed?: Uint8Array }
+export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSave[]; smart?: SmartData<TileToSave[]> }
 
-// ----- The .lyd file (version 2) -----
+// ----- The .lyd file (version 3) -----
 //
 // Bytes 0–7:   "LYDIAPRJ", to recognize the file
 // Bytes 8–11:  the length of the header, in bytes (a 32-bit number, least significant byte first)
@@ -66,24 +71,30 @@ export type LayerToSave = Omit<LayerData, 'tiles'> & {
 //
 // The header's "background" is the paper's color, or null when it is transparent, and "dpi" is the drawing's
 // resolution. Files saved before Lydia 0.5.1 have no background (their paper is white), and files saved before 0.5.2
-// have no resolution (they are 300 DPI)
+// have no resolution (they are 300 DPI).
+//
+// A smart object's layer also has "smart": its source's tiles, listed like the layer's, the rectangle of the source
+// with paint ("bounds"), the corners where that rectangle is on the paper, and "smooth". A tile that the layer and its
+// source share is stored once. Only files with smart objects are version 3: the others stay version 2, so that
+// Lydia 0.7 can still open them
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
-const VERSION = 2
+const VERSION = 3 // the newest version this Lydia can open
+const SMART_VERSION = 3 // the first version with smart objects
 
 type TileEntry = { column: number; row: number; color?: number; offset?: number; length?: number }
 
 type FileHeader = {
   format: typeof FORMAT
-  version: typeof VERSION
+  version: number
   width: number
   height: number
   tileSize: number
   background: string | null
   dpi: number
   activeLayer: number
-  layers: (Omit<LayerData, 'tiles'> & { tiles: TileEntry[] })[]
+  layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
 // Turn a drawing into the contents of a .lyd file
@@ -94,24 +105,32 @@ export function serializeProject(
 ) {
   const data: Uint8Array[] = []
   let offset = 0
+  const offsets = new Map<Uint8Array, number>() // where each tile's bytes are, so a tile used twice is stored once
+  const entries = (tiles: TileToSave[]): TileEntry[] =>
+    tiles.map(({ column, row, color, packed }) => {
+      if (!packed) return { column, row, color }
+      let start = offsets.get(packed)
+      if (start === undefined) {
+        start = offset
+        offsets.set(packed, start)
+        data.push(packed)
+        offset += packed.length
+      }
+      return { column, row, offset: start, length: packed.length }
+    })
   const header: FileHeader = {
     format: FORMAT,
-    version: VERSION,
+    version: layers.some(layer => layer.smart) ? SMART_VERSION : 2,
     width,
     height,
     tileSize: TILE_SIZE,
     background,
     dpi,
     activeLayer,
-    layers: layers.map(({ tiles, ...layer }) => ({
+    layers: layers.map(({ tiles, smart, ...layer }) => ({
       ...layer,
-      tiles: tiles.map(({ column, row, color, packed }) => {
-        if (!packed) return { column, row, color }
-        const entry = { column, row, offset, length: packed.length }
-        data.push(packed)
-        offset += packed.length
-        return entry
-      }),
+      tiles: entries(tiles),
+      smart: smart && { ...smart, tiles: entries(smart.tiles) },
     })),
   }
 
@@ -157,6 +176,27 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
 
+  // A list of tiles from the header. Tiles stored as bytes are views into the file's bytes, without copying them
+  function readTiles(entries: unknown[]) {
+    const tiles = new Map<string, StoredTile>()
+    for (const entry of entries) {
+      if (!isObject(entry)) throw damaged()
+      const { column, row, color, offset, length } = entry
+      const isInGrid =
+        isInteger(column) && isInteger(row) && column >= 0 && column < grid.columns && row >= 0 && row < grid.rows
+      if (!isInGrid) throw damaged()
+      if (color !== undefined) {
+        if (!isInteger(color) || color < 0 || color > 0xffffffff) throw damaged()
+        tiles.set(tileKey(column, row), { color, lastUsed: 0 })
+      } else {
+        if (!isInteger(offset) || !isInteger(length) || offset < 0 || length <= 0) throw damaged()
+        if (dataStart + offset + length > bytes.length) throw damaged()
+        tiles.set(tileKey(column, row), { packed: new Uint8Array(file, dataStart + offset, length), lastUsed: 0 })
+      }
+    }
+    return tiles
+  }
+
   const project: ProjectData = {
     width: grid.width,
     height: grid.height,
@@ -174,24 +214,27 @@ export function parseProject(file: ArrayBuffer): ProjectData {
       ) {
         throw damaged()
       }
-      const tiles = new Map<string, StoredTile>()
-      for (const entry of layer.tiles) {
-        if (!isObject(entry)) throw damaged()
-        const { column, row, color, offset, length } = entry
-        const isInGrid =
-          isInteger(column) && isInteger(row) && column >= 0 && column < grid.columns && row >= 0 && row < grid.rows
-        if (!isInGrid) throw damaged()
-        if (color !== undefined) {
-          if (!isInteger(color) || color < 0 || color > 0xffffffff) throw damaged()
-          tiles.set(tileKey(column, row), { color, lastUsed: 0 })
-        } else {
-          if (!isInteger(offset) || !isInteger(length) || offset < 0 || length <= 0) throw damaged()
-          if (dataStart + offset + length > bytes.length) throw damaged()
-          // A view into the file's bytes, without copying them
-          tiles.set(tileKey(column, row), { packed: new Uint8Array(file, dataStart + offset, length), lastUsed: 0 })
+      const { name, visible, opacity, blendMode } = layer
+      const data: LayerData = { name, visible, opacity, blendMode, tiles: readTiles(layer.tiles) }
+      if (layer.smart !== undefined) {
+        const smart = layer.smart
+        if (
+          !isObject(smart) ||
+          !Array.isArray(smart.tiles) ||
+          !isBounds(smart.bounds, grid) ||
+          !isCorners(smart.corners) ||
+          typeof smart.smooth !== 'boolean'
+        ) {
+          throw damaged()
+        }
+        data.smart = {
+          tiles: readTiles(smart.tiles),
+          bounds: smart.bounds,
+          corners: smart.corners,
+          smooth: smart.smooth,
         }
       }
-      return { name: layer.name, visible: layer.visible, opacity: layer.opacity, blendMode: layer.blendMode, tiles }
+      return data
     }),
     activeLayer: 0,
   }
@@ -207,4 +250,19 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isInteger(value: unknown): value is number {
   return Number.isInteger(value)
+}
+
+// A rectangle of whole pixels inside the paper
+function isBounds(value: unknown, grid: Grid): value is Rect {
+  if (!isObject(value)) return false
+  const { x, y, width, height } = value
+  if (!isInteger(x) || !isInteger(y) || !isInteger(width) || !isInteger(height)) return false
+  return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= grid.width && y + height <= grid.height
+}
+
+// Four corners a smart object can have (see isValidQuad)
+function isCorners(value: unknown): value is Quad {
+  if (!Array.isArray(value) || value.length !== 4) return false
+  const isPoint = (point: unknown) => isObject(point) && Number.isFinite(point.x) && Number.isFinite(point.y)
+  return value.every(isPoint) && isValidQuad(value as Quad)
 }
