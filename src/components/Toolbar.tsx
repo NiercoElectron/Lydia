@@ -199,8 +199,8 @@ function TransformButtons({ controls, smooth }: { controls: TransformControls; s
   return (
     <>
       <span className="notice">
-        Drag the corners or the sides to scale (Shift keeps the proportions, Alt from the middle), outside to turn, with
-        Ctrl to distort or skew
+        Drag the corners or the sides to scale (Shift changes the proportions, Alt from the middle), outside to turn,
+        with Ctrl to distort or skew
       </span>
       <span className="button-group" title="How the pixels are worked out: smoothly, or as whole pixels for pixel art">
         Pixels

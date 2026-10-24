@@ -15,6 +15,11 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
   above, named after the file, and Esc leaves it out. An image bigger than the paper is made smaller to fit it. The
   tray stays while Lydia is open, from one drawing to the next.
 
+### Changed
+
+- A transform's corner handles keep the proportions: dragging one away makes the object bigger, and dragging it in
+  makes it smaller. Shift lets the proportions change (before, Shift kept them), as in Photoshop.
+
 ## [0.8.1] - 2026-10-23
 
 ### Fixed

@@ -959,6 +959,9 @@ for the history) or **open** (not decided yet).
     one way, from the opposite corner or side (Shift keeps the proportions, Alt scales from the middle); outside the
     object turns it (Shift: in steps of 15°); inside moves it, by whole pixels. With Ctrl, a corner moves alone
     (distort) and a side moves its two corners (skew). Enter applies it, Esc leaves everything as it was.
+  - Since the tray (decision 43), a corner **keeps the proportions** by default: dragging it away makes the object
+    bigger and dragging it in makes it smaller, and Shift lets the proportions change, as in Photoshop since 2019.
+    Enrico found that the proportions changed too easily by mistake the other way round.
   - **Smooth** (bicubic, for painting) or **Whole** pixels (for pixel art), in the bar while transforming (Enrico's
     choice). Each smart object keeps its choice, and it can be changed again later without loss.
   - A smart object can't be painted on, erased or filled, and Clear layer and Delete leave it alone. With those tools

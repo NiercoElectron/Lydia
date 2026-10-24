@@ -4,9 +4,9 @@ import type { Point } from './selection'
 import { homography, invert, mapPoint, rectQuad, type Quad, type Rect } from './smartObject'
 
 // The handles of a transform (decision 42), like Photoshop's: a square on each corner and on the middle of each side.
-// A corner scales both ways and a side one way, from the opposite corner or side (from the middle with Alt); Shift
-// keeps the proportions. With Ctrl, a corner moves alone (distort) and a side moves its two corners (skew). Dragging
-// inside moves the object, and outside turns it around its middle (Shift: in steps of 15°)
+// A corner scales both ways keeping the proportions (Shift lets them change), and a side one way, from the opposite
+// corner or side (from the middle with Alt). With Ctrl, a corner moves alone (distort) and a side moves its two corners
+// (skew). Dragging inside moves the object, and outside turns it around its middle (Shift: in steps of 15°)
 
 // What is transformed: the part of the source with paint, and where its corners are on the paper
 export type TransformTarget = { bounds: Rect; corners: Quad }
@@ -128,7 +128,7 @@ export function transformed(target: TransformTarget, handle: Handle, from: Point
     if (handle.index % 2 === 0)
       sx = 1 // the top and bottom sides only scale up and down
     else sy = 1
-  } else if (keys.shift) {
+  } else if (!keys.shift) {
     // The same scale both ways: how far the pointer is along the line from the anchor through the corner
     const ax = grabbed.x - anchor.x
     const ay = grabbed.y - anchor.y
