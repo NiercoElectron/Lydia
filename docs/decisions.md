@@ -6,6 +6,9 @@ are at the bottom. The full measurements are in [spike-notes.md](spike-notes.md)
 Each entry has a status: **adopted** (in use), **planned** (decided, not built yet), **replaced** (no longer in use, kept
 for the history) or **open** (not decided yet).
 
+This is my log, written in my voice: "I" is me, Enrico. I lead Lydia, and Claude Code, an AI coding assistant, writes
+most of the code (decision 19). Where an idea or a suggestion came from Claude, the entry says so.
+
 ## 1. A web app, packaged for the desktop later
 
 - **Date:** 2026-10-17
@@ -54,6 +57,11 @@ for the history) or **open** (not decided yet).
 - **Why:** tiles keep memory proportional to what is painted, and undo only has to keep the tiles a stroke changed.
   The graphics card paints and blends millions of pixels per frame. PixiJS takes care of textures and drawing, which
   would take a long time to write directly in WebGL.
+- **How it was chosen:** after my artist friend saw the old Lydia freeze on a big drawing (2026-10-20), Claude
+  suggested painting pixels with Canvas 2D for now, and moving to WebGL later, once Canvas 2D reached its limits. I
+  looked into it myself and chose WebGL with PixiJS right away: at 10000×10000 with many layers, Canvas 2D would have
+  reached them soon (no control over memory, reads that make everything wait, no shaders), and the pixel engine would
+  have been written twice.
 - **Tile size:** 256×256 is a common choice; other sizes were not compared.
 - **Evidence:** spike sections 1–6. A 10000×10000 paper ran at 144 FPS on my PC (RTX 4060 Ti, 144 Hz screen), and at
   60 FPS, the screen's maximum, on a MacBook Air M4. Exporting the whole paper as PNG took ~2.2 s on the PC and ~1 s on
@@ -325,7 +333,7 @@ for the history) or **open** (not decided yet).
   picture appears, in a single step, 2.0–2.6 s later. The longest frame meanwhile takes 13–34 ms (49 ms when the
   opacity slider is let go).
 - **Why:** the goal is 20 or more layers at 10000×10000 (decision 9). That many pixels don't fit in the graphics card,
-  so a change to all of them can't be instant, but the screen must never freeze, and Enrico prefers a change that
+  so a change to all of them can't be instant, but the screen must never freeze, and I prefer a change that
   appears at once. Sending fewer tiles is still open: unpacking in workers (decision 14), batches (decision 18), a
   bigger cache on cards with more memory.
 
@@ -333,8 +341,8 @@ for the history) or **open** (not decided yet).
 
 - **Date:** 2026-10-22
 - **Status:** adopted
-- **Problem:** even prepared in the background (decision 26), a layer change on Enrico's drawing (4 full layers) took
-  0.7–1 s to appear, which Enrico found too slow. With 4 full layers of 10000×10000 (6,400 tiles), each change
+- **Problem:** even prepared in the background (decision 26), a layer change on my drawing (4 full layers) took
+  0.7–1 s to appear, which I found too slow. With 4 full layers of 10000×10000 (6,400 tiles), each change
   sent ~6,000 tiles from RAM to the graphics card again, because it kept only 2,000 (decision 11). Measured on the RTX
   4060 Ti: 1.3 s to move a layer.
 - **Decision:** the graphics card keeps up to 8,000 tiles that are not painted (about 2 GB, so ~3 GB in all with the
@@ -345,7 +353,7 @@ for the history) or **open** (not decided yet).
   → 80–90 ms, hiding or showing 30–313 ms → 38–46 ms, first step of the opacity slider 290 ms → 51 ms, all without
   sending a tile. 8 full layers (12,800 tiles, more than it keeps): 2.0–2.9 s → 1.1–1.4 s for most changes, ~4,700
   tiles sent instead of ~12,700; showing a layer again or undoing a delete still takes ~2.3 s.
-- **Why:** Enrico's card has 8 GB, and so does the friend's RTX 3050. Cards with 4 GB or less may get slower, since
+- **Why:** my card has 8 GB, and so does the friend's RTX 3050. Cards with 4 GB or less may get slower, since
   Windows then keeps part of the textures in the computer's RAM. Browsers don't tell how much memory the graphics card
   has; the desktop app (1.0) can find out and choose the size from it.
 
@@ -384,7 +392,7 @@ for the history) or **open** (not decided yet).
   - The desktop app (1.0) will read a real folder of brushes, where adding a brush is just copying its file there.
   - A Brush Designer, for drawing a tip and saving it as a brush, comes in 0.5.0.
 - **Why:**
-  - It was Enrico's idea: brushes that can be shared and added just by moving a file, like the brushes of Krita
+  - It was my idea: brushes that can be shared and added just by moving a file, like the brushes of Krita
     and Procreate.
   - **Only data, never code.** Brush files will come from anywhere, so nothing in a file is ever run. Before using a
     file, Lydia checks it: the tip must be a PNG of up to 1024×1024 with some paint in it, the numbers must be within
@@ -393,7 +401,7 @@ for the history) or **open** (not decided yet).
     one is left alone.
   - A web page can't look into a folder of the computer by itself. Chrome and Edge can open a folder the user picks,
     but they ask for permission again at every visit, and Firefox and Safari can't do it at all. Importing works in
-    every browser, so Enrico chose it for the web version.
+    every browser, so I chose it for the web version.
 - **How:**
   - The tip is a texture with mipmaps (smaller copies of itself), so a big tip full of detail stays smooth when the
     brush is small.
@@ -426,10 +434,10 @@ for the history) or **open** (not decided yet).
     Saving again during the same visit changes that brush instead of adding another one. **Export file** saves the
     `.lydbrush` file.
 - **Why:**
-  - It was Enrico's idea, together with brushes as files (decision 29).
-  - A screen of its own was Enrico's choice, over a window on top of the drawing. It keeps the Designer simple: the
+  - It was my idea, together with brushes as files (decision 29).
+  - A screen of its own was my choice, over a window on top of the drawing. It keeps the Designer simple: the
     drawing and the Designer never run at the same time, nor share the keyboard.
-  - Left out for now, also Enrico's choice: opening an existing brush to change it, using an image as the tip, and
+  - Left out for now, also my choice: opening an existing brush to change it, using an image as the tip, and
     painting the tip with the other brushes.
 - **How:** after every change to the paper (a stroke, undo, redo, clearing), its picture is exported, cut to the
   painted part and read as a tip again. The engine and the brush list share code with the Designer: the shortcuts,
@@ -453,8 +461,8 @@ for the history) or **open** (not decided yet).
     transparent). Files saved before have no background and open on white paper, as before; Lydia 0.5.0 opens a
     transparent file on white paper.
 - **Why:**
-  - It was Enrico's request, and so was remembering the last choice. A choice of resolution (DPI) and a button to
-    swap width and height were left out, also by Enrico's choice: another resolution can be typed in.
+  - It was my request, and so was remembering the last choice. A choice of resolution (DPI) and a button to
+    swap width and height were left out, also by my choice: another resolution can be typed in.
   - 300 DPI is the usual resolution for printing, and A3 at 300 DPI (3508×4961) is still well within Lydia's
     10000×10000.
 - **How:**
@@ -475,7 +483,7 @@ for the history) or **open** (not decided yet).
 
 - **Date:** 2026-10-22
 - **Status:** adopted
-- **Problem:** Enrico printed an A4 drawing (2480×3508 pixels, made with the A4 size of decision 31) on an A4 sheet,
+- **Problem:** I printed an A4 drawing (2480×3508 pixels, made with the A4 size of decision 31) on an A4 sheet,
   and it came out smaller than the sheet, with white margins. The image itself was right: A4 at 300 DPI, painted to
   the edges.
 - **Why it happens:**
@@ -495,9 +503,9 @@ for the history) or **open** (not decided yet).
     the list stays that paper when the resolution changes; a size typed in keeps its pixels, and only its size on
     paper changes. The window shows the size on paper, in centimeters and inches. A paper that would be bigger than
     10000 pixels at the chosen resolution (Tabloid at 600 DPI) can't be chosen.
-- **Why:** at first every image was going to say 300 DPI, the resolution of the paper sizes, which Enrico chose over
+- **Why:** at first every image was going to say 300 DPI, the resolution of the paper sizes, which I chose over
   a resolution for each drawing. Then it showed that a size typed in for another resolution (an A4 at 150 DPI) would
-  print at half its size, and Enrico chose to add the resolution right away. The screen ignores it: it only matters
+  print at half its size, and I chose to add the resolution right away. The screen ignores it: it only matters
   on paper.
 - **How:**
   - PNG files get a "pHYs" chunk (pixels per meter: 11,811 for 300 DPI) before the image data; in JPEG files, the
@@ -518,7 +526,7 @@ for the history) or **open** (not decided yet).
     other brushes stay smooth at every size.
   - Its size is its width in pixels, as with the other brushes, from 1 pixel up. Its tip is round and worked out for
     each size: it paints the pixels whose centers are within half the size from the tip's center. At size 3 that
-    would be a full square, so there the tip is a plus. The smallest sizes, as Enrico drew them:
+    would be a full square, so there the tip is a plus. The smallest sizes, as I drew them:
 
     ```
     1  #     2  ##    3  .#.    4  .##.    5  .###.
@@ -535,9 +543,9 @@ for the history) or **open** (not decided yet).
   - The `.lydbrush` file says `"pixel": "round"`. Versions of Lydia without pixel brushes ignore that and paint with
     the tip's picture, a hard circle, as a smooth brush.
 - **Why:**
-  - Enrico wants Lydia to appeal to pixel artists too. A smooth brush at 1 or 2 pixels blurs its edges and can't
+  - I want Lydia to appeal to pixel artists too. A smooth brush at 1 or 2 pixels blurs its edges and can't
     paint one exact pixel.
-  - The shapes are the ones pixel artists draw by hand. Enrico chose the size as the width, like the other brushes,
+  - The shapes are the ones pixel artists draw by hand. I chose the size as the width, like the other brushes,
     and a new brush instead of a pixel mode for every brush.
 - **How:**
   - Each size has its own texture of the tip, made the first time it is used. It is painted at its own size with
@@ -550,7 +558,7 @@ for the history) or **open** (not decided yet).
     Measured in a straight line, a sloped line got extra pixels at its steps.
   - Since 0.8.1, a pixel brush counts the spacing from the edge of the pixel the stroke started in, not from the pen:
     counted from the pen, depending on where in its pixel the stroke started, the pen sometimes had to go past the
-    middle of the next pixel before it was painted (Enrico noticed it). Now, going straight, each pixel is painted as
+    middle of the next pixel before it was painted (I noticed it). Now, going straight, each pixel is painted as
     the pen enters it. A dab at every edge the pen crosses, across and down, was tried first: it left holes where a
     line turns between mostly across and mostly down and, filled, about twice as many doubled corners near 45° (220
     instead of 95 in 208 simulated strokes; 126 with the start counted from the edge). Painting every pixel at once
@@ -581,11 +589,11 @@ for the history) or **open** (not decided yet).
     background.
   - The lines are one pixel of the display wide at any zoom and display scale, and only inside the paper.
 - **Why:**
-  - Enrico couldn't tell the pixels apart when drawing with the Pixel brush. His idea was lines in the inverse color
-    of what is under them, so that they always contrast. But the inverse of middle gray (128) is the same gray (127),
-    so the lines disappeared there and were weak on the grays near it. Moving each color half the way across keeps
-    Enrico's idea and gives every color the same contrast; Enrico chose it, and the grid showing on its own from 800%
-    with a button to turn it off.
+  - I couldn't tell the pixels apart when drawing with the Pixel brush. My idea was lines in the inverse color of
+    what is under them, so that they always contrast. But, as Claude pointed out, the inverse of middle gray (128) is
+    the same gray (127), so the lines disappeared there and were weak on the grays near it. Moving each color half the
+    way across keeps my idea and gives every color the same contrast; I chose it, and the grid showing on its own from
+    800% with a button to turn it off.
   - From 800% each pixel is at least 8 pixels of the screen; closer lines would cover the drawing.
   - Halfway to the line color shows the lines without covering the drawing, about as strong as Aseprite's grid (black
     at a quarter of opacity). It is one number to change (`STRENGTH` in `pixelGrid.ts`).
@@ -609,7 +617,7 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:**
   - A brush can have "filtered noise" in its dabs: random numbers filtered so that no two dabs are alike, but all of
-    them keep the brush's character. It was Enrico's idea: a sequence of numbers filtered in a way that brings
+    them keep the brush's character. It was my idea: a sequence of numbers filtered in a way that brings
     randomness to the stamp without losing what it looks like.
   - The noise goes over any tip: drawn in the Brush Designer, imported, or worked out (the Pixel brush's tips are not
     used with noise). Its settings, in the Brush Designer and in the `.lydbrush` file:
@@ -630,14 +638,14 @@ for the history) or **open** (not decided yet).
     that turn with the stroke, washed: see decision 36) and **Sponge** (new noise for each dab, dabs far apart, turned
     and scattered).
 - **Why:**
-  - Enrico chose to have the graphics card work the noise out, for each pixel of each dab, while painting it: nothing
+  - I chose to have the graphics card work the noise out, for each pixel of each dab, while painting it: nothing
     has to be prepared, every dab is truly different, and it is sharp at any size. Pictures of noise made beforehand
     and picked at random would repeat.
   - Painting the noise over the tip's picture costs the same as over a tip worked out by numbers, so the noise goes
     over any tip.
   - With Mix alone, the tip's edge cut the grains in two, with a sharp circle on a hard tip or a fade on a soft one.
-    Enrico wanted whole grains, like drops of paint, and no fade; Drops and Worn do that in two ways, and he chose to
-    keep the three.
+    I wanted whole grains, like drops of paint, and no fade; Drops and Worn do that in two ways, and I chose to keep
+    the three.
   - New noise for each dab mostly shows at the edges of a stroke: where the dabs overlap, their different noises
     average out, as the grain inside the Pencil brush did (decision 29). Inside a stroke, the noise only shows when
     it is the same along the stroke and the stroke is washed (decision 36).
@@ -682,7 +690,7 @@ for the history) or **open** (not decided yet).
     - The eraser no longer leaves empty tiles where there was no paint.
 - **Why:**
   - Without it, the dabs pile up: a place that gets 30% of paint from 25 dabs in a row ends up almost fully painted,
-    which hid the noise inside the strokes. Enrico chose to do it now, as it also brings the opacity for each stroke
+    which hid the noise inside the strokes. I chose to do it now, as it also brings the opacity for each stroke
     from the roadmap.
 - **How:**
   - The stroke's tiles come from a pool (64 kept), with the size of the layer's tiles. Dabs go into them with the
@@ -711,12 +719,12 @@ for the history) or **open** (not decided yet).
     [Lucide](https://lucide.dev) (`lucide-react`, ISC license). Resting the pointer on a button shows the tool's name
     and shortcut. The bar on top keeps the brush's settings (color, size, opacity) and the grid. The Brush Designer
     keeps its own Brush and Eraser buttons.
-  - The tools of this stage, in this order (Enrico's choice): the eyedropper; the hand, zoom and rotate tools; the fill
+  - The tools of this stage, in this order (my choice): the eyedropper; the hand, zoom and rotate tools; the fill
     bucket; rectangle and lasso selections, with moving, scaling and rotating what is selected.
   - The eyedropper (I) picks the color the screen shows: the paper and every visible layer, with their opacities.
     Clicking picks a color, and dragging keeps picking as it moves. Outside the paper, and where nothing is painted on
     a transparent paper, the color stays as it was. It stays the chosen tool after picking, as in Photoshop and Krita.
-  - Picking a color sets the stroke's opacity back to 100% (Enrico's choice): the picked color is the one the screen
+  - Picking a color sets the stroke's opacity back to 100% (my choice): the picked color is the one the screen
     shows, and painting it at a lower opacity would come out lighter than what was picked.
   - Holding Alt with the brush or the eraser picks colors too, as in Photoshop.
 - **Why:**
@@ -755,13 +763,13 @@ for the history) or **open** (not decided yet).
       around the point where the drag started: in to the right, out to the left, like Photoshop's "scrubby zoom".
     - **Rotate view** (R): dragging around the middle of the screen turns the view as far as the pointer goes around
       it. With Shift, it turns in steps of 15°.
-  - Holding Shift + Space turns the view with any tool, as in Krita (Enrico's choice). There it turns freely, since
+  - Holding Shift + Space turns the view with any tool, as in Krita (my choice). There it turns freely, since
     Shift is already held.
-  - M flips the view, as in Krita (Enrico's choice); the rectangle selection will get another key. The flip is a
+  - M flips the view, as in Krita (my choice); the rectangle selection will get another key. The flip is a
     mirror of the screen, around its middle: a view turned one way looks turned the other way in a mirror, so the
     angle changes sign. The drawing itself never changes.
-  - The bar on top shows the zoom and the angle, with **Straighten** (back to 0°), **Flip** and **Fit** (Enrico's
-    choice). **Fit** keeps the view turned and flipped and fits the turned paper, as in Photoshop (Enrico's choice).
+  - The bar on top shows the zoom and the angle, with **Straighten** (back to 0°), **Flip** and **Fit** (my
+    choice). **Fit** keeps the view turned and flipped and fits the turned paper, as in Photoshop (my choice).
 - **Why:**
   - Painters turn the paper like a sheet on a desk, to draw each line at the angle their hand draws best. Looking at
     a drawing in a mirror shows mistakes in its proportions that the eye got used to.
@@ -795,17 +803,17 @@ for the history) or **open** (not decided yet).
   - The fill bucket (F) fills the region around the point clicked: the pixels connected to it, side by side or above
     and below, whose colors are close to the color there. It fills with the color and the Opacity of the bar, as one
     step of undo. Holding Alt with it picks a color, as with the brush.
-  - Its settings in the bar, chosen by Enrico:
+  - Its settings in the bar, chosen by me:
     - **Tolerance**, from 0 to 255, 32 at first as in Photoshop: how far each of red, green, blue and alpha may be
       from the color clicked.
-    - **Look at**: **All layers**, the visible layers put together without the paper (at first, Enrico's choice), or
+    - **Look at**: **All layers**, the visible layers put together without the paper (at first, my choice), or
       **This layer**.
     - **Expand**, from 0 to 50 pixels, 20 at first: at most how far the fill goes past its edge, under the lines.
   - Past the edge of the region, the fill goes on into the soft edge of the lines around it, as long as their color
     keeps getting further from the one clicked: up to where the line is darkest, like Clip Studio Paint's "to the
     darkest pixel". There it fills behind the paint already there, so the soft edge of the line stays on top of the
-    color (Enrico's choice). Inside the region it fills over the paint, so a flat color can be changed for another.
-  - It always fills only the region that touches the point clicked; Enrico left out the choice of filling every pixel
+    color (my choice). Inside the region it fills over the paint, so a flat color can be changed for another.
+  - It always fills only the region that touches the point clicked; I left out the choice of filling every pixel
     of that color.
 - **Why:**
   - The most common way of coloring is lines on one layer and flat color under them on another: with **All layers**
@@ -814,12 +822,12 @@ for the history) or **open** (not decided yet).
     a light rim between the color and the line. Around a circle in the test, 124 such pixels without it, none with
     it.
   - At first **Expand** grew the region by a square of 2 pixels and filled over the paint. With the line on the same
-    layer, Enrico saw the fill cut into the soft edge of a line drawn with Soft round: hard and stepped on the side of
+    layer, I saw the fill cut into the soft edge of a line drawn with Soft round: hard and stepped on the side of
     the color, while the other side stayed soft. Filling behind the paint, up to where the line is darkest, keeps the
     line as it was on both sides, the same as with the line on a layer of its own. Since it stops at the line by
     itself, **Expand** is now only a limit, and can be bigger.
-  - Then, zoomed in, Enrico saw a band of dark red between the red fill and a black Soft round line: the soft edge of
-    the line over the color. He chose to keep it rather than cut the line cleanly at its middle: it is the line's own
+  - Then, zoomed in, I saw a band of dark red between the red fill and a black Soft round line: the soft edge of
+    the line over the color. I chose to keep it rather than cut the line cleanly at its middle: it is the line's own
     softness, as Photoshop and Krita show a soft line over a color. A narrower band comes from a harder brush.
 - **How:**
   - The fill first waits until every painted tile is saved in RAM (decisions 12 and 15). Then the processor works
@@ -856,18 +864,18 @@ for the history) or **open** (not decided yet).
 - **Date:** 2026-10-23
 - **Status:** adopted
 - **Decision:**
-  - Two selection tools: **Rectangle select** (S) and **Lasso** (L). Their keys are Enrico's choice: M already flips
+  - Two selection tools: **Rectangle select** (S) and **Lasso** (L). Their keys are my choice: M already flips
     the view, as in Krita. The rectangle follows the sides of the paper, even with the view turned.
-  - Shift + drag adds to the selection and Alt + drag takes away from it, as in Photoshop and Krita (Enrico's choice).
+  - Shift + drag adds to the selection and Alt + drag takes away from it, as in Photoshop and Krita (my choice).
     Without a key, a new selection takes the place of the old one, and a click selects nothing.
-  - The edges are soft at first, and hard (whole pixels, for pixel art) with a button in the bar (Enrico's choice).
-    Choosing a pixel brush makes them hard, and choosing another brush soft again (Enrico's choice, after a soft edge
+  - The edges are soft at first, and hard (whole pixels, for pixel art) with a button in the bar (my choice).
+    Choosing a pixel brush makes them hard, and choosing another brush soft again (my choice, after a soft edge
     across a line of pixel art left a gray row in a transformed part of it: see decision 42).
   - The brush, the eraser and the fill bucket only work inside the selection, as much as each pixel is selected.
     Delete takes out the paint inside it. Ctrl+A selects everything, Ctrl+D nothing, and Ctrl+Shift+I what wasn't
     selected; the bar has the same as buttons. Every change of the selection is a step of undo.
   - The selection's edge shows as "marching ants": black and white dashes that move.
-  - Next, in steps of their own: moving what is selected (V; without a selection, the whole layer, Enrico's choice),
+  - Next, in steps of their own: moving what is selected (V; without a selection, the whole layer, my choice),
     then scaling and turning it.
 - **Why:**
   - That is how selections work in Photoshop and Krita, so painters know it already. Soft edges keep the edge of what
@@ -904,7 +912,7 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:**
   - The **Move** tool (V, as in Photoshop) drags the selected part of the active layer, as much as each pixel is
-    selected; when nothing is selected, the whole layer (Enrico's choice). It moves by whole pixels of the paper, and
+    selected; when nothing is selected, the whole layer (my choice). It moves by whole pixels of the paper, and
     Shift keeps it level or upright. The selection moves along with the paint, and the move is one step of undo
     together with the selection. A click without dragging does nothing.
   - Paint moved off the paper is lost: the layers only have tiles over the paper. Photoshop and Krita keep it, with
@@ -949,23 +957,23 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:**
   - Scaling, turning, skewing and distorting make **smart objects**, like Photoshop's: a layer that keeps its original
-    pixels and where its corners are, so transforming it again and again never loses anything. Enrico chose this over a
+    pixels and where its corners are, so transforming it again and again never loses anything. I chose this over a
     plain transform, which works out the pixels again from the last result every time.
   - **Ctrl+T**, or **Transform** in the bar of the move and selection tools, starts a transform. On a smart object, it
-    transforms it. On a normal layer (Enrico's choice), the selected part goes into a new layer above as a smart
+    transforms it. On a normal layer (my choice), the selected part goes into a new layer above as a smart
     object, or, with nothing selected, the whole layer becomes one. Browsers keep Ctrl+T for a new tab, so there only
     the button works; the desktop app will have the key.
-  - The handles (Enrico's choice, with skewing and distorting in this stage too): a corner scales both ways and a side
+  - The handles (my choice, with skewing and distorting in this stage too): a corner scales both ways and a side
     one way, from the opposite corner or side (Shift keeps the proportions, Alt scales from the middle); outside the
     object turns it (Shift: in steps of 15°); inside moves it, by whole pixels. With Ctrl, a corner moves alone
     (distort) and a side moves its two corners (skew). Enter applies it, Esc leaves everything as it was.
   - Since the tray (decision 43), a corner **keeps the proportions** by default: dragging it away makes the object
     bigger and dragging it in makes it smaller, and Shift lets the proportions change, as in Photoshop since 2019.
-    Enrico found that the proportions changed too easily by mistake the other way round.
-  - **Smooth** (bicubic, for painting) or **Whole** pixels (for pixel art), in the bar while transforming (Enrico's
+    I found that the proportions changed too easily by mistake the other way round.
+  - **Smooth** (bicubic, for painting) or **Whole** pixels (for pixel art), in the bar while transforming (my
     choice). Each smart object keeps its choice, and it can be changed again later without loss.
   - A smart object can't be painted on, erased or filled, and Clear layer and Delete leave it alone. With those tools
-    the bar says so and offers **Convert to pixels**, which makes it a normal layer again (Enrico's choice). The move
+    the bar says so and offers **Convert to pixels**, which makes it a normal layer again (my choice). The move
     tool moves a whole smart object, without loss; the selection doesn't matter on it.
   - Smart objects are saved in `.lyd` files with their original, so they stay smart objects when opened again.
 - **Why:**
@@ -1014,16 +1022,16 @@ for the history) or **open** (not decided yet).
 - **Status:** adopted
 - **Decision:**
   - Images are imported into a **tray**: a panel that the **Tray** button, at the foot of the tool column, opens
-    floating over the drawing and closes again (Enrico's choice). Images are added with Import… in it, or by dropping
+    floating over the drawing and closes again (my choice). Images are added with Import… in it, or by dropping
     their files anywhere on the window, which opens it. From there, an image is dragged onto the drawing as often as
     needed, without importing it again.
   - An image dragged onto the drawing goes in as a **smart object** (decision 42), centered where it was dropped,
-    with the handles already showing (Enrico's choice), like Photoshop's Place: it can be moved, scaled, turned or
+    with the handles already showing (my choice), like Photoshop's Place: it can be moved, scaled, turned or
     distorted right away. Enter puts it into a new layer above the active one, named after the file, as one undo
     step; Esc leaves it out. An image file dropped straight onto the drawing also goes into it there.
-  - The tray is kept **only while Lydia is open** (Enrico's choice): it stays the same from one drawing to the next,
+  - The tray is kept **only while Lydia is open** (my choice): it stays the same from one drawing to the next,
     and is empty again after the page is closed or reloaded. It isn't saved in `.lyd` files.
-  - An image bigger than the paper is **made smaller to fit it** (Enrico's choice), keeping its proportions.
+  - An image bigger than the paper is **made smaller to fit it** (my choice), keeping its proportions.
 - **Why:**
   - Reference pictures, textures and pieces used again and again are common in drawing, and finding the file each time
     is slow. Going in as a smart object keeps the image's pixels however it is scaled while placing it.
@@ -1062,7 +1070,7 @@ for the history) or **open** (not decided yet).
   into two triangles.
 - **What was tried:** big and fast strokes, changing pressure, undo and redo, moving the layer, the opacity slider,
   sending the layer to RAM and back, and zoom levels from 0.3× to 2.5×, on the same graphics card, headless and in a
-  visible window: no lines. Enrico couldn't make them appear again either.
+  visible window: no lines. I couldn't make them appear again either.
 - **Next time:** save the project with the lines on screen (to see whether they are in the layer's pixels or only on
   the screen), and write down what was done just before.
 
