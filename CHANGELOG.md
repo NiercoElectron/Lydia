@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-25
+
 ### Added
 
 - The brush's outline ([decision 45](docs/decisions.md#45-the-brushs-outline)). With the brush or the eraser, the
@@ -343,7 +345,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/NiercoElectron/Lydia/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/NiercoElectron/Lydia/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/NiercoElectron/Lydia/compare/v0.8.2...v0.8.3

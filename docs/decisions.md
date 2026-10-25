@@ -230,7 +230,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   (decision 30); 0.6.0 started pixel art, with the Pixel brush and the pixel grid (decisions 33 and 34); 0.7.0 brought
   brushes with filtered noise and strokes painted in tiles of their own (decisions 35 and 36); 0.8.0 brought the basic
   tools: the tool column, the eyedropper, turning and flipping the view, the fill bucket, selections, the move tool and
-  smart objects (decisions 37 to 42), and 0.8.1 to 0.8.5 small features after it, one each. 1.0.0 will be the desktop app, packaged with Electron. The full list is in
+  smart objects (decisions 37 to 42), and 0.8.1 to 0.8.5 small features after it, one each. 0.9.0, the first version for a whole stage, brought the
+  Painting stage: the brush's outline, the stabilizer, tapered stroke ends and pixel brushes drawn in the Brush
+  Designer (decisions 45 to 48). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
   [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
