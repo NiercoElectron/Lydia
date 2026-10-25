@@ -1053,6 +1053,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     paperAtWindow: view.paperAtWindow,
     subscribeView: view.subscribe,
     fitToScreen: view.fitToScreen,
+    zoomView: view.zoomTo,
+    turnView: view.turnTo,
     straightenView: view.straighten,
     flipView: view.flip,
     exportImage,

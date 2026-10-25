@@ -6,6 +6,12 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- The value of every slider can be typed in: clicking the number next to it turns it into a field. Enter, or clicking
+  elsewhere, keeps the value (within the slider's range), and Esc leaves it as it was. The view's zoom and angle in the
+  bar can be typed in the same way, and change around the middle of the screen.
+
 ## [0.8.3] - 2026-10-25
 
 ### Added

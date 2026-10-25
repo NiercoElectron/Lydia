@@ -1,6 +1,7 @@
 import { Box } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
+import { SliderValue } from './SliderValue'
 
 type Props = {
   layers: EngineSnapshot['layers'] // from the bottom to the top
@@ -213,7 +214,14 @@ function OpacitySlider({ opacity, onChange, onChangeEnd }: OpacitySliderProps) {
         value={percent}
         onChange={e => onChange(Number(e.target.value) / 100)}
       />
-      <span className="opacity-value">{percent}%</span>
+      <SliderValue
+        value={percent}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={value => onChange(value / 100)}
+        onDone={onChangeEnd}
+      />
     </label>
   )
 }

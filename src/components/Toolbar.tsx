@@ -1,6 +1,7 @@
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { Tool } from '../engine/tools'
+import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
@@ -105,7 +106,7 @@ export function Toolbar({
             value={size}
             onChange={e => onSizeChange(Number(e.target.value))}
           />
-          {size}
+          <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={onSizeChange} />
         </label>
       )}
       {!isSelecting && !isMoving && (
@@ -118,7 +119,7 @@ export function Toolbar({
             value={opacity}
             onChange={e => onOpacityChange(Number(e.target.value))}
           />
-          <span className="slider-value">{opacity}%</span>
+          <SliderValue value={opacity} min={1} max={100} unit="%" onChange={onOpacityChange} />
         </label>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
@@ -144,7 +145,7 @@ function FillControls({
           value={fill.tolerance}
           onChange={e => onFillChange({ tolerance: Number(e.target.value) })}
         />
-        <span className="slider-value">{fill.tolerance}</span>
+        <SliderValue value={fill.tolerance} min={0} max={255} onChange={tolerance => onFillChange({ tolerance })} />
       </label>
       <span className="button-group" title="What the fill looks at to find where to stop">
         Look at
@@ -164,7 +165,13 @@ function FillControls({
           value={fill.expand}
           onChange={e => onFillChange({ expand: Number(e.target.value) })}
         />
-        <span className="slider-value">{fill.expand} px</span>
+        <SliderValue
+          value={fill.expand}
+          min={0}
+          max={MAX_FILL_EXPAND}
+          unit=" px"
+          onChange={expand => onFillChange({ expand })}
+        />
       </label>
     </>
   )

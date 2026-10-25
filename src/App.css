@@ -160,12 +160,6 @@ fieldset.new-project-row {
   gap: 8px;
 }
 
-.view-value {
-  min-width: 5ch;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .editor-main {
   display: flex;
   flex: 1;
@@ -386,11 +380,33 @@ button.brush[aria-pressed='true'] {
   gap: 4px;
 }
 
-/* Numbers next to sliders keep their width, so the sliders don't move while they change */
+/* Numbers next to sliders keep their width, so the sliders don't move while they change ("ch" is the width of a "0",
+   and "%" is wider than that). Each is a button that looks like plain text, and becomes a field to type in when
+   clicked (see SliderValue) */
 .slider-value {
+  box-sizing: border-box;
   min-width: 5ch;
   text-align: right;
+  font: inherit;
   font-variant-numeric: tabular-nums;
+}
+
+button.slider-value {
+  padding: 1px 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  cursor: text;
+}
+
+button.slider-value:hover:not(:disabled) {
+  border-color: #bbb;
+}
+
+input.slider-value {
+  width: 7ch;
+  padding: 0 2px;
 }
 
 .designer-panel {
@@ -523,13 +539,6 @@ button.brush[aria-pressed='true'] {
 .opacity input {
   flex: 1;
   min-width: 0;
-}
-
-/* Always as wide as "100%", so the slider doesn't change size while it moves */
-.opacity-value {
-  min-width: 5ch; /* "ch" is the width of a "0", and "%" is wider than that */
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .layers-list {

@@ -3,6 +3,7 @@ import type { BrushShape } from '../engine/brushFile'
 import type { BrushTip } from '../engine/brushTip'
 import type { StrokePoint } from '../engine/dabs'
 import { createPreviewSurface, sampleWave, type PreviewSurface } from '../engine/previewSurface'
+import { SliderValue } from './SliderValue'
 
 const WIDTH = 280
 const HEIGHT = 200
@@ -122,7 +123,7 @@ export function BrushTestArea({ tip, shape }: Props) {
             value={size}
             onChange={e => setSize(Number(e.target.value))}
           />
-          <span className="slider-value">{size}</span>
+          <SliderValue value={size} min={MIN_SIZE} max={MAX_SIZE} onChange={setSize} />
         </label>
         <button onClick={handleClear}>Clear</button>
       </div>

@@ -10,8 +10,8 @@ import { tilesInRect, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
 
-const MIN_ZOOM = 0.01 // 1% (zoomed far out)
-const MAX_ZOOM = 32 // 3200% (each pixel of the paper is 32 pixels of the screen)
+export const MIN_ZOOM = 0.01 // 1% (zoomed far out)
+export const MAX_ZOOM = 32 // 3200% (each pixel of the paper is 32 pixels of the screen)
 const ZOOM_STEP = 2 // a click with the zoom tool zooms in this many times (out with Alt)
 const SCRUB_ZOOM = 0.01 // dragging with the zoom tool: how fast it zooms, for each pixel of the screen
 const CLICK_DISTANCE = 4 // pixels of the screen a click may move before it counts as dragging
@@ -150,6 +150,16 @@ export function createView(
   function showSaved({ zoom, rotation, flipped, center }: ViewData) {
     setView(zoom, (rotation * Math.PI) / 180, flipped)
     placeAt(center, middle())
+  }
+
+  // Zoom to this much (1 = 100%), around the middle of the screen: a zoom typed in
+  function zoomTo(zoom: number) {
+    setViewAround(middle(), zoom, world.rotation, isFlipped())
+  }
+
+  // Turn the view to this angle, in degrees, around the middle of the screen: an angle typed in
+  function turnTo(degrees: number) {
+    setViewAround(middle(), currentZoom(), (degrees * Math.PI) / 180, isFlipped())
   }
 
   // Turn the view back to 0°, around the middle of the screen
@@ -595,6 +605,8 @@ export function createView(
 
   return {
     fitToScreen,
+    zoomTo,
+    turnTo,
     straighten,
     flip,
     setTool,

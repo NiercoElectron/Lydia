@@ -47,6 +47,9 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 Back goes to the start screen, and asks first when there are changes that weren't saved. So does closing the tab.
 
+Every slider has its number next to it: click the number to type a value. Enter, or clicking elsewhere, keeps it
+(within the slider's range), and Esc leaves it as it was. The zoom and the angle in the bar work the same way.
+
 ## Brush and eraser
 
 **Brush (B)** paints with the chosen brush and color; **Eraser (E)** takes paint away with the same brush.
@@ -158,7 +161,7 @@ Changing the view never changes the drawing.
   tool. **Straighten** turns it back.
 - **Flip** like in a mirror, to check a drawing with fresh eyes: **M**, or the Flip button.
 - **Fit**, or **Ctrl+0**, shows the whole drawing.
-- The bar shows the zoom and the angle.
+- The bar shows the zoom and the angle: click either one to type it (a zoom from 1% to 3200%, any angle).
 
 ## Undo and redo
 

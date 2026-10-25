@@ -1,4 +1,5 @@
 import type { BrushShape, NoiseMode } from '../engine/brushFile'
+import { SliderValue } from './SliderValue'
 
 // How the noise can form each copy of the tip (see noiseDabs.ts)
 const NOISE_MODES: [NoiseMode, string, string][] = [
@@ -190,10 +191,7 @@ function Slider({ label, hint, min, max, step = 1, value, unit, disabled = false
         disabled={disabled}
         onChange={e => onChange(Number(e.target.value))}
       />
-      <span className="slider-value">
-        {value}
-        {unit}
-      </span>
+      <SliderValue value={value} min={min} max={max} step={step} unit={unit} disabled={disabled} onChange={onChange} />
     </label>
   )
 }

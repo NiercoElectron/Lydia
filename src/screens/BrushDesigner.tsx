@@ -3,6 +3,7 @@ import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
 import { BrushShapeControls } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
+import { SliderValue } from '../components/SliderValue'
 import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
 import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
@@ -160,7 +161,14 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
               disabled={tool === 'eraser'}
               onChange={e => setStrength(Number(e.target.value))}
             />
-            <span className="slider-value">{strength}%</span>
+            <SliderValue
+              value={strength}
+              min={1}
+              max={100}
+              unit="%"
+              disabled={tool === 'eraser'}
+              onChange={setStrength}
+            />
           </label>
           <label title="Brush size ([ and ])">
             Size
@@ -171,7 +179,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
               value={size}
               onChange={e => setSize(Number(e.target.value))}
             />
-            <span className="slider-value">{size}</span>
+            <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={setSize} />
           </label>
           <GridButton isOn={isGridOn} onToggle={toggleGrid} />
         </div>
