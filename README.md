@@ -56,6 +56,7 @@ background color or transparency, `.lyd` projects, PNG and JPEG export. What cha
 
 Next, roughly in this order:
 
+- [ ] Dark mode: a dark look for the whole interface
 - [ ] Painting: pixel brushes drawn in the Brush Designer, the brush's outline under the pen, pen tilt (the brush
       follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
