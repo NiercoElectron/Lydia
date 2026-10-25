@@ -63,7 +63,8 @@ Next, roughly in this order:
 - [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
 - [ ] Selections: magic wand
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
-      the picture with the pen, and brush it back to how it was); in the Brush Designer, edit existing brushes and use
+      the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
+      that bend the picture where each one is dragged); in the Brush Designer, edit existing brushes and use
       an image as the tip
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
