@@ -1,3 +1,4 @@
+import { MAX_TAPER, NO_TAPER, TAPER_THINS, type TaperSettings } from './engine/dabs'
 import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MIN_SIZE } from './engine/projectFile'
 import { DEFAULT_STABILIZER, MAX_STABILIZER, STABILIZER_MODES, type StabilizerSettings } from './engine/stabilizer'
 
@@ -111,6 +112,47 @@ export function loadStabilizer(): StabilizerSettings {
 export function saveStabilizer(settings: StabilizerSettings) {
   try {
     localStorage.setItem(STABILIZER_KEY, JSON.stringify(settings))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+// How the strokes' ends thin out (see dabs.ts). Not at first
+const TAPER_KEY = 'lydia.taper'
+
+export function loadTaper(): TaperSettings {
+  const isLength = (n: unknown) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_TAPER
+  try {
+    const saved = JSON.parse(localStorage.getItem(TAPER_KEY) ?? 'null')
+    const isValid = isLength(saved?.start) && isLength(saved.end) && TAPER_THINS.includes(saved.thins)
+    return isValid ? { start: saved.start, end: saved.end, thins: saved.thins } : NO_TAPER
+  } catch {
+    return NO_TAPER
+  }
+}
+
+export function saveTaper(taper: TaperSettings) {
+  try {
+    localStorage.setItem(TAPER_KEY, JSON.stringify(taper))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+// Whether the bar's Advanced panel stays open (see AdvancedMenu). It doesn't at first
+const ADVANCED_PINNED_KEY = 'lydia.advancedPinned'
+
+export function loadAdvancedPinned() {
+  try {
+    return localStorage.getItem(ADVANCED_PINNED_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function saveAdvancedPinned(pinned: boolean) {
+  try {
+    localStorage.setItem(ADVANCED_PINNED_KEY, pinned ? 'on' : 'off')
   } catch {
     // not remembered next time, but used now
   }

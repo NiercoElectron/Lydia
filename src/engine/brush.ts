@@ -3,7 +3,7 @@ import type { WebGLRenderer } from 'pixi.js'
 import type { BrushShape } from './brushFile'
 import type { BrushTip } from './brushTip'
 import { createDabPainter } from './dabPainter'
-import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
+import { createDabPath, NO_TAPER, type Dab, type DabPath, type StrokePoint, type TaperSettings } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
@@ -17,6 +17,7 @@ export type BrushSettings = {
   color: string
   size: number // the tip's longer side, in pixels of the paper, at full pressure
   opacity: number // how much the whole stroke covers, from 0 to 1
+  taper: TaperSettings // how the stroke's ends thin out (see dabs.ts)
 }
 
 // The selection, as the brush sees it (see selectionView.ts): whether a tile can be painted at all, and cutting a
@@ -41,7 +42,7 @@ export function createBrush(
   startShape: BrushShape,
   selection: StrokeCutter,
 ) {
-  const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20, opacity: 1 }
+  const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20, opacity: 1, taper: NO_TAPER }
   let tip = startTip
   let shape = startShape
   const painter = createDabPainter(renderer, tip, shape)
@@ -100,10 +101,10 @@ export function createBrush(
     painter.setTip(tip, shape)
   }
 
-  function paintDabs(dabs: Dab[]) {
+  // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
+  function dabsByTile(dabs: Dab[]) {
     const isPixel = shape.pixel !== 'none'
-    // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
-    const dabsByTile = new Map<string, Dab[]>()
+    const byTile = new Map<string, Dab[]>()
     for (const dab of dabs) {
       // A pixel tip is a square that never turns; drops of noise can stick out of the tip a little
       const radius = isPixel ? dab.size / 2 : dab.size * (tip.reach / 2 + noiseReach(shape))
@@ -112,49 +113,93 @@ export function createBrush(
       for (let column = area.firstColumn; column <= area.lastColumn; column++) {
         for (let row = area.firstRow; row <= area.lastRow; row++) {
           const key = tileKey(column, row)
-          let tileDabs = dabsByTile.get(key)
+          let tileDabs = byTile.get(key)
           if (!tileDabs) {
             tileDabs = []
-            dabsByTile.set(key, tileDabs)
+            byTile.set(key, tileDabs)
           }
           tileDabs.push(dab)
         }
       }
     }
+    return byTile
+  }
 
-    // Paint into each touched tile of the stroke only the dabs that touch it, shifted so that the tile's corner is at
-    // (0, 0), and keep only what is selected
-    for (const [key, tileDabs] of dabsByTile) {
+  // Paint into each touched tile of the stroke only the dabs that touch it, shifted so that the tile's corner is at
+  // (0, 0), and keep only what is selected. "fresh": the tiles are cleared first, to be painted again from the start
+  function paintTiles(byTile: Map<string, Dab[]>, fresh = false) {
+    for (const [key, tileDabs] of byTile) {
       if (!selection.canPaint(key)) continue
       const { column, row } = parseTileKey(key)
       const strokeTexture = strokeTile(key, column, row)
+      if (fresh) renderer.render({ container: nothing, target: strokeTexture, clear: true, clearColor: [0, 0, 0, 0] })
       painter.paint(strokeTexture, tileDabs, column * TILE_SIZE, row * TILE_SIZE)
       selection.cut(strokeTexture, key)
       projection.composeTile(column, row)
     }
   }
 
+  function paintDabs(dabs: Dab[]) {
+    strokeDabs.push(...dabs)
+    paintTiles(dabsByTile(dabs))
+  }
+
   // Where the dabs of the stroke being painted go, or null when not painting
   let path: DabPath | null = null
+  // The stroke being painted as it was started, its points and the dabs painted so far, to work it out again at its
+  // end (see taperEnd)
+  let strokeStart = { size: 0, seed: 0, taper: NO_TAPER }
+  let strokePoints: StrokePoint[] = []
+  let strokeDabs: Dab[] = []
 
   // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1
   function startStroke(x: number, y: number, pressure: number) {
     history.begin(stack.active)
     stroke = { tiles: strokeTiles, color: settings.color, opacity: settings.opacity, erase: settings.tool === 'eraser' }
     projection.showStroke(stroke)
-    path = createDabPath(shape, settings.size)
+    strokeStart = { size: settings.size, seed: Math.floor(Math.random() * 2 ** 32), taper: settings.taper }
+    strokePoints = [{ x, y, pressure }]
+    strokeDabs = []
+    path = createDabPath(shape, strokeStart.size, strokeStart)
     paintDabs(path.start({ x, y, pressure }))
   }
 
   // Continue the stroke through these points
   function continueStroke(points: StrokePoint[]) {
-    if (path) paintDabs(path.moveTo(points))
+    if (!path) return
+    strokePoints.push(...points)
+    paintDabs(path.moveTo(points))
+  }
+
+  const isSameDab = (a: Dab, b: Dab) =>
+    a.x === b.x && a.y === b.y && a.size === b.size && a.angle === b.angle && a.alpha === b.alpha && a.seed === b.seed
+
+  // The end of a stroke can only taper once the stroke has ended and its length is known, and a short stroke's start
+  // tapers less than was painted (see dabs.ts). So the stroke is worked out again from its points, with the same random
+  // numbers, now knowing its length: its dabs are the same up to where the taper changes them. The tiles touched by
+  // the dabs from there on, as painted or as they should be, are painted again from the start
+  function taperEnd(length: number) {
+    const { taper } = strokeStart
+    if (taper.start === 0 && taper.end === 0) return
+    const again = createDabPath(shape, strokeStart.size, { ...strokeStart, length })
+    const tapered = [...again.start(strokePoints[0]), ...again.moveTo(strokePoints.slice(1)), ...again.end()]
+    let first = 0
+    while (first < strokeDabs.length && first < tapered.length && isSameDab(strokeDabs[first], tapered[first])) first++
+    if (first === strokeDabs.length && first === tapered.length) return
+    const changed = dabsByTile([...strokeDabs.slice(first), ...tapered.slice(first)])
+    const allTapered = dabsByTile(tapered)
+    paintTiles(new Map([...changed.keys()].map(key => [key, allTapered.get(key) ?? []])), true)
   }
 
   // Finish the stroke. Returns whether it changed anything (and so was added to the undo history)
   function endStroke() {
-    if (path) paintDabs(path.end())
+    if (path) {
+      paintDabs(path.end())
+      taperEnd(path.strokeLength())
+    }
     path = null
+    strokePoints = []
+    strokeDabs = []
     if (stroke) mergeStroke(stroke)
     projection.showStroke(null)
     stroke = null

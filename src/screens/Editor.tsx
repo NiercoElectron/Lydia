@@ -9,6 +9,7 @@ import {
   useBrushOutline,
   usePixelGrid,
   useStabilizer,
+  useTaper,
   useSelectionShortcuts,
   useTransformShortcuts,
 } from '../components/engineHooks'
@@ -255,6 +256,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
+  const [taper, changeTaper] = useTaper(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
   useSelectionShortcuts(engine)
@@ -328,6 +330,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
             onConvertToPixels: () => engine?.convertToPixels(),
           }}
           stabilizer={stabilizer}
+          taper={taper}
           isGridOn={isGridOn}
           isOutlineOn={isOutlineOn}
           onColorChange={setColor}
@@ -335,6 +338,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onOpacityChange={setOpacity}
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
           onStabilizerChange={changeStabilizer}
+          onTaperChange={changeTaper}
           onGridToggle={toggleGrid}
           onOutlineToggle={toggleOutline}
         />

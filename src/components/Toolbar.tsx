@@ -1,7 +1,9 @@
+import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
+import { AdvancedMenu } from './AdvancedMenu'
 import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
@@ -38,6 +40,7 @@ type Props = {
   selection: SelectionControls
   transform: TransformControls
   stabilizer: StabilizerSettings
+  taper: TaperSettings
   isGridOn: boolean
   isOutlineOn: boolean
   onColorChange: (color: string) => void
@@ -45,12 +48,13 @@ type Props = {
   onOpacityChange: (opacity: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
+  onTaperChange: (change: Partial<TaperSettings>) => void
   onGridToggle: () => void
   onOutlineToggle: () => void
 }
 
-// The settings of the chosen tool: the color, then the brush's size, opacity and stabilizer, the fill bucket's
-// settings, or the selection's. The move tool has none. While a transform is made, its own settings instead
+// The settings of the chosen tool: the color, then the brush's size and opacity, with its stabilizer and taper under
+// Advanced, the fill bucket's settings, or the selection's. The move tool has none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
   color,
@@ -60,6 +64,7 @@ export function Toolbar({
   selection,
   transform,
   stabilizer,
+  taper,
   isGridOn,
   isOutlineOn,
   onColorChange,
@@ -67,6 +72,7 @@ export function Toolbar({
   onOpacityChange,
   onFillChange,
   onStabilizerChange,
+  onTaperChange,
   onGridToggle,
   onOutlineToggle,
 }: Props) {
@@ -132,7 +138,10 @@ export function Toolbar({
         </label>
       )}
       {(tool === 'brush' || tool === 'eraser') && (
-        <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
+        <AdvancedMenu>
+          <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
+          <TaperControls taper={taper} onChange={onTaperChange} />
+        </AdvancedMenu>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
@@ -278,6 +287,56 @@ export function StabilizerControls({
         >
           String
         </button>
+      </span>
+    </>
+  )
+}
+
+const THINS: { value: TaperThins; label: string }[] = [
+  { value: 'size', label: 'Size' },
+  { value: 'opacity', label: 'Opacity' },
+  { value: 'both', label: 'Both' },
+]
+
+// How long the stroke's ends thin out (0 is not at all), and what thins (see dabs.ts). Also used by the Brush Designer
+export function TaperControls({
+  taper,
+  onChange,
+}: {
+  taper: TaperSettings
+  onChange: (change: Partial<TaperSettings>) => void
+}) {
+  return (
+    <>
+      <label title="Over how many pixels of the paper the stroke's start thins out. 0 is not at all">
+        Taper start
+        <input
+          type="range"
+          min={0}
+          max={MAX_TAPER}
+          value={taper.start}
+          onChange={e => onChange({ start: Number(e.target.value) })}
+        />
+        <SliderValue value={taper.start} min={0} max={MAX_TAPER} unit=" px" onChange={start => onChange({ start })} />
+      </label>
+      <label title="Over how many pixels of the paper the stroke's end thins out, once the pen comes up. 0 is not at all">
+        Taper end
+        <input
+          type="range"
+          min={0}
+          max={MAX_TAPER}
+          value={taper.end}
+          onChange={e => onChange({ end: Number(e.target.value) })}
+        />
+        <SliderValue value={taper.end} min={0} max={MAX_TAPER} unit=" px" onChange={end => onChange({ end })} />
+      </label>
+      <span className="button-group" title="What thins out toward the stroke's ends">
+        Thins
+        {THINS.map(({ value, label }) => (
+          <button key={value} aria-pressed={taper.thins === value} onClick={() => onChange({ thins: value })}>
+            {label}
+          </button>
+        ))}
       </span>
     </>
   )

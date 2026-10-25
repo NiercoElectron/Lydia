@@ -1139,7 +1139,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     - **String** (Photoshop's "pulled string"): the brush doesn't move while the pen stays within a string's length,
       and is pulled straight behind it when the pen goes further.
   - Its **strength**, from 0 (off) to 100, is a slider in the bar, the same for every brush (my choice), and the
-    browser remembers it with the way chosen. It starts off.
+    browser remembers it with the way chosen. It starts off. (Moved into the Advanced panel the same day, decision
+    47.)
   - When the pen comes up, the stroke goes on straight to where it left (my choice), like Photoshop's "catch-up", so
     lines end where they were drawn to.
   - While the brush lags, the outline (decision 45) is where the brush is, which is where the paint goes, and a line
@@ -1166,6 +1167,44 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   reaching it; the line from the brush to the pen; String not moving within the string, pulled behind the pen beyond
   it, catching up when the pen comes up; 0 painting right under the pen; the settings remembered; the drawing area's
   height the same with every tool and while transforming.
+
+## 47. Tapered stroke ends, and the Advanced panel
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - The ends of every stroke of the brush and the eraser can **taper**: **Taper start** and **Taper end**, two
+    sliders (my choice), say over how many **pixels of the paper** (my choice) the stroke thins out from its start and
+    before its end, from 0 (not at all) to 500. **Thins** chooses what thins out: the **Size**, the **Opacity** or
+    **Both** (my choice). They are the same for every brush, like the stabilizer (my choice), and the browser
+    remembers them.
+  - The end can only thin out once the pen comes up, when the stroke's length is known, so it does then, as in Clip
+    Studio Paint. A stroke shorter than both tapers has them shortened alike until they meet; a click, with no length,
+    paints a whole dot.
+  - The stabilizer and the taper are under **Advanced** (my idea): a button in the bar of the brush and the eraser
+    that opens a panel over the drawing. Clicking elsewhere or Esc closes it, and a click on the drawing then only
+    closes it, without painting. Its pin keeps it open, also the next time (my idea). With the taper, the brush's
+    settings no longer fitted in the bar's first row: at 1600 pixels across, and less on a 1366 laptop, it would have
+    taken a second row again, and the drawing would jump when changing tools (decision 46).
+- **Why:**
+  - Tapered ends give lines the look of ink, and are what a pen's pressure gives for free; with a mouse, or a light
+    hand, they are the only way to get it. ibisPaint and Clip Studio have them.
+- **How:**
+  - The taper is part of working out the dabs (`dabs.ts`): each dab knows how far along the stroke it is, and gets a
+    share of its size or paint that grows evenly from 5% at the tip to all of it at the taper's length. The spacing
+    between dabs follows the thinner size, so a thin tip has no gaps.
+  - For the end, the brush keeps the stroke's points. When the pen comes up, it works the whole stroke out again,
+    now knowing its length. The random parts of a brush (its scatter, its turns, its noise) come from numbers drawn
+    from a seed kept for each stroke instead of `Math.random`, so the stroke worked out again is the same, dab for
+    dab, up to where the taper changes it. Only the tiles touched by the dabs from there on are painted again, from
+    the start, in the stroke's own tiles (decision 36), before the stroke goes into the layer, so it is still one undo
+    step. A stroke with no taper is not worked out again.
+- **Checked:** Advanced opening with the stabilizer and the taper, a click on the drawing only closing it, Esc, pinned
+  staying open and painting, gone with other tools and back with the brush, the drawing area's size unchanged; Taper
+  start thin at the start and full past 100 pixels; Taper end full while painting and thin at the end once the pen
+  came up; one undo and redo of a tapered stroke; Thins Opacity fainter but as wide; a stroke shorter than both tapers;
+  a click; the Pixel brush, Chalk (with noise and random turns) and Soft round tapered (screenshot); a stroke of 300
+  points ending in 0.14 s; the settings remembered.
 
 ## Open questions
 

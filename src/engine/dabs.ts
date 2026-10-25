@@ -14,6 +14,16 @@ export type Dab = {
 
 export type StrokePoint = { x: number; y: number; pressure: number }
 
+// A stroke's ends can be tapered: thinner, fainter or both toward its tips, over this many pixels of the paper from
+// its start and before its end, growing evenly to the full size or paint
+export const TAPER_THINS = ['size', 'opacity', 'both'] as const
+export type TaperThins = (typeof TAPER_THINS)[number]
+export type TaperSettings = { start: number; end: number; thins: TaperThins }
+export const NO_TAPER: TaperSettings = { start: 0, end: 0, thins: 'size' }
+export const MAX_TAPER = 500
+// The very tip of a taper still gets this much of the full size or paint, so it isn't cut off
+const TAPER_TIP = 0.05
+
 const FULL_TURN = Math.PI * 2
 const DEGREES = Math.PI / 180
 // How much of the earlier direction is kept at each new point, so that a shaky hand doesn't make the tip wobble
@@ -21,11 +31,28 @@ const DIRECTION_MEMORY = 0.6
 // Seeds are whole numbers below this, small enough for the graphics card to get them exactly
 const SEEDS = 65536
 
+// Random numbers from a seed (mulberry32): the same seed always gives the same numbers, so that a stroke can be worked
+// out again exactly as it was painted (see brush.ts)
+function seededRandom(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// What else a stroke can be worked out with: its taper, the seed of its random numbers (any, if not given), and its
+// length along the paper once it is known, after it ended, so its end can be tapered too
+export type DabPathOptions = { taper?: TaperSettings; seed?: number; length?: number }
+
 // Where the dabs of one stroke go, as the pointer passes through its points. "size" is the brush size at full
 // pressure. Shared by the brush, which paints the dabs into the tiles, and the brush previews, which draw them on a
 // small canvas
-export function createDabPath(shape: BrushShape, size: number) {
+export function createDabPath(shape: BrushShape, size: number, options: DabPathOptions = {}) {
   const isPixel = shape.pixel !== 'none'
+  const { taper = NO_TAPER, length } = options
+  const random = seededRandom(options.seed ?? Math.floor(Math.random() * 2 ** 32))
   let last: StrokePoint | null = null
   let distanceSinceLastDab = 0
   let directionX = 0
@@ -34,24 +61,48 @@ export function createDabPath(shape: BrushShape, size: number) {
   let waitingDab: StrokePoint | null = null
   let lastDab: Dab | null = null // the latest dab placed
   let isFirstMove = false // a pixel brush's stroke hasn't moved yet (see pastEdge)
-  const strokeSeed = Math.floor(Math.random() * SEEDS) // for brushes whose noise changes once per stroke
+  let travelled = 0 // how far along the paper the stroke has gone, to its latest point
+  const strokeSeed = Math.floor(random() * SEEDS) // for brushes whose noise changes once per stroke
+
+  // The taper's lengths. Once the stroke's length is known, ends that would overlap (a short stroke) are shortened
+  // alike until they meet, so a click, with no length, has none
+  let taperStart = taper.start
+  let taperEnd = taper.end
+  if (length !== undefined && taperStart + taperEnd > length) {
+    const share = length / (taperStart + taperEnd)
+    taperStart *= share
+    taperEnd *= share
+  }
+  const thinsSize = taper.thins !== 'opacity'
+  const thinsOpacity = taper.thins !== 'size'
+
+  // How much of the full size or paint a dab gets at this distance along the stroke, from TAPER_TIP to 1. The end
+  // only tapers once the stroke's length is known
+  function taperAt(distance: number) {
+    let share = 1
+    if (taperStart > 0) share = Math.min(share, distance / taperStart)
+    if (length !== undefined && taperEnd > 0) share = Math.min(share, (length - distance) / taperEnd)
+    return Math.max(TAPER_TIP, share)
+  }
 
   // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time
-  const sizeAt = (pressure: number) => {
-    const dabSize = shape.pressureSize ? size * pressure : size
+  const sizeAt = (pressure: number, taperShare: number) => {
+    const dabSize = (shape.pressureSize ? size * pressure : size) * (thinsSize ? taperShare : 1)
     return isPixel ? Math.max(1, Math.round(dabSize)) : dabSize
   }
 
-  function dabAt(x: number, y: number, pressure: number, direction: number): Dab {
-    const dabSize = sizeAt(pressure)
-    const alpha = shape.pressureFlow ? shape.flow * pressure : shape.flow
-    const seed = shape.noisePerStroke ? strokeSeed : Math.floor(Math.random() * SEEDS)
+  // A dab at this point, "along" pixels from the start of the stroke
+  function dabAt(x: number, y: number, pressure: number, direction: number, along: number): Dab {
+    const taperShare = taperAt(along)
+    const dabSize = sizeAt(pressure, taperShare)
+    const alpha = (shape.pressureFlow ? shape.flow * pressure : shape.flow) * (thinsOpacity ? taperShare : 1)
+    const seed = shape.noisePerStroke ? strokeSeed : Math.floor(random() * SEEDS)
     let angle = shape.angle * DEGREES + (shape.followStroke ? direction : 0)
-    if (shape.angleJitter > 0) angle += (Math.random() - 0.5) * shape.angleJitter * FULL_TURN
+    if (shape.angleJitter > 0) angle += (random() - 0.5) * shape.angleJitter * FULL_TURN
     if (shape.scatter > 0) {
       // Anywhere in a circle around the point, evenly
-      const distance = shape.scatter * dabSize * Math.sqrt(Math.random())
-      const toward = Math.random() * FULL_TURN
+      const distance = shape.scatter * dabSize * Math.sqrt(random())
+      const toward = random() * FULL_TURN
       x += Math.cos(toward) * distance
       y += Math.sin(toward) * distance
     }
@@ -90,7 +141,7 @@ export function createDabPath(shape: BrushShape, size: number) {
     lastDab = null
     const dabs: Dab[] = []
     if (shape.followStroke) waitingDab = point
-    else place(dabs, dabAt(point.x, point.y, point.pressure, 0))
+    else place(dabs, dabAt(point.x, point.y, point.pressure, 0, 0))
     return dabs
   }
 
@@ -109,11 +160,11 @@ export function createDabPath(shape: BrushShape, size: number) {
       directionY = directionY * DIRECTION_MEMORY + dy
       const direction = Math.atan2(directionY, directionX)
       if (waitingDab) {
-        place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, direction))
+        place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, direction, 0))
         waitingDab = null
       }
 
-      const spacing = Math.max(1, sizeAt(point.pressure) * shape.spacing)
+      const spacing = Math.max(1, sizeAt(point.pressure, taperAt(travelled)) * shape.spacing)
       // A pixel brush starts counting from the edge of the pixel the stroke started in, along the longer side of its
       // first move
       if (isPixel && isFirstMove) {
@@ -121,7 +172,7 @@ export function createDabPath(shape: BrushShape, size: number) {
         distanceSinceLastDab = pastEdge(
           isAcross ? last.x : last.y,
           Math.sign(isAcross ? dx : dy),
-          sizeAt(last.pressure),
+          sizeAt(last.pressure, taperAt(travelled)),
         )
       }
       isFirstMove = false
@@ -130,10 +181,11 @@ export function createDabPath(shape: BrushShape, size: number) {
         // A pixel brush's dab is worked out a hair further, inside the pixel the pen enters there
         const t = isPixel ? Math.min(1, (along + 1e-6) / distance) : along / distance
         const pressure = last.pressure + (point.pressure - last.pressure) * t
-        place(dabs, dabAt(last.x + dx * t, last.y + dy * t, pressure, direction))
+        place(dabs, dabAt(last.x + dx * t, last.y + dy * t, pressure, direction, travelled + along))
         along += spacing
       }
       distanceSinceLastDab = distance - (along - spacing)
+      travelled += distance
       last = point
     }
     return dabs
@@ -144,8 +196,8 @@ export function createDabPath(shape: BrushShape, size: number) {
   // dab, so a stroke ends exactly where the pen left
   function end(): Dab[] {
     const dabs: Dab[] = []
-    if (waitingDab) place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, 0))
-    else if (isPixel && last) place(dabs, dabAt(last.x, last.y, last.pressure, 0))
+    if (waitingDab) place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, 0, 0))
+    else if (isPixel && last) place(dabs, dabAt(last.x, last.y, last.pressure, 0, travelled))
     waitingDab = null
     last = null
     return dabs
@@ -154,7 +206,10 @@ export function createDabPath(shape: BrushShape, size: number) {
   // Which way the stroke is going, in radians, clockwise from the right (0 before it has moved)
   const direction = () => Math.atan2(directionY, directionX)
 
-  return { start, moveTo, end, direction }
+  // How far along the paper the stroke has gone, in pixels (a pixel brush measures along the longer side, see moveTo)
+  const strokeLength = () => travelled
+
+  return { start, moveTo, end, direction, strokeLength }
 }
 
 export type DabPath = ReturnType<typeof createDabPath>

@@ -11,8 +11,17 @@ import {
   useEngineSnapshot,
   usePixelGrid,
   useStabilizer,
+  useTaper,
 } from '../components/engineHooks'
-import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, OutlineButton, StabilizerControls } from '../components/Toolbar'
+import { AdvancedMenu } from '../components/AdvancedMenu'
+import {
+  GridButton,
+  MAX_BRUSH_SIZE,
+  MIN_BRUSH_SIZE,
+  OutlineButton,
+  StabilizerControls,
+  TaperControls,
+} from '../components/Toolbar'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
 import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
 import type { Engine } from '../engine/engine'
@@ -82,6 +91,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
+  const [taper, changeTaper] = useTaper(engine)
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
 
@@ -191,7 +201,10 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
             />
             <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={setSize} />
           </label>
-          <StabilizerControls stabilizer={stabilizer} onChange={changeStabilizer} />
+          <AdvancedMenu>
+            <StabilizerControls stabilizer={stabilizer} onChange={changeStabilizer} />
+            <TaperControls taper={taper} onChange={changeTaper} />
+          </AdvancedMenu>
           <GridButton isOn={isGridOn} onToggle={toggleGrid} />
           <OutlineButton isOn={isOutlineOn} onToggle={toggleOutline} />
         </div>

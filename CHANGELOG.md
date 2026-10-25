@@ -14,11 +14,18 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   pressure, and turned as it paints (Dashes turns with the stroke). The Pixel brush's outline goes along the pixels it
   would paint. Smaller than 8 pixels on the screen, the cursor's cross shows instead. The **Outline** button, next to
   Grid, turns it off and on.
-- A stabilizer, for smoother strokes ([decision 46](docs/decisions.md#46-the-stabilizer)). **Stabilizer** in the bar of
-  the brush and the eraser, from 0 (off) to 100, chooses how strong it is, for every brush, and the browser remembers
+- A stabilizer, for smoother strokes ([decision 46](docs/decisions.md#46-the-stabilizer)). **Stabilizer**, under
+  **Advanced** in the bar of the brush and the eraser, from 0 (off) to 100, chooses how strong it is, for every brush, and the browser remembers
   it. **Smooth**: the brush chases the pen, lagging behind it, and keeps going when the pen holds still. **String**: the
   pen pulls the brush on a string, which only moves when the pen goes further than the string. When the pen comes up,
   the stroke goes on to where it left. While the brush lags, a line joins it to the pen.
+- Tapered stroke ends ([decision 47](docs/decisions.md#47-tapered-stroke-ends-and-the-advanced-panel)). **Taper
+  start** and **Taper end**, under **Advanced**, thin out the stroke over that many pixels of the paper from its start
+  and before its end, with the mouse too. **Thins** chooses what: the **Size**, the **Opacity** or **Both**. The end
+  thins out once the pen comes up. A stroke shorter than both tapers has them shortened to meet; a click paints a
+  whole dot.
+- **Advanced**, in the bar of the brush and the eraser: a panel, opened over the drawing, with the settings changed less
+  often (the stabilizer and the taper). Clicking elsewhere or Esc closes it; its pin keeps it open, also the next time.
 
 ### Changed
 

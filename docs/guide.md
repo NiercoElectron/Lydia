@@ -64,8 +64,11 @@ Every slider has its number next to it: click the number to type a value. Enter,
   at full pressure and turned as it paints (brushes like Dashes turn it with the stroke). The Pixel brush's outline
   goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.
-- **The stabilizer** smooths the strokes, for steady lines with a shaky hand. **Stabilizer**, in the bar, goes from 0
-  (off) to 100 and is the same for every brush:
+- **Advanced**, in the bar, opens a panel over the drawing with the settings changed less often: the stabilizer and
+  the taper, below. Clicking elsewhere (which doesn't paint) or Esc closes it. Its **pin** keeps it open, also the
+  next time; the Advanced button then closes it.
+- **The stabilizer** smooths the strokes, for steady lines with a shaky hand. **Stabilizer**, under Advanced, goes from
+  0 (off) to 100 and is the same for every brush:
   - **Smooth**: the brush chases the pen, lagging behind it and cutting its wobbles. The stronger, the more it lags.
     When the pen holds still, the brush keeps going until it reaches it;
   - **String**: the pen pulls the brush on a string. The brush doesn't move while the pen stays within the string's
@@ -73,6 +76,13 @@ Every slider has its number next to it: click the number to type a value. Enter,
 
   While the brush lags, a line joins it to the pen, and the outline is where the brush is. When the pen comes up, the
   stroke goes on to where it left.
+
+- **The taper** thins out the ends of every stroke, even with the mouse, like a stroke of ink. Under Advanced:
+  - **Taper start** and **Taper end**: over how many pixels of the paper (0 is not at all) the stroke thins out from
+    its start, and before its end. The end thins out the moment the pen comes up, since only then is it known;
+  - **Thins**: what thins out, the **Size**, the **Opacity** or **Both**.
+
+  A stroke shorter than both tapers has them shortened alike until they meet, and a click paints a whole dot.
 
 - **The brushes:** nine come with Lydia (Soft round, Hard round, Pixel, Airbrush, Chalk, Calligraphy, Dashes, Bristles,
   Sponge). Click one to paint with it.

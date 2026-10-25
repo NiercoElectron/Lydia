@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import type { TaperSettings } from '../engine/dabs'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import type { StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
@@ -7,9 +8,11 @@ import {
   loadBrushOutline,
   loadPixelGrid,
   loadStabilizer,
+  loadTaper,
   saveBrushOutline,
   savePixelGrid,
   saveStabilizer,
+  saveTaper,
 } from '../settings'
 import { themeColor, useTheme } from '../theme'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
@@ -91,6 +94,22 @@ export function useStabilizer(engine: Engine | null) {
     })
   }, [])
   return [settings, change] as const
+}
+
+// How the strokes' ends thin out, as chosen last time
+export function useTaper(engine: Engine | null) {
+  const [taper, setTaper] = useState(loadTaper)
+  useEffect(() => {
+    engine?.setBrush({ taper })
+  }, [engine, taper])
+  const change = useCallback((change: Partial<TaperSettings>) => {
+    setTaper(current => {
+      const next = { ...current, ...change }
+      saveTaper(next)
+      return next
+    })
+  }, [])
+  return [taper, change] as const
 }
 
 // The selection's shortcuts, as in Photoshop: Ctrl/Cmd + A selects everything, Ctrl/Cmd + D nothing, and
