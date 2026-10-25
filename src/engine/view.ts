@@ -1,6 +1,6 @@
 import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
-import { pixelTipOutline, tipOutline } from './brushOutline'
+import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
@@ -501,7 +501,8 @@ export function createView(
 
     const center = stabilizer ? stabilizer.brushAt() : paperAt(at)
     const tip = brush.getTip()
-    const isPixel = brush.getShape().pixel !== 'none'
+    const pixelTip = brush.getShape().pixel
+    const isPixel = pixelTip !== 'none'
     const angle = brush.tipAngle()
     const { position, scale, rotation } = world
     const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle]
@@ -515,11 +516,7 @@ export function createView(
     if (!isShown) {
       // only the line
     } else if (isPixel) {
-      // Along the pixels the dab would paint there (see dabs.ts)
-      const side = Math.max(1, Math.round(size))
-      const left = Math.round(center.x - side / 2)
-      const top = Math.round(center.y - side / 2)
-      loops = [pixelTipOutline(side).map(p => ({ x: left + p.x, y: top + p.y }))]
+      loops = pixelBrushOutline(tip, pixelTip === 'drawn', size, center)
     } else {
       const cos = Math.cos(angle) * size
       const sin = Math.sin(angle) * size

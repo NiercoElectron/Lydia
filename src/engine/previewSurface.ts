@@ -80,7 +80,7 @@ export async function createPreviewSurface() {
     else painter = createDabPainter(renderer, tip, shape)
     unit = pixels
     clearTexture(stroke)
-    path = createDabPath(shape, size)
+    path = createDabPath(shape, size, { tip: tip.image })
     paintDabs(path.start(point))
   }
 

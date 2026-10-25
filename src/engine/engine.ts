@@ -68,6 +68,11 @@ const JPEG_QUALITY = 0.95 // from 0 to 1; PNG ignores it
 // (see changeTiles)
 const SHOWN_AT_ONCE = 32
 
+// Destroying the engine's PixiJS application takes its canvas off the page, but leaves PixiJS's global resources
+// alone ("true" would release them too): the brush previews' own renderer (see previewSurface.ts) keeps using them,
+// and released, they broke the next preview drawn (decision 30)
+const KEEP_GLOBAL_RESOURCES = { removeView: true, releaseGlobalResources: false }
+
 // Under a transparent background, the screen shows gray and white squares, like Photoshop and Krita, of this many
 // pixels of the screen at any zoom
 const CHECKER_SIZE = 8
@@ -102,7 +107,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   })
   const renderer = app.renderer as WebGLRenderer
   if (!(renderer.gl instanceof WebGL2RenderingContext)) {
-    app.destroy(true)
+    app.destroy(KEEP_GLOBAL_RESOURCES)
     throw new Error('Lydia needs WebGL 2, which this browser or graphics card does not support.')
   }
   app.canvas.style.display = 'block'
@@ -1029,7 +1034,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     projection.destroy()
     gpu.destroy()
     memory.destroy()
-    app.destroy(true, { children: true })
+    app.destroy(KEEP_GLOBAL_RESOURCES, { children: true })
     listeners.clear()
   }
 

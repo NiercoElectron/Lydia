@@ -1,6 +1,6 @@
 import { CanvasSource, Container, Sprite, Texture, type WebGLRenderer } from 'pixi.js'
 import type { BrushShape } from './brushFile'
-import type { BrushTip } from './brushTip'
+import { PIXEL_PAINTS, type BrushTip } from './brushTip'
 import type { Dab } from './dabs'
 import { createNoiseDabs } from './noiseDabs'
 import { roundTipRows } from './pixelTip'
@@ -28,6 +28,24 @@ function createPixelTipTexture(size: number) {
   return new Texture({ source: new CanvasSource({ resource: canvas, resolution: 1, scaleMode: 'nearest' }) })
 }
 
+// A drawn pixel tip (see brushFile.ts) at "times" its picture's size: each pixel of the picture that paints becomes a
+// square of times × times pixels, painting fully
+function createDrawnTipTexture(tip: BrushTip, times: number) {
+  const { width, height } = tip.image
+  const picture = tip.image.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, width, height).data
+  const canvas = document.createElement('canvas')
+  canvas.width = width * times
+  canvas.height = height * times
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (picture[(y * width + x) * 4 + 3] >= PIXEL_PAINTS) ctx.fillRect(x * times, y * times, times, times)
+    }
+  }
+  return new Texture({ source: new CanvasSource({ resource: canvas, resolution: 1, scaleMode: 'nearest' }) })
+}
+
 // A pixel brush needs a tip for each size it paints at, as the pen's pressure changes it. They are made when first
 // needed, and the ones unused for the longest time are forgotten once they add up to more than this many pixels
 const PIXEL_TIPS_BUDGET = 4 * 1024 ** 2
@@ -51,8 +69,12 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
     if (pixelTexture) {
       pixelTips.delete(size) // to put it last again
     } else {
-      pixelTexture = createPixelTipTexture(size)
-      pixelTipsArea += size * size
+      // A drawn tip's sizes are whole multiples of its picture's longer side (see dabs.ts)
+      pixelTexture =
+        shape.pixel === 'drawn'
+          ? createDrawnTipTexture(tip, Math.max(1, Math.round(size / Math.max(tip.image.width, tip.image.height))))
+          : createPixelTipTexture(size)
+      pixelTipsArea += pixelTexture.width * pixelTexture.height
     }
     pixelTips.set(size, pixelTexture)
     return pixelTexture
@@ -66,13 +88,22 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
     for (const [size, pixelTexture] of pixelTips) {
       if (pixelTipsArea <= PIXEL_TIPS_BUDGET) break
       pixelTips.delete(size)
-      pixelTipsArea -= size * size
+      pixelTipsArea -= pixelTexture.width * pixelTexture.height
       pixelTexture.destroy(true)
     }
   }
 
+  // Forget every pixel tip, made for another tip or another kind of pixel brush
+  function forgetPixelTips() {
+    for (const sprite of dabSprites) sprite.texture = texture
+    for (const pixelTexture of pixelTips.values()) pixelTexture.destroy(true)
+    pixelTips.clear()
+    pixelTipsArea = 0
+  }
+
   // Paint with another brush from now on. The tip's picture goes to the graphics card again only when it changed
   function setTip(newTip: BrushTip, newShape: BrushShape) {
+    if (newTip !== tip || newShape.pixel !== shape.pixel) forgetPixelTips()
     shape = newShape
     if (newTip === tip) return
     const oldTexture = texture

@@ -1,4 +1,4 @@
-import type { BrushTip } from './brushTip'
+import { PIXEL_PAINTS, type BrushTip } from './brushTip'
 import { roundTipRows } from './pixelTip'
 import type { Point } from './selection'
 
@@ -198,9 +198,87 @@ function keepStraying(points: Point[], first: number, last: number, tolerance: n
   keepStraying(points, far, last, tolerance, kept)
 }
 
+// The outline of a pixel brush's tip at this brush size, along the edges of the pixels it would paint with the pointer
+// at "center", placed as a pixel dab is (see dabs.ts). A drawn tip is a whole multiple of its picture's size
+export function pixelBrushOutline(tip: BrushTip, isDrawn: boolean, size: number, center: Point): Point[][] {
+  let loops: Point[][]
+  let width: number
+  let height: number
+  let times = 1
+  if (isDrawn) {
+    times = Math.max(1, Math.round(size / Math.max(tip.image.width, tip.image.height)))
+    width = tip.image.width * times
+    height = tip.image.height * times
+    loops = drawnTipOutline(tip)
+  } else {
+    width = height = Math.max(1, Math.round(size))
+    loops = [pixelTipOutline(width)]
+  }
+  const left = Math.round(center.x - width / 2)
+  const top = Math.round(center.y - height / 2)
+  return loops.map(loop => loop.map(p => ({ x: left + p.x * times, y: top + p.y * times })))
+}
+
+// Each drawn tip's outline, worked out once
+const drawnOutlines = new WeakMap<BrushTip, Point[][]>()
+
+// The outline of a drawn pixel tip at 1×, from its top left corner, along the edges between its pixels that paint and
+// those that don't: a loop around each part of it, and around each hole
+function drawnTipOutline(tip: BrushTip): Point[][] {
+  let loops = drawnOutlines.get(tip)
+  if (loops) return loops
+  const { width, height } = tip.image
+  const data = tip.image.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, width, height).data
+  const paints = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * 4 + 3] >= PIXEL_PAINTS
+  // The edges, each going clockwise around the pixel that paints, by the corner they start from ("x,y" -> where
+  // each one from there goes). Every corner has as many edges coming in as going out, so following them always leads
+  // back to where it started
+  const edges = new Map<string, Point[]>()
+  const add = (from: Point, to: Point) => {
+    const key = `${from.x},${from.y}`
+    const list = edges.get(key)
+    if (list) list.push(to)
+    else edges.set(key, [to])
+  }
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!paints(x, y)) continue
+      if (!paints(x, y - 1)) add({ x, y }, { x: x + 1, y })
+      if (!paints(x + 1, y)) add({ x: x + 1, y }, { x: x + 1, y: y + 1 })
+      if (!paints(x, y + 1)) add({ x: x + 1, y: y + 1 }, { x, y: y + 1 })
+      if (!paints(x - 1, y)) add({ x, y: y + 1 }, { x, y })
+    }
+  }
+  loops = []
+  for (const [start, list] of edges) {
+    while (list.length > 0) {
+      const [x, y] = start.split(',').map(Number)
+      const loop: Point[] = [{ x, y }]
+      let to = list.pop()!
+      while (`${to.x},${to.y}` !== start) {
+        loop.push(to)
+        to = edges.get(`${to.x},${to.y}`)!.pop()!
+      }
+      loops.push(withoutStraightPoints(loop))
+    }
+  }
+  drawnOutlines.set(tip, loops)
+  return loops
+}
+
+// The same loop without the points where its edge goes straight on, along the edges of pixels
+function withoutStraightPoints(loop: Point[]) {
+  return loop.filter((p, i) => {
+    const before = loop[(i + loop.length - 1) % loop.length]
+    const after = loop[(i + 1) % loop.length]
+    return !((before.x === p.x && p.x === after.x) || (before.y === p.y && p.y === after.y))
+  })
+}
+
 // The outline of a pixel brush's round tip of this size (see pixelTip.ts), along the edges of the pixels it paints,
 // from the tip's top left corner: down its right side, row by row, and back up its left side
-export function pixelTipOutline(size: number): Point[] {
+function pixelTipOutline(size: number): Point[] {
   const rows = roundTipRows(size)
   const right: Point[] = []
   const left: Point[] = []
@@ -209,11 +287,5 @@ export function pixelTipOutline(size: number): Point[] {
     right.push({ x: start + count, y: row }, { x: start + count, y: row + 1 })
     left.push({ x: start, y: row }, { x: start, y: row + 1 })
   })
-  // Points where the edge goes straight on are left out
-  const loop = [...right, ...left.reverse()]
-  return loop.filter((p, i) => {
-    const before = loop[(i + loop.length - 1) % loop.length]
-    const after = loop[(i + 1) % loop.length]
-    return !((before.x === p.x && p.x === after.x) || (before.y === p.y && p.y === after.y))
-  })
+  return withoutStraightPoints([...right, ...left.reverse()])
 }

@@ -3,6 +3,8 @@ export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each s
 export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip of 1024×1024 full of detail is well under this
 export const TIP_SIZES = [256, 512, 1024] // the papers the Brush Designer offers for drawing a tip
 export const DEFAULT_TIP_SIZE = 512
+export const PIXEL_TIP_SIZES = [16, 32, 64] // the papers for drawing a pixel brush's tip, pixel by pixel
+export const DEFAULT_PIXEL_TIP_SIZE = 32
 const MAX_NAME_LENGTH = 100
 
 // How copies of the tip are placed along a stroke (see dabs.ts)
@@ -30,8 +32,9 @@ export type BrushShape = {
 }
 
 // "none": a smooth brush, its tip's picture resized to any size. "round": a pixel brush with a round tip, worked out
-// for each size (see pixelTip.ts)
-const PIXEL_TIPS = ['none', 'round'] as const
+// for each size (see pixelTip.ts). "drawn": a pixel brush whose tip was drawn pixel by pixel: its picture, each pixel
+// painting fully or not at all, at a whole multiple of its size (1×, 2×, 3×…)
+const PIXEL_TIPS = ['none', 'round', 'drawn'] as const
 export type PixelTip = (typeof PIXEL_TIPS)[number]
 
 const NOISE_MODES = ['mix', 'drops', 'worn'] as const
@@ -88,7 +91,9 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
 //
 // "tip" is the picture of the brush tip, a PNG image of up to 1024×1024: black paints, white or transparent doesn't,
 // gray paints lightly. "pixel" is "round" for a pixel brush, which works out its tip for each size: its picture is then
-// only for versions of Lydia without pixel brushes, which paint with it as a smooth brush. A missing field takes its
+// only for versions of Lydia without pixel brushes, which paint with it as a smooth brush. It is "drawn" for a pixel
+// brush that paints its picture as it is, where it is darker than middle gray, at a whole multiple of its size;
+// versions of Lydia before 0.9.0, which brought them, paint it as a smooth brush. A missing field takes its
 // usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left alone, so a file from a newer version of the
 // same format still opens. A brush file is only data: nothing in it is ever run, so brushes downloaded from anywhere
 // are safe to add

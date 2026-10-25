@@ -49,10 +49,14 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
 
 const TIP_MARGIN = 2 // white pixels kept around the paint, so the edge of a turned dab fades out instead of being cut
 
+// Whether a pixel of a drawn pixel tip paints: where it is darker than middle gray (see brushFile.ts)
+export const PIXEL_PAINTS = 128
+
 // The tip drawn in the Brush Designer, from a picture of its paper (white where nothing is painted), as a PNG cut down
 // to the painted part, like Photoshop does when it defines a brush: the brush size then measures the drawing, not
-// the paper. Null when nothing is painted
-export async function tipFromPicture(picture: Blob): Promise<Uint8Array | null> {
+// the paper. Null when nothing is painted. A pixel brush's tip ("pixel") is cut with no margin, every pixel of it
+// black, which paints, or white
+export async function tipFromPicture(picture: Blob, pixel = false): Promise<Uint8Array | null> {
   const bitmap = await createImageBitmap(picture)
   const { width, height } = bitmap
   const paper = document.createElement('canvas')
@@ -62,16 +66,19 @@ export async function tipFromPicture(picture: Blob): Promise<Uint8Array | null> 
   ctx.drawImage(bitmap, 0, 0)
   bitmap.close()
 
-  // The box around everything that isn't white
+  // The box around everything that isn't white (for a pixel tip, that is darker than middle gray)
   const data = ctx.getImageData(0, 0, width, height).data
+  const isPainted = (i: number) =>
+    pixel
+      ? 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] < PIXEL_PAINTS
+      : !(data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255)
   let left = width
   let top = height
   let right = -1
   let bottom = -1
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4
-      if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255) continue
+      if (!isPainted((y * width + x) * 4)) continue
       left = Math.min(left, x)
       right = Math.max(right, x)
       top = Math.min(top, y)
@@ -80,23 +87,35 @@ export async function tipFromPicture(picture: Blob): Promise<Uint8Array | null> 
   }
   if (right === -1) return null
 
+  const margin = pixel ? 0 : TIP_MARGIN
   const tip = document.createElement('canvas')
-  tip.width = right - left + 1 + 2 * TIP_MARGIN
-  tip.height = bottom - top + 1 + 2 * TIP_MARGIN
+  tip.width = right - left + 1 + 2 * margin
+  tip.height = bottom - top + 1 + 2 * margin
   const tipCtx = tip.getContext('2d')!
-  tipCtx.fillStyle = '#fff'
-  tipCtx.fillRect(0, 0, tip.width, tip.height)
-  tipCtx.drawImage(
-    paper,
-    left,
-    top,
-    right - left + 1,
-    bottom - top + 1,
-    TIP_MARGIN,
-    TIP_MARGIN,
-    right - left + 1,
-    bottom - top + 1,
-  )
+  if (pixel) {
+    const pixels = tipCtx.createImageData(tip.width, tip.height)
+    for (let y = 0; y < tip.height; y++) {
+      for (let x = 0; x < tip.width; x++) {
+        const level = isPainted(((top + y) * width + left + x) * 4) ? 0 : 255
+        pixels.data.set([level, level, level, 255], (y * tip.width + x) * 4)
+      }
+    }
+    tipCtx.putImageData(pixels, 0, 0)
+  } else {
+    tipCtx.fillStyle = '#fff'
+    tipCtx.fillRect(0, 0, tip.width, tip.height)
+    tipCtx.drawImage(
+      paper,
+      left,
+      top,
+      right - left + 1,
+      bottom - top + 1,
+      margin,
+      margin,
+      right - left + 1,
+      bottom - top + 1,
+    )
+  }
   const png = await new Promise<Blob | null>(resolve => tip.toBlob(resolve, 'image/png'))
   if (!png) throw new Error('Could not make a picture of the tip.')
   return new Uint8Array(await png.arrayBuffer())

@@ -26,11 +26,21 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   whole dot.
 - **Advanced**, in the bar of the brush and the eraser: a panel, opened over the drawing, with the settings changed less
   often (the stabilizer and the taper). Clicking elsewhere or Esc closes it; its pin keeps it open, also the next time.
+- Pixel brushes drawn in the Brush Designer ([decision 48](docs/decisions.md#48-pixel-brushes-drawn-in-the-brush-designer)).
+  On the start screen, **Pixel** opens the Designer on a small paper (16, 32 or 64 pixels), zoomed in with the pixel
+  grid, to draw the tip pixel by pixel with the Pixel brush. The new brush paints its tip as it was drawn, every
+  pixel fully or not at all, at 1×, 2×, 3×… its size, the nearest to the brush size; choosing it sets the size to 1×.
+  Its outline goes along its pixels. Versions of Lydia before this one open these brushes as smooth brushes.
 
 ### Changed
 
 - The settings of the chosen tool always have the bar's first row, and the actions (Undo, the view, Export…) the
   second, so the drawing area no longer changes size, and the drawing no longer jumps, when another tool is chosen.
+
+### Fixed
+
+- Opening the Brush Designer a second time made its test area fail on the first stroke, and the whole screen with it
+  ([decision 30](docs/decisions.md#30-the-brush-designer)).
 
 ## [0.8.5] - 2026-10-25
 

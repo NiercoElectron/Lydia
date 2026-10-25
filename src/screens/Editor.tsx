@@ -107,7 +107,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
     let cancelled = false
     tipOf(brush).then(
       tip => {
-        if (!cancelled) engine.setBrushTip(tip, brush.preset)
+        if (cancelled) return
+        engine.setBrushTip(tip, brush.preset)
+        // A drawn pixel brush starts at 1×, its tip as it was drawn (see dabs.ts)
+        if (brush.preset.pixel === 'drawn') setSize(Math.max(tip.image.width, tip.image.height))
       },
       error => alert(error instanceof Error ? error.message : 'Could not use this brush.'),
     )

@@ -42,9 +42,15 @@ function seededRandom(seed: number) {
   }
 }
 
-// What else a stroke can be worked out with: its taper, the seed of its random numbers (any, if not given), and its
-// length along the paper once it is known, after it ended, so its end can be tapered too
-export type DabPathOptions = { taper?: TaperSettings; seed?: number; length?: number }
+// What else a stroke can be worked out with: its taper, the seed of its random numbers (any, if not given), its
+// length along the paper once it is known, after it ended, so its end can be tapered too, and the size of the tip's
+// picture, which a drawn pixel tip is painted at a whole multiple of
+export type DabPathOptions = {
+  taper?: TaperSettings
+  seed?: number
+  length?: number
+  tip?: { width: number; height: number }
+}
 
 // Where the dabs of one stroke go, as the pointer passes through its points. "size" is the brush size at full
 // pressure. Shared by the brush, which paints the dabs into the tiles, and the brush previews, which draw them on a
@@ -52,6 +58,12 @@ export type DabPathOptions = { taper?: TaperSettings; seed?: number; length?: nu
 export function createDabPath(shape: BrushShape, size: number, options: DabPathOptions = {}) {
   const isPixel = shape.pixel !== 'none'
   const { taper = NO_TAPER, length } = options
+  // A pixel dab's width and height, for each pixel of its longer side: a drawn tip's picture may be wider than tall.
+  // Its size is a whole multiple of "tipSide" (any whole size for the round tip)
+  const isDrawn = shape.pixel === 'drawn' && options.tip !== undefined
+  const tipSide = isDrawn ? Math.max(options.tip!.width, options.tip!.height) : 1
+  const across = isDrawn ? options.tip!.width / tipSide : 1
+  const down = isDrawn ? options.tip!.height / tipSide : 1
   const random = seededRandom(options.seed ?? Math.floor(Math.random() * 2 ** 32))
   let last: StrokePoint | null = null
   let distanceSinceLastDab = 0
@@ -85,10 +97,11 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
     return Math.max(TAPER_TIP, share)
   }
 
-  // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time
+  // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time (a drawn tip's,
+  // a whole multiple of its picture's size)
   const sizeAt = (pressure: number, taperShare: number) => {
     const dabSize = (shape.pressureSize ? size * pressure : size) * (thinsSize ? taperShare : 1)
-    return isPixel ? Math.max(1, Math.round(dabSize)) : dabSize
+    return isPixel ? Math.max(1, Math.round(dabSize / tipSide)) * tipSide : dabSize
   }
 
   // A dab at this point, "along" pixels from the start of the stroke
@@ -109,9 +122,11 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
     if (isPixel) {
       // On the pixels of the paper, never turned: the tip's corner goes to the nearest corner between pixels, so an
       // odd size is centered on the pixel under the pen, and an even size on the corner nearest to it
-      const left = Math.round(x - dabSize / 2)
-      const top = Math.round(y - dabSize / 2)
-      return { x: left + dabSize / 2, y: top + dabSize / 2, size: dabSize, angle: 0, alpha, seed }
+      const width = dabSize * across
+      const height = dabSize * down
+      const left = Math.round(x - width / 2)
+      const top = Math.round(y - height / 2)
+      return { x: left + width / 2, y: top + height / 2, size: dabSize, angle: 0, alpha, seed }
     }
     return { x, y, size: dabSize, angle, alpha, seed }
   }
@@ -172,7 +187,7 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
         distanceSinceLastDab = pastEdge(
           isAcross ? last.x : last.y,
           Math.sign(isAcross ? dx : dy),
-          sizeAt(last.pressure, taperAt(travelled)),
+          sizeAt(last.pressure, taperAt(travelled)) * (isAcross ? across : down),
         )
       }
       isFirstMove = false

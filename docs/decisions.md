@@ -449,6 +449,12 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   (`dabCanvas.ts`).
 - **Measured (RTX 4060 Ti):** the tip is ready 18–35 ms after a stroke on papers of 256 and 512 pixels, and
   73–97 ms on a paper of 1024.
+- **Fixed (2026-10-25):** opening the Designer a second time, or after a brush preview had been freed, made its test
+  area fail on the first stroke, taking the whole screen down. Claude found it while testing pixel brushes (decision
+  48): it was already there in 0.8.5. Closing an engine destroyed its PixiJS application with `true`, which also
+  releases PixiJS's global resources, such as the pool of batches every renderer shares; the brush previews' own
+  renderer, still running, was left using batches that had been destroyed. The engine now keeps those resources
+  (`releaseGlobalResources: false`).
 
 ## 31. A window for new drawings, with a background color or none
 
@@ -1205,6 +1211,43 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   came up; one undo and redo of a tapered stroke; Thins Opacity fainter but as wide; a stroke shorter than both tapers;
   a click; the Pixel brush, Chalk (with noise and random turns) and Soft round tapered (screenshot); a stroke of 300
   points ending in 0.14 s; the settings remembered.
+
+## 48. Pixel brushes drawn in the Brush Designer
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - The Brush Designer makes **pixel brushes** too: on the start screen, **Smooth** or **Pixel**. A pixel brush's tip
+    is drawn on a **small paper**, 16, 32 or 64 pixels (my choice), zoomed in with the pixel grid, with Lydia's own
+    Pixel brush (decision 33), a pixel at a time.
+  - Each pixel of the tip paints **fully or not at all** (my choice), as pixel art needs: there are no edges or
+    strengths to choose, and gray in a tip file counts as paint only where it is darker than middle gray.
+  - The brush size makes it bigger by **whole multiples** (my choice): a tip of 5 pixels paints 5×5 at 1×, 10×10 at
+    2×, 15×15 at 3×, every pixel of the tip a square of whole pixels, so the drawing never gets uneven. The size goes
+    to the nearest multiple; choosing the brush sets it to 1×, the tip as drawn.
+  - The settings that turn the tip (Angle, Turn with the stroke, Random angle), Wash and Noise are left out for it:
+    a pixel dab never turns and has no noise. It starts placing its tip at every pixel (Spacing 1%), as the Pixel
+    brush does, and at one size whatever the pen's pressure, which can be turned on.
+  - The pen's tilt left the Painting stage for later (my choice), for the Brushes stage: it can only be tried with a
+    pen that knows its tilt. The Painting stage ends here.
+- **Why:**
+  - Pixel artists use their own brushes: patterns, dithering, small shapes stamped again and again. The Pixel brush
+    only had round tips.
+- **How:**
+  - In the `.lydbrush` file, `"pixel": "drawn"`; the file stays at version 1. Lydia reads an unknown `pixel` as a
+    smooth brush, so versions before this one open these brushes as smooth brushes, painting their small picture
+    blurred, instead of refusing them.
+  - The Designer cuts the tip to its painted pixels with no margin (a smooth tip keeps 2 white pixels around, decision
+    30), every pixel black or white.
+  - A dab's size is a whole multiple of the tip's longer side. A tip wider than tall is placed by its width and its
+    height, each on whole pixels, as the round tips are (decision 33). For each multiple, the tip is made once, each of
+    its pixels a square of that many pixels, and drawn with the graphics card's "nearest" so it stays sharp.
+  - The outline (decision 45) follows the edges between the pixels that paint and those that don't, so it goes around
+    each part of the tip and each hole.
+- **Checked:** the start screen's choice and papers; the Designer without Edge, Strength and the settings left out,
+  zoomed in with the grid; a tip of an L and a pixel apart, cut to 3×3; saved and chosen in a drawing, the size set to
+  3; painted at 1× exactly as drawn and nothing around it, at 2× each pixel a square of 2×2, and size 8 going to 9
+  (3×), with its outline 9 pixels across; a stroke; its sample in the brush list.
 
 ## Open questions
 

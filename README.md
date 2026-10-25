@@ -38,6 +38,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
 - Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
   brush list or as a file
+- Pixel brushes drawn in the Brush Designer, pixel by pixel, that paint their tip at 1×, 2×, 3×… its size
 - Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
@@ -53,15 +54,13 @@ How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
-stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, turning and flipping the view, the fill bucket, rectangle and lasso
+stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, turning and flipping the view, the fill bucket, rectangle and lasso
 selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Painting: pixel brushes drawn in the Brush Designer, pen tilt (the brush follows how the pen leans, like a
-      pencil)
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: folders of layers (a "Head" folder with the chin, the hair, the ears…), blend modes, clipping masks,
@@ -69,8 +68,8 @@ Next, roughly in this order:
 - [ ] Selections: magic wand
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
       the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
-      that bend the picture where each one is dragged); in the Brush Designer, edit existing brushes and use
-      an image as the tip
+      that bend the picture where each one is dragged), pen tilt (the brush follows how the pen leans, like a
+      pencil); in the Brush Designer, edit existing brushes and use an image as the tip
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)

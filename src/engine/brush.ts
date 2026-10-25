@@ -160,7 +160,7 @@ export function createBrush(
     strokeStart = { size: settings.size, seed: Math.floor(Math.random() * 2 ** 32), taper: settings.taper }
     strokePoints = [{ x, y, pressure }]
     strokeDabs = []
-    path = createDabPath(shape, strokeStart.size, strokeStart)
+    path = createDabPath(shape, strokeStart.size, { ...strokeStart, tip: tip.image })
     paintDabs(path.start({ x, y, pressure }))
   }
 
@@ -181,7 +181,7 @@ export function createBrush(
   function taperEnd(length: number) {
     const { taper } = strokeStart
     if (taper.start === 0 && taper.end === 0) return
-    const again = createDabPath(shape, strokeStart.size, { ...strokeStart, length })
+    const again = createDabPath(shape, strokeStart.size, { ...strokeStart, length, tip: tip.image })
     const tapered = [...again.start(strokePoints[0]), ...again.moveTo(strokePoints.slice(1)), ...again.end()]
     let first = 0
     while (first < strokeDabs.length && first < tapered.length && isSameDab(strokeDabs[first], tapered[first])) first++
@@ -207,10 +207,12 @@ export function createBrush(
   }
 
   // How far from the pointer the brush can paint, in pixels of the paper. A pixel brush's tip can be up to a pixel
-  // further, as it moves to the nearest pixels
+  // further, as it moves to the nearest pixels, and a drawn pixel tip's size is rounded to a multiple of its picture's
   const reach = () => {
-    const tipReach =
-      shape.pixel === 'none' ? settings.size * (tip.reach / 2 + noiseReach(shape)) : settings.size / 2 + 1
+    const tipSide = Math.max(tip.image.width, tip.image.height)
+    const pixelSize =
+      shape.pixel === 'drawn' ? Math.max(1, Math.round(settings.size / tipSide)) * tipSide : settings.size
+    const tipReach = shape.pixel === 'none' ? settings.size * (tip.reach / 2 + noiseReach(shape)) : pixelSize / 2 + 1
     return tipReach + shape.scatter * settings.size
   }
 

@@ -7,8 +7,10 @@ import { loadGpuMemory, saveGpuMemory } from './settings'
 import type { TrayImage } from './tray'
 import './App.css'
 
-// The screen being shown: the start screen, a drawing, or the Brush Designer with the size of its paper
-type Screen = { name: 'home' } | { name: 'editor'; project: ProjectData } | { name: 'designer'; tipSize: number }
+// The screen being shown: the start screen, a drawing, or the Brush Designer with the size of its paper, for a smooth
+// brush or a pixel brush
+type Screen =
+  { name: 'home' } | { name: 'editor'; project: ProjectData } | { name: 'designer'; tipSize: number; pixel: boolean }
 
 function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
@@ -28,7 +30,7 @@ function App() {
     return <Editor project={screen.project} gpuMemory={gpuMemory} tray={tray} onTrayChange={setTray} onBack={goHome} />
   }
   if (screen.name === 'designer') {
-    return <BrushDesigner tipSize={screen.tipSize} gpuMemory={gpuMemory} onBack={goHome} />
+    return <BrushDesigner tipSize={screen.tipSize} pixel={screen.pixel} gpuMemory={gpuMemory} onBack={goHome} />
   }
   return (
     <Home
@@ -36,7 +38,7 @@ function App() {
       onGpuMemoryChange={handleGpuMemoryChange}
       onNewProject={openProject}
       onOpenProject={openProject}
-      onOpenDesigner={tipSize => setScreen({ name: 'designer', tipSize })}
+      onOpenDesigner={(tipSize, pixel) => setScreen({ name: 'designer', tipSize, pixel })}
     />
   )
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
 import { NewProjectDialog } from '../components/NewProjectDialog'
-import { DEFAULT_TIP_SIZE, TIP_SIZES } from '../engine/brushFile'
+import { DEFAULT_PIXEL_TIP_SIZE, DEFAULT_TIP_SIZE, PIXEL_TIP_SIZES, TIP_SIZES } from '../engine/brushFile'
 import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { tilesInGigabytes } from '../engine/tiles'
 import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES, type ThemeChoice } from '../settings'
@@ -20,12 +20,13 @@ type Props = {
   onGpuMemoryChange: (gigabytes: number) => void
   onNewProject: (project: ProjectData) => void
   onOpenProject: (project: ProjectData) => void
-  onOpenDesigner: (tipSize: number) => void
+  onOpenDesigner: (tipSize: number, pixel: boolean) => void
 }
 
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
   const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
   const [isOpening, setIsOpening] = useState(false)
+  const [isPixelTip, setIsPixelTip] = useState(false) // the Brush Designer makes a pixel brush
   const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const theme = useTheme()
@@ -72,17 +73,42 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
         <h2>Brush Designer</h2>
         <p className="hint">Draw the tip of a new brush, try it, and save it to your brushes or as a file.</p>
         <label>
+          Brush
+          <span className="button-group">
+            <button
+              aria-pressed={!isPixelTip}
+              onClick={() => {
+                setIsPixelTip(false)
+                setTipSize(DEFAULT_TIP_SIZE)
+              }}
+              title="A brush for painting: its tip is resized to any size, smoothly"
+            >
+              Smooth
+            </button>
+            <button
+              aria-pressed={isPixelTip}
+              onClick={() => {
+                setIsPixelTip(true)
+                setTipSize(DEFAULT_PIXEL_TIP_SIZE)
+              }}
+              title="A brush for pixel art: its tip is drawn pixel by pixel, and paints at 1×, 2×, 3×… its size"
+            >
+              Pixel
+            </button>
+          </span>
+        </label>
+        <label>
           Tip paper
           <select value={tipSize} onChange={e => setTipSize(Number(e.target.value))}>
-            {TIP_SIZES.map(tip => (
+            {(isPixelTip ? PIXEL_TIP_SIZES : TIP_SIZES).map(tip => (
               <option key={tip} value={tip}>
                 {tip}×{tip}
-                {tip === DEFAULT_TIP_SIZE ? ' (default)' : ''}
+                {tip === (isPixelTip ? DEFAULT_PIXEL_TIP_SIZE : DEFAULT_TIP_SIZE) ? ' (default)' : ''}
               </option>
             ))}
           </select>
         </label>
-        <button onClick={() => onOpenDesigner(tipSize)}>Open Brush Designer</button>
+        <button onClick={() => onOpenDesigner(tipSize, isPixelTip)}>Open Brush Designer</button>
       </section>
 
       <section className="gpu-memory">

@@ -37,6 +37,11 @@ const MAX_NAME_LENGTH = 100
 type Edge = 'soft' | 'hard'
 const ROUND_BRUSHES: Record<Edge, string> = { soft: 'soft-round', hard: 'hard-round' }
 
+// A pixel brush's tip is drawn with Lydia's Pixel brush, a pixel at a time, and the new brush starts placing its tip
+// at every pixel, as the Pixel brush does, at one size whatever the pen's pressure
+const PIXEL_DRAWING_BRUSH = 'pixel'
+const PIXEL_SHAPE: BrushShape = { ...DEFAULT_SHAPE, spacing: 0.01, pressureSize: false, pixel: 'drawn' }
+
 // The tip is drawn with the brush and the eraser only
 const DESIGNER_TOOLS: readonly PaintTool[] = ['brush', 'eraser']
 
@@ -50,22 +55,24 @@ function grayFor(strength: number) {
 
 type Props = {
   tipSize: number // the paper's width and height, in pixels
+  pixel: boolean // the brush is a pixel brush, its tip drawn pixel by pixel (see brushFile.ts)
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   onBack: () => void
 }
 
 // The Brush Designer: draw the tip of a new brush on a small paper, choose how the tip is placed along a stroke, try
-// it, and keep it in the brushes or as a file (decision 30)
-export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
+// it, and keep it in the brushes or as a file (decision 30). A pixel brush's tip paints fully or not at all: it is
+// drawn in black only, and its edges, strength and the settings that turn the tip are left out
+export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   const [paper] = useState(() => newProject(tipSize, tipSize))
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<PaintTool>('brush')
   const [edge, setEdge] = useState<Edge>('hard')
   const [strength, setStrength] = useState(100)
-  const [size, setSize] = useState(Math.round(tipSize / 8))
+  const [size, setSize] = useState(pixel ? 1 : Math.round(tipSize / 8))
   const [name, setName] = useState(DEFAULT_NAME)
-  const [shape, setShape] = useState<BrushShape>(DEFAULT_SHAPE)
+  const [shape, setShape] = useState<BrushShape>(pixel ? PIXEL_SHAPE : DEFAULT_SHAPE)
   const [tipPng, setTipPng] = useState<Uint8Array | null>(null) // the tip as it goes in the file
   const [tip, setTip] = useState<BrushTip | null>(null) // the same tip, ready to paint with
   // The id the brush got when it was saved, so saving again changes it, and the file saved then
@@ -79,14 +86,14 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
   useEffect(() => {
     if (!engine) return
     let cancelled = false
-    const round = builtInBrush(ROUND_BRUSHES[edge])
-    tipOf(round).then(roundTip => {
-      if (!cancelled) engine.setBrushTip(roundTip, round.preset)
+    const drawing = builtInBrush(pixel ? PIXEL_DRAWING_BRUSH : ROUND_BRUSHES[edge])
+    tipOf(drawing).then(drawingTip => {
+      if (!cancelled) engine.setBrushTip(drawingTip, drawing.preset)
     })
     return () => {
       cancelled = true
     }
-  }, [engine, edge])
+  }, [engine, edge, pixel])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
@@ -100,7 +107,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
     if (!engine) return
     let cancelled = false
     async function makeTip(engine: Engine) {
-      const png = await tipFromPicture(await engine.exportImage('png'))
+      const png = await tipFromPicture(await engine.exportImage('png'), pixel)
       const decoded = png ? await decodeTip(png) : null
       if (cancelled) return
       setTipPng(png)
@@ -112,7 +119,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
     return () => {
       cancelled = true
     }
-  }, [engine, snapshot])
+  }, [engine, snapshot, pixel])
 
   // The brush's file as it is now, or null while nothing is painted
   const file = useMemo(
@@ -162,34 +169,38 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
           <button aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser (E)">
             Eraser
           </button>
-          <span className="button-group">
-            Edge
-            <button aria-pressed={edge === 'soft'} onClick={() => setEdge('soft')}>
-              Soft
-            </button>
-            <button aria-pressed={edge === 'hard'} onClick={() => setEdge('hard')}>
-              Hard
-            </button>
-          </span>
-          <label title="How much the brush paints: black paints fully, gray paints lightly">
-            Strength
-            <input
-              type="range"
-              min={1}
-              max={100}
-              value={strength}
-              disabled={tool === 'eraser'}
-              onChange={e => setStrength(Number(e.target.value))}
-            />
-            <SliderValue
-              value={strength}
-              min={1}
-              max={100}
-              unit="%"
-              disabled={tool === 'eraser'}
-              onChange={setStrength}
-            />
-          </label>
+          {!pixel && (
+            <>
+              <span className="button-group">
+                Edge
+                <button aria-pressed={edge === 'soft'} onClick={() => setEdge('soft')}>
+                  Soft
+                </button>
+                <button aria-pressed={edge === 'hard'} onClick={() => setEdge('hard')}>
+                  Hard
+                </button>
+              </span>
+              <label title="How much the brush paints: black paints fully, gray paints lightly">
+                Strength
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={strength}
+                  disabled={tool === 'eraser'}
+                  onChange={e => setStrength(Number(e.target.value))}
+                />
+                <SliderValue
+                  value={strength}
+                  min={1}
+                  max={100}
+                  unit="%"
+                  disabled={tool === 'eraser'}
+                  onChange={setStrength}
+                />
+              </label>
+            </>
+          )}
           <label title="Brush size ([ and ])">
             Size
             <input
@@ -234,8 +245,11 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
           </label>
           <p className="hint">
             {tip
-              ? `Tip: ${tip.image.width}×${tip.image.height} pixels, the painted part of the paper.`
-              : 'Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.'}
+              ? `Tip: ${tip.image.width}×${tip.image.height} pixels, the painted part of the paper.` +
+                (pixel ? ' It paints at 1×, 2×, 3×… this size, as the brush size comes nearest.' : '')
+              : pixel
+                ? 'Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.'
+                : 'Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.'}
           </p>
           <BrushShapeControls shape={shape} onChange={setShape} />
           <h2>Try it</h2>

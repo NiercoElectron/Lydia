@@ -31,8 +31,9 @@ On a Mac, Cmd works wherever Ctrl is written.
   Lydia remembers the last choice.
 
 - **Open project** opens a `.lyd` file saved by Lydia.
-- **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Choose the size of the paper for its tip
-  first: 256, 512 or 1024 pixels.
+- **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Choose first the kind of brush, **Smooth**
+  or **Pixel** (for pixel art), and the size of the paper for its tip: 256, 512 or 1024 pixels for a smooth brush,
+  16, 32 or 64 for a pixel brush.
 - **Interface**: the colors of Lydia's buttons and panels: **System** (as the computer is set, changing with it),
   **Light** or **Dark**. The drawing never changes color.
 - **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes
@@ -89,8 +90,11 @@ Every slider has its number next to it: click the number to type a value. Enter,
   - **Import…** adds brushes from `.lydbrush` files; dropping the files on the window does the same.
   - **Export** saves the chosen brush as a file, to share it.
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
-- **The Pixel brush** is for pixel art: whole pixels with hard edges, from 1 pixel up. While it is chosen, new
-  selections get hard edges (see [Selections](#selections)).
+- **The Pixel brush** is for pixel art: whole pixels with hard edges, from 1 pixel up. While it or any other pixel
+  brush is chosen, new selections get hard edges (see [Selections](#selections)).
+- **Pixel brushes drawn in the Brush Designer** paint their tip as it was drawn, pixel by pixel, at 1×, 2×, 3×… its
+  size: the **Size** goes to the nearest of them (a tip of 5 pixels paints 5 at sizes up to 7, 10 at sizes 8 to 12…).
+  Choosing one sets the Size to 1×.
 - **The pixel grid** shows the pixels from 800% zoom: the **Grid** button, or **G**, turns it on and off.
 - With a selection, the brush and the eraser only work inside it. A smart object can't be painted on (see
   [Transforming](#transforming-and-smart-objects)).
@@ -215,6 +219,11 @@ Opened from the start screen, it draws the tip of a new brush.
   texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
 - **Try it** paints with the brush as it is now, at any size; **Clear** wipes the test area.
 - **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file.
+
+**A pixel brush** (Pixel on the start screen) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
+Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
+The tip is cut to its painted pixels. The settings that turn the tip or give it noise are left out; the new brush
+starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
 
 ## All shortcuts
 
