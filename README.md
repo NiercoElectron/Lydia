@@ -66,7 +66,8 @@ Next, roughly in this order:
       the picture with the pen, and brush it back to how it was); in the Brush Designer, edit existing brushes and use
       an image as the tip
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
-- [ ] Guides: symmetry and rulers (straight lines, ellipses, perspective)
+- [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
+      outlined with the brush's own tip or filled, that stay editable and can be transformed)
 - [ ] Text and filters (hue and saturation, levels, blur)
 - [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
       from the computer
