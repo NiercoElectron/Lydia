@@ -1,7 +1,8 @@
 # Changelog
 
-Every version of Lydia and what changed in it, newest first. The middle number goes up with each big stage, and the
-last one with each small fix or feature ([decision 20](docs/decisions.md#20-version-numbers)). The format follows
+Every version of Lydia and what changed in it, newest first. A version comes out when a stage of the roadmap is
+finished, as the next middle number; the last number is for fixes to a version already out (until 0.8.5 it went up
+with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]

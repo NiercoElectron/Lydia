@@ -221,16 +221,20 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   [CHANGELOG.md](../CHANGELOG.md): each change is added under "Unreleased" when it is made, and moves under its
   number when the version comes out. Changes that leave the app the same (documentation, notes, tests) get no number
   and no line in the changelog, since the numbers tell what the app itself does.
+- **Changed (2026-10-25):** from 0.8.5 on, a version comes out only when a whole stage of the roadmap is finished
+  (my choice): its changes gather under "Unreleased" as they are made, and come out together as the next middle
+  number. The Painting stage will be 0.9.0. The last number is left for fixes to a version already out.
 - **Versions:** 0.1.0 was the first usable version, still with strokes stored as data (decision 3); 0.2.0 brought the
   tile engine from the spike into the main app; 0.3.0 completed the layers (delete, move, rename, undo of every layer
   change); 0.4.0 made brushes files that can be shared and added (decision 29); 0.5.0 brought the Brush Designer
   (decision 30); 0.6.0 started pixel art, with the Pixel brush and the pixel grid (decisions 33 and 34); 0.7.0 brought
   brushes with filtered noise and strokes painted in tiles of their own (decisions 35 and 36); 0.8.0 brought the basic
   tools: the tool column, the eyedropper, turning and flipping the view, the fill bucket, selections, the move tool and
-  smart objects (decisions 37 to 42). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
+  smart objects (decisions 37 to 42), and 0.8.1 to 0.8.5 small features after it, one each. 1.0.0 will be the desktop app, packaged with Electron. The full list is in
   [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
-  along it is.
+  along it is. A version for each small feature made five versions in two days; one for each stage is a version
+  worth trying, and its changelog tells what the stage brought.
 
 ## 21. A new project file, without opening the old one
 
