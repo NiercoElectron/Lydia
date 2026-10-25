@@ -6,8 +6,13 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-25
+
 ### Added
 
+- A saved drawing opens as it was shown: with the same zoom, angle and flip, and the same part of it in the middle of
+  the screen ([decision 38](docs/decisions.md#38-turning-and-flipping-the-view)). Before, it always opened straight,
+  showing the whole paper.
 - The start screen shows Lydia's version next to its name.
 - A guide to every tool and shortcut, [docs/guide.md](docs/guide.md). The README links to it in place of its own
   table of shortcuts.
@@ -286,7 +291,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/NiercoElectron/Lydia/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/NiercoElectron/Lydia/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/NiercoElectron/Lydia/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/NiercoElectron/Lydia/compare/v0.7.0...v0.8.0
