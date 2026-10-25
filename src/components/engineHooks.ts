@@ -3,6 +3,7 @@ import type { Engine, EngineSnapshot } from '../engine/engine'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
 import { loadPixelGrid, savePixelGrid } from '../settings'
+import { themeColor, useTheme } from '../theme'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
 import { TOOLS } from './toolList'
 
@@ -32,6 +33,14 @@ export function useEngineSnapshot(engine: Engine | null) {
 // zooming, and only what shows it needs to update then
 export function useViewState(engine: Engine | null) {
   return useSyncExternalStore(engine?.subscribeView ?? subscribeToNothing, engine?.getView ?? getStartingView)
+}
+
+// The color around the paper, as the interface's colors say (see theme.ts)
+export function useBackdrop(engine: Engine | null) {
+  const { theme } = useTheme()
+  useEffect(() => {
+    engine?.setBackdrop(themeColor('--around-paper'))
+  }, [engine, theme])
 }
 
 // The pixel grid, on or off as chosen last time. The engine shows it when the view is zoomed in enough

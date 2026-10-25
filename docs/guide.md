@@ -33,6 +33,8 @@ On a Mac, Cmd works wherever Ctrl is written.
 - **Open project** opens a `.lyd` file saved by Lydia.
 - **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Choose the size of the paper for its tip
   first: 256, 512 or 1024 pixels.
+- **Interface**: the colors of Lydia's buttons and panels: **System** (as the computer is set, changing with it),
+  **Light** or **Dark**. The drawing never changes color.
 - **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes
   switching layers and undoing faster, but choosing more than the card has makes everything very slow or loses the
   drawing. Choose at most half of your card's memory; if you're not sure, keep the default.

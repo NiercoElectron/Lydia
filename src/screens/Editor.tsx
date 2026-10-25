@@ -3,6 +3,7 @@ import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type 
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
 import {
+  useBackdrop,
   useDrawingShortcuts,
   useEngineSnapshot,
   usePixelGrid,
@@ -251,6 +252,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
+  useBackdrop(engine)
   useSelectionShortcuts(engine)
   useTransformShortcuts(engine)
 

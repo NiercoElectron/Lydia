@@ -6,6 +6,12 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- A dark mode ([decision 44](docs/decisions.md#44-a-dark-mode)). On the start screen, **Interface** chooses
+  **System** (as the computer is set, changing with it), **Light** or **Dark**, remembered by the browser. The gray
+  around the paper gets darker too; the drawing never changes color.
+
 ## [0.8.4] - 2026-10-25
 
 ### Added

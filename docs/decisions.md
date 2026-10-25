@@ -1062,6 +1062,32 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   active layer; a second image waiting for the first; taking an image out of the tray; a file that isn't an image; the
   tray staying for the next drawing.
 
+## 44. A dark mode
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - Lydia's interface can be light or dark. **Interface** on the start screen chooses **System** (as the computer is
+    set, changing with it), **Light** or **Dark** (my choice). It starts on System, and the browser remembers it.
+  - The gray around the paper gets darker in dark mode, as in Photoshop and Krita (my choice). The drawing, the
+    Brush Designer's test area and the squares of a transparent paper are paper, and keep their colors.
+  - It came first in the roadmap, before the Painting stage: every new screen would have added colors to change.
+- **Why:**
+  - Painters spend hours in front of the screen, often with little light around, and the programs they know are
+    dark. A light interface around a drawing also makes its colors look darker than they are.
+- **How:**
+  - Every color of the interface is a CSS variable, with a light and a dark set. `color-scheme` makes the browser's
+    own buttons, fields, lists and windows light or dark too, so they need no colors of their own.
+  - `theme.ts` keeps the choice, follows the computer's setting while it is System, and puts the colors on the page
+    (`data-theme` on its root) before anything is shown. Until Lydia starts, the page follows the computer.
+  - The gray around the paper is drawn by the graphics card, so the engine reads it from the CSS (`--around-paper`)
+    whenever the colors change.
+  - The brushes' sample strokes are black on a transparent canvas; on a dark card they are shown inverted, white.
+- **Checked:** System following the computer as it changes, Light and Dark against it, the choice remembered after
+  a reload; the gray around the paper in the editor and the Brush Designer, in both; the sample strokes; screenshots
+  of the start screen, the editor with the tray and the Brush Designer in dark mode, and the editor in light mode, the
+  same as before.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

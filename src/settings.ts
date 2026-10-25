@@ -71,6 +71,27 @@ export function savePixelGrid(on: boolean) {
   }
 }
 
+// The interface's colors (see theme.ts): "system" follows the computer's setting
+export type ThemeChoice = 'system' | 'light' | 'dark'
+const THEME_KEY = 'lydia.theme'
+
+export function loadThemeChoice(): ThemeChoice {
+  try {
+    const saved = localStorage.getItem(THEME_KEY)
+    return saved === 'light' || saved === 'dark' ? saved : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+export function saveThemeChoice(choice: ThemeChoice) {
+  try {
+    localStorage.setItem(THEME_KEY, choice)
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // The brush chosen last (its id in the brush library, see brushLibrary.ts)
 const BRUSH_KEY = 'lydia.brush'
 

@@ -987,6 +987,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     changed()
   }
 
+  // ----- The color around the paper -----
+
+  // It follows the interface's colors (see theme.ts)
+  function setBackdrop(color: string) {
+    app.renderer.background.color = color
+  }
+
   // ----- Pixel grid -----
 
   // Turn the pixel grid on or off. When on, it shows from 800% zoom (see pixelGrid.ts)
@@ -1023,6 +1030,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setFill,
     setBrushTip,
     setPixelGrid,
+    setBackdrop,
     undo,
     redo,
     clearLayer,

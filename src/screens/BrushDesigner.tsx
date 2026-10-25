@@ -4,7 +4,7 @@ import { BrushShapeControls } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
 import { SliderValue } from '../components/SliderValue'
-import { useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
+import { useBackdrop, useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
 import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
 import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
@@ -74,6 +74,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
+  useBackdrop(engine)
 
   // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it
   useEffect(() => {

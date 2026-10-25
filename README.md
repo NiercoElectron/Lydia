@@ -42,6 +42,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Export the drawing as a PNG or JPEG image, at full size
 - Save and open projects as `.lyd` files
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)
+- A light or a dark interface, or as the computer is set (on the start screen)
 
 How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
@@ -50,13 +51,12 @@ How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
 stroke opacity, a tool column, the eyedropper, turning and flipping the view, the fill bucket, rectangle and lasso
-selections, the move tool, smart objects and transforming, importing images with a tray, new drawings with common sizes, a resolution (DPI) and a
-background color or transparency, `.lyd` projects, PNG and JPEG export. What changed in each version is in
-[CHANGELOG.md](CHANGELOG.md).
+selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
+with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export.
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Dark mode: a dark look for the whole interface
 - [ ] Painting: pixel brushes drawn in the Brush Designer, the brush's outline under the pen, pen tilt (the brush
       follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,

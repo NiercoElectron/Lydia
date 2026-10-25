@@ -5,7 +5,15 @@ import { NewProjectDialog } from '../components/NewProjectDialog'
 import { DEFAULT_TIP_SIZE, TIP_SIZES } from '../engine/brushFile'
 import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { tilesInGigabytes } from '../engine/tiles'
-import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES } from '../settings'
+import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES, type ThemeChoice } from '../settings'
+import { setThemeChoice, useTheme } from '../theme'
+
+// The choices for the interface's colors (see theme.ts)
+const THEME_CHOICES: [ThemeChoice, string][] = [
+  ['system', 'System'],
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+]
 
 type Props = {
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
@@ -20,6 +28,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   const [isOpening, setIsOpening] = useState(false)
   const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const theme = useTheme()
 
   async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -46,6 +55,17 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
         </button>
       </div>
       <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+      <div
+        className="button-group theme-choice"
+        title="The colors of Lydia's buttons and panels (System: as the computer is set). The drawing never changes"
+      >
+        Interface
+        {THEME_CHOICES.map(([value, label]) => (
+          <button key={value} aria-pressed={theme.choice === value} onClick={() => setThemeChoice(value)}>
+            {label}
+          </button>
+        ))}
+      </div>
       {isChoosingNew && <NewProjectDialog onCreate={onNewProject} onCancel={() => setIsChoosingNew(false)} />}
 
       <section className="designer-start">
