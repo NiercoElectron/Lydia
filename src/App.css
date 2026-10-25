@@ -206,6 +206,13 @@ fieldset.new-project-row {
   gap: 8px;
 }
 
+/* The tool's settings always have a row of their own, above the actions, so that the drawing area keeps its size when
+   another tool, with more or fewer settings, is chosen */
+.editor-bar > .toolbar {
+  flex-basis: 100%;
+  min-height: 28px;
+}
+
 .busy,
 .notice {
   color: var(--muted);

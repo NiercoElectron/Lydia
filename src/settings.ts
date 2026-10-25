@@ -1,4 +1,5 @@
 import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MIN_SIZE } from './engine/projectFile'
+import { DEFAULT_STABILIZER, MAX_STABILIZER, STABILIZER_MODES, type StabilizerSettings } from './engine/stabilizer'
 
 // Choices remembered by this browser between visits
 
@@ -85,6 +86,31 @@ export function loadBrushOutline() {
 export function saveBrushOutline(on: boolean) {
   try {
     localStorage.setItem(BRUSH_OUTLINE_KEY, on ? 'on' : 'off')
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+// How strokes are smoothed (see stabilizer.ts). Off at first
+const STABILIZER_KEY = 'lydia.stabilizer'
+
+export function loadStabilizer(): StabilizerSettings {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STABILIZER_KEY) ?? 'null')
+    const isValid =
+      STABILIZER_MODES.includes(saved?.mode) &&
+      Number.isInteger(saved.strength) &&
+      saved.strength >= 0 &&
+      saved.strength <= MAX_STABILIZER
+    return isValid ? { mode: saved.mode, strength: saved.strength } : DEFAULT_STABILIZER
+  } catch {
+    return DEFAULT_STABILIZER
+  }
+}
+
+export function saveStabilizer(settings: StabilizerSettings) {
+  try {
+    localStorage.setItem(STABILIZER_KEY, JSON.stringify(settings))
   } catch {
     // not remembered next time, but used now
   }

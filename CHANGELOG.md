@@ -14,6 +14,16 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   pressure, and turned as it paints (Dashes turns with the stroke). The Pixel brush's outline goes along the pixels it
   would paint. Smaller than 8 pixels on the screen, the cursor's cross shows instead. The **Outline** button, next to
   Grid, turns it off and on.
+- A stabilizer, for smoother strokes ([decision 46](docs/decisions.md#46-the-stabilizer)). **Stabilizer** in the bar of
+  the brush and the eraser, from 0 (off) to 100, chooses how strong it is, for every brush, and the browser remembers
+  it. **Smooth**: the brush chases the pen, lagging behind it, and keeps going when the pen holds still. **String**: the
+  pen pulls the brush on a string, which only moves when the pen goes further than the string. When the pen comes up,
+  the stroke goes on to where it left. While the brush lags, a line joins it to the pen.
+
+### Changed
+
+- The settings of the chosen tool always have the bar's first row, and the actions (Undo, the view, Export…) the
+  second, so the drawing area no longer changes size, and the drawing no longer jumps, when another tool is chosen.
 
 ## [0.8.5] - 2026-10-25
 

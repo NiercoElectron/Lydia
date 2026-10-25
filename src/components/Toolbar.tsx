@@ -1,5 +1,6 @@
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
+import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
 import { SliderValue } from './SliderValue'
 
@@ -36,18 +37,20 @@ type Props = {
   fill: FillSettings
   selection: SelectionControls
   transform: TransformControls
+  stabilizer: StabilizerSettings
   isGridOn: boolean
   isOutlineOn: boolean
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
+  onStabilizerChange: (change: Partial<StabilizerSettings>) => void
   onGridToggle: () => void
   onOutlineToggle: () => void
 }
 
-// The settings of the chosen tool: the color, then the brush's size and opacity, the fill bucket's settings, or the
-// selection's. The move tool has none. While a transform is made, its own settings instead
+// The settings of the chosen tool: the color, then the brush's size, opacity and stabilizer, the fill bucket's
+// settings, or the selection's. The move tool has none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
   color,
@@ -56,12 +59,14 @@ export function Toolbar({
   fill,
   selection,
   transform,
+  stabilizer,
   isGridOn,
   isOutlineOn,
   onColorChange,
   onSizeChange,
   onOpacityChange,
   onFillChange,
+  onStabilizerChange,
   onGridToggle,
   onOutlineToggle,
 }: Props) {
@@ -125,6 +130,9 @@ export function Toolbar({
           />
           <SliderValue value={opacity} min={1} max={100} unit="%" onChange={onOpacityChange} />
         </label>
+      )}
+      {(tool === 'brush' || tool === 'eraser') && (
+        <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
@@ -229,6 +237,48 @@ function TransformButtons({ controls, smooth }: { controls: TransformControls; s
       <button onClick={controls.onCancel} title="Cancel (Esc)">
         Cancel
       </button>
+    </>
+  )
+}
+
+// The stabilizer's strength (0 is off) and the way it smooths (see stabilizer.ts). Also used by the Brush Designer
+export function StabilizerControls({
+  stabilizer,
+  onChange,
+}: {
+  stabilizer: StabilizerSettings
+  onChange: (change: Partial<StabilizerSettings>) => void
+}) {
+  const { mode, strength } = stabilizer
+  return (
+    <>
+      <label title="Smoother strokes: the brush follows the pen instead of being exactly where it is. 0 is off">
+        Stabilizer
+        <input
+          type="range"
+          min={0}
+          max={MAX_STABILIZER}
+          value={strength}
+          onChange={e => onChange({ strength: Number(e.target.value) })}
+        />
+        <SliderValue value={strength} min={0} max={MAX_STABILIZER} onChange={strength => onChange({ strength })} />
+      </label>
+      <span className="button-group">
+        <button
+          aria-pressed={mode === 'smooth'}
+          onClick={() => onChange({ mode: 'smooth' })}
+          title="The brush chases the pen, lagging behind it, and keeps going when the pen holds still"
+        >
+          Smooth
+        </button>
+        <button
+          aria-pressed={mode === 'string'}
+          onClick={() => onChange({ mode: 'string' })}
+          title="The pen pulls the brush on a string: the brush only moves when the pen goes further than the string"
+        >
+          String
+        </button>
+      </span>
     </>
   )
 }

@@ -1127,6 +1127,46 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   down while painting downward; the Pixel brush at 3200% along the edges of its pixels; the Outline button off and
   on, remembered; screenshots of the outline over a dab of each brush.
 
+## 46. The stabilizer
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - A stabilizer smooths the strokes of the brush and the eraser, in **two ways** to choose from (my choice), as
+    Photoshop and Krita have:
+    - **Smooth**: the brush chases the pen, closing part of the distance at every moment, so it lags behind and cuts
+      the wobbles and the corners; when the pen holds still, the brush keeps going until it reaches it;
+    - **String** (Photoshop's "pulled string"): the brush doesn't move while the pen stays within a string's length,
+      and is pulled straight behind it when the pen goes further.
+  - Its **strength**, from 0 (off) to 100, is a slider in the bar, the same for every brush (my choice), and the
+    browser remembers it with the way chosen. It starts off.
+  - When the pen comes up, the stroke goes on straight to where it left (my choice), like Photoshop's "catch-up", so
+    lines end where they were drawn to.
+  - While the brush lags, the outline (decision 45) is where the brush is, which is where the paint goes, and a line
+    joins it to the pen (my choice), as in Krita.
+- **Why:**
+  - Steady lines and smooth curves are hard by hand, more so with a mouse or a small tablet; the stabilizer is one of
+    the settings painters change the most. The two ways suit different work: Smooth for painting and sketching, String
+    for clean lines that must not wobble at all.
+- **How:**
+  - The stabilizer sits between the pointer and the brush (`stabilizer.ts`): it gets the pen's points and gives back
+    the points the brush passes through, with the pressure, and the brush places its dabs along them as before.
+  - Smooth works in time, not in points, so it lags the same however many points the browser sends: in every
+    millisecond, the brush closes the same share of its distance to the pen. At full strength it closes about two
+    thirds of it in 0.3 s, and that time grows with the square of the strength, so the low strengths, for a light
+    touch, get more of the slider. The brush is worked out every 4 ms along the line between two points of the pen,
+    so it draws a curve and not a few jumps, and every frame while the pen holds still.
+  - The string's length is measured on the screen (up to 80 pixels), so it feels the same at any zoom.
+  - The bar's two rows: the strength slider and the two ways made the brush's settings too long to share a row with
+    the actions at 1600 pixels across, so the drawing area got shorter whenever the brush was chosen, and the drawing
+    jumped. The fill bucket's settings already did that. Now the tool's settings always have the first row and the
+    actions the second, and the drawing area keeps its size with every tool.
+- **Checked:** the slider showing with the brush and the eraser only; a shaky line drawn with Smooth at 60 wobbling
+  5 pixels instead of 25, and ending where the pen came up; with the pen held still, the brush first behind it, then
+  reaching it; the line from the brush to the pen; String not moving within the string, pulled behind the pen beyond
+  it, catching up when the pen comes up; 0 painting right under the pen; the settings remembered; the drawing area's
+  height the same with every tool and while transforming.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

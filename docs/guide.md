@@ -41,7 +41,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 ## The editor
 
-- **At the top:** the settings of the chosen tool, then Undo, Redo, Clear layer, the view (zoom, angle, Straighten,
+- **At the top:** the settings of the chosen tool on the first row; on the second, Undo, Redo, Clear layer, the view (zoom, angle, Straighten,
   Flip, Fit), Export PNG, Export JPEG, Save and Back. What Lydia is busy with ("Saving…", "Filling…") shows at the
   end.
 - **At the left:** the tools, with the **Tray** button at their foot, then the brushes.
@@ -64,6 +64,16 @@ Every slider has its number next to it: click the number to type a value. Enter,
   at full pressure and turned as it paints (brushes like Dashes turn it with the stroke). The Pixel brush's outline
   goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.
+- **The stabilizer** smooths the strokes, for steady lines with a shaky hand. **Stabilizer**, in the bar, goes from 0
+  (off) to 100 and is the same for every brush:
+  - **Smooth**: the brush chases the pen, lagging behind it and cutting its wobbles. The stronger, the more it lags.
+    When the pen holds still, the brush keeps going until it reaches it;
+  - **String**: the pen pulls the brush on a string. The brush doesn't move while the pen stays within the string's
+    length (longer the stronger), and follows it straight when it goes further. Good for clean curves and lines.
+
+  While the brush lags, a line joins it to the pen, and the outline is where the brush is. When the pen comes up, the
+  stroke goes on to where it left.
+
 - **The brushes:** nine come with Lydia (Soft round, Hard round, Pixel, Airbrush, Chalk, Calligraphy, Dashes, Bristles,
   Sponge). Click one to paint with it.
   - **Import…** adds brushes from `.lydbrush` files; dropping the files on the window does the same.

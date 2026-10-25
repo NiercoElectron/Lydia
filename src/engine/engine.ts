@@ -36,6 +36,7 @@ import {
   type SmartObject,
   type SmartView,
 } from './smartObject'
+import type { StabilizerSettings } from './stabilizer'
 import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, tileSize, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
@@ -1008,6 +1009,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     view.setBrushOutline(on)
   }
 
+  // ----- The stabilizer -----
+
+  // How strokes are smoothed (see stabilizer.ts)
+  function setStabilizer(settings: StabilizerSettings) {
+    view.setStabilizer(settings)
+  }
+
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
@@ -1038,6 +1046,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setBrushTip,
     setPixelGrid,
     setBrushOutline,
+    setStabilizer,
     setBackdrop,
     undo,
     redo,

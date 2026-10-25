@@ -8,6 +8,7 @@ import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
 import type { Quad } from './smartObject'
+import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { tilesInRect, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
@@ -205,17 +206,24 @@ export function createView(
 
   // ----- What each tool does with the pointer -----
 
+  // The brush paints where the pen goes, or, with the stabilizer on, where the stabilizer lets it follow the pen
   function paint(e: PointerEvent): Gesture {
     hoverPoint = null
-    const point = toPaper(e)
-    brush.startStroke(point.x, point.y, pressureOf(e))
+    const point = { ...toPaper(e), pressure: pressureOf(e) }
+    brush.startStroke(point.x, point.y, point.pressure)
+    if (stabilizerSettings.strength > 0) {
+      stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
+    }
     return {
       move(e) {
         // The browser groups fast movements into one event; get all the points in between
         const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
-        brush.continueStroke(points)
+        brush.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
       },
-      up() {
+      up(e) {
+        // A stroke the browser took away ends where the brush is, not where the pen was
+        if (stabilizer && e.type === 'pointerup') brush.continueStroke(stabilizer.finish())
+        stabilizer = null
         if (brush.endStroke()) actions.onStrokeEnd()
       },
     }
@@ -485,21 +493,28 @@ export function createView(
       isOutlineShown = isShown
       showCursor()
     }
-    brushOutline.visible = isShown
-    if (!isShown) return
+    // While the stabilizer holds the brush back, the outline is where the brush is, and a line joins it to the pen.
+    // The line shows even when the outline doesn't
+    const isLagging = stabilizer !== null && isPaintTool(used)
+    brushOutline.visible = isShown || (at !== null && isLagging)
+    if (!at || !brushOutline.visible) return
 
+    const center = stabilizer ? stabilizer.brushAt() : paperAt(at)
     const tip = brush.getTip()
     const isPixel = brush.getShape().pixel !== 'none'
     const angle = brush.tipAngle()
     const { position, scale, rotation } = world
-    const key = [at.x, at.y, size, isPixel, angle, position.x, position.y, scale.x, scale.y, rotation].join()
+    const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle]
+      .concat([position.x, position.y, scale.x, scale.y, rotation])
+      .join()
     if (key === outlineKey && tip === outlineTip) return
     outlineKey = key
     outlineTip = tip
 
-    const center = paperAt(at)
-    let loops: Point[][]
-    if (isPixel) {
+    let loops: Point[][] = []
+    if (!isShown) {
+      // only the line
+    } else if (isPixel) {
       // Along the pixels the dab would paint there (see dabs.ts)
       const side = Math.max(1, Math.round(size))
       const left = Math.round(center.x - side / 2)
@@ -513,12 +528,15 @@ export function createView(
       )
     }
     const onScreenLoops = loops.map(loop => loop.map(toScreen))
+    const brushOnScreen = toScreen(center)
+    const hasLine = isLagging && Math.hypot(brushOnScreen.x - at.x, brushOnScreen.y - at.y) >= 1
     brushOutline.clear()
     for (const [width, color] of [
       [3, 0xffffff],
       [1, 0x000000],
     ]) {
       for (const loop of onScreenLoops) brushOutline.poly(loop, true)
+      if (hasLine) brushOutline.poly([brushOnScreen, at], false)
       brushOutline.stroke({ width, color })
     }
   }
@@ -526,6 +544,21 @@ export function createView(
   // Turn the brush's outline on or off. When off, the brush shows the cursor's cross
   function setBrushOutline(on: boolean) {
     isOutlineOn = on
+  }
+
+  // ----- The stabilizer -----
+
+  let stabilizerSettings = DEFAULT_STABILIZER
+  let stabilizer: Stabilizer | null = null // the stroke's, while painting with it on (see stabilizer.ts)
+
+  // While painting with the stabilizer, the brush goes on toward the pen every frame, even when the pen holds still
+  function keepStabilizing() {
+    if (stabilizer) brush.continueStroke(stabilizer.wait(performance.now()))
+  }
+
+  // How strokes are smoothed from the next one on
+  function setStabilizer(settings: StabilizerSettings) {
+    stabilizerSettings = settings
   }
 
   // ----- Mouse, pen and keyboard -----
@@ -669,6 +702,7 @@ export function createView(
   window.addEventListener('blur', handleBlur)
   app.ticker.add(prepareUnderBrush)
   app.ticker.add(showHandles)
+  app.ticker.add(keepStabilizing)
   app.ticker.add(showBrushOutline)
   showCursor()
   fitToScreen()
@@ -685,6 +719,7 @@ export function createView(
     window.removeEventListener('blur', handleBlur)
     app.ticker.remove(prepareUnderBrush)
     app.ticker.remove(showHandles)
+    app.ticker.remove(keepStabilizing)
     app.ticker.remove(showBrushOutline)
     outline.destroy()
     handles.destroy()
@@ -700,6 +735,7 @@ export function createView(
     flip,
     setTool,
     setBrushOutline,
+    setStabilizer,
     getState: () => state,
     getSaved,
     showSaved,

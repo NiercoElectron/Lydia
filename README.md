@@ -14,6 +14,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   lasso, move, hand, zoom and rotate view
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
+- A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - A fill bucket, with a tolerance, looking at all the visible layers or only the active one, and expanding under the
   soft edge of the lines, so that no light rim is left between the color and the line
 - An eyedropper that picks the color the screen shows, by clicking or dragging over the drawing (or holding Alt while
@@ -51,7 +52,7 @@ How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
-stroke opacity, a tool column, the eyedropper, the brush's outline, turning and flipping the view, the fill bucket, rectangle and lasso
+stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, turning and flipping the view, the fill bucket, rectangle and lasso
 selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
@@ -59,7 +60,7 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 Next, roughly in this order:
 
 - [ ] Painting: pixel brushes drawn in the Brush Designer, pen tilt (the brush follows how the pen leans, like a
-      pencil), stabilizer (smoother strokes), tapered stroke ends
+      pencil), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
 - [ ] Layers: folders of layers (a "Head" folder with the chin, the hair, the ears…), blend modes, clipping masks,

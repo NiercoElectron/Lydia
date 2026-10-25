@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Engine, EngineSnapshot } from '../engine/engine'
+import type { StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
-import { loadBrushOutline, loadPixelGrid, saveBrushOutline, savePixelGrid } from '../settings'
+import {
+  loadBrushOutline,
+  loadPixelGrid,
+  loadStabilizer,
+  saveBrushOutline,
+  savePixelGrid,
+  saveStabilizer,
+} from '../settings'
 import { themeColor, useTheme } from '../theme'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
 import { TOOLS } from './toolList'
@@ -67,6 +75,22 @@ export function useBrushOutline(engine: Engine | null) {
     setIsOn(!isOn)
   }, [isOn])
   return [isOn, toggle] as const
+}
+
+// The stabilizer's settings, as chosen last time
+export function useStabilizer(engine: Engine | null) {
+  const [settings, setSettings] = useState(loadStabilizer)
+  useEffect(() => {
+    engine?.setStabilizer(settings)
+  }, [engine, settings])
+  const change = useCallback((change: Partial<StabilizerSettings>) => {
+    setSettings(current => {
+      const next = { ...current, ...change }
+      saveStabilizer(next)
+      return next
+    })
+  }, [])
+  return [settings, change] as const
 }
 
 // The selection's shortcuts, as in Photoshop: Ctrl/Cmd + A selects everything, Ctrl/Cmd + D nothing, and
