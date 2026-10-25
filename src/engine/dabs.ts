@@ -151,7 +151,10 @@ export function createDabPath(shape: BrushShape, size: number) {
     return dabs
   }
 
-  return { start, moveTo, end }
+  // Which way the stroke is going, in radians, clockwise from the right (0 before it has moved)
+  const direction = () => Math.atan2(directionY, directionX)
+
+  return { start, moveTo, end, direction }
 }
 
 export type DabPath = ReturnType<typeof createDabPath>

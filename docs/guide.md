@@ -60,6 +60,10 @@ Every slider has its number next to it: click the number to type a value. Enter,
   Opacity is how much a stroke covers, however many times it passes over the same place.
 - With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
 - Hold **Alt** to pick a color from the drawing while painting.
+- **The outline:** over the drawing, the brush shows the outline of its tip instead of the cursor, as big as it paints
+  at full pressure and turned as it paints (brushes like Dashes turn it with the stroke). The Pixel brush's outline
+  goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
+  **Outline** button, next to Grid, turns it off, for the cross always.
 - **The brushes:** nine come with Lydia (Soft round, Hard round, Pixel, Airbrush, Chalk, Calligraphy, Dashes, Bristles,
   Sponge). Click one to paint with it.
   - **Import…** adds brushes from `.lydbrush` files; dropping the files on the window does the same.

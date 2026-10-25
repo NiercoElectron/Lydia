@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
-import { loadPixelGrid, savePixelGrid } from '../settings'
+import { loadBrushOutline, loadPixelGrid, saveBrushOutline, savePixelGrid } from '../settings'
 import { themeColor, useTheme } from '../theme'
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from './Toolbar'
 import { TOOLS } from './toolList'
@@ -51,6 +51,19 @@ export function usePixelGrid(engine: Engine | null) {
   }, [engine, isOn])
   const toggle = useCallback(() => {
     savePixelGrid(!isOn)
+    setIsOn(!isOn)
+  }, [isOn])
+  return [isOn, toggle] as const
+}
+
+// The brush's outline under the pointer, on or off as chosen last time
+export function useBrushOutline(engine: Engine | null) {
+  const [isOn, setIsOn] = useState(loadBrushOutline)
+  useEffect(() => {
+    engine?.setBrushOutline(isOn)
+  }, [engine, isOn])
+  const toggle = useCallback(() => {
+    saveBrushOutline(!isOn)
     setIsOn(!isOn)
   }, [isOn])
   return [isOn, toggle] as const

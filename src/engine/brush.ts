@@ -28,6 +28,7 @@ export type StrokeCutter = {
 
 // Tiles of finished strokes kept for the next ones, instead of creating and deleting textures at every stroke
 const SPARE_STROKE_TILES = 64
+const DEGREES = Math.PI / 180
 
 export function createBrush(
   renderer: WebGLRenderer,
@@ -168,6 +169,10 @@ export function createBrush(
     return tipReach + shape.scatter * settings.size
   }
 
+  // How much the tip is turned now, in radians, clockwise: as the brush is made, and also with the direction of the
+  // stroke while painting with a brush that turns with it. The random turn of each dab is left out
+  const tipAngle = () => shape.angle * DEGREES + (shape.followStroke && path ? path.direction() : 0)
+
   function destroy() {
     painter.destroy()
     mergeRoot.destroy({ children: true })
@@ -177,6 +182,9 @@ export function createBrush(
   return {
     settings,
     setTip,
+    getTip: () => tip,
+    getShape: () => shape,
+    tipAngle,
     startStroke,
     continueStroke,
     endStroke,

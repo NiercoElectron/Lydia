@@ -1088,6 +1088,41 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   of the start screen, the editor with the tray and the Brush Designer in dark mode, and the editor in light mode, the
   same as before.
 
+## 45. The brush's outline
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - With the brush or the eraser, the outline of the brush's **tip** follows the pointer, in its shape and turned as
+    it paints (my choice), like in Krita and Photoshop: Calligraphy shows a thin slanted ellipse, Dashes a bar that
+    turns with the stroke while painting. The Pixel brush's outline goes along the edges of the pixels it would
+    paint there.
+  - It shows the brush's **full size**, the size at full pressure, and doesn't change with the pen's pressure while
+    painting (my choice), as in Photoshop.
+  - It takes the cursor's place. When the brush is **smaller than 8 pixels on the screen**, the cursor's cross shows
+    instead (my choice), so the point where it paints can still be seen.
+  - The **Outline** button in the bar, next to Grid, turns it off and on (my choice), in the editor and the Brush
+    Designer; the browser remembers it.
+  - It was the first item of the Painting stage, the smallest one and the one used all the time.
+- **Why:**
+  - Without it, the size of the brush is only known after painting. The shape matters too: a brush that isn't round
+    paints differently in each direction.
+- **How:**
+  - Browsers draw cursors only up to 128 pixels, and a brush can be far bigger on the screen. So the graphics card
+    draws the outline, over everything, from where the pointer is, turned and flipped with the view. It is drawn again
+    only when what it shows changes: where the pointer is, the size, the angle, the tip or the view.
+  - A tip's outline is worked out once, from its picture: shrunk to at most 64 squares across, the outline goes where
+    the tip paints 5% of the most it paints anywhere (marching squares). So a soft tip's outline is nearly as big as
+    all it paints, and the small holes of a grainy tip (Chalk) don't show. Loops around tiny specks are left out, and
+    each loop keeps only the points needed to follow its shape.
+  - The random parts of a brush aren't shown: the random turn of each dab (Chalk), its scatter and the noise that
+    goes past the tip (Sponge).
+- **Checked:** the outline over the paper and the cursor hidden; its size against the brush's; centered on the
+  pointer and following it; hidden off the drawing, with Space, with other tools and below 8 pixels (the cross
+  then); the eraser; redrawn bigger when zooming in; Calligraphy turned; Dashes across before painting and turned
+  down while painting downward; the Pixel brush at 3200% along the edges of its pixels; the Outline button off and
+  on, remembered; screenshots of the outline over a dab of each brush.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

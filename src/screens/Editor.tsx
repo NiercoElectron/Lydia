@@ -6,6 +6,7 @@ import {
   useBackdrop,
   useDrawingShortcuts,
   useEngineSnapshot,
+  useBrushOutline,
   usePixelGrid,
   useSelectionShortcuts,
   useTransformShortcuts,
@@ -251,6 +252,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   }, [importBrushes, addToTray, placeImage, tray, engine])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
+  const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
   useSelectionShortcuts(engine)
@@ -324,11 +326,13 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
             onConvertToPixels: () => engine?.convertToPixels(),
           }}
           isGridOn={isGridOn}
+          isOutlineOn={isOutlineOn}
           onColorChange={setColor}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
           onGridToggle={toggleGrid}
+          onOutlineToggle={toggleOutline}
         />
         <div className="actions">
           <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">

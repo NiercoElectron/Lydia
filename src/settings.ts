@@ -71,6 +71,25 @@ export function savePixelGrid(on: boolean) {
   }
 }
 
+// Whether the brush shows its outline under the pointer (see view.ts). It does at first
+const BRUSH_OUTLINE_KEY = 'lydia.brushOutline'
+
+export function loadBrushOutline() {
+  try {
+    return localStorage.getItem(BRUSH_OUTLINE_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function saveBrushOutline(on: boolean) {
+  try {
+    localStorage.setItem(BRUSH_OUTLINE_KEY, on ? 'on' : 'off')
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // The interface's colors (see theme.ts): "system" follows the computer's setting
 export type ThemeChoice = 'system' | 'light' | 'dark'
 const THEME_KEY = 'lydia.theme'

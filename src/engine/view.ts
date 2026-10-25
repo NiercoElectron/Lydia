@@ -1,5 +1,7 @@
 import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
+import { pixelTipOutline, tipOutline } from './brushOutline'
+import type { BrushTip } from './brushTip'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { ViewData } from './projectFile'
@@ -17,6 +19,7 @@ const SCRUB_ZOOM = 0.01 // dragging with the zoom tool: how fast it zooms, for e
 const CLICK_DISTANCE = 4 // pixels of the screen a click may move before it counts as dragging
 const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of this many degrees
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
+const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen shows the cursor's cross, not its outline
 
 // The cursor of each tool over the drawing
 const CURSORS: Record<Tool, string> = {
@@ -445,11 +448,84 @@ export function createView(
     else if (!gesture && !isSpaceDown && transformCursor && actions.getTransform()) cursor = transformCursor
     else if (shown === 'hand' && gesture) cursor = 'grabbing'
     else if (shown === 'zoom' && isAltDown && !gesture) cursor = 'zoom-out'
+    else if (isOutlineShown) cursor = 'none'
     if (cursor === shownCursor) return
     shownCursor = cursor
     // PixiJS sets the canvas's cursor too, to its "default" style, when the pointer first moves over it
     app.renderer.events.cursorStyles.default = cursor
     canvas.style.cursor = cursor
+  }
+
+  // ----- The brush's outline -----
+
+  // With the brush or the eraser, the outline of the brush's tip follows the pointer, over everything, as big as the
+  // brush paints at full pressure and turned as its tip is, so the size and the shape of the brush show before
+  // painting. It takes the cursor's place, unless it would be too small to see. White with a black line inside, like a
+  // selection's outline, and drawn again only when what it shows changes
+  const brushOutline = new Graphics()
+  app.stage.addChild(brushOutline)
+  let isOutlineOn = true
+  let isOutlineShown = false
+  let pointer: Point | null = null // where the pointer is on the canvas, or null when it isn't over it
+  let outlineKey = '' // what the outline was last drawn for: where, how big, how turned, and the view
+  let outlineTip: BrushTip | null = null
+
+  function showBrushOutline() {
+    const at = pointer
+    const used = gesture?.tool ?? currentTool()
+    const { size } = brush.settings
+    const isShown =
+      isOutlineOn &&
+      at !== null &&
+      isPaintTool(used) &&
+      actions.canUse(used) &&
+      !actions.getTransform() &&
+      size * currentZoom() >= MIN_OUTLINE
+    if (isShown !== isOutlineShown) {
+      isOutlineShown = isShown
+      showCursor()
+    }
+    brushOutline.visible = isShown
+    if (!isShown) return
+
+    const tip = brush.getTip()
+    const isPixel = brush.getShape().pixel !== 'none'
+    const angle = brush.tipAngle()
+    const { position, scale, rotation } = world
+    const key = [at.x, at.y, size, isPixel, angle, position.x, position.y, scale.x, scale.y, rotation].join()
+    if (key === outlineKey && tip === outlineTip) return
+    outlineKey = key
+    outlineTip = tip
+
+    const center = paperAt(at)
+    let loops: Point[][]
+    if (isPixel) {
+      // Along the pixels the dab would paint there (see dabs.ts)
+      const side = Math.max(1, Math.round(size))
+      const left = Math.round(center.x - side / 2)
+      const top = Math.round(center.y - side / 2)
+      loops = [pixelTipOutline(side).map(p => ({ x: left + p.x, y: top + p.y }))]
+    } else {
+      const cos = Math.cos(angle) * size
+      const sin = Math.sin(angle) * size
+      loops = tipOutline(tip).map(loop =>
+        loop.map(p => ({ x: center.x + p.x * cos - p.y * sin, y: center.y + p.x * sin + p.y * cos })),
+      )
+    }
+    const onScreenLoops = loops.map(loop => loop.map(toScreen))
+    brushOutline.clear()
+    for (const [width, color] of [
+      [3, 0xffffff],
+      [1, 0x000000],
+    ]) {
+      for (const loop of onScreenLoops) brushOutline.poly(loop, true)
+      brushOutline.stroke({ width, color })
+    }
+  }
+
+  // Turn the brush's outline on or off. When off, the brush shows the cursor's cross
+  function setBrushOutline(on: boolean) {
+    isOutlineOn = on
   }
 
   // ----- Mouse, pen and keyboard -----
@@ -502,6 +578,7 @@ export function createView(
   // The left button (or the pen tip) uses the tool; the middle button always moves the view
   function handlePointerDown(e: PointerEvent) {
     if (gesture) return // already busy with another pointer
+    pointer = onScreen(e) // a pen can touch the drawing without hovering over it first
     if (e.button !== 0 && e.button !== 1) return
     e.preventDefault() // the middle button would otherwise start the browser's auto-scroll
     // That also keeps the keyboard where it was, so take it away from a text field (like the brush name) as any other
@@ -526,6 +603,7 @@ export function createView(
   }
 
   function handlePointerMove(e: PointerEvent) {
+    pointer = onScreen(e)
     if (gesture) {
       if (e.pointerId === gesture.pointerId) gesture.move(e)
       return
@@ -546,6 +624,12 @@ export function createView(
     gesture = null // first, so that what the gesture does at its end sees the pointer free
     ended.up(e)
     showCursor()
+  }
+
+  // The pointer went off the drawing (or a pen away from the tablet). While a tool is used it stays the drawing's
+  // until it comes up, and only then does this come
+  function handlePointerLeave() {
+    pointer = null
   }
 
   // The first dab of a stroke can cover dozens of tiles at once, and each of them needs every layer at that place on
@@ -579,11 +663,13 @@ export function createView(
   canvas.addEventListener('pointermove', handlePointerMove)
   canvas.addEventListener('pointerup', handlePointerUp)
   canvas.addEventListener('pointercancel', handlePointerUp)
+  canvas.addEventListener('pointerleave', handlePointerLeave)
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('blur', handleBlur)
   app.ticker.add(prepareUnderBrush)
   app.ticker.add(showHandles)
+  app.ticker.add(showBrushOutline)
   showCursor()
   fitToScreen()
 
@@ -593,13 +679,16 @@ export function createView(
     canvas.removeEventListener('pointermove', handlePointerMove)
     canvas.removeEventListener('pointerup', handlePointerUp)
     canvas.removeEventListener('pointercancel', handlePointerUp)
+    canvas.removeEventListener('pointerleave', handlePointerLeave)
     window.removeEventListener('keydown', handleKeyDown)
     window.removeEventListener('keyup', handleKeyUp)
     window.removeEventListener('blur', handleBlur)
     app.ticker.remove(prepareUnderBrush)
     app.ticker.remove(showHandles)
+    app.ticker.remove(showBrushOutline)
     outline.destroy()
     handles.destroy()
+    brushOutline.destroy()
     listeners.clear()
   }
 
@@ -610,6 +699,7 @@ export function createView(
     straighten,
     flip,
     setTool,
+    setBrushOutline,
     getState: () => state,
     getSaved,
     showSaved,

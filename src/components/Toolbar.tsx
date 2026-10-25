@@ -37,11 +37,13 @@ type Props = {
   selection: SelectionControls
   transform: TransformControls
   isGridOn: boolean
+  isOutlineOn: boolean
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
   onGridToggle: () => void
+  onOutlineToggle: () => void
 }
 
 // The settings of the chosen tool: the color, then the brush's size and opacity, the fill bucket's settings, or the
@@ -55,11 +57,13 @@ export function Toolbar({
   selection,
   transform,
   isGridOn,
+  isOutlineOn,
   onColorChange,
   onSizeChange,
   onOpacityChange,
   onFillChange,
   onGridToggle,
+  onOutlineToggle,
 }: Props) {
   const isSelecting = tool === 'select' || tool === 'lasso'
   const isMoving = tool === 'move'
@@ -123,6 +127,7 @@ export function Toolbar({
         </label>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
+      <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
     </div>
   )
 }
@@ -233,6 +238,15 @@ export function GridButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => 
   return (
     <button aria-pressed={isOn} onClick={onToggle} title={`Pixel grid, shown from ${PIXEL_GRID_ZOOM * 100}% zoom (G)`}>
       Grid
+    </button>
+  )
+}
+
+// Shows the outline of the brush's tip under the pointer, or the cursor's cross. Also used by the Brush Designer
+export function OutlineButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
+  return (
+    <button aria-pressed={isOn} onClick={onToggle} title="The outline of the brush under the pointer">
+      Outline
     </button>
   )
 }

@@ -4,8 +4,14 @@ import { BrushShapeControls } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
 import { SliderValue } from '../components/SliderValue'
-import { useBackdrop, useDrawingShortcuts, useEngineSnapshot, usePixelGrid } from '../components/engineHooks'
-import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '../components/Toolbar'
+import {
+  useBackdrop,
+  useBrushOutline,
+  useDrawingShortcuts,
+  useEngineSnapshot,
+  usePixelGrid,
+} from '../components/engineHooks'
+import { GridButton, MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, OutlineButton } from '../components/Toolbar'
 import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
 import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
 import type { Engine } from '../engine/engine'
@@ -73,6 +79,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
   }, [engine, edge])
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
+  const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
 
@@ -183,6 +190,7 @@ export function BrushDesigner({ tipSize, gpuMemory, onBack }: Props) {
             <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={setSize} />
           </label>
           <GridButton isOn={isGridOn} onToggle={toggleGrid} />
+          <OutlineButton isOn={isOutlineOn} onToggle={toggleOutline} />
         </div>
         <div className="actions">
           <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">

@@ -1001,6 +1001,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     pixelGrid.setOn(on)
   }
 
+  // ----- The brush's outline -----
+
+  // Show the outline of the brush's tip under the pointer, or the cursor's cross (see view.ts)
+  function setBrushOutline(on: boolean) {
+    view.setBrushOutline(on)
+  }
+
   function destroy() {
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
@@ -1030,6 +1037,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setFill,
     setBrushTip,
     setPixelGrid,
+    setBrushOutline,
     setBackdrop,
     undo,
     redo,

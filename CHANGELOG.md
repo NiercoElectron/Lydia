@@ -6,6 +6,14 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+### Added
+
+- The brush's outline ([decision 45](docs/decisions.md#45-the-brushs-outline)). With the brush or the eraser, the
+  outline of the brush's tip follows the pointer instead of the cursor: in its shape, as big as it paints at full
+  pressure, and turned as it paints (Dashes turns with the stroke). The Pixel brush's outline goes along the pixels it
+  would paint. Smaller than 8 pixels on the screen, the cursor's cross shows instead. The **Outline** button, next to
+  Grid, turns it off and on.
+
 ## [0.8.5] - 2026-10-25
 
 ### Added
