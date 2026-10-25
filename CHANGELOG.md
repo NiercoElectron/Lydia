@@ -7,6 +7,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **What's New?** on the start screen, at the right: what changed in each version, read from this changelog, the
+  newest open and the others closed below it.
+
 ## [0.9.0] - 2026-10-25
 
 ### Added
