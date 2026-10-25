@@ -2,6 +2,7 @@ import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
+import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
 import type { Quad } from './smartObject'
@@ -138,6 +139,17 @@ export function createView(
     const height = sin * grid.width + cos * grid.height
     setView(Math.min(app.screen.width / width, app.screen.height / height) * 0.9, world.rotation, isFlipped())
     placeAt({ x: grid.width / 2, y: grid.height / 2 }, middle())
+  }
+
+  // The view as it is now, to save it with the drawing (see ViewData)
+  function getSaved(): ViewData {
+    return { zoom: currentZoom(), rotation: state.rotation, flipped: isFlipped(), center: paperAt(middle()) }
+  }
+
+  // Show the drawing as it was saved: the same zoom, angle and flip, with the same point of the paper in the middle
+  function showSaved({ zoom, rotation, flipped, center }: ViewData) {
+    setView(zoom, (rotation * Math.PI) / 180, flipped)
+    placeAt(center, middle())
   }
 
   // Turn the view back to 0°, around the middle of the screen
@@ -587,6 +599,8 @@ export function createView(
     flip,
     setTool,
     getState: () => state,
+    getSaved,
+    showSaved,
     paperAtWindow,
     subscribe(listener: () => void) {
       listeners.add(listener)

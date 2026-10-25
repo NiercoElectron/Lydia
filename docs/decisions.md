@@ -770,6 +770,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     angle changes sign. The drawing itself never changes.
   - The bar on top shows the zoom and the angle, with **Straighten** (back to 0°), **Flip** and **Fit** (my
     choice). **Fit** keeps the view turned and flipped and fits the turned paper, as in Photoshop (my choice).
+  - Since 0.8.3, a `.lyd` file keeps the view it had when it was saved (zoom, angle, flip, and the point of the paper
+    in the middle of the screen, which stays in the middle in a window of another size), and opens with it. My artist
+    friend had a drawing turned, and it opened straight again. A file without a view, or with one that makes no sense,
+    opens showing the whole paper, as before; older versions of Lydia ignore it.
 - **Why:**
   - Painters turn the paper like a sheet on a desk, to draw each line at the angle their hand draws best. Looking at
     a drawing in a mirror shows mistakes in its proportions that the eye got used to.

@@ -1,5 +1,6 @@
 import type { BlendMode } from './layers'
 import type { StoredTile } from './memory'
+import type { Point } from './selection'
 import { isValidQuad, type Quad, type Rect } from './smartObject'
 import { createGrid, TILE_SIZE, tileKey, type Grid } from './tiles'
 
@@ -29,6 +30,11 @@ export type LayerData = {
   smart?: SmartData<Map<string, StoredTile>> // for a smart object
 }
 
+// How the drawing was shown when it was saved (see view.ts), so it opens the same way: the zoom, the angle in degrees,
+// the flip, and the point of the paper in the middle of the screen, which stays in the middle in a window of another
+// size
+export type ViewData = { zoom: number; rotation: number; flipped: boolean; center: Point }
+
 // A drawing, as it is opened or created: its paper (size, background and resolution) and its layers, from the bottom
 // to the top
 export type ProjectData = {
@@ -38,6 +44,7 @@ export type ProjectData = {
   dpi: number // pixels in an inch on paper
   layers: LayerData[] // empty for a new drawing (it starts with one empty layer)
   activeLayer: number // the position of the layer the brush paints on
+  view?: ViewData // none for a new drawing, which shows the whole paper
 }
 
 export type Paper = Pick<ProjectData, 'width' | 'height' | 'background' | 'dpi'>
@@ -71,7 +78,8 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 //
 // The header's "background" is the paper's color, or null when it is transparent, and "dpi" is the drawing's
 // resolution. Files saved before Lydia 0.5.1 have no background (their paper is white), and files saved before 0.5.2
-// have no resolution (they are 300 DPI).
+// have no resolution (they are 300 DPI). Since 0.8.3, "view" is how the drawing was shown (see ViewData); a file without
+// it, or with one that makes no sense, opens showing the whole paper.
 //
 // A smart object's layer also has "smart": its source's tiles, listed like the layer's, the rectangle of the source
 // with paint ("bounds"), the corners where that rectangle is on the paper, and "smooth". A tile that the layer and its
@@ -94,6 +102,7 @@ type FileHeader = {
   background: string | null
   dpi: number
   activeLayer: number
+  view?: ViewData
   layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
@@ -101,6 +110,7 @@ type FileHeader = {
 export function serializeProject(
   { width, height, background, dpi }: Paper,
   activeLayer: number,
+  view: ViewData,
   layers: LayerToSave[],
 ) {
   const data: Uint8Array[] = []
@@ -127,6 +137,7 @@ export function serializeProject(
     background,
     dpi,
     activeLayer,
+    view,
     layers: layers.map(({ tiles, smart, ...layer }) => ({
       ...layer,
       tiles: entries(tiles),
@@ -171,7 +182,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new Error('This project was made with a newer version of Lydia. Update Lydia to open it.')
   }
 
-  const { width, height, tileSize, background, dpi, activeLayer, layers } = header
+  const { width, height, tileSize, background, dpi, activeLayer, view, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -241,6 +252,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   if (isInteger(activeLayer) && activeLayer >= 0 && activeLayer < project.layers.length) {
     project.activeLayer = activeLayer
   }
+  if (isView(view)) project.view = view
   return project
 }
 
@@ -258,6 +270,21 @@ function isBounds(value: unknown, grid: Grid): value is Rect {
   const { x, y, width, height } = value
   if (!isInteger(x) || !isInteger(y) || !isInteger(width) || !isInteger(height)) return false
   return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= grid.width && y + height <= grid.height
+}
+
+// How a drawing can be shown (see ViewData). A view that isn't one only loses the view, not the drawing
+function isView(value: unknown): value is ViewData {
+  if (!isObject(value) || !isObject(value.center)) return false
+  const { zoom, rotation, flipped, center } = value
+  return (
+    typeof zoom === 'number' &&
+    zoom > 0 &&
+    Number.isFinite(zoom) &&
+    Number.isFinite(rotation) &&
+    typeof flipped === 'boolean' &&
+    Number.isFinite(center.x) &&
+    Number.isFinite(center.y)
+  )
 }
 
 // Four corners a smart object can have (see isValidQuad)

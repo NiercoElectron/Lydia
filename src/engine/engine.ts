@@ -194,6 +194,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     getTransform: () => (transform ? { bounds: transform.object.bounds, corners: transform.corners } : null),
     onTransform: corners => setTransformCorners(corners),
   })
+  // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
+  if (project.view) view.showSaved(project.view)
   // Painting, filling, undoing, transforming and changing the layers wait for each other
   const isBusy = () => view.isPainting() || task !== null || transform !== null
 
@@ -547,7 +549,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const file = serializeProject(project, activeIndex(stack), layersToSave)
+    const file = serializeProject(project, activeIndex(stack), view.getSaved(), layersToSave)
     isModified = false
     changed(false)
     return file

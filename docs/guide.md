@@ -168,7 +168,8 @@ forgotten.
 
 ## Saving and exporting
 
-- **Save** downloads the drawing as a `.lyd` file, with its layers and smart objects, to open it again later.
+- **Save** downloads the drawing as a `.lyd` file, with its layers and smart objects, to open it again later. It
+  opens as it was shown: with the same zoom, angle and flip.
 - **Export PNG** saves the picture at full size, keeping a transparent background transparent.
 - **Export JPEG** makes a much smaller file, without transparency (a transparent background becomes white).
 
