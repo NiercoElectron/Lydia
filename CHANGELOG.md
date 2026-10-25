@@ -6,6 +6,8 @@ last one with each small fix or feature ([decision 20](docs/decisions.md#20-vers
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-10-25
+
 ### Added
 
 - A dark mode ([decision 44](docs/decisions.md#44-a-dark-mode)). On the start screen, **Interface** chooses
@@ -305,7 +307,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/NiercoElectron/Lydia/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/NiercoElectron/Lydia/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/NiercoElectron/Lydia/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/NiercoElectron/Lydia/compare/v0.8.1...v0.8.2
