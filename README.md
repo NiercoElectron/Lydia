@@ -60,7 +60,8 @@ Next, roughly in this order:
       follows how the pen leans, like a pencil), stabilizer (smoother strokes), tapered stroke ends
 - [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
       4×) without blurring
-- [ ] Layers: blend modes, clipping masks, alpha lock, duplicate and merge down
+- [ ] Layers: folders of layers (a "Head" folder with the chin, the hair, the ears…), blend modes, clipping masks,
+      alpha lock, duplicate and merge down
 - [ ] Selections: magic wand
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
       the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
