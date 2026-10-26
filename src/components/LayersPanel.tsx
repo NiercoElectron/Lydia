@@ -6,8 +6,11 @@ import { SliderValue } from './SliderValue'
 type Props = {
   layers: EngineSnapshot['layers'] // from the bottom to the top
   activeLayerId: number
+  canMergeDown: boolean
   onAdd: () => void
   onDelete: () => void
+  onDuplicate: () => void
+  onMergeDown: () => void
   onSelect: (id: number) => void
   onMove: (id: number, index: number) => void // index from the bottom, 0 = the bottom layer
   onRename: (id: number, name: string) => void
@@ -27,8 +30,11 @@ type Drag = { id: number; pointerId: number; startY: number; isMoving: boolean; 
 export function LayersPanel({
   layers,
   activeLayerId,
+  canMergeDown,
   onAdd,
   onDelete,
+  onDuplicate,
+  onMergeDown,
   onSelect,
   onMove,
   onRename,
@@ -99,6 +105,16 @@ export function LayersPanel({
         <button onClick={onAdd}>New layer</button>
         <button onClick={onDelete} disabled={layers.length <= 1} title="Delete the active layer">
           Delete layer
+        </button>
+        <button onClick={onDuplicate} title="Copy the active layer above it (Ctrl+J)">
+          Duplicate
+        </button>
+        <button
+          onClick={onMergeDown}
+          disabled={!canMergeDown}
+          title="Merge the active layer into the one under it (Ctrl+E). Both must be shown"
+        >
+          Merge down
         </button>
       </div>
       {active && (

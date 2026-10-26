@@ -7,6 +7,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Duplicate** (Ctrl+J) and **Merge down** (Ctrl+E) in the layers ([decision 54](docs/decisions.md#54-duplicating-and-merging-layers)).
+  A copy costs no memory until it is painted on; merging keeps the picture as it was, as one step of undo.
+
 ## [0.10.0] - 2026-10-26
 
 ### Added

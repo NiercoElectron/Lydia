@@ -1442,6 +1442,37 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   pixels of one color; a pixel of the Pixel brush at its place, enlarged; a Soft round dab's grays exactly as at 1×;
   the file name with @4x; saved and read again, 4×; a transparent paper at 3×, see-through around the enlarged pixel.
 
+## 54. Duplicating and merging layers
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - The first part of the Layers stage (0.11.0). I chose the stage's order, from the smallest part to the biggest:
+    duplicating and merging down, then locking a layer's transparency, blend modes, clipping masks, and folders of
+    layers last (folders within folders, no limit). Blend modes start with the ones painters use, and the whole list
+    of Photoshop's comes later; locking and clipping are icons in each layer's row (my choices).
+  - **Duplicate** (Ctrl+J, as in Photoshop) puts a copy of the active layer above it, named "... copy", and makes it
+    the active layer. A smart object's copy is a smart object too.
+  - **Merge down** (Ctrl+E) puts the active layer's paint onto the layer under it, as it shows, at its opacity, as
+    one step of undo; the layer under keeps its own opacity and becomes the active layer, as in Photoshop. It isn't
+    offered for the bottom layer, when either layer is hidden (a hidden layer's paint would appear or be lost), or
+    onto a smart object (it can't be painted on).
+  - Both are buttons under New layer and Delete layer.
+- **How:**
+  - A copy shares the original's tiles in RAM, which never change (a change makes new ones), so it costs no memory
+    until it is painted on. A smart object's copy gets a source layer of its own, sharing the same tiles too. Both
+    wait first until every tile painted on the graphics card is in RAM.
+  - Merging draws each of the upper layer's tiles onto the lower layer's on the graphics card, a few every frame, as
+    a step of tiles and a step of order gathered into one: undo brings the upper layer back with its tiles, and the
+    lower layer's tiles from before. The picture doesn't change, so nothing is put together again.
+  - Layers can't choose a blend mode yet (only Normal is offered), so merging uses the upper layer's as the graphics
+    card blends it; the blend modes part will merge with the same formulas the picture is put together with.
+- **Checked:** Ctrl+J making "Layer 1 copy" above, active, with the same paint; painting the copy leaving the
+  original alone; undo and redo of a copy; Merge down not offered for the bottom layer, a hidden layer or onto a
+  smart object; a layer at 50% merged with the picture unchanged (red under half black, gray beside it); one undo
+  bringing both layers back, the lower without the black; redo; a smart object's copy being a smart object with a
+  source of its own sharing the tiles.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

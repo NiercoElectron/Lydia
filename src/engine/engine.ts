@@ -1,4 +1,4 @@
-import { Application, CanvasSource, Container, Texture, TilingSprite } from 'pixi.js'
+import { Application, CanvasSource, Container, Sprite, Texture, TilingSprite } from 'pixi.js'
 import type { RenderTexture, WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createBrush, type BrushSettings } from './brush'
@@ -80,6 +80,7 @@ export type EngineSnapshot = {
   task: string | null // what is being worked out over several frames ("Filling…"), if anything (see runTask)
   hasSelection: boolean
   transform: { smooth: boolean } | null // the transform being made, if any (see smartObject.ts)
+  canMergeDown: boolean // the active layer can be merged into the one under it (see mergeDown)
   exportScale: number // how many times bigger images are exported
   exportScales: number[] // the ones this drawing's images fit at
 }
@@ -302,6 +303,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       task,
       hasSelection: selection !== null,
       transform: transform ? { smooth: transform.smooth } : null,
+      canMergeDown: canMergeDown(),
       exportScale,
       exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
     }
@@ -470,6 +472,76 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     history.recordLayer(layer, propsOf(layer))
     layer.name = newName
     changed()
+  }
+
+  // Put a copy of the active layer above it, and make the copy the active layer. The copy shares the tiles in RAM,
+  // which never change (a change makes new ones), so it costs no memory until one of them is painted. A smart object's
+  // copy is a smart object too, with a source of its own sharing the same tiles
+  function duplicateLayer() {
+    return runTask('Duplicating…', async () => {
+      const original = stack.active // every tile in RAM now (see runTask)
+      const copy = createLayer(`${original.name} copy`, new Map(original.tiles))
+      copy.visible = original.visible
+      copy.opacity = original.opacity
+      copy.blendMode = original.blendMode
+      copy.showOffPaper = original.showOffPaper
+      if (original.smart) {
+        const { source, bounds, corners, smooth } = original.smart
+        const ownSource = createLayer(source.name, new Map(source.tiles))
+        copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
+      }
+      history.recordOrder(copy)
+      stack.layers.splice(activeIndex(stack) + 1, 0, copy)
+      stack.active = copy
+      projection.markAllBelowStale() // "below" now has one more layer
+      if (copy.visible) projection.composeLayerTiles(copy)
+      return true
+    })
+  }
+
+  // The active layer can be merged down when there is a layer under it, both are shown (a hidden layer's paint would
+  // appear or be lost), and the one under it isn't a smart object (it can't be painted on)
+  function canMergeDown() {
+    const index = activeIndex(stack)
+    const lower = stack.layers[index - 1]
+    return index > 0 && stack.active.visible && lower.visible && !lower.smart
+  }
+
+  // Merge the active layer into the one under it, which becomes the active layer, as one step of undo. Its paint goes
+  // on top of that layer's as it shows, at its opacity; the layer under keeps its own opacity, as in Photoshop. Tile
+  // by tile on the graphics card, a few every frame
+  const mergeRoot = new Container() // PixiJS ignores the blend mode of what it is asked to render
+  const mergeSprite = new Sprite()
+  mergeRoot.addChild(mergeSprite)
+  function mergeDown() {
+    if (!canMergeDown()) return
+    return runTask('Merging…', async () => {
+      const upper = stack.active
+      const index = activeIndex(stack)
+      const lower = stack.layers[index - 1]
+      const pace = createPacer()
+      mergeSprite.alpha = upper.opacity
+      mergeSprite.blendMode = upper.blendMode
+      history.startGroup()
+      history.begin(lower)
+      for (const key of gpu.tilesWithPaint(upper)) {
+        const { column, row } = parseTileKey(key)
+        const paint = gpu.getTexture(upper, column, row, false)
+        if (!paint) continue
+        history.backUpTile(key)
+        mergeSprite.texture = paint
+        renderer.render({ container: mergeRoot, target: gpu.getTexture(lower, column, row, true)!, clear: false })
+        gpu.markDirty(lower, key)
+        await pace()
+      }
+      history.end()
+      history.recordOrder(upper) // the merged layer stays in this step, so undo brings it back
+      history.endGroup()
+      stack.layers.splice(index, 1)
+      stack.active = lower
+      projection.markAllBelowStale() // "below" now has other layers; the picture itself looks the same
+      return true
+    })
   }
 
   function selectLayer(id: number) {
@@ -1198,6 +1270,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     selectLayer,
     setLayerVisible,
     setLayerOffPaper,
+    duplicateLayer,
+    mergeDown,
     setLayerOpacity,
     finishLayerOpacity,
     // The selection (see selection.ts)

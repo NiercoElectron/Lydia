@@ -11,6 +11,7 @@ import {
   usePixelPerfect,
   useStabilizer,
   useTaper,
+  useLayerShortcuts,
   useSelectionShortcuts,
   useTransformShortcuts,
 } from '../components/engineHooks'
@@ -265,6 +266,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
   useSelectionShortcuts(engine)
+  useLayerShortcuts(engine)
   useTransformShortcuts(engine)
 
   // Ask before closing the tab with changes that aren't saved
@@ -415,8 +417,11 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         <LayersPanel
           layers={snapshot.layers}
           activeLayerId={snapshot.activeLayerId}
+          canMergeDown={snapshot.canMergeDown}
           onAdd={() => engine?.addLayer()}
           onDelete={() => engine?.deleteLayer()}
+          onDuplicate={() => engine?.duplicateLayer()}
+          onMergeDown={() => engine?.mergeDown()}
           onSelect={id => engine?.selectLayer(id)}
           onMove={(id, index) => engine?.moveLayer(id, index)}
           onRename={(id, name) => engine?.renameLayer(id, name)}

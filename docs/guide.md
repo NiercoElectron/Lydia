@@ -185,6 +185,9 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 
 - **New layer** adds an empty layer above the active one; **Delete layer** deletes the active one (the last layer
   stays).
+- **Duplicate** (Ctrl+J) puts a copy of the active layer above it. **Merge down** (Ctrl+E) puts the active layer's
+  paint onto the layer under it, as it shows; that layer keeps its own opacity. Both layers must be shown, and the
+  one under can't be a smart object.
 - Click a layer to paint on it. **Drag** it up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
@@ -265,6 +268,7 @@ starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen
 | Ctrl + A / Ctrl + D / Ctrl + Shift + I         | Select everything / nothing / invert the selection |
 | Delete, Backspace                              | Take out what is selected                          |
 | Shift + drag, with V                           | Move only across, or only up and down              |
+| Ctrl + J / Ctrl + E                            | Duplicate the layer / merge it down                |
 | Ctrl + T, or Transform in the bar              | Transform (in a browser, use the button)           |
 | Enter / Esc, while transforming                | Apply / cancel                                     |
 | Shift + drag a corner                          | Scale without keeping the proportions              |

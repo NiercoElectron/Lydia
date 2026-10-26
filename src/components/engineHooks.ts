@@ -31,6 +31,7 @@ const startingSnapshot: EngineSnapshot = {
   task: null,
   hasSelection: false,
   transform: null,
+  canMergeDown: false,
   exportScale: 1,
   exportScales: [1],
 }
@@ -172,6 +173,23 @@ export function useTransformShortcuts(engine: Engine | null) {
       } else if (e.key === 'Escape') {
         engine.cancelTransform()
       }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [engine])
+}
+
+// The layers' shortcuts, as in Photoshop: Ctrl/Cmd + J duplicates the active layer, Ctrl/Cmd + E merges it down
+export function useLayerShortcuts(engine: Engine | null) {
+  useEffect(() => {
+    if (!engine) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key === 'j') engine.duplicateLayer()
+      else if (key === 'e') engine.mergeDown()
+      else return
+      e.preventDefault() // stop the browser from using the shortcut itself (downloads, the search box)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
