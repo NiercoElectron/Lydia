@@ -17,12 +17,12 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 // - "order": a layer was added, deleted or moved. The step keeps the list of layers and the active layer from before
 //   (the same layers, not copies), and which layer it was about. A deleted layer stays in the step, with its tiles,
 //   so it can come back
-// - "layer": a layer was hidden or shown, or got another opacity or name. The step keeps the values from before
+// - "layer": a layer was hidden or shown, or got another opacity, blend mode or name. The step keeps the values from before
 // - "selection": the selection changed. The step keeps the selection from before (selections never change, see
 //   selection.ts)
 // - "group": several steps that are undone and redone together (a transform that makes a new layer from a selection)
 type TileBackup = StoredTile | null | PendingPixels
-export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'name' | 'smart'>
+export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'blendMode' | 'name' | 'smart'>
 // "selection" and "smart" are undefined when the step doesn't keep them; "smart" is null when the layer wasn't a smart
 // object
 type TilesStep = {
@@ -44,8 +44,8 @@ export type SelectionHolder = { get: () => Selection | null; set: (selection: Se
 
 const MAX_UNDO_BYTES = 500 * 1024 * 1024 // RAM kept for undo and redo
 
-export function propsOf({ visible, opacity, name, smart }: Layer): LayerProps {
-  return { visible, opacity, name, smart }
+export function propsOf({ visible, opacity, blendMode, name, smart }: Layer): LayerProps {
+  return { visible, opacity, blendMode, name, smart }
 }
 
 // A step and the steps inside it, if it is a group
@@ -258,7 +258,9 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     const now = propsOf(layer)
     Object.assign(layer, step.props)
     step.props = now
-    const looksDifferent = now.visible !== layer.visible || (layer.visible && now.opacity !== layer.opacity)
+    const looksDifferent =
+      now.visible !== layer.visible ||
+      (layer.visible && (now.opacity !== layer.opacity || now.blendMode !== layer.blendMode))
     if (looksDifferent) projection.composeLayerTiles(layer)
   }
 

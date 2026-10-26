@@ -1,13 +1,14 @@
 import { Application, CanvasSource, Container, Sprite, Texture, TilingSprite } from 'pixi.js'
 import type { RenderTexture, WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
+import { createLayerBlender } from './blendModes'
 import { createBrush, type BrushSettings } from './brush'
 import { parseBrushFile, type BrushShape } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
 import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings } from './fill'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
-import { activeIndex, createLayer, LOCKED_ALPHA, type Layer, type LayerStack } from './layers'
+import { activeIndex, createLayer, LOCKED_ALPHA, type BlendMode, type Layer, type LayerStack } from './layers'
 import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
@@ -68,6 +69,7 @@ export type EngineSnapshot = {
     name: string
     visible: boolean
     opacity: number
+    blendMode: BlendMode
     isSmart: boolean
     hasOffPaper: boolean
     showsOffPaper: boolean
@@ -176,7 +178,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   const memory = createTileMemory(RAW_BUDGET)
   const gpu = createGpuTiles(renderer, memory, tilesInGigabytes(gpuMemory))
-  const projection = createProjection(renderer, grid, stack, gpu, project.background)
+  const blender = createLayerBlender(renderer)
+  const projection = createProjection(renderer, grid, stack, gpu, blender, project.background)
   const history = createHistory(stack, gpu, projection, {
     get: () => selection,
     set: kept => {
@@ -301,6 +304,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         name: layer.name,
         visible: layer.visible,
         opacity: layer.opacity,
+        blendMode: layer.blendMode,
         isSmart: layer.smart !== undefined,
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
@@ -520,8 +524,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   // Merge the active layer into the one under it, which becomes the active layer, as one step of undo. Its paint goes
-  // on top of that layer's as it shows, at its opacity; the layer under keeps its own opacity, as in Photoshop. Tile
-  // by tile on the graphics card, a few every frame
+  // on top of that layer's as it shows, at its opacity and with its blend mode (with the formulas the picture is put
+  // together with, see blendModes.ts); the layer under keeps its own opacity and blend mode, as in Photoshop. Tile by
+  // tile on the graphics card, a few every frame
   const mergeRoot = new Container() // PixiJS ignores the blend mode of what it is asked to render
   const mergeSprite = new Sprite()
   mergeRoot.addChild(mergeSprite)
@@ -533,7 +538,6 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const lower = stack.layers[index - 1]
       const pace = createPacer()
       mergeSprite.alpha = upper.opacity
-      mergeSprite.blendMode = upper.blendMode
       history.startGroup()
       history.begin(lower)
       for (const key of gpu.tilesWithPaint(upper)) {
@@ -541,8 +545,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         const paint = gpu.getTexture(upper, column, row, false)
         if (!paint) continue
         history.backUpTile(key)
-        mergeSprite.texture = paint
-        renderer.render({ container: mergeRoot, target: gpu.getTexture(lower, column, row, true)!, clear: false })
+        const target = gpu.getTexture(lower, column, row, true)!
+        if (upper.blendMode === 'normal') {
+          mergeSprite.texture = paint
+          renderer.render({ container: mergeRoot, target, clear: false })
+        } else {
+          blender.blendOnto(target, paint, upper.opacity, upper.blendMode)
+        }
         gpu.markDirty(lower, key)
         await pace()
       }
@@ -551,7 +560,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       history.endGroup()
       stack.layers.splice(index, 1)
       stack.active = lower
-      projection.markAllBelowStale() // "below" now has other layers; the picture itself looks the same
+      projection.markAllBelowStale() // "below" now has other layers
+      // With Normal the picture looks the same. Another blend mode mixed the paint with the layer under only, and
+      // where that layer doesn't cover fully, what was under it no longer takes part, as in Photoshop
+      if (upper.blendMode !== 'normal') projection.composeLayerTiles(lower)
       return true
     })
   }
@@ -588,6 +600,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     history.recordLayer(layer, propsOf(layer))
     layer.visible = visible
     projection.composeLayerTiles(layer)
+    changed()
+  }
+
+  // Put a layer's paint onto what is under it in another way (see blendModes.ts), as one step of undo
+  function setLayerBlendMode(id: number, mode: BlendMode) {
+    const layer = findLayer(id)
+    if (!layer || layer.blendMode === mode || isBusy()) return
+    history.recordLayer(layer, propsOf(layer))
+    layer.blendMode = mode
+    if (layer.visible) projection.composeLayerTiles(layer)
     changed()
   }
 
@@ -1262,6 +1284,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     view.destroy()
     brush.destroy()
     projection.destroy()
+    blender.destroy()
     gpu.destroy()
     memory.destroy()
     app.destroy(KEEP_GLOBAL_RESOURCES, { children: true })
@@ -1294,6 +1317,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setLayerVisible,
     setLayerOffPaper,
     setLayerAlphaLock,
+    setLayerBlendMode,
     duplicateLayer,
     mergeDown,
     setLayerOpacity,

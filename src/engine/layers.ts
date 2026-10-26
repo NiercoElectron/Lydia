@@ -1,7 +1,26 @@
 import type { StoredTile } from './memory'
 import type { SmartObject } from './smartObject'
 
-export type BlendMode = 'normal' | 'multiply'
+// The ways a layer's paint can go onto what is under it (see blendModes.ts)
+export const LAYER_BLEND_MODES = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'add',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'soft-light',
+  'hard-light',
+  'difference',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
+] as const
+export type BlendMode = (typeof LAYER_BLEND_MODES)[number]
 
 export type Layer = {
   id: number // never reused, so caches can tell layers apart

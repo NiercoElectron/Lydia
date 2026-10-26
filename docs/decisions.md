@@ -1465,8 +1465,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - Merging draws each of the upper layer's tiles onto the lower layer's on the graphics card, a few every frame, as
     a step of tiles and a step of order gathered into one: undo brings the upper layer back with its tiles, and the
     lower layer's tiles from before. The picture doesn't change, so nothing is put together again.
-  - Layers can't choose a blend mode yet (only Normal is offered), so merging uses the upper layer's as the graphics
-    card blends it; the blend modes part will merge with the same formulas the picture is put together with.
+  - Layers couldn't choose a blend mode yet, so merging used the graphics card's own blending; since blend modes
+    (decision 56), merging uses the same formulas the picture is put together with.
 - **Checked:** Ctrl+J making "Layer 1 copy" above, active, with the same paint; painting the copy leaving the
   original alone; undo and redo of a copy; Merge down not offered for the bottom layer, a hidden layer or onto a
   smart object; a layer at 50% merged with the picture unchanged (red under half black, gray beside it); one undo
@@ -1499,6 +1499,43 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   while painting and after, without empty tiles; the eraser with its notice, taking nothing away; a fill where there
   is no paint doing nothing, and one on the red coloring it green and nothing beside it; undo; saved with the drawing;
   a copy locked too; unlocked, painting anywhere again.
+
+## 56. Blend modes
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - Each layer has a **blend mode**: how its paint goes onto what is under it. It is chosen in a list ("Blend") above
+    the opacity, for the active layer, as in Photoshop and Krita.
+  - For now, the modes painters use (my choice, decision 54), grouped as in Photoshop: Normal; Darken, Multiply, Color
+    Burn; Lighten, Screen, Color Dodge, Add (Linear Dodge); Overlay, Soft Light, Hard Light; Difference; Hue,
+    Saturation, Color, Luminosity. The rest of Photoshop's list (Linear Burn, Vivid Light, Exclusion, Subtract,
+    Divide…) comes later.
+  - Changing it is a step of undo, as the opacity is, and it is saved with the drawing. A copy of a layer keeps it.
+  - **Merge down** puts the paint on with the layer's mode, with the same formulas; the merged layer keeps the mode of
+    the layer under, as in Photoshop. Where the layer under doesn't cover fully, the paint then mixes with that layer
+    only, so the picture can change there (in Photoshop too).
+- **How:**
+  - The graphics card's own blending can only add and multiply the colors it has, which gives Normal, Screen and Add,
+    and Multiply only over paint that covers fully. So the layer's tile and a picture of what is under it go into a
+    small program of our own (a shader, in `blendModes.ts`), which works out each pixel with the mode's formula.
+  - The formulas are the W3C standard's for CSS and SVG ("Compositing and Blending"), which are Photoshop's and
+    Krita's too: where only one of the two has paint, that one shows; where both have, the mode mixes their colors,
+    and the mix shows as much as both cover. So a layer over a transparent part shows its paint as it is. (Multiply
+    was already in the file format, with the graphics card's blending, which lost paint over transparent parts.)
+  - The projection (decision 10) still puts the normal layers together in one pass. At a layer with another mode, what
+    is together so far is drawn into a whole tile, the layer is blended with it into a second one, and the layers above
+    go on top of that. Only the tiles where such a layer has paint take the extra passes.
+  - The live opacity (decision 23) needs the layer itself to be Normal too: otherwise its tiles are put together at
+    each step, as with a layer above with another mode.
+  - While a part is moved (decision 41), the active layer's mode shows with the graphics card's closest blending
+    (Multiply, Screen and Add); the others show as Normal until it is let go.
+  - The fill bucket's **All layers** (decision 39) still finds its region in the layers put together as Normal.
+- **Checked:** the 16 modes against the formulas written again in the test on its own, over red, a blue gray, gray and
+  the white paper; nothing changed where the layer has no paint; the list in the panel; Multiply at 50% while the
+  slider moves and after; undo and redo of a mode; painting on the layer under a Multiply layer, multiplied while
+  painting and after; saved with the drawing; merging down with the picture unchanged, the paint kept as it is where
+  the layer under had none, and undo bringing both layers back.
 
 ## Open questions
 

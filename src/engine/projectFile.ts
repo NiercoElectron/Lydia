@@ -1,4 +1,4 @@
-import type { BlendMode } from './layers'
+import { LAYER_BLEND_MODES, type BlendMode } from './layers'
 import { decompress } from './lz4'
 import type { StoredTile } from './memory'
 import type { Point } from './selection'
@@ -104,7 +104,8 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // (TILE_SIZE × TILE_SIZE) and can be anywhere (its column and row can be negative), and so can a smart object's
 // source and "bounds". A drawing with nothing off the paper is still saved as version 2 or 3, so older versions of
 // Lydia can open it. A layer's "showOffPaper" (since 0.10) says it shows its paint off the paper; it is false when
-// missing, and its "alphaLocked" (since 0.11) that its transparency is locked, false when missing. The header's
+// missing, and its "alphaLocked" (since 0.11) that its transparency is locked, false when missing. Its "blendMode" is
+// one of LAYER_BLEND_MODES (before 0.11, only "normal" or "multiply"). The header's
 // "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
 
 const MAGIC = 'LYDIAPRJ'
@@ -255,12 +256,13 @@ export function parseProject(file: ArrayBuffer): ProjectData {
         typeof layer.visible !== 'boolean' ||
         typeof layer.opacity !== 'number' ||
         !(layer.opacity >= 0 && layer.opacity <= 1) ||
-        (layer.blendMode !== 'normal' && layer.blendMode !== 'multiply') ||
+        !LAYER_BLEND_MODES.includes(layer.blendMode as BlendMode) ||
         !Array.isArray(layer.tiles)
       ) {
         throw damaged()
       }
-      const { name, visible, opacity, blendMode } = layer
+      const { name, visible, opacity } = layer
+      const blendMode = layer.blendMode as BlendMode // checked above
       const data: LayerData = { name, visible, opacity, blendMode, tiles: readTiles(layer.tiles) }
       if (layer.showOffPaper === true) data.showOffPaper = true
       if (layer.alphaLocked === true) data.alphaLocked = true

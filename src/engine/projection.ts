@@ -1,7 +1,8 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
 import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
+import type { LayerBlender } from './blendModes'
 import type { GpuTiles } from './gpuTiles'
-import { activeIndex, LOCKED_ALPHA, type Layer, type LayerStack } from './layers'
+import { activeIndex, LOCKED_ALPHA, type BlendMode, type Layer, type LayerStack } from './layers'
 import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the paper's
@@ -37,6 +38,7 @@ export function createProjection(
   grid: Grid,
   stack: LayerStack,
   gpu: GpuTiles,
+  blender: LayerBlender,
   background: string | null,
 ) {
   const projection = new Map<string, RenderTexture>() // "column,row" -> the tile's texture
@@ -91,6 +93,13 @@ export function createProjection(
     stroke = shown
   }
 
+  // Layers with a blend mode other than normal go onto what is under them through blendModes.ts: what is put together
+  // so far is drawn into one of these two whole tiles, the layer is blended with it into the other, and the layers
+  // above go on top of that
+  const blendTiles = [0, 1].map(() => RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE }))
+  const blendedSprite = new Sprite()
+  const otherBlendTile = (tile: RenderTexture | null) => (tile === blendTiles[0] ? blendTiles[1] : blendTiles[0])
+
   // Put the tiles at this column and row of the layers from "first" to "last" (not included) on top of "base",
   // into "target"
   function composeLayers(
@@ -103,6 +112,7 @@ export function createProjection(
   ) {
     composeRoot.removeChildren()
     composeRoot.addChild(base)
+    let blended: RenderTexture | null = null // the blend tile with what is put together so far, if any
     let count = 0
     for (let i = first; i < last; i++) {
       const layer = stack.layers[i]
@@ -111,6 +121,21 @@ export function createProjection(
       const strokeTexture = layer === stack.active ? stroke?.tiles.get(tileKey(column, row)) : undefined
       if (stroke && strokeTexture) texture = withStroke(texture, strokeTexture, stroke)
       if (!texture) continue // no paint on this layer here
+      if (layer.blendMode !== 'normal') {
+        // What is put together so far, in a blend tile, unless it is all in one already
+        if (!blended || composeRoot.children.length > 1) {
+          const into = otherBlendTile(blended)
+          renderer.render({ container: composeRoot, target: into, clear: true })
+          blended = into
+        }
+        const into = otherBlendTile(blended)
+        blender.blend(blended, texture, layer.opacity, layer.blendMode, into)
+        blended = into
+        blendedSprite.texture = into
+        composeRoot.removeChildren()
+        composeRoot.addChild(blendedSprite)
+        continue
+      }
       let sprite = layerSprites[count]
       if (!sprite) {
         sprite = new Sprite()
@@ -118,7 +143,6 @@ export function createProjection(
       }
       sprite.texture = texture
       sprite.alpha = layer.opacity
-      sprite.blendMode = layer.blendMode
       composeRoot.addChild(sprite)
       count++
     }
@@ -329,10 +353,12 @@ export function createProjection(
   // and the tiles must be put together again instead
   function showOpacityLive(layer: Layer, keys: Iterable<string>) {
     if (layer !== stack.active) return false // "below" only has the layers under the active one
-    // The layers above are put together on their own, without what is under them. That only gives the same picture
-    // when they all use the normal blend mode: the others (like multiply) depend on what is under them
-    const above = stack.layers.slice(activeIndex(stack) + 1)
-    if (above.some(other => other.visible && other.blendMode !== 'normal')) return false
+    // The layers above are put together on their own, without what is under them, and the layer goes onto "below" as
+    // the graphics card blends. That only gives the same picture when the layer and the ones above it all use the
+    // normal blend mode: the others (like multiply) depend on what is under them
+    if (stack.layers.slice(activeIndex(stack)).some(other => other.visible && other.blendMode !== 'normal')) {
+      return false
+    }
     if (liveLayer !== layer) {
       finishLive()
       gpu.keep(layer) // the sprites show the layer's own textures, so they must stay on the graphics card
@@ -363,7 +389,6 @@ export function createProjection(
     const sprites = new Container()
     sprites.position.set(column * TILE_SIZE, row * TILE_SIZE)
     const layerSprite = new Sprite(texture)
-    layerSprite.blendMode = layer.blendMode
     sprites.addChild(new Sprite(below.get(key)!), layerSprite)
     if (above) sprites.addChild(new Sprite(above))
     for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
@@ -436,7 +461,7 @@ export function createProjection(
   // The pictures are copies, so the layer's tiles can change under them once the move is let go. Like the live
   // opacity, the layers above are put together on their own, so a blend mode other than normal among them looks a
   // little different until the move is done, and so does the moved part over what is left of a layer at less than full
-  // opacity.
+  // opacity. The active layer's own blend mode is shown with the graphics card's closest blending (see closestBlend).
   // The pictures of the active layer are its whole tiles, and it can have paint off the paper: they are cut at the
   // paper's edge, and the "ghost", under the paper (see engine.ts), shows them faded where they are off it
   type MoveTile = { sprites: Sprite[]; textures: RenderTexture[] }
@@ -458,6 +483,12 @@ export function createProjection(
   let movedContent: Container | null = null // shown in place of the moved part's tiles (see setMoveContent)
   let ghostContent: Container | null = null
   for (const part of moveParts) part.visible = false
+
+  // The graphics card's own blending closest to a layer's blend mode, to show a move: Screen and Add give the same
+  // picture, and Multiply too over paint that covers fully (like the paper's). The others show as Normal until the
+  // move is let go
+  const closestBlend = (mode: BlendMode): BLEND_MODES =>
+    mode === 'multiply' || mode === 'screen' || mode === 'add' ? mode : 'normal'
 
   // The tiles on the paper where a visible layer above the active one has paint
   function paintedAbove() {
@@ -481,7 +512,7 @@ export function createProjection(
       sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
       if (isActiveLayer) {
         sprite.alpha = layer.opacity
-        sprite.blendMode = layer.blendMode
+        sprite.blendMode = closestBlend(layer.blendMode)
       }
       part.addChild(sprite)
       tile.sprites.push(sprite)
@@ -633,7 +664,7 @@ export function createProjection(
     endMove()
     for (const tile of live.values()) tile.above?.destroy(true)
     for (const texture of [...prepared.values(), ...spareTextures]) texture.destroy(true)
-    for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
+    for (const texture of [...projection.values(), ...below.values(), ...blendTiles]) texture.destroy(true)
     container.destroy({ children: true })
     ghost.destroy({ children: true })
     composeRoot.destroy()

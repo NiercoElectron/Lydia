@@ -685,6 +685,18 @@ input.slider-value {
   flex: 1 1 40%;
 }
 
+.layer-blend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.layer-blend select {
+  flex: 1;
+  min-width: 0;
+}
+
 .opacity {
   display: flex;
   align-items: center;

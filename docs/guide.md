@@ -119,8 +119,8 @@ or the fill bucket does the same.
 **Fill (F)**: click to fill an area of one color with the brush's color.
 
 - **Tolerance** (0 to 255): how different a color can be from the one clicked and still be filled.
-- **Look at:** **All layers** finds the area in what the screen shows; **This layer** only in the active layer. The
-  fill always goes into the active layer.
+- **Look at:** **All layers** finds the area in what the screen shows (with every layer as Normal); **This layer**
+  only in the active layer. The fill always goes into the active layer.
 - **Expand** (0 to 50 pixels): how far the fill goes past its edge, behind the soft edge of the lines around it, up to
   where they are darkest, so that no light rim is left between the color and the line.
 - With a selection, only what is selected is filled. Hold **Alt** to pick a color.
@@ -186,8 +186,8 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - **New layer** adds an empty layer above the active one; **Delete layer** deletes the active one (the last layer
   stays).
 - **Duplicate** (Ctrl+J) puts a copy of the active layer above it. **Merge down** (Ctrl+E) puts the active layer's
-  paint onto the layer under it, as it shows; that layer keeps its own opacity. Both layers must be shown, and the
-  one under can't be a smart object.
+  paint onto the layer under it, as it shows; that layer keeps its own opacity and blend mode. Both layers must
+  be shown, and the one under can't be a smart object.
 - Click a layer to paint on it. **Drag** it up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
@@ -196,6 +196,18 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
   kept with the drawing.
 - A layer with paint off the paper (see [Move](#move)) has an icon at the right of its name: click it to show that
   paint, faded, around the paper, and again to hide it. It is kept with the drawing.
+- **Blend**, above the list, is how the active layer's paint goes onto what is under it:
+  - **Normal**: the paint covers what is under it.
+  - **Darken**, **Multiply**, **Color Burn**: darken. Multiply is like layers of ink, good for shadows (white changes
+    nothing).
+  - **Lighten**, **Screen**, **Color Dodge**, **Add (Linear Dodge)**: lighten, for light and glows (black changes
+    nothing).
+  - **Overlay**, **Soft Light**, **Hard Light**: more contrast, darkening the dark parts and lightening the light ones.
+  - **Difference**: how far apart the colors are.
+  - **Hue**, **Saturation**, **Color**, **Luminosity**: take only that from the layer's colors, the rest from what is
+    under (Color is good for coloring a gray drawing).
+  - Over a transparent part, the paint shows as it is, whatever the mode. A change can be undone, and is kept with the
+    drawing.
 - **Opacity**, above the list, is the active layer's.
 - **Clear layer**, in the top bar, takes all the paint out of the active layer.
 

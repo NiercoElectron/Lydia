@@ -1,6 +1,7 @@
 import { Box, Lock, LockOpen, ScanEye } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
+import type { BlendMode } from '../engine/layers'
 import { SliderValue } from './SliderValue'
 
 type Props = {
@@ -17,9 +18,51 @@ type Props = {
   onVisibleChange: (id: number, visible: boolean) => void
   onOffPaperChange: (id: number, show: boolean) => void // show the layer's paint off the paper, or not
   onAlphaLockChange: (id: number, locked: boolean) => void // lock the layer's transparency, or unlock it
+  onBlendModeChange: (id: number, mode: BlendMode) => void
   onOpacityChange: (id: number, opacity: number) => void
   onOpacityChangeEnd: () => void
 }
+
+// The blend modes offered (see blendModes.ts), in groups as in Photoshop: those that darken, those that lighten, those
+// that add contrast, the comparison, and those that take part of a color
+const BLEND_MODE_GROUPS: { label: string; modes: [BlendMode, string][] }[] = [
+  { label: 'Normal', modes: [['normal', 'Normal']] },
+  {
+    label: 'Darken',
+    modes: [
+      ['darken', 'Darken'],
+      ['multiply', 'Multiply'],
+      ['color-burn', 'Color Burn'],
+    ],
+  },
+  {
+    label: 'Lighten',
+    modes: [
+      ['lighten', 'Lighten'],
+      ['screen', 'Screen'],
+      ['color-dodge', 'Color Dodge'],
+      ['add', 'Add (Linear Dodge)'],
+    ],
+  },
+  {
+    label: 'Contrast',
+    modes: [
+      ['overlay', 'Overlay'],
+      ['soft-light', 'Soft Light'],
+      ['hard-light', 'Hard Light'],
+    ],
+  },
+  { label: 'Comparison', modes: [['difference', 'Difference']] },
+  {
+    label: 'Color',
+    modes: [
+      ['hue', 'Hue'],
+      ['saturation', 'Saturation'],
+      ['color', 'Color'],
+      ['luminosity', 'Luminosity'],
+    ],
+  },
+]
 
 const DRAG_START_PX = 4 // how far a layer must be dragged before it starts moving, so a click stays a click
 const MAX_NAME_LENGTH = 100
@@ -42,6 +85,7 @@ export function LayersPanel({
   onVisibleChange,
   onOffPaperChange,
   onAlphaLockChange,
+  onBlendModeChange,
   onOpacityChange,
   onOpacityChangeEnd,
 }: Props) {
@@ -119,6 +163,22 @@ export function LayersPanel({
           Merge down
         </button>
       </div>
+      {active && (
+        <label className="layer-blend" title="How the active layer's paint goes onto what is under it">
+          Blend
+          <select value={active.blendMode} onChange={e => onBlendModeChange(active.id, e.target.value as BlendMode)}>
+            {BLEND_MODE_GROUPS.map(({ label, modes }) => (
+              <optgroup key={label} label={label}>
+                {modes.map(([mode, name]) => (
+                  <option key={mode} value={mode}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      )}
       {active && (
         <OpacitySlider
           opacity={active.opacity}
