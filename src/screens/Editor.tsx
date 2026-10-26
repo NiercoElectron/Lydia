@@ -290,7 +290,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   function handleExport(type: ImageType) {
     if (!engine) return
     const extension = type === 'jpeg' ? 'jpg' : 'png' // ".jpg" is the name most programs use for JPEG files
-    runTask('Exporting…', async () => downloadBlob(await engine.exportImage(type), `lydia-${timestamp()}.${extension}`))
+    // An enlarged image says how many times in its name, as "@4x"
+    const scale = snapshot.exportScales.includes(snapshot.exportScale) ? snapshot.exportScale : 1
+    const name = `lydia-${timestamp()}${scale > 1 ? `@${scale}x` : ''}.${extension}`
+    runTask('Exporting…', async () => downloadBlob(await engine.exportImage(type), name))
   }
 
   function handleSave() {
@@ -367,6 +370,20 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null}>
             Export JPEG
           </button>
+          <label title="How many times bigger images are exported, each pixel a square of pixels (for pixel art)">
+            Scale
+            <select
+              value={snapshot.exportScale}
+              disabled={!engine || snapshot.exportScales.length < 2}
+              onChange={e => engine?.setExportScale(Number(e.target.value))}
+            >
+              {snapshot.exportScales.map(scale => (
+                <option key={scale} value={scale}>
+                  {scale}×
+                </option>
+              ))}
+            </select>
+          </label>
           <button onClick={handleSave} disabled={!engine || busy !== null}>
             Save
           </button>

@@ -22,6 +22,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   paints a straight line from where the last stroke ended, shown while Shift is held; with **Ctrl** too, it keeps to
   the clean angles of pixel art (1:1, 2:1, 3:1…) with a pixel brush, or to every 15° with the others. A pixel brush's
   line has one pixel in each column, in steps as even as its angle lets them be.
+- Exporting enlarged ([decision 53](docs/decisions.md#53-exporting-enlarged)). **Scale**, next to the exports, makes
+  the PNG or JPEG 2, 3, 4, 6 or 8 times bigger, each pixel a sharp square, for pixel art. Each drawing keeps its
+  choice. The image's resolution goes up as many times, so it prints at the same size, and its name says it
+  (`@4x`). The scales a big drawing wouldn't fit at aren't offered.
 
 ### Changed
 

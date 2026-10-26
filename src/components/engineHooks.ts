@@ -31,6 +31,8 @@ const startingSnapshot: EngineSnapshot = {
   task: null,
   hasSelection: false,
   transform: null,
+  exportScale: 1,
+  exportScales: [1],
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}

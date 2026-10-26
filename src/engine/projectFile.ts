@@ -18,6 +18,15 @@ export const MAX_DPI = 2400
 export const isDpi = (value: unknown): value is number =>
   Number.isInteger(value) && (value as number) >= MIN_DPI && (value as number) <= MAX_DPI
 
+// Exported images can be enlarged, each pixel of the drawing a square of 2×2, 3×3... pixels, for pixel art (decision
+// 53). Each drawing keeps its own choice
+export const EXPORT_SCALES = [1, 2, 3, 4, 6, 8]
+// An enlarged image must still fit: browsers make pictures up to 16384 pixels across, and it can't have more pixels
+// than the biggest paper
+const MAX_EXPORT_SIDE = 16384
+export const fitsExport = (width: number, height: number, scale: number) =>
+  width * scale <= MAX_EXPORT_SIDE && height * scale <= MAX_EXPORT_SIDE && width * height * scale ** 2 <= MAX_SIZE ** 2
+
 // A smart object as it is opened or saved (see smartObject.ts): its source's tiles, the part of the source with paint,
 // where that part's corners are on the paper, and how its pixels are worked out
 export type SmartData<Tiles> = { tiles: Tiles; bounds: Rect; corners: Quad; smooth: boolean }
@@ -47,6 +56,7 @@ export type ProjectData = {
   layers: LayerData[] // empty for a new drawing (it starts with one empty layer)
   activeLayer: number // the position of the layer the brush paints on
   view?: ViewData // none for a new drawing, which shows the whole paper
+  exportScale?: number // how many times bigger images are exported (see EXPORT_SCALES); 1 when missing
 }
 
 export type Paper = Pick<ProjectData, 'width' | 'height' | 'background' | 'dpi'>
@@ -93,7 +103,7 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // (TILE_SIZE × TILE_SIZE) and can be anywhere (its column and row can be negative), and so can a smart object's
 // source and "bounds". A drawing with nothing off the paper is still saved as version 2 or 3, so older versions of
 // Lydia can open it. A layer's "showOffPaper" (since 0.10) says it shows its paint off the paper; it is false when
-// missing
+// missing. The header's "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -116,13 +126,14 @@ type FileHeader = {
   dpi: number
   activeLayer: number
   view?: ViewData
+  exportScale?: number
   layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
 // Turn a drawing into the contents of a .lyd file. "wholeTiles": its tiles are whole, some of them off the paper
 // (version 4); otherwise they are on the paper, cut at its edge
 export function serializeProject(
-  { width, height, background, dpi }: Paper,
+  { width, height, background, dpi, exportScale = 1 }: Paper & Pick<ProjectData, 'exportScale'>,
   activeLayer: number,
   view: ViewData,
   layers: LayerToSave[],
@@ -153,6 +164,7 @@ export function serializeProject(
     dpi,
     activeLayer,
     view,
+    exportScale,
     layers: layers.map(({ tiles, smart, ...layer }) => ({
       ...layer,
       tiles: entries(tiles),
@@ -197,7 +209,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new Error('This project was made with a newer version of Lydia. Update Lydia to open it.')
   }
 
-  const { width, height, tileSize, background, dpi, activeLayer, view, layers } = header
+  const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -275,6 +287,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     project.activeLayer = activeLayer
   }
   if (isView(view)) project.view = view
+  if (EXPORT_SCALES.includes(exportScale as number)) project.exportScale = exportScale as number
   return project
 }
 

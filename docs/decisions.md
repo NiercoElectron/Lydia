@@ -1411,6 +1411,35 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   steps of 2; a line on from the end of the last one, one pixel in each column; undo taking only the last line; Hard
   round at 27° with Ctrl painting along 30°; the eraser along a line.
 
+## 53. Exporting enlarged
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - Images can be exported **enlarged**, each pixel of the drawing a square of 2×2, 3×3... pixels, nothing blended
+    between them, so pixel art stays sharp wherever it is shown. Pixel art is drawn small (32×32, 128×128), and
+    other programs enlarging it blend its pixels into a blur.
+  - **Scale**, a choice next to Export PNG and Export JPEG (my choice), for both, at **1×, 2×, 3×, 4×, 6× or 8×** (my
+    choice). Each drawing keeps its own, saved in it; it isn't a step of undo.
+  - Only the scales the image fits at are offered: at most 16384 pixels across, the biggest picture browsers make,
+    and no more pixels than the biggest paper (10000×10000), which Lydia already exports. A drawing of 10000×10000
+    exports at 1× only, one of 1250×1250 up to 8×.
+  - The resolution is **multiplied too** (my choice): a drawing of 300 DPI exported at 4× says 1200 DPI, so on paper
+    it is as big as before, only sharper.
+  - It works for **every drawing** (my choice), not only pixel art: a painting enlarged gets square pixels too, which
+    is what was asked for.
+  - An enlarged image says so in its name, as `lydia-...@4x.png` (Claude's suggestion, as images for screens of
+    double density are named).
+- **How:**
+  - The export draws each tile of the projection into the image that many times bigger, with the browser's smoothing
+    off (`imageSmoothingEnabled`), so each pixel is copied as a square. The colors are exactly those of the image at
+    1×, soft edges and see-through pixels too.
+  - In the file, the header's `exportScale`; older versions of Lydia leave it alone.
+- **Checked:** the scales offered and the limits (10000×10000 at 1× only; 1250×1250 up to 8×, 1251 not; 2048 across
+  at 8×, 2049 not); 64×48 at 1× and 300 DPI, at 4× 256×192 and 1200 DPI, in PNG and in JPEG; every square of 4×4
+  pixels of one color; a pixel of the Pixel brush at its place, enlarged; a Soft round dab's grays exactly as at 1×;
+  the file name with @4x; saved and read again, 4×; a transparent paper at 3×, see-through around the enlarged pixel.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

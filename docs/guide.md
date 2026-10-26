@@ -220,8 +220,13 @@ forgotten.
   before 0.10 can't open a drawing that has some.
 - **Export PNG** saves the picture at full size, keeping a transparent background transparent.
 - **Export JPEG** makes a much smaller file, without transparency (a transparent background becomes white).
+- **Scale**, next to them, exports the image 2, 3, 4, 6 or 8 times bigger, each pixel a sharp square of pixels, for
+  pixel art (other programs blur small images when they enlarge them). Each drawing keeps its choice. The file's name
+  says it, like `lydia-...@4x.png`. A big drawing only offers the scales it fits at: at most 16384 pixels across,
+  and no more pixels than a paper of 10000 × 10000.
 
-Exported images carry the drawing's resolution, so they print at the size of their paper.
+Exported images carry the drawing's resolution, so they print at the size of their paper (an image enlarged 4 times
+says 4 times as many pixels in an inch, so it too prints at that size, only sharper).
 
 ## The Brush Designer
 

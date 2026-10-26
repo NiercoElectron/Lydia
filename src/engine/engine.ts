@@ -13,7 +13,14 @@ import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
-import { MAX_SIZE, serializeProject, type LayerToSave, type ProjectData } from './projectFile'
+import {
+  EXPORT_SCALES,
+  fitsExport,
+  MAX_SIZE,
+  serializeProject,
+  type LayerToSave,
+  type ProjectData,
+} from './projectFile'
 import { withResolution } from './resolution'
 import {
   combine,
@@ -73,6 +80,8 @@ export type EngineSnapshot = {
   task: string | null // what is being worked out over several frames ("Filling…"), if anything (see runTask)
   hasSelection: boolean
   transform: { smooth: boolean } | null // the transform being made, if any (see smartObject.ts)
+  exportScale: number // how many times bigger images are exported
+  exportScales: number[] // the ones this drawing's images fit at
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -154,6 +163,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       : [createLayer('Layer 1')]
   const stack: LayerStack = { layers, active: layers[project.activeLayer] ?? layers[layers.length - 1] }
   let layersCreated = layers.length // for naming new layers
+  let exportScale = project.exportScale ?? 1
   let selection: Selection | null = null // see selection.ts
 
   const memory = createTileMemory(RAW_BUDGET)
@@ -292,6 +302,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       task,
       hasSelection: selection !== null,
       transform: transform ? { smooth: transform.smooth } : null,
+      exportScale,
+      exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
     }
   }
 
@@ -557,18 +569,32 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // ----- Files -----
 
-  // The drawing as an image at its full size. The projection already has the paper and all the visible layers put
-  // together, so only its tiles need to be copied
+  // Export images this many times bigger from now on (see EXPORT_SCALES). It is kept with the drawing, but isn't a step
+  // of undo
+  function setExportScale(scale: number) {
+    if (scale === exportScale || !EXPORT_SCALES.includes(scale)) return
+    exportScale = scale
+    changed()
+  }
+
+  // The drawing as an image at its full size, or enlarged (see setExportScale): each pixel a square of whole pixels,
+  // with nothing blended between them, so pixel art stays sharp. The projection already has the paper and all the
+  // visible layers put together, so only its tiles need to be copied
   async function exportImage(type: ImageType) {
     await nextFrame() // let the screen show that the export started before the slow part
     // Tiles still shown live, or waiting after a layer change, are not in the projection yet
     projection.finishLive()
     projection.finishWaiting()
+    const scale = fitsExport(grid.width, grid.height, exportScale) ? exportScale : 1
     const canvas = document.createElement('canvas')
-    canvas.width = grid.width
-    canvas.height = grid.height
+    canvas.width = grid.width * scale
+    canvas.height = grid.height * scale
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('This image is too big for this browser.')
+    ctx.imageSmoothingEnabled = false // enlarged, each pixel copied as a square, not blended with its neighbors
+    // A tile's place and size in the image
+    const drawTile = (picture: CanvasImageSource, column: number, row: number, width: number, height: number) =>
+      ctx.drawImage(picture, column * TILE_SIZE * scale, row * TILE_SIZE * scale, width * scale, height * scale)
     if (project.background === null && type === 'jpeg') {
       // Where a JPEG would be transparent, browsers make it black
       ctx.fillStyle = '#ffffff'
@@ -579,7 +605,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     for (const [key, texture] of projection.tiles) {
       const { column, row } = parseTileKey(key)
       if (project.background !== null) {
-        ctx.drawImage(renderer.extract.canvas(texture) as HTMLCanvasElement, column * TILE_SIZE, row * TILE_SIZE)
+        const picture = renderer.extract.canvas(texture) as HTMLCanvasElement
+        drawTile(picture, column, row, picture.width, picture.height)
         continue
       }
       // The graphics card keeps colors already multiplied by their alpha, and an image needs them as they are: copied
@@ -596,11 +623,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       tileCanvas.width = width
       tileCanvas.height = height
       tileCtx.putImageData(new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, width, height), 0, 0)
-      ctx.drawImage(tileCanvas, column * TILE_SIZE, row * TILE_SIZE) // over white paper for a JPEG
+      drawTile(tileCanvas, column, row, width, height) // over white paper for a JPEG
     }
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
     if (!blob) throw new Error('This image is too big for this browser.')
-    return withResolution(blob, project.dpi)
+    // As many times more pixels in an inch, so that on paper it is as big as before, only sharper
+    return withResolution(blob, project.dpi * scale)
   }
 
   // The drawing as the contents of a .lyd file. A drawing with nothing off the paper is saved the way it was before
@@ -647,7 +675,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const file = serializeProject(project, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
+    const paper = { ...project, exportScale }
+    const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
     isModified = false
     changed(false)
     return file
@@ -1194,6 +1223,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     turnView: view.turnTo,
     straightenView: view.straighten,
     flipView: view.flip,
+    setExportScale,
     exportImage,
     saveProject,
     destroy,
