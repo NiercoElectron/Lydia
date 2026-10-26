@@ -15,7 +15,7 @@ import {
   type WebGLRenderer,
 } from 'pixi.js'
 import type { Selection } from './selection'
-import { TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
+import { parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 // The selection on the graphics card (decision 40): its edge shown as "marching ants", a line of black and white dashes
 // that move, and the strokes cut to it.
@@ -80,6 +80,9 @@ export function createSelectionView(
   const selectedTextures = new Map<Uint8Array, Texture>()
   // The same tile turned around: what isn't selected, to cut strokes with (made from the one above, on the graphics card)
   const outsideTextures = new Map<Uint8Array, RenderTexture>()
+  // Masks of a whole part on the paper, by their size: a "full" tile at the paper's edge, to cut a layer's whole tile with
+  // (see maskFor)
+  const allSelected = new Map<string, Uint8Array>()
 
   function selectedTexture(mask: Uint8Array, width: number, height: number) {
     let texture = selectedTextures.get(mask)
@@ -108,14 +111,16 @@ export function createSelectionView(
   cutter.blendMode = 'erase'
   cutRoot.addChild(whole, cutter)
 
+  // As big as a layer's whole tile, so it cuts that too, whatever is off the paper not being selected; on a smaller
+  // texture (a stroke's tile at the paper's edge) only its part on the paper is used
   function outsideTexture(mask: Uint8Array, width: number, height: number) {
     let texture = outsideTextures.get(mask)
     if (!texture) {
-      texture = RenderTexture.create({ width, height })
+      texture = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
       // All white, then the selected part taken out
       whole.visible = true
-      whole.width = width
-      whole.height = height
+      whole.width = TILE_SIZE
+      whole.height = TILE_SIZE
       cutter.texture = selectedTexture(mask, width, height)
       renderer.render({ container: cutRoot, target: texture, clear: true, clearColor: [0, 0, 0, 0] })
       outsideTextures.set(mask, texture)
@@ -129,24 +134,48 @@ export function createSelectionView(
     return !selection || selection.has(key)
   }
 
-  // Keep only the selected part of a stroke's tile (white, with the paint in its alpha: see brush.ts)
-  function cut(strokeTexture: RenderTexture, key: string) {
+  // The selection's tile at this key, to cut "texture" with: a mask of the tile's part on the paper, with its size;
+  // undefined where nothing is selected, and "full" where all of the texture is. A layer's whole tile at the paper's
+  // edge is never selected whole, even in a "full" tile: its part off the paper is never selected
+  function maskFor(key: string, texture: Texture) {
     const tile = getSelection()?.get(key)
-    if (!tile || tile === 'full') return
-    // First, since making it the first time shows "whole"
-    const outside = outsideTexture(tile, strokeTexture.width, strokeTexture.height)
-    whole.visible = false
-    cutter.texture = outside
-    renderer.render({ container: cutRoot, target: strokeTexture, clear: false })
+    if (!tile) return undefined
+    const { column, row } = parseTileKey(key)
+    const { width, height } = tileSize(grid, column, row)
+    if (tile !== 'full') return { mask: tile, width, height }
+    if (texture.width <= width && texture.height <= height) return 'full'
+    const size = `${width}x${height}`
+    let mask = allSelected.get(size)
+    if (!mask) {
+      mask = new Uint8Array(width * height).fill(255)
+      allSelected.set(size, mask)
+    }
+    return { mask, width, height }
   }
 
-  // The other way round: take the selected part out of a layer's tile partly selected, keeping what isn't selected
-  // (for what is left of a layer while the move tool drags its selected part away)
-  function cutAway(texture: RenderTexture, key: string) {
-    const tile = getSelection()?.get(key)
-    if (!tile || tile === 'full') return
+  // Keep only the selected part of a stroke's tile (white, with the paint in its alpha: see brush.ts), or of a layer's
+  // tile that the move tool drags
+  function cut(texture: RenderTexture, key: string) {
+    const found = maskFor(key, texture)
+    if (!found || found === 'full') return
+    // First, since making it the first time shows "whole"
+    const outside = outsideTexture(found.mask, found.width, found.height)
     whole.visible = false
-    cutter.texture = selectedTexture(tile, texture.width, texture.height)
+    cutter.texture = outside
+    renderer.render({ container: cutRoot, target: texture, clear: false })
+  }
+
+  // The other way round: take the selected part out of a layer's tile, keeping what isn't selected (for what is left of
+  // a layer while the move tool drags its selected part away)
+  function cutAway(texture: RenderTexture, key: string) {
+    const found = maskFor(key, texture)
+    if (!found) return
+    whole.visible = false
+    if (found === 'full') {
+      renderer.render({ container: cutRoot, target: texture, clear: true, clearColor: [0, 0, 0, 0] })
+      return
+    }
+    cutter.texture = selectedTexture(found.mask, found.width, found.height)
     renderer.render({ container: cutRoot, target: texture, clear: false })
   }
 

@@ -209,11 +209,12 @@ export function invert(grid: Grid, selection: Selection | null): Selection | nul
   return result.size > 0 ? result : null
 }
 
-// A layer's tile with the paint taken out where it is selected (null = nothing left), for Delete
-export function cutOut(tile: StoredTile, selected: SelectionTile, width: number, height: number, memory: TileMemory) {
+// A layer's whole tile with the paint taken out where it is selected (null = nothing left), for Delete. "selected" is
+// the selection's tile as a mask of the whole tile (see wholeTileMask in tiles.ts)
+export function cutOut(tile: StoredTile, selected: SelectionTile, memory: TileMemory) {
   if (selected === 'full') return null
-  const pixels = new Uint8ClampedArray(width * height * 4) // it rounds and keeps within 0–255
-  pixels.set(memory.unpack(tile, width, height)) // a copy: stored pixels never change
+  const pixels = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4) // it rounds and keeps within 0–255
+  pixels.set(memory.unpack(tile, TILE_SIZE, TILE_SIZE)) // a copy: stored pixels never change
   for (let i = 0; i < selected.length; i++) {
     if (selected[i] === 0) continue
     const keep = 1 - selected[i] / 255

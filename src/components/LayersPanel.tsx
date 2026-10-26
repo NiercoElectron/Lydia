@@ -1,4 +1,4 @@
-import { Box } from 'lucide-react'
+import { Box, ScanEye } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 import { SliderValue } from './SliderValue'
@@ -12,6 +12,7 @@ type Props = {
   onMove: (id: number, index: number) => void // index from the bottom, 0 = the bottom layer
   onRename: (id: number, name: string) => void
   onVisibleChange: (id: number, visible: boolean) => void
+  onOffPaperChange: (id: number, show: boolean) => void // show the layer's paint off the paper, or not
   onOpacityChange: (id: number, opacity: number) => void
   onOpacityChangeEnd: () => void
 }
@@ -32,6 +33,7 @@ export function LayersPanel({
   onMove,
   onRename,
   onVisibleChange,
+  onOffPaperChange,
   onOpacityChange,
   onOpacityChangeEnd,
 }: Props) {
@@ -150,6 +152,20 @@ export function LayersPanel({
                 >
                   {layer.isSmart && <Box className="smart-icon" size={14} aria-label="Smart object" />}
                   {layer.name}
+                </button>
+              )}
+              {layer.hasOffPaper && (
+                <button
+                  className="icon-button"
+                  aria-pressed={layer.showsOffPaper}
+                  onClick={() => onOffPaperChange(layer.id, !layer.showsOffPaper)}
+                  title={
+                    layer.showsOffPaper
+                      ? 'Hide the paint of this layer that is off the paper'
+                      : 'This layer has paint off the paper: show it, faded, around the paper'
+                  }
+                >
+                  <ScanEye size={14} aria-hidden />
                 </button>
               )}
             </li>

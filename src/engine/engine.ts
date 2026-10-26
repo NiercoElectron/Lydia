@@ -8,11 +8,12 @@ import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings 
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
-import { createTileMemory, type StoredTile } from './memory'
+import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
+import { createOutsideView } from './outsideView'
 import { createPixelGrid } from './pixelGrid'
 import { createProjection } from './projection'
-import { serializeProject, type LayerToSave, type ProjectData } from './projectFile'
+import { MAX_SIZE, serializeProject, type LayerToSave, type ProjectData } from './projectFile'
 import { withResolution } from './resolution'
 import {
   combine,
@@ -37,13 +38,33 @@ import {
   type SmartView,
 } from './smartObject'
 import type { StabilizerSettings } from './stabilizer'
-import { createGrid, parseTileKey, TILE_SIZE, tilesInGigabytes, tileSize, type Grid } from './tiles'
+import {
+  createGrid,
+  isOnPaper,
+  paperPart,
+  parseTileKey,
+  TILE_SIZE,
+  tilesInGigabytes,
+  tileSize,
+  wholeTileMask,
+  type Grid,
+} from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { createView } from './view'
 
 // What the screen needs to know about the drawing. A new object every time something changes, so React can tell
 export type EngineSnapshot = {
-  layers: { id: number; name: string; visible: boolean; opacity: number; isSmart: boolean }[] // from the bottom up
+  // From the bottom up. "hasOffPaper": the layer has paint off the paper; "showsOffPaper": it shows it (see
+  // outsideView.ts)
+  layers: {
+    id: number
+    name: string
+    visible: boolean
+    opacity: number
+    isSmart: boolean
+    hasOffPaper: boolean
+    showsOffPaper: boolean
+  }[]
   activeLayerId: number
   canUndo: boolean
   canRedo: boolean
@@ -136,7 +157,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let selection: Selection | null = null // see selection.ts
 
   const memory = createTileMemory(RAW_BUDGET)
-  const gpu = createGpuTiles(renderer, grid, memory, tilesInGigabytes(gpuMemory))
+  const gpu = createGpuTiles(renderer, memory, tilesInGigabytes(gpuMemory))
   const projection = createProjection(renderer, grid, stack, gpu, project.background)
   const history = createHistory(stack, gpu, projection, {
     get: () => selection,
@@ -147,8 +168,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Everything that belongs to the drawing: zooming, moving, turning and flipping the view change this container (see
   // view.ts). Under a transparent background, the squares go first: they move, turn and flip with the drawing, but
-  // keep their size on the screen, so they get smaller as the view zooms in, every frame
+  // keep their size on the screen, so they get smaller as the view zooms in, every frame. Under everything, the paint
+  // off the paper, faded: the layers' that show it (see outsideView.ts), then what a move or a transform moves (the
+  // ghost, see projection.ts). The paper hides it where it is on the paper
   const world = new Container()
+  const outside = createOutsideView(grid, stack, gpu)
+  world.addChild(outside.container, projection.ghost)
   const checkers = project.background === null ? createCheckers(grid) : null
   if (checkers) world.addChild(checkers)
   world.addChild(projection.container)
@@ -178,6 +203,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let hasHardSelectionEdges = false
   let task: string | null = null // see runTask
   let isMoveEnding = false // a move waits for the tiles it changed to be put together (see endLift)
+  // The layer a move or a transform shows on its own, with its paint off the paper (see prepareLift), left out of the
+  // layers' paint off the paper meanwhile
+  let outsideHidden: Layer | null = null
+  // A transform drew tiles that are only on the graphics card for now: whether they have paint off the paper is told
+  // again once they are in RAM (see hasPaintOff and backgroundWork)
+  let offPaperStale = false
   let transform: Transform | null = null // see startTransform
 
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
@@ -209,16 +240,49 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   const listeners = new Set<() => void>()
   let isModified = false
+
+  // Whether a layer's tile has paint off the paper: off it, or in its part past the paper's right or bottom edge.
+  // Tiles never change (see memory.ts), so the answer for each edge tile is kept. A tile whose latest pixels are still
+  // only on the graphics card is looked at as it is in RAM (see offPaperStale)
+  const paintOffEdge = new WeakMap<StoredTile, boolean>()
+  function hasPaintOff(key: string, tile: StoredTile | undefined) {
+    const { column, row } = parseTileKey(key)
+    if (!isOnPaper(grid, column, row)) return true
+    const { width, height } = tileSize(grid, column, row)
+    if ((width === TILE_SIZE && height === TILE_SIZE) || !tile) return false
+    let found = paintOffEdge.get(tile)
+    if (found === undefined) {
+      found = false
+      const pixels = memory.unpack(tile, TILE_SIZE, TILE_SIZE)
+      for (let y = 0; y < TILE_SIZE && !found; y++) {
+        for (let x = y < height ? width : 0; x < TILE_SIZE; x++) {
+          if (pixels[(y * TILE_SIZE + x) * 4 + 3] !== 0) {
+            found = true
+            break
+          }
+        }
+      }
+      paintOffEdge.set(tile, found)
+    }
+    return found
+  }
+
+  const hasPaintOffPaper = (layer: Layer) =>
+    [...gpu.tilesWithPaint(layer)].some(key => hasPaintOff(key, layer.tiles.get(key)))
+
   let snapshot = makeSnapshot()
+  outside.update() // a drawing opened from a file may have layers that show their paint off the paper
 
   function makeSnapshot(): EngineSnapshot {
     return {
-      layers: stack.layers.map(({ id, name, visible, opacity, smart }) => ({
-        id,
-        name,
-        visible,
-        opacity,
-        isSmart: smart !== undefined,
+      layers: stack.layers.map(layer => ({
+        id: layer.id,
+        name: layer.name,
+        visible: layer.visible,
+        opacity: layer.opacity,
+        isSmart: layer.smart !== undefined,
+        hasOffPaper: hasPaintOffPaper(layer),
+        showsOffPaper: layer.showOffPaper,
       })),
       activeLayerId: stack.active.id,
       canUndo: history.canUndo(),
@@ -234,6 +298,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Something changed: make a new snapshot and tell whoever is listening. "modified" = the drawing itself changed
   function changed(modified = true) {
     if (modified) isModified = true
+    outside.update(outsideHidden)
     snapshot = makeSnapshot()
     for (const listener of listeners) listener()
   }
@@ -257,6 +322,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       gpu.finishReads(isPainting ? 2 : 4)
       gpu.trim() // the tiles saved just now can leave the graphics card, if it is over its budget
       gpu.startSaving(isPainting ? 8 : Infinity, cached => history.isRecording(cached.layer, cached.key))
+    }
+    if (offPaperStale && !gpu.hasUnsaved()) {
+      offPaperStale = false
+      changed(false)
     }
     const now = performance.now()
     if (!isPainting && now - lastBudgetCheck > 1000) {
@@ -295,13 +364,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   // Change tiles of a layer in RAM, a few every frame, as one undo step: "change" gives a tile's new pixels (null = no
-  // paint), or undefined to leave it as it is. The new tiles are sent to the graphics card where it has a copy of
+  // paint, and the tile is whole: see tiles.ts), or undefined to leave it as it is. The new tiles are sent to the graphics card where it has a copy of
   // them, so nothing has to be read back from it. "withSelection": the selection changes too, right afterwards, as part
   // of the same step (a move). Returns whether anything changed
   async function changeTiles(
     layer: Layer,
     keys: Iterable<string>,
-    change: (key: string, tile: StoredTile | undefined, width: number, height: number) => StoredTile | null | undefined,
+    change: (key: string, tile: StoredTile | undefined) => StoredTile | null | undefined,
     withSelection = false,
   ) {
     while (gpu.hasUnsaved()) await nextFrame() // every tile in RAM (nothing could paint since runTask waited)
@@ -310,9 +379,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     history.begin(layer, { selection: withSelection })
     for (const key of keys) {
       await pace()
-      const { column, row } = parseTileKey(key)
-      const { width, height } = tileSize(grid, column, row)
-      const tile = change(key, layer.tiles.get(key), width, height)
+      const tile = change(key, layer.tiles.get(key))
       if (tile === undefined) continue
       history.backUpTile(key)
       if (tile) layer.tiles.set(key, tile)
@@ -399,6 +466,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     stack.active = layer
     projection.markAllBelowStale() // "below" now has different layers
     changed(false) // the drawing itself didn't change
+  }
+
+  // Show a layer's paint off the paper, faded around the paper, or not (see outsideView.ts). It is only a way of
+  // looking at the drawing, so it is no step of undo, but it is saved with the drawing
+  function setLayerOffPaper(id: number, show: boolean) {
+    const layer = findLayer(id)
+    if (!layer || layer.showOffPaper === show) return
+    layer.showOffPaper = show
+    changed()
   }
 
   function setLayerVisible(id: number, visible: boolean) {
@@ -527,25 +603,41 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     return withResolution(blob, project.dpi)
   }
 
-  // The drawing as the contents of a .lyd file
+  // The drawing as the contents of a .lyd file. A drawing with nothing off the paper is saved the way it was before
+  // layers could go off it, its tiles at the paper's edges cut there, so versions of Lydia before 0.10 can open it
+  // (see projectFile.ts)
   async function saveProject() {
     // Every painted tile must be in RAM first
     while (gpu.hasUnsaved()) await nextFrame()
-    const pack = (tiles: Map<string, StoredTile>) =>
-      Promise.all(
-        [...tiles].map(async ([key, tile]) => {
+    const allTiles = stack.layers.flatMap(({ tiles, smart }) => (smart ? [tiles, smart.source.tiles] : [tiles]))
+    const wholeTiles = allTiles.some(tiles => [...tiles].some(([key, tile]) => hasPaintOff(key, tile)))
+    // A tile as it is saved: whole, or its part on the paper (null: none)
+    const savedTile = (key: string, tile: StoredTile) => {
+      const { column, row } = parseTileKey(key)
+      const { width, height } = tileSize(grid, column, row)
+      if (wholeTiles || (width === TILE_SIZE && height === TILE_SIZE)) return tile
+      return toStoredTile(paperPart(memory.unpack(tile, TILE_SIZE, TILE_SIZE), width, height))
+    }
+    const pack = async (tiles: Map<string, StoredTile>) => {
+      const packed = await Promise.all(
+        [...tiles].map(async ([key, whole]) => {
           const { column, row } = parseTileKey(key)
+          const tile = savedTile(key, whole)
+          if (!tile) return null
           if (tile.color !== undefined) return { column, row, color: tile.color }
           return { column, row, packed: await memory.pack(tile) }
         }),
       )
+      return packed.filter(tile => tile !== null)
+    }
     // A smart object also keeps its source (see smartObject.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
-      stack.layers.map(async ({ name, visible, opacity, blendMode, tiles, smart }) => ({
+      stack.layers.map(async ({ name, visible, opacity, blendMode, showOffPaper, tiles, smart }) => ({
         name,
         visible,
         opacity,
         blendMode,
+        showOffPaper,
         tiles: await pack(tiles),
         smart: smart && {
           tiles: await pack(smart.source.tiles),
@@ -555,7 +647,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const file = serializeProject(project, activeIndex(stack), view.getSaved(), layersToSave)
+    const file = serializeProject(project, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
     isModified = false
     changed(false)
     return file
@@ -600,11 +692,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const { tolerance, expand } = fillSettings
       const region = await findFillRegion(grid, reference, memory, seedX, seedY, tolerance, expand)
       const { color, opacity } = brush.settings
-      return changeTiles(layer, region.keys(), (key, tile, width, height) => {
+      return changeTiles(layer, region.keys(), (key, tile) => {
         const selected = selection ? selection.get(key) : 'full'
         if (!selected) return undefined // not selected at all
         const amounts = selected === 'full' ? undefined : selected
-        return fillTile(tile, region.get(key)!, color, opacity, width, height, memory, amounts)
+        return fillTile(grid, key, tile, region.get(key)!, color, opacity, memory, amounts)
       })
     })
   }
@@ -646,8 +738,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     return runTask('Deleting…', () => {
       const layer = stack.active
       const keys = [...cut.keys()].filter(key => layer.tiles.has(key))
-      return changeTiles(layer, keys, (key, tile, width, height) =>
-        tile ? cutOut(tile, cut.get(key)!, width, height, memory) : undefined,
+      return changeTiles(layer, keys, (key, tile) =>
+        tile ? cutOut(tile, wholeTileMask(grid, key, cut.get(key)!, 255), memory) : undefined,
       )
     })
   }
@@ -695,27 +787,38 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Get the projection ready to show a part of the active layer on its own (see showMove in projection.ts), a few
   // tiles every frame: what is left of the layer where it loses paint ("lifted"), and the layers above where they have
   // paint. With "withPictures", also pictures of the part it loses there, to move along; a smart object being
-  // transformed draws itself instead. Tiles shown live would show through all that
+  // transformed draws itself instead. What the layer keeps off the paper shows faded meanwhile (see the ghost in
+  // projection.ts). Tiles shown live would show through all that
   async function prepareLift(layer: Layer, cut: Selection | null, lifted: string[], withPictures: boolean) {
     projection.finishLive()
+    outsideHidden = layer
+    outside.update(layer)
     const isLifted = new Set(lifted)
+    const offPaper = [...gpu.tilesWithPaint(layer)].filter(key => {
+      const { column, row } = parseTileKey(key)
+      return !isOnPaper(grid, column, row)
+    })
     const pace = createPacer()
-    for (const key of new Set([...lifted, ...projection.paintedAbove()])) {
+    for (const key of new Set([...lifted, ...(lifted.length > 0 ? offPaper : []), ...projection.paintedAbove()])) {
       await pace()
       const { column, row } = parseTileKey(key)
       const texture = layer.visible ? gpu.getTexture(layer, column, row, false) : null
       const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
+      // All of the tile moves when it is selected whole, and, with a selection (which is only on the paper), all of it
+      // is on the paper
+      const { width, height } = tileSize(grid, column, row)
+      const movesWhole = selected === 'full' && (!cut || (width === TILE_SIZE && height === TILE_SIZE))
       let moving: RenderTexture | null = null
       let left: RenderTexture | null = null
       if (texture && selected && withPictures) {
-        moving = projection.moveTexture(column, row)
+        moving = projection.moveTexture()
         gpu.copyInto(texture, moving)
-        selectionView.cut(moving, key)
+        if (cut) selectionView.cut(moving, key)
       }
-      if (texture && selected !== 'full') {
-        left = projection.moveTexture(column, row)
+      if (texture && !movesWhole) {
+        left = projection.moveTexture()
         gpu.copyInto(texture, left)
-        if (selected) selectionView.cutAway(left, key)
+        if (selected && cut) selectionView.cutAway(left, key)
       }
       projection.prepareMoveTile(key, moving, left)
     }
@@ -759,6 +862,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   async function endLift() {
     isMoveEnding = true
     while (isMoveEnding) await nextFrame()
+    outsideHidden = null
   }
 
   // On a smart object, the move tool moves the whole object, without losing anything: a transform that only moves it.
@@ -811,12 +915,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           const selected = cut ? cut.get(key) : 'full'
           if (!selected) continue
           await pace()
-          const { column, row } = parseTileKey(key)
-          const { width, height } = tileSize(grid, column, row)
-          const part = selectedPart(tile, selected, width, height, memory)
+          const part = selectedPart(tile, cut ? wholeTileMask(grid, key, selected, 255) : selected, memory)
           if (part) tiles.set(key, part)
         }
-        const bounds = paintBounds(grid, tiles, memory)
+        const bounds = paintBounds(tiles, memory)
         if (!bounds) return false // nothing to transform
         const source = createLayer(`${layer.name} (source)`, tiles)
         object = { source, bounds, corners: rectQuad(bounds), smooth: smoothTransforms }
@@ -829,7 +931,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Put an image into the drawing as a smart object, centered at this point of the paper, with the handles showing:
   // Enter puts it into a new layer above the active one, named after it, and Esc leaves it out. An image bigger than
-  // the paper is made smaller to fit it, since a source is on the paper's grid. The image is closed afterwards
+  // the paper keeps its size, going past the paper (decision 49); only one bigger than the biggest paper is made
+  // smaller, to fit in it. The image is closed afterwards
   function placeImage(image: ImageBitmap, name: string, at: Point) {
     if (isBusy()) {
       image.close()
@@ -839,16 +942,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     return runTask('Placing…', async () => {
       let fitted = image
       try {
-        const scale = Math.min(1, grid.width / image.width, grid.height / image.height)
+        const scale = Math.min(1, MAX_SIZE / image.width, MAX_SIZE / image.height)
         if (scale < 1) {
           fitted = await createImageBitmap(image, {
-            resizeWidth: Math.max(1, Math.min(grid.width, Math.round(image.width * scale))),
-            resizeHeight: Math.max(1, Math.min(grid.height, Math.round(image.height * scale))),
+            resizeWidth: Math.max(1, Math.min(MAX_SIZE, Math.round(image.width * scale))),
+            resizeHeight: Math.max(1, Math.min(MAX_SIZE, Math.round(image.height * scale))),
             resizeQuality: 'high',
           })
         }
         const pace = createPacer()
-        const tiles = await imageTiles(grid, fitted, pace)
+        const tiles = await imageTiles(fitted, pace)
         const { width, height } = fitted
         // On whole pixels, so that at 100% its pixels are the image's own
         const x = Math.round(at.x - width / 2)
@@ -876,13 +979,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     pace: () => Promise<void>,
   ) {
     const { object } = started
-    const view = createSmartView(renderer, grid, gpu, object)
+    const view = createSmartView(renderer, gpu, object)
     for (const key of view.blocks) {
       await pace()
       view.addBlock(key)
     }
     await prepareLift(started.layer, started.cut, lifted, false)
-    projection.setMoveContent(view.container)
+    projection.setMoveContent(view.container, view.faded)
     projection.showMove(0, 0)
     transform = { ...started, corners: object.corners, smooth: object.smooth, view }
   }
@@ -909,6 +1012,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     transform = null
     projection.endMove()
     ended.view.destroy()
+    outsideHidden = null
     changed(false)
   }
 
@@ -927,8 +1031,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       try {
         if (kind === 'part' && cut) {
           const keys = [...cut.keys()].filter(key => layer.tiles.has(key))
-          await changeTiles(layer, keys, (key, tile, width, height) =>
-            tile ? cutOut(tile, cut.get(key)!, width, height, memory) : undefined,
+          await changeTiles(layer, keys, (key, tile) =>
+            tile ? cutOut(tile, wholeTileMask(grid, key, cut.get(key)!, 255), memory) : undefined,
           )
           history.recordSelection()
           selection = null
@@ -981,6 +1085,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     layer.smart = object
     history.end()
     projection.composeLater(keys)
+    offPaperStale = true
   }
 
   // Turn the active smart object into a normal layer: its pixels stay as they are and can be painted on, but its
@@ -1026,6 +1131,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     app.ticker.remove(backgroundWork)
     app.ticker.remove(followZoom)
     pixelGrid.destroy()
+    outside.destroy()
     transform?.view.destroy()
     selectionView.destroy()
     checkers?.texture.destroy(true)
@@ -1062,6 +1168,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     renameLayer,
     selectLayer,
     setLayerVisible,
+    setLayerOffPaper,
     setLayerOpacity,
     finishLayerOpacity,
     // The selection (see selection.ts)

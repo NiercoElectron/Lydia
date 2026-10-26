@@ -11,6 +11,17 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 - **What's New?** on the start screen, at the right: what changed in each version, read from this changelog, the
   newest open and the others closed below it.
+- A layer with paint off the paper has an icon in the layers that shows that paint, faded, around the paper, and hides
+  it again ([decision 50](docs/decisions.md#50-showing-paint-off-the-paper)). It is off at first, and kept with the
+  drawing.
+
+### Changed
+
+- Layers can have paint off the paper ([decision 49](docs/decisions.md#49-layers-off-the-paper)). Paint moved off the
+  paper, with the move tool or a transform, is kept, hidden, and comes back when it is moved onto the paper again;
+  meanwhile it shows faded around the paper. An image bigger than the paper keeps its size. Paint off the paper is
+  saved: such a drawing is a version 4 `.lyd` file, which earlier versions of Lydia can't open (a drawing without any
+  is saved as before).
 
 ## [0.9.0] - 2026-10-25
 

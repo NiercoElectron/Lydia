@@ -24,11 +24,11 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   soft or hard edges (hard with a pixel brush); the brush, the eraser and the fill bucket only work inside, and Delete
   takes out what is inside
 - A move tool that drags what is selected, or the whole layer when nothing is, by whole pixels; the selection moves
-  along
+  along, and paint moved off the paper is kept, to be brought back
 - Smart objects, like Photoshop's: scale, turn, skew or distort what is selected or a whole layer with handles, again
   and again without losing anything, smoothly or by whole pixels for pixel art
 - Import images into a tray (the Tray button, at the foot of the tool column) and drag them onto the drawing as often
-  as needed, as smart objects; the tray stays while Lydia is open
+  as needed, as smart objects, at their own size; the tray stays while Lydia is open
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
@@ -39,7 +39,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
   brush list or as a file
 - Pixel brushes drawn in the Brush Designer, pixel by pixel, that paint their tip at 1×, 2×, 3×… its size
-- Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity
+- Layers: add, delete, choose, move (drag them in the list), rename (double-click), hide and show, change the opacity,
+  and show their paint off the paper
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
 - Zoom, move, turn and flip the view (the drawing itself doesn't change), with the zoom and the angle shown in the bar

@@ -932,7 +932,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     Shift keeps it level or upright. The selection moves along with the paint, and the move is one step of undo
     together with the selection. A click without dragging does nothing.
   - Paint moved off the paper is lost: the layers only have tiles over the paper. Photoshop and Krita keep it, with
-    layers that can be bigger than the paper; that would be a stage of its own.
+    layers that can be bigger than the paper; that would be a stage of its own. (Changed on 2026-10-25: it is kept,
+    see decision 49.)
   - A hidden layer isn't moved, since nothing of it shows.
   - Next, in a step of its own: scaling and turning what is selected.
 - **Why:**
@@ -1047,7 +1048,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     step; Esc leaves it out. An image file dropped straight onto the drawing also goes into it there.
   - The tray is kept **only while Lydia is open** (my choice): it stays the same from one drawing to the next,
     and is empty again after the page is closed or reloaded. It isn't saved in `.lyd` files.
-  - An image bigger than the paper is **made smaller to fit it** (my choice), keeping its proportions.
+  - An image bigger than the paper is **made smaller to fit it** (my choice), keeping its proportions. (Changed on
+    2026-10-25: it keeps its size, going past the paper, see decision 49.)
 - **Why:**
   - Reference pictures, textures and pieces used again and again are common in drawing, and finding the file each time
     is slow. Going in as a smart object keeps the image's pixels however it is scaled while placing it.
@@ -1250,6 +1252,83 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   zoomed in with the grid; a tip of an L and a pixel apart, cut to 3×3; saved and chosen in a drawing, the size set to
   3; painted at 1× exactly as drawn and nothing around it, at 2× each pixel a square of 2×2, and size 8 going to 9
   (3×), with its outline 9 pixels across; a stroke; its sample in the brush list.
+
+## 49. Layers off the paper
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - Layers can have paint **off the paper**, at any distance (my choice), like in Photoshop: paint moved off it with
+    the move tool or a transform is kept, not shown, and comes back when it is moved onto the paper again. An image
+    bigger than the paper goes in at its own size (decision 43); only one bigger than the biggest paper (10000
+    pixels) is still made smaller.
+  - What is off the paper is **saved** in the `.lyd` file (my choice). A drawing with some is saved as version 4,
+    which older versions of Lydia can't open; one with nothing off the paper is still saved as version 2 or 3, so
+    they can.
+  - It is hidden, and shows **faded** while the move tool or a transform is used on the layer (my choice), so what is
+    there can be found and brought back.
+  - Only what moves goes off the paper: the brush, the eraser and the fill bucket paint only on it, a selection is
+    only on it (Select all too), and exported images are the paper.
+  - It came first after the Painting stage, before the liquify of the Brushes stage, which will need it too, and is
+    the first item of the Pixel art stage's version. The smart objects that alias when much smaller (decision 42) stay
+    for later.
+- **Why:**
+  - Losing paint by moving it a little too far was a trap, and a picture bigger than the paper couldn't be placed at
+    its size, to choose the part to show.
+- **How:**
+  - A layer's tiles are now always whole, 256 × 256, wherever they are, also at the paper's right and bottom edges,
+    where they used to be cut at the paper (decision 5), and their columns and rows can be negative. Everything that
+    belongs to the paper itself keeps its tiles cut at its edge: the picture the screen shows (the projection), the
+    selection, the stroke being painted and the fill's region. Where they meet a layer's tile, their masks are made
+    whole first, with nothing off the paper; so a stroke, Delete or a fill never reaches past the paper, even inside
+    an edge tile.
+  - The projection only puts together the tiles on the paper; the layers' tiles off it stay in RAM, compressed when
+    RAM gets short, and only go to the graphics card when they are moved or transformed.
+  - While a move or a transform is shown, what moves is cut at the paper's edge (a mask), and the "ghost", under the
+    paper, shows the active layer's paint again at 35%: the paper hides it where it is on the paper. The smart
+    objects' shader now takes the opacity of what it is in, which the ghost needs.
+  - The file: in version 4 every tile is whole and can be anywhere (within 4096 tiles of the paper's corner each way,
+    so a damaged file can't make Lydia go through millions of places), and so can a smart object's source. Saving
+    looks for paint off the paper: in tiles off it, or in the part of the edge tiles past its edge. Without any, the
+    edge tiles are cut at the paper and the file is version 2 or 3, as before. Opening a version 2 or 3 file makes
+    its edge tiles whole.
+- **Checked (headless browser):** a square moved off the right side and back, whole, with nothing left off the paper;
+  undo and redo of both moves; off the left side, into negative columns, and back; Select all + Delete leaving what
+  is off the paper, also in an edge tile's part past the paper; a selection moving only what is selected, and the
+  paint off the paper staying; the brush and the fill at the paper's edge leaving nothing past it; saving with paint
+  off the paper as version 4 and opening it with that paint, and without as version 2, opening with its edge tiles
+  whole; a version 3 file with a smart object; an image of 1500 × 1200 on a paper of 1000 × 800 keeping its size,
+  its corner off the paper moved onto it; the ghost while moving and transforming, gone afterwards (screenshots).
+
+## 50. Showing paint off the paper
+
+- **Date:** 2026-10-25
+- **Status:** adopted
+- **Decision:**
+  - Paint off the paper (decision 49) could only be found with the move tool or a transform, guessing it was there.
+    So each layer can **show its paint off the paper**, faded around the paper (my idea), and the choice is per
+    layer: off at first, turned on and off at any time.
+  - The switch is an icon in the layer's row, at the right, that **only shows on layers that have paint off the
+    paper** (Claude's suggestion), so it also tells which layers have some.
+  - It shows **faded** (my choice), at the same 35% as during a move, so it is clear what is outside the drawing
+    and won't be exported.
+  - It is **saved** with the drawing, but isn't a step of undo (my choice): it changes how the drawing is looked at,
+    not the drawing.
+- **Why:**
+  - Paint moved off the paper and forgotten was as good as lost: nothing told it was there, nor where.
+- **How:**
+  - The layers that show it have their tiles off the paper, and their edge tiles, drawn faded under the paper
+    (`outsideView.ts`), which hides them where they are on the paper. Those tiles stay on the graphics card meanwhile
+    ("pinned"), since sprites show them; they are drawn again after every change. A layer being moved or transformed
+    is left out of it then, since the ghost (decision 49) shows it.
+  - Whether a layer has paint off the paper: a tile off it, or paint in an edge tile's part past the paper, looked
+    for once for each tile, since tiles never change. After a transform, whose tiles are only on the graphics card
+    for a moment, the layers are told again once those tiles are in RAM.
+  - In the file, the layer's `showOffPaper`; older versions of Lydia leave it alone.
+- **Checked:** no icon with everything on the paper; the icon with paint only in an edge tile's part past the paper,
+  and with paint off it; shown, red faded around the paper and nothing over it; hidden again, the gray; Ctrl+Z
+  undoing the move before it, not the switch; while the layer is moved, only the ghost showing it; saved and opened
+  again, still shown; brought back onto the paper, the icon gone; after a transform past the edge, the icon.
 
 ## Open questions
 

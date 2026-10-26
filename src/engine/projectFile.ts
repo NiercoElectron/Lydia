@@ -1,8 +1,9 @@
 import type { BlendMode } from './layers'
+import { decompress } from './lz4'
 import type { StoredTile } from './memory'
 import type { Point } from './selection'
 import { isValidQuad, type Quad, type Rect } from './smartObject'
-import { createGrid, TILE_SIZE, tileKey, type Grid } from './tiles'
+import { createGrid, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 export const PROJECT_EXTENSION = '.lyd'
 export const MIN_SIZE = 16
@@ -26,6 +27,7 @@ export type LayerData = {
   visible: boolean
   opacity: number
   blendMode: BlendMode
+  showOffPaper?: boolean // its paint off the paper shows around the paper (see outsideView.ts)
   tiles: Map<string, StoredTile> // "column,row" -> tile
   smart?: SmartData<Map<string, StoredTile>> // for a smart object
 }
@@ -64,7 +66,7 @@ export const isColor = (value: unknown): value is string => typeof value === 'st
 type TileToSave = { column: number; row: number; color?: number; packed?: Uint8Array }
 export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSave[]; smart?: SmartData<TileToSave[]> }
 
-// ----- The .lyd file (version 3) -----
+// ----- The .lyd file (version 4) -----
 //
 // Bytes 0–7:   "LYDIAPRJ", to recognize the file
 // Bytes 8–11:  the length of the header, in bytes (a 32-bit number, least significant byte first)
@@ -84,12 +86,23 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // A smart object's layer also has "smart": its source's tiles, listed like the layer's, the rectangle of the source
 // with paint ("bounds"), the corners where that rectangle is on the paper, and "smooth". A tile that the layer and its
 // source share is stored once. Only files with smart objects are version 3: the others stay version 2, so that
-// Lydia 0.7 can still open them
+// Lydia 0.7 can still open them.
+//
+// In versions 2 and 3, tiles are on the paper, and the ones at its right and bottom edges are cut there. Since Lydia
+// 0.10, layers can have paint off the paper (decision 49): a drawing with some is version 4, where every tile is whole
+// (TILE_SIZE × TILE_SIZE) and can be anywhere (its column and row can be negative), and so can a smart object's
+// source and "bounds". A drawing with nothing off the paper is still saved as version 2 or 3, so older versions of
+// Lydia can open it. A layer's "showOffPaper" (since 0.10) says it shows its paint off the paper; it is false when
+// missing
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
-const VERSION = 3 // the newest version this Lydia can open
+const VERSION = 4 // the newest version this Lydia can open
 const SMART_VERSION = 3 // the first version with smart objects
+const WHOLE_TILES_VERSION = 4 // the first version with whole tiles, off the paper too
+// How far from the paper's corner a tile can be, in tiles each way: far beyond anything a drawing needs, so a damaged
+// file can't make Lydia go through millions of places
+const MAX_TILE_INDEX = 4096
 
 type TileEntry = { column: number; row: number; color?: number; offset?: number; length?: number }
 
@@ -106,12 +119,14 @@ type FileHeader = {
   layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
-// Turn a drawing into the contents of a .lyd file
+// Turn a drawing into the contents of a .lyd file. "wholeTiles": its tiles are whole, some of them off the paper
+// (version 4); otherwise they are on the paper, cut at its edge
 export function serializeProject(
   { width, height, background, dpi }: Paper,
   activeLayer: number,
   view: ViewData,
   layers: LayerToSave[],
+  wholeTiles: boolean,
 ) {
   const data: Uint8Array[] = []
   let offset = 0
@@ -130,7 +145,7 @@ export function serializeProject(
     })
   const header: FileHeader = {
     format: FORMAT,
-    version: layers.some(layer => layer.smart) ? SMART_VERSION : 2,
+    version: wholeTiles ? WHOLE_TILES_VERSION : layers.some(layer => layer.smart) ? SMART_VERSION : 2,
     width,
     height,
     tileSize: TILE_SIZE,
@@ -186,24 +201,30 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
+  const isWhole = header.version >= WHOLE_TILES_VERSION
 
-  // A list of tiles from the header. Tiles stored as bytes are views into the file's bytes, without copying them
+  // A list of tiles from the header. Tiles stored as bytes are views into the file's bytes, without copying them. In
+  // older files, the tiles at the paper's edges are cut there: they are made whole
   function readTiles(entries: unknown[]) {
     const tiles = new Map<string, StoredTile>()
     for (const entry of entries) {
       if (!isObject(entry)) throw damaged()
       const { column, row, color, offset, length } = entry
-      const isInGrid =
-        isInteger(column) && isInteger(row) && column >= 0 && column < grid.columns && row >= 0 && row < grid.rows
-      if (!isInGrid) throw damaged()
+      if (!isInteger(column) || !isInteger(row)) throw damaged()
+      const isInPlace = isWhole
+        ? Math.abs(column) <= MAX_TILE_INDEX && Math.abs(row) <= MAX_TILE_INDEX
+        : column >= 0 && column < grid.columns && row >= 0 && row < grid.rows
+      if (!isInPlace) throw damaged()
+      let tile: StoredTile
       if (color !== undefined) {
         if (!isInteger(color) || color < 0 || color > 0xffffffff) throw damaged()
-        tiles.set(tileKey(column, row), { color, lastUsed: 0 })
+        tile = { color, lastUsed: 0 }
       } else {
         if (!isInteger(offset) || !isInteger(length) || offset < 0 || length <= 0) throw damaged()
         if (dataStart + offset + length > bytes.length) throw damaged()
-        tiles.set(tileKey(column, row), { packed: new Uint8Array(file, dataStart + offset, length), lastUsed: 0 })
+        tile = { packed: new Uint8Array(file, dataStart + offset, length), lastUsed: 0 }
       }
+      tiles.set(tileKey(column, row), isWhole ? tile : wholeTile(grid, column, row, tile, damaged))
     }
     return tiles
   }
@@ -227,12 +248,13 @@ export function parseProject(file: ArrayBuffer): ProjectData {
       }
       const { name, visible, opacity, blendMode } = layer
       const data: LayerData = { name, visible, opacity, blendMode, tiles: readTiles(layer.tiles) }
+      if (layer.showOffPaper === true) data.showOffPaper = true
       if (layer.smart !== undefined) {
         const smart = layer.smart
         if (
           !isObject(smart) ||
           !Array.isArray(smart.tiles) ||
-          !isBounds(smart.bounds, grid) ||
+          !isBounds(smart.bounds, grid, isWhole) ||
           !isCorners(smart.corners) ||
           typeof smart.smooth !== 'boolean'
         ) {
@@ -264,12 +286,36 @@ function isInteger(value: unknown): value is number {
   return Number.isInteger(value)
 }
 
-// A rectangle of whole pixels inside the paper
-function isBounds(value: unknown, grid: Grid): value is Rect {
+// A rectangle of whole pixels: inside the paper, or with whole tiles ("isWhole") anywhere tiles can be
+function isBounds(value: unknown, grid: Grid, isWhole: boolean): value is Rect {
   if (!isObject(value)) return false
   const { x, y, width, height } = value
   if (!isInteger(x) || !isInteger(y) || !isInteger(width) || !isInteger(height)) return false
-  return x >= 0 && y >= 0 && width > 0 && height > 0 && x + width <= grid.width && y + height <= grid.height
+  if (width <= 0 || height <= 0) return false
+  if (!isWhole) return x >= 0 && y >= 0 && x + width <= grid.width && y + height <= grid.height
+  const far = MAX_TILE_INDEX * TILE_SIZE
+  return Math.abs(x) <= far && Math.abs(y) <= far && width <= 2 * far && height <= 2 * far
+}
+
+// A tile from a file of version 2 or 3 as a whole tile: the same tile when it is all on the paper; at the paper's right
+// and bottom edges, where it was cut, its pixels with nothing around them. "damaged" makes the error for bytes that
+// don't unpack
+function wholeTile(grid: Grid, column: number, row: number, tile: StoredTile, damaged: () => Error): StoredTile {
+  const { width, height } = tileSize(grid, column, row)
+  if (width === TILE_SIZE && height === TILE_SIZE) return tile
+  const part = new Uint8ClampedArray(width * height * 4)
+  if (tile.color !== undefined) {
+    new Uint32Array(part.buffer).fill(tile.color)
+  } else {
+    try {
+      decompress(tile.packed!, part)
+    } catch {
+      throw damaged()
+    }
+  }
+  const pixels = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4)
+  for (let y = 0; y < height; y++) pixels.set(part.subarray(y * width * 4, (y + 1) * width * 4), y * TILE_SIZE * 4)
+  return { pixels, lastUsed: 0 }
 }
 
 // How a drawing can be shown (see ViewData). A view that isn't one only loses the view, not the drawing

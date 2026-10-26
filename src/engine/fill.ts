@@ -1,5 +1,5 @@
 import { toStoredTile, type StoredTile, type TileMemory } from './memory'
-import { TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
+import { paperPart, TILE_SIZE, tileKey, tileSize, wholeTileMask, type Grid } from './tiles'
 
 // The fill bucket (decision 39): it fills the region around the point clicked whose colors are close to the color
 // there, and goes on under the soft edge of the lines around it. The region is worked out by the processor from the
@@ -63,7 +63,8 @@ function filledColor(below: number, color: string, opacity: number) {
 }
 
 // What the fill looks at in a tile: the layers put together, as one color when every one of them is a single color
-// there (or has nothing), or as the color of each pixel
+// there (or has nothing), or as the color of each pixel of the tile's part on the paper ("width" × "height"; the
+// layers' tiles are whole, see tiles.ts)
 function referenceOf(layers: ReferenceLayer[], memory: TileMemory, key: string, width: number, height: number) {
   const present = layers.filter(layer => layer.opacity > 0 && layer.tiles.has(key))
   if (present.every(layer => layer.tiles.get(key)!.color !== undefined)) {
@@ -71,7 +72,8 @@ function referenceOf(layers: ReferenceLayer[], memory: TileMemory, key: string, 
   }
   // A single layer, fully shown: its own pixels, without a copy
   if (present.length === 1 && present[0].opacity === 1) {
-    return new Uint32Array(memory.unpack(present[0].tiles.get(key)!, width, height).buffer)
+    const pixels = memory.unpack(present[0].tiles.get(key)!, TILE_SIZE, TILE_SIZE)
+    return new Uint32Array(paperPart(pixels, width, height).buffer)
   }
   const out = new Uint8ClampedArray(width * height * 4) // transparent at first; it rounds and keeps within 0–255
   for (const { tiles, opacity } of present) {
@@ -83,7 +85,7 @@ function referenceOf(layers: ReferenceLayer[], memory: TileMemory, key: string, 
         for (let c = 0; c < 4; c++) out[i + c] = color[c] * opacity + out[i + c] * keep
       }
     } else {
-      const pixels = memory.unpack(tile, width, height)
+      const pixels = paperPart(memory.unpack(tile, TILE_SIZE, TILE_SIZE), width, height)
       for (let i = 0; i < out.length; i += 4) {
         const keep = 1 - (pixels[i + 3] / 255) * opacity
         for (let c = 0; c < 4; c++) out[i + c] = pixels[i + c] * opacity + out[i + c] * keep
@@ -361,30 +363,32 @@ export async function findFillRegion(
   return region
 }
 
-// A layer's tile after the fill (null = no paint): the color, at this opacity, over its pixels where the mask says
-// FILL, and behind them where it says BEHIND; with a selection, only as much as each pixel is selected ("selected",
-// from 0 to 255; all of it without one). Worked out in RAM rather than painted on the graphics card, so nothing has to
-// be read back from it afterwards: with big fills, hundreds of tiles read back at once made the screen stop for a
-// moment
+// A layer's tile at "key" after the fill (null = no paint): the color, at this opacity, over its pixels where the mask
+// says FILL, and behind them where it says BEHIND; with a selection, only as much as each pixel is selected
+// ("selected", from 0 to 255; all of it without one). The masks cover the tile's part on the paper: off the paper,
+// nothing is filled. Worked out in RAM rather than painted on the graphics card, so nothing has to be read back from
+// it afterwards: with big fills, hundreds of tiles read back at once made the screen stop for a moment
 export function fillTile(
+  grid: Grid,
+  key: string,
   tile: StoredTile | undefined,
-  mask: FillMask,
+  regionMask: FillMask,
   color: string,
   opacity: number,
-  width: number,
-  height: number,
   memory: TileMemory,
-  selected?: Uint8Array,
+  selectedPart?: Uint8Array,
 ): StoredTile | null {
+  const mask = wholeTileMask(grid, key, regionMask, FILL)
+  const selected = selectedPart && (wholeTileMask(grid, key, selectedPart, 255) as Uint8Array)
   if (mask === 'full' && !selected && (!tile || tile.color !== undefined)) {
     return { color: filledColor(tile?.color ?? 0, color, opacity), lastUsed: performance.now() }
   }
-  const pixels = new Uint8ClampedArray(width * height * 4) // it rounds and keeps within 0–255
-  if (tile) pixels.set(memory.unpack(tile, width, height)) // a copy: stored pixels never change
+  const pixels = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4) // it rounds and keeps within 0–255
+  if (tile) pixels.set(memory.unpack(tile, TILE_SIZE, TILE_SIZE)) // a copy: stored pixels never change
   const [red, green, blue] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) * opacity)
   const alpha = 255 * opacity
   const keep = 1 - opacity
-  for (let i = 0; i < width * height; i++) {
+  for (let i = 0; i < TILE_SIZE * TILE_SIZE; i++) {
     const what = mask === 'full' ? FILL : mask[i]
     if (!what) continue
     const amount = selected ? selected[i] / 255 : 1

@@ -399,6 +399,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onMove={(id, index) => engine?.moveLayer(id, index)}
           onRename={(id, name) => engine?.renameLayer(id, name)}
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
+          onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
           onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
           onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
         />

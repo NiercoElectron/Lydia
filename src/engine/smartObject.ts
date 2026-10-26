@@ -13,7 +13,7 @@ import type { GpuTiles } from './gpuTiles'
 import type { Layer } from './layers'
 import { toStoredTile, type StoredTile, type TileMemory } from './memory'
 import type { Point, SelectionTile } from './selection'
-import { parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
+import { parseTileKey, TILE_SIZE, tileKey, tilesTouching } from './tiles'
 
 // Smart objects (decision 42): a layer that keeps its original pixels (its "source") and where the source's corners
 // are on the paper. Its own tiles are the source drawn at those corners, worked out again from the source after every
@@ -28,7 +28,8 @@ export type Quad = [Point, Point, Point, Point]
 
 export type SmartObject = {
   // The original pixels, as a layer of their own that isn't in the drawing, so the graphics card can keep their tiles
-  // like any layer's. They are on the paper's grid, where they were when the smart object was made
+  // like any layer's. They are on the paper's grid of tiles, where they were when the smart object was made, and can be
+  // off the paper like any layer's (an image bigger than the paper)
   source: Layer
   bounds: Rect // the part of the source with paint: what the corners show
   corners: Quad // where the corners of "bounds" are on the paper
@@ -121,9 +122,10 @@ export function isValidQuad(quad: Quad) {
 
 // ----- Making one -----
 
-// The rectangle where tiles have paint, to the pixel (null: no paint at all). Only the tiles on the outer rows and
-// columns can hold the outermost pixels, and in each of them a side is only looked at until its first painted pixel
-export function paintBounds(grid: Grid, tiles: Map<string, StoredTile>, memory: TileMemory): Rect | null {
+// The rectangle where tiles have paint, to the pixel (null: no paint at all), on the paper or off it. Only the tiles on
+// the outer rows and columns can hold the outermost pixels, and in each of them a side is only looked at until its
+// first painted pixel
+export function paintBounds(tiles: Map<string, StoredTile>, memory: TileMemory): Rect | null {
   if (tiles.size === 0) return null
   const places = [...tiles.keys()].map(parseTileKey)
   const firstColumn = Math.min(...places.map(p => p.column))
@@ -143,7 +145,8 @@ export function paintBounds(grid: Grid, tiles: Map<string, StoredTile>, memory: 
     }
     if (!sides.left && !sides.right && !sides.top && !sides.bottom) continue
     const tile = tiles.get(tileKey(column, row))!
-    const { width, height } = tileSize(grid, column, row)
+    const width = TILE_SIZE
+    const height = TILE_SIZE
     const x0 = column * TILE_SIZE
     const y0 = row * TILE_SIZE
     if (tile.color !== undefined) {
@@ -186,18 +189,12 @@ export function paintBounds(grid: Grid, tiles: Map<string, StoredTile>, memory: 
   return { x: left, y: top, width: right - left, height: bottom - top }
 }
 
-// The selected part of a layer's tile, as much as each pixel is selected (null: nothing), for a smart object made from
-// a selection
-export function selectedPart(
-  tile: StoredTile,
-  selected: SelectionTile,
-  width: number,
-  height: number,
-  memory: TileMemory,
-) {
+// The selected part of a layer's whole tile, as much as each pixel is selected (null: nothing), for a smart object made
+// from a selection. "selected" is the selection's tile as a mask of the whole tile (see wholeTileMask in tiles.ts)
+export function selectedPart(tile: StoredTile, selected: SelectionTile, memory: TileMemory) {
   if (selected === 'full') return tile
-  const pixels = new Uint8ClampedArray(width * height * 4) // it rounds and keeps within 0–255
-  pixels.set(memory.unpack(tile, width, height)) // a copy: stored pixels never change
+  const pixels = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4) // it rounds and keeps within 0–255
+  pixels.set(memory.unpack(tile, TILE_SIZE, TILE_SIZE)) // a copy: stored pixels never change
   for (let i = 0; i < selected.length; i++) {
     if (selected[i] === 255) continue
     const keep = selected[i] / 255
@@ -210,9 +207,9 @@ export function selectedPart(
   return toStoredTile(pixels)
 }
 
-// An image's pixels as the tiles of a smart object's source, with its top left corner at the paper's (it is no bigger
-// than the paper). A canvas's pixels aren't premultiplied, so they are made so here. A few tiles every frame
-export async function imageTiles(grid: Grid, image: ImageBitmap, pace: () => Promise<void>) {
+// An image's pixels as the tiles of a smart object's source, with its top left corner at the paper's, going past the
+// paper when it is bigger. A canvas's pixels aren't premultiplied, so they are made so here. A few tiles every frame
+export async function imageTiles(image: ImageBitmap, pace: () => Promise<void>) {
   const canvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE)
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!
   ctx.imageSmoothingEnabled = false // copied pixel for pixel
@@ -220,10 +217,9 @@ export async function imageTiles(grid: Grid, image: ImageBitmap, pace: () => Pro
   for (let row = 0; row * TILE_SIZE < image.height; row++) {
     for (let column = 0; column * TILE_SIZE < image.width; column++) {
       await pace()
-      const { width, height } = tileSize(grid, column, row)
       ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE)
       ctx.drawImage(image, -column * TILE_SIZE, -row * TILE_SIZE)
-      const pixels = ctx.getImageData(0, 0, width, height).data // it rounds and keeps within 0–255
+      const pixels = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data // it rounds and keeps within 0–255
       for (let i = 0; i < pixels.length; i += 4) {
         const alpha = pixels[i + 3]
         if (alpha === 255) continue
@@ -273,6 +269,7 @@ uniform mat3 uInverse; // from the paper to the source
 uniform float uSmooth;
 uniform vec2 uOrigin; // where the texture's first pixel is in the source
 uniform vec2 uSize; // the texture's size
+uniform vec4 uColor; // set by PixiJS: its alpha is how much the mesh shows (with the containers it is in)
 
 vec4 texel(vec2 at) {
   return texelFetch(uTexture, ivec2(clamp(at, vec2(0.0), uSize - 1.0)), 0);
@@ -289,7 +286,7 @@ void main(void) {
   vec3 mapped = uInverse * vec3(vPaper, 1.0);
   vec2 at = mapped.xy / mapped.z - uOrigin; // in pixels of the texture
   if (uSmooth < 0.5) {
-    finalColor = texel(floor(at));
+    finalColor = texel(floor(at)) * uColor.a;
     return;
   }
   vec2 centered = at - 0.5;
@@ -306,18 +303,20 @@ void main(void) {
   // Catmull-Rom can overshoot a little at sharp edges: keep the color a valid one, multiplied by its alpha
   color.a = clamp(color.a, 0.0, 1.0);
   color.rgb = clamp(color.rgb, 0.0, color.a);
-  finalColor = color;
+  finalColor = color * uColor.a;
 }
 `
 
-// A block of the source, ready to draw: its texture with a border, the part of the source it draws, and two meshes
-// sharing one shape, one for the screen and one for drawing into the layer's tiles
+// A block of the source, ready to draw: its texture with a border, the part of the source it draws, and three meshes
+// sharing one shape: one for the screen (cut at the paper's edge, see projection.ts), one for its faded part off the
+// paper, and one for drawing into the layer's tiles
 type SourceBlock = {
   texture: RenderTexture
   rect: Rect
   geometry: MeshGeometry
   shader: Shader
   shown: Mesh<MeshGeometry, Shader>
+  ghost: Mesh<MeshGeometry, Shader>
   drawn: Mesh<MeshGeometry, Shader>
   area: Rect
 }
@@ -327,7 +326,7 @@ const BLOCK_TILES = 4
 const BLOCK_SIZE = BLOCK_TILES * TILE_SIZE
 
 // Draws smart objects: on the screen while they are transformed, and into their layer's tiles
-export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTiles, object: SmartObject) {
+export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: SmartObject) {
   const glProgram = GlProgram.from({ vertex, fragment, name: 'smart-object', preferredFragmentPrecision: 'highp' })
   const shared = new UniformGroup({
     uInverse: { value: new Float32Array(9), type: 'mat3x3<f32>' },
@@ -335,7 +334,8 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
   })
   const blocks: SourceBlock[] = []
   const container = new Container() // what the screen shows, placed on the paper
-  const drawRoot = new Container() // for drawing into one tile of the paper at a time
+  const faded = new Container() // the same again, for the part off the paper, shown faded (see the ghost in projection.ts)
+  const drawRoot = new Container() // for drawing into one tile of the layer at a time
   const padRoot = new Container()
   const padSprites: Sprite[] = []
   const bounds = object.bounds // never changes for one object: only its corners and smoothness do
@@ -353,8 +353,8 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
     const { column: blockColumn, row: blockRow } = parseTileKey(key)
     const x0 = blockColumn * BLOCK_SIZE
     const y0 = blockRow * BLOCK_SIZE
-    const width = Math.min(BLOCK_SIZE, grid.width - x0)
-    const height = Math.min(BLOCK_SIZE, grid.height - y0)
+    const width = BLOCK_SIZE
+    const height = BLOCK_SIZE
     const texture = RenderTexture.create({ width: width + 2 * PAD, height: height + 2 * PAD })
     // The block's tiles, and the edges of the tiles around it
     padRoot.removeChildren()
@@ -398,10 +398,12 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
       indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
     })
     const shown = new Mesh({ geometry, shader })
+    const ghost = new Mesh({ geometry, shader })
     const drawn = new Mesh({ geometry, shader })
     container.addChild(shown)
+    faded.addChild(ghost)
     drawRoot.addChild(drawn)
-    const block = { texture, rect, geometry, shader, shown, drawn, area: rect }
+    const block = { texture, rect, geometry, shader, shown, ghost, drawn, area: rect }
     blocks.push(block)
     place(block, homography(bounds, corners))
   }
@@ -436,14 +438,16 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
     shared.update()
   }
 
-  // The tiles of the paper the object covers now
+  // The tiles the object covers now, on the paper or off it
   function coveredKeys() {
     const keys = new Set<string>()
     for (const { area } of blocks) {
-      const firstColumn = Math.max(0, Math.floor(area.x / TILE_SIZE))
-      const lastColumn = Math.min(grid.columns - 1, Math.floor((area.x + area.width) / TILE_SIZE))
-      const firstRow = Math.max(0, Math.floor(area.y / TILE_SIZE))
-      const lastRow = Math.min(grid.rows - 1, Math.floor((area.y + area.height) / TILE_SIZE))
+      const { firstColumn, lastColumn, firstRow, lastRow } = tilesTouching(
+        area.x,
+        area.y,
+        area.x + area.width,
+        area.y + area.height,
+      )
       for (let column = firstColumn; column <= lastColumn; column++) {
         for (let row = firstRow; row <= lastRow; row++) keys.add(tileKey(column, row))
       }
@@ -451,7 +455,7 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
     return keys
   }
 
-  // Draw the object into one tile of the paper, in place of what the texture had
+  // Draw the object into one of the layer's tiles, in place of what the texture had
   function drawTile(column: number, row: number, target: RenderTexture) {
     const x = column * TILE_SIZE
     const y = row * TILE_SIZE
@@ -466,6 +470,7 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
   function destroy() {
     for (const block of blocks) {
       block.shown.destroy()
+      block.ghost.destroy()
       block.drawn.destroy()
       block.geometry.destroy()
       block.shader.destroy()
@@ -473,6 +478,7 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
     }
     blocks.length = 0
     container.destroy()
+    faded.destroy()
     drawRoot.destroy()
     padRoot.destroy()
     for (const sprite of padSprites) sprite.destroy()
@@ -481,7 +487,7 @@ export function createSmartView(renderer: WebGLRenderer, grid: Grid, gpu: GpuTil
 
   setCorners(corners)
 
-  return { container, blocks: [...blockKeys], addBlock, setCorners, setSmooth, coveredKeys, drawTile, destroy }
+  return { container, faded, blocks: [...blockKeys], addBlock, setCorners, setSmooth, coveredKeys, drawTile, destroy }
 }
 
 export type SmartView = ReturnType<typeof createSmartView>

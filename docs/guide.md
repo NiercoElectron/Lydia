@@ -135,7 +135,9 @@ selection moves along.
 
 - Hold **Shift** to move only across, or only up and down.
 - On a smart object, it moves the whole object, without losing anything.
-- Paint moved off the paper is lost.
+- Paint moved off the paper is kept, hidden: move it back and it comes back. While the layer is moved (or
+  transformed), what is off the paper shows faded around it, and the layer's icon in the [layers](#layers) shows it
+  at any time. Only what moves goes off the paper: the brush, the fill bucket and selections stay on it.
 
 ## Transforming and smart objects
 
@@ -166,7 +168,8 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - **Drag an image from the tray onto the drawing**, as often as needed. It goes in as a smart object, centered where
   it was dropped, with the handles showing: move it, scale it or turn it, then **Enter** puts it into a new layer
   above the active one, named after the file, and **Esc** leaves it out.
-- An image bigger than the paper is made smaller to fit it.
+- An image bigger than the paper keeps its size: the part off the paper shows faded while it is placed, and stays
+  in the layer, hidden, to be moved onto the paper later. (Only an image bigger than 10000 pixels is made smaller.)
 - Pointing at an image in the tray shows a **×** that takes it out of the tray.
 - The tray stays the same from one drawing to the next while Lydia is open, and is empty again after the page is
   closed or reloaded.
@@ -178,6 +181,8 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - Click a layer to paint on it. **Drag** it up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
+- A layer with paint off the paper (see [Move](#move)) has an icon at the right of its name: click it to show that
+  paint, faded, around the paper, and again to hide it. It is kept with the drawing.
 - **Opacity**, above the list, is the active layer's.
 - **Clear layer**, in the top bar, takes all the paint out of the active layer.
 
@@ -204,7 +209,8 @@ forgotten.
 ## Saving and exporting
 
 - **Save** downloads the drawing as a `.lyd` file, with its layers and smart objects, to open it again later. It
-  opens as it was shown: with the same zoom, angle and flip.
+  opens as it was shown: with the same zoom, angle and flip. Paint off the paper is saved too; versions of Lydia
+  before 0.10 can't open a drawing that has some.
 - **Export PNG** saves the picture at full size, keeping a transparent background transparent.
 - **Export JPEG** makes a much smaller file, without transparency (a transparent background becomes white).
 

@@ -2,7 +2,7 @@ import { BufferImageSource, Container, RenderTexture, Sprite, Texture } from 'pi
 import type { GlRenderTarget, GlRenderTargetAdaptor, WebGLRenderer } from 'pixi.js'
 import type { Layer } from './layers'
 import { toStoredTile, type StoredTile, type TileMemory } from './memory'
-import { tileKey, tileSize, type Grid } from './tiles'
+import { TILE_SIZE, tileKey } from './tiles'
 
 // The pixels of every layer live in RAM (the "shelf"), which is much bigger than the graphics card's memory. The
 // graphics card (the "desk") only keeps copies of the tiles it needs right now, up to "cacheTiles" tiles that are not
@@ -34,7 +34,7 @@ export type PendingRead = {
   isSaving: boolean // started by the background saving
 }
 
-export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: TileMemory, cacheTiles: number) {
+export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cacheTiles: number) {
   const gl = renderer.gl as WebGL2RenderingContext
 
   // ----- Textures -----
@@ -44,9 +44,9 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     renderer.render({ container: emptyContainer, target: texture, clear: true })
   }
 
-  // A transparent texture for the tile at this column and row
-  function createTexture(column: number, row: number) {
-    const texture = RenderTexture.create(tileSize(grid, column, row))
+  // A transparent texture for a layer's tile (always whole, on the paper or off it: see tiles.ts)
+  function createTexture() {
+    const texture = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
     clearTexture(texture)
     return texture
   }
@@ -124,7 +124,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     } else {
       const tile = layer.tiles.get(key)
       if (!tile && !create) return null
-      const texture = createTexture(column, row)
+      const texture = createTexture()
       if (tile) upload(tile, texture)
       cached = { layer, key, texture, dirty: false, version: 0, reading: null }
     }
@@ -140,7 +140,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
       cache.set(`${layer.id}/${key}`, {
         layer,
         key,
-        texture: createTexture(column, row),
+        texture: createTexture(),
         dirty: false,
         version: 0,
         reading: null,
@@ -173,12 +173,27 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
   }
 
   // A layer whose tiles must stay on the graphics card, because sprites on the screen show them (see showOpacityLive
-  // in projection.ts). A layer has at most 1600 tiles (10000 / 256 = 40 columns and rows), fewer than the smallest
-  // budget (0.5 GB = 2048 tiles), so there is always room left for the other layers
+  // in projection.ts). Those are its tiles on the paper, at most 1600 (10000 / 256 = 40 columns and rows), fewer than
+  // the smallest budget (0.5 GB = 2048 tiles), so there is always room left for the other layers
   let keptLayer: Layer | null = null
 
   function keep(layer: Layer | null) {
     keptLayer = layer
+  }
+
+  // Tiles that sprites on the screen show too (paint off the paper, see outsideView.ts): they stay on the graphics card
+  // until they are unpinned
+  const pinned = new Set<CachedTile>()
+
+  // The texture of a layer's tile, kept on the graphics card from now on (null: the tile has no paint)
+  function pin(layer: Layer, column: number, row: number) {
+    const texture = getTexture(layer, column, row, false)
+    if (texture) pinned.add(getCached(layer, tileKey(column, row))!)
+    return texture
+  }
+
+  function unpinAll() {
+    pinned.clear()
   }
 
   // Free graphics card memory: remove the least recently used tiles until the cache fits its budget again.
@@ -190,7 +205,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     if (cleanCount() <= cacheTiles + TRIM_BATCH) return
     for (const [id, cached] of cache) {
       if (cleanCount() <= cacheTiles) break
-      if (cached.dirty || cached.layer === keptLayer) continue
+      if (cached.dirty || cached.layer === keptLayer || pinned.has(cached)) continue
       cached.texture.destroy(true)
       cache.delete(id)
     }
@@ -210,6 +225,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
       cached.texture.destroy(true)
       cache.delete(id)
       dirtyTiles.delete(cached)
+      pinned.delete(cached)
     }
   }
 
@@ -351,6 +367,7 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     for (const cached of cache.values()) cached.texture.destroy(true)
     cache.clear()
     dirtyTiles.clear()
+    pinned.clear()
     for (const texture of stagingTextures.values()) texture.destroy(true)
   }
 
@@ -365,6 +382,8 @@ export function createGpuTiles(renderer: WebGLRenderer, grid: Grid, memory: Tile
     markDirty,
     markClean,
     keep,
+    pin,
+    unpinAll,
     trim,
     tilesWithPaint,
     dropLayer,

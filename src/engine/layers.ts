@@ -10,6 +10,7 @@ export type Layer = {
   visible: boolean
   opacity: number // from 0 (invisible) to 1
   blendMode: BlendMode
+  showOffPaper: boolean // its paint off the paper shows faded around the paper (see outsideView.ts)
   smart?: SmartObject // set when the layer is a smart object (see smartObject.ts): its tiles are then its source drawn
 }
 
@@ -22,7 +23,7 @@ export type LayerStack = {
 let nextLayerId = 1
 
 export function createLayer(name: string, tiles = new Map<string, StoredTile>()): Layer {
-  return { id: nextLayerId++, name, tiles, visible: true, opacity: 1, blendMode: 'normal' }
+  return { id: nextLayerId++, name, tiles, visible: true, opacity: 1, blendMode: 'normal', showOffPaper: false }
 }
 
 // The position of the active layer in the stack (0 = the bottom one)
