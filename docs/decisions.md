@@ -1473,6 +1473,33 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   bringing both layers back, the lower without the black; redo; a smart object's copy being a smart object with a
   source of its own sharing the tiles.
 
+## 55. Locking a layer's transparency
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - A layer's transparency can be **locked** (alpha lock), with a lock in its row (my choice, decision 54): painting
+    then only changes the color of the paint already there, as much as it covers, and where the layer has no paint
+    nothing is painted. It is how shading and recoloring is done inside the lines.
+  - The **brush** and the **fill bucket** keep to it (my choice): the fill colors only the paint in its region, and
+    adds nothing behind the lines. Moving, transforming, Delete and Clear layer work as before: they aren't painting.
+  - The **eraser can't be used** on such a layer (my choice, as in Krita and Procreate): erasing is changing the
+    transparency. The bar says why.
+  - It is saved with the drawing, and a copy of the layer keeps it, but it is no step of undo: it changes how the
+    layer takes paint, not the drawing.
+- **How:**
+  - The stroke goes onto the layer with a blend mode of its own ("source-atop"): the new color times the layer's
+    alpha, plus the old color times what the stroke leaves, and the alpha as it was. PixiJS has no such mode, so the
+    engine adds it to the map of blend modes PixiJS keeps for WebGL (`LOCKED_ALPHA`, in `layers.ts`). The same mode
+    shows the stroke while it is painted, so it looks as it will be.
+  - Tiles without paint are left out, as the eraser does, so no empty tiles are made.
+  - The fill computes the same in RAM: on each pixel of the region, the color times its alpha and the fill's opacity,
+    the alpha untouched; a tile of a single color stays one.
+- **Checked:** the open lock at first and the lock locking; a blue stroke across a red one coloring only the red,
+  while painting and after, without empty tiles; the eraser with its notice, taking nothing away; a fill where there
+  is no paint doing nothing, and one on the red coloring it green and nothing beside it; undo; saved with the drawing;
+  a copy locked too; unlocked, painting anywhere again.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

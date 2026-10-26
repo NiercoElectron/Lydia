@@ -11,6 +11,9 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 - **Duplicate** (Ctrl+J) and **Merge down** (Ctrl+E) in the layers ([decision 54](docs/decisions.md#54-duplicating-and-merging-layers)).
   A copy costs no memory until it is painted on; merging keeps the picture as it was, as one step of undo.
+- **Locking a layer's transparency**, with the lock in its row ([decision 55](docs/decisions.md#55-locking-a-layers-transparency)):
+  the brush and the fill bucket then only color the paint already there, and the eraser can't be used. It is saved
+  with the drawing.
 
 ## [0.10.0] - 2026-10-26
 

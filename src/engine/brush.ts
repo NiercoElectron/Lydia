@@ -18,7 +18,7 @@ import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
-import type { Projection, ShownStroke } from './projection'
+import { strokeBlend, type Projection, type ShownStroke } from './projection'
 import type { Point } from './selection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
 import type { PaintTool } from './tools'
@@ -131,11 +131,12 @@ export function createBrush(
     const layer = stack.active
     mergeSprite.tint = shown.color
     mergeSprite.alpha = shown.opacity
-    mergeSprite.blendMode = shown.erase ? 'erase' : 'normal'
+    mergeSprite.blendMode = strokeBlend(shown)
     for (const [key, strokeTexture] of strokeTiles) {
       const { column, row } = parseTileKey(key)
-      // The eraser has nothing to take away where the layer has no paint, and mustn't leave an empty tile there
-      if (!shown.erase || gpu.getTexture(layer, column, row, false)) {
+      // The eraser has nothing to take away where the layer has no paint, nor a layer whose transparency is locked
+      // anything to color, and they mustn't leave an empty tile there
+      if (!(shown.erase || shown.alphaLocked) || gpu.getTexture(layer, column, row, false)) {
         history.backUpTile(key)
         mergeSprite.texture = strokeTexture
         renderer.render({ container: mergeRoot, target: gpu.getTexture(layer, column, row, true)!, clear: false })
@@ -299,7 +300,9 @@ export function createBrush(
   // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1
   function startStroke(x: number, y: number, pressure: number) {
     history.begin(stack.active)
-    stroke = { tiles: strokeTiles, color: settings.color, opacity: settings.opacity, erase: settings.tool === 'eraser' }
+    const { color, opacity } = settings
+    const erase = settings.tool === 'eraser'
+    stroke = { tiles: strokeTiles, color, opacity, erase, alphaLocked: stack.active.alphaLocked }
     projection.showStroke(stroke)
     strokeStart = {
       size: settings.size,

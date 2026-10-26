@@ -343,6 +343,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           taper={taper}
           isGridOn={isGridOn}
           isOutlineOn={isOutlineOn}
+          isAlphaLocked={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.alphaLocked ?? false}
           isPixelBrush={isPixelBrush}
           isPixelPerfectOn={isPixelPerfectOn}
           onColorChange={setColor}
@@ -427,6 +428,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onRename={(id, name) => engine?.renameLayer(id, name)}
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
           onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
+          onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
           onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
           onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
         />

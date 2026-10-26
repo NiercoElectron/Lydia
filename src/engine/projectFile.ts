@@ -37,6 +37,7 @@ export type LayerData = {
   opacity: number
   blendMode: BlendMode
   showOffPaper?: boolean // its paint off the paper shows around the paper (see outsideView.ts)
+  alphaLocked?: boolean // its transparency is locked (see layers.ts)
   tiles: Map<string, StoredTile> // "column,row" -> tile
   smart?: SmartData<Map<string, StoredTile>> // for a smart object
 }
@@ -103,7 +104,8 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // (TILE_SIZE × TILE_SIZE) and can be anywhere (its column and row can be negative), and so can a smart object's
 // source and "bounds". A drawing with nothing off the paper is still saved as version 2 or 3, so older versions of
 // Lydia can open it. A layer's "showOffPaper" (since 0.10) says it shows its paint off the paper; it is false when
-// missing. The header's "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
+// missing, and its "alphaLocked" (since 0.11) that its transparency is locked, false when missing. The header's
+// "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -261,6 +263,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
       const { name, visible, opacity, blendMode } = layer
       const data: LayerData = { name, visible, opacity, blendMode, tiles: readTiles(layer.tiles) }
       if (layer.showOffPaper === true) data.showOffPaper = true
+      if (layer.alphaLocked === true) data.alphaLocked = true
       if (layer.smart !== undefined) {
         const smart = layer.smart
         if (

@@ -7,7 +7,7 @@ import { decodeTip, type BrushTip } from './brushTip'
 import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings } from './fill'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
-import { activeIndex, createLayer, type Layer, type LayerStack } from './layers'
+import { activeIndex, createLayer, LOCKED_ALPHA, type Layer, type LayerStack } from './layers'
 import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
@@ -71,6 +71,7 @@ export type EngineSnapshot = {
     isSmart: boolean
     hasOffPaper: boolean
     showsOffPaper: boolean
+    alphaLocked: boolean
   }[]
   activeLayerId: number
   canUndo: boolean
@@ -137,6 +138,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     preference: 'webgl',
   })
   const renderer = app.renderer as WebGLRenderer
+  // The blend mode for layers whose transparency is locked (see layers.ts): the color of the paint goes where the
+  // layer has paint, as much as it covers, and the layer's transparency stays. PixiJS keeps its blend modes in a map
+  // it doesn't let others reach, and uses any mode found in it
+  const gl = renderer.gl
+  const blendModes = (renderer.state as unknown as { blendModesMap: Record<string, number[]> }).blendModesMap
+  blendModes[LOCKED_ALPHA] = [gl.DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE]
   if (!(renderer.gl instanceof WebGL2RenderingContext)) {
     app.destroy(KEEP_GLOBAL_RESOURCES)
     throw new Error('Lydia needs WebGL 2, which this browser or graphics card does not support.')
@@ -238,7 +245,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     onMoveEnd: keep => releaseMove(keep),
     isWorking: () => task !== null,
     // Smart objects can't be painted on (see smartObject.ts)
-    canUse: tool => !(stack.active.smart && (isPaintTool(tool) || tool === 'fill')),
+    // A smart object can't be painted on, and the eraser can't take paint out of a layer whose transparency is locked
+    canUse: tool =>
+      !(stack.active.smart && (isPaintTool(tool) || tool === 'fill')) &&
+      !(tool === 'eraser' && stack.active.alphaLocked),
     getTransform: () => (transform ? { bounds: transform.object.bounds, corners: transform.corners } : null),
     onTransform: corners => setTransformCorners(corners),
   })
@@ -294,6 +304,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         isSmart: layer.smart !== undefined,
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
+        alphaLocked: layer.alphaLocked,
       })),
       activeLayerId: stack.active.id,
       canUndo: history.canUndo(),
@@ -485,6 +496,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       copy.opacity = original.opacity
       copy.blendMode = original.blendMode
       copy.showOffPaper = original.showOffPaper
+      copy.alphaLocked = original.alphaLocked
       if (original.smart) {
         const { source, bounds, corners, smooth } = original.smart
         const ownSource = createLayer(source.name, new Map(source.tiles))
@@ -554,6 +566,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Show a layer's paint off the paper, faded around the paper, or not (see outsideView.ts). It is only a way of
   // looking at the drawing, so it is no step of undo, but it is saved with the drawing
+  // Lock a layer's transparency, or unlock it (see layers.ts). It changes how the layer takes paint, not the drawing,
+  // so it is no step of undo, but it is saved with the drawing
+  function setLayerAlphaLock(id: number, locked: boolean) {
+    const layer = findLayer(id)
+    if (!layer || layer.alphaLocked === locked) return
+    layer.alphaLocked = locked
+    changed()
+  }
+
   function setLayerOffPaper(id: number, show: boolean) {
     const layer = findLayer(id)
     if (!layer || layer.showOffPaper === show) return
@@ -732,12 +753,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
     // A smart object also keeps its source (see smartObject.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
-      stack.layers.map(async ({ name, visible, opacity, blendMode, showOffPaper, tiles, smart }) => ({
+      stack.layers.map(async ({ name, visible, opacity, blendMode, showOffPaper, alphaLocked, tiles, smart }) => ({
         name,
         visible,
         opacity,
         blendMode,
         showOffPaper,
+        alphaLocked,
         tiles: await pack(tiles),
         smart: smart && {
           tiles: await pack(smart.source.tiles),
@@ -796,8 +818,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       return changeTiles(layer, region.keys(), (key, tile) => {
         const selected = selection ? selection.get(key) : 'full'
         if (!selected) return undefined // not selected at all
+        if (layer.alphaLocked && !tile) return undefined // no paint to take the color
         const amounts = selected === 'full' ? undefined : selected
-        return fillTile(grid, key, tile, region.get(key)!, color, opacity, memory, amounts)
+        return fillTile(grid, key, tile, region.get(key)!, color, opacity, memory, amounts, layer.alphaLocked)
       })
     })
   }
@@ -1270,6 +1293,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     selectLayer,
     setLayerVisible,
     setLayerOffPaper,
+    setLayerAlphaLock,
     duplicateLayer,
     mergeDown,
     setLayerOpacity,

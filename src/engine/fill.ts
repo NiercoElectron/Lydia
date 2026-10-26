@@ -62,6 +62,18 @@ function filledColor(below: number, color: string, opacity: number) {
   return over(below, (red | (green << 8) | (blue << 16) | (255 << 24)) >>> 0, opacity)
 }
 
+// The color a tile of a single color ("below") gets when its layer's transparency is locked: the fill's color goes
+// only where there is paint, as much as it covers, and the transparency stays
+function coloredPaint(below: number, color: string, opacity: number) {
+  const alpha = channel(below, 3) / 255
+  let result = channel(below, 3) << 24
+  for (let i = 0; i < 3; i++) {
+    const fill = parseInt(color.slice(1 + i * 2, 3 + i * 2), 16)
+    result |= Math.min(255, Math.round(fill * alpha * opacity + channel(below, i) * (1 - opacity))) << (i * 8)
+  }
+  return result >>> 0
+}
+
 // What the fill looks at in a tile: the layers put together, as one color when every one of them is a single color
 // there (or has nothing), or as the color of each pixel of the tile's part on the paper ("width" × "height"; the
 // layers' tiles are whole, see tiles.ts)
@@ -377,11 +389,14 @@ export function fillTile(
   opacity: number,
   memory: TileMemory,
   selectedPart?: Uint8Array,
+  keepsAlpha = false, // the layer's transparency is locked: only the paint there takes the color
 ): StoredTile | null {
   const mask = wholeTileMask(grid, key, regionMask, FILL)
   const selected = selectedPart && (wholeTileMask(grid, key, selectedPart, 255) as Uint8Array)
   if (mask === 'full' && !selected && (!tile || tile.color !== undefined)) {
-    return { color: filledColor(tile?.color ?? 0, color, opacity), lastUsed: performance.now() }
+    const below = tile?.color ?? 0
+    const filled = keepsAlpha ? coloredPaint(below, color, opacity) : filledColor(below, color, opacity)
+    return { color: filled, lastUsed: performance.now() }
   }
   const pixels = new Uint8ClampedArray(TILE_SIZE * TILE_SIZE * 4) // it rounds and keeps within 0–255
   if (tile) pixels.set(memory.unpack(tile, TILE_SIZE, TILE_SIZE)) // a copy: stored pixels never change
@@ -394,7 +409,15 @@ export function fillTile(
     const amount = selected ? selected[i] / 255 : 1
     if (amount === 0) continue
     const j = i * 4
-    if (what === FILL && amount === 1) {
+    if (keepsAlpha) {
+      // Only the paint there takes the color, as much as it covers; past the region nothing is added behind the lines
+      if (what !== FILL) continue
+      const covers = pixels[j + 3] / 255
+      const left = 1 - opacity * amount
+      pixels[j] = red * amount * covers + pixels[j] * left
+      pixels[j + 1] = green * amount * covers + pixels[j + 1] * left
+      pixels[j + 2] = blue * amount * covers + pixels[j + 2] * left
+    } else if (what === FILL && amount === 1) {
       pixels[j] = red + pixels[j] * keep
       pixels[j + 1] = green + pixels[j + 1] * keep
       pixels[j + 2] = blue + pixels[j + 2] * keep

@@ -43,6 +43,7 @@ type Props = {
   taper: TaperSettings
   isGridOn: boolean
   isOutlineOn: boolean
+  isAlphaLocked: boolean // the active layer's transparency is locked: the eraser can't be used
   isPixelBrush: boolean
   isPixelPerfectOn: boolean
   onColorChange: (color: string) => void
@@ -71,6 +72,7 @@ export function Toolbar({
   taper,
   isGridOn,
   isOutlineOn,
+  isAlphaLocked,
   isPixelBrush,
   isPixelPerfectOn,
   onColorChange,
@@ -117,6 +119,9 @@ export function Toolbar({
             Convert to pixels
           </button>
         </>
+      )}
+      {tool === 'eraser' && isAlphaLocked && !isBlocked && (
+        <span className="notice">This layer's transparency is locked: the eraser can't take paint away.</span>
       )}
       {tool !== 'fill' && !isSelecting && !isMoving && (
         <label title="Brush size ([ and ])">

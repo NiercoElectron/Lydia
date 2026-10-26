@@ -191,6 +191,9 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - Click a layer to paint on it. **Drag** it up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
+- The **lock** in each layer's row locks its transparency: the brush and the fill bucket then only color the paint
+  already there (to shade or recolor inside the lines), and the eraser can't be used. Click it again to unlock. It is
+  kept with the drawing.
 - A layer with paint off the paper (see [Move](#move)) has an icon at the right of its name: click it to show that
   paint, faded, around the paper, and again to hide it. It is kept with the drawing.
 - **Opacity**, above the list, is the active layer's.

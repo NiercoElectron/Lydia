@@ -1,4 +1,4 @@
-import { Box, ScanEye } from 'lucide-react'
+import { Box, Lock, LockOpen, ScanEye } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 import { SliderValue } from './SliderValue'
@@ -16,6 +16,7 @@ type Props = {
   onRename: (id: number, name: string) => void
   onVisibleChange: (id: number, visible: boolean) => void
   onOffPaperChange: (id: number, show: boolean) => void // show the layer's paint off the paper, or not
+  onAlphaLockChange: (id: number, locked: boolean) => void // lock the layer's transparency, or unlock it
   onOpacityChange: (id: number, opacity: number) => void
   onOpacityChangeEnd: () => void
 }
@@ -40,6 +41,7 @@ export function LayersPanel({
   onRename,
   onVisibleChange,
   onOffPaperChange,
+  onAlphaLockChange,
   onOpacityChange,
   onOpacityChangeEnd,
 }: Props) {
@@ -170,6 +172,18 @@ export function LayersPanel({
                   {layer.name}
                 </button>
               )}
+              <button
+                className="icon-button"
+                aria-pressed={layer.alphaLocked}
+                onClick={() => onAlphaLockChange(layer.id, !layer.alphaLocked)}
+                title={
+                  layer.alphaLocked
+                    ? 'Its transparency is locked: painting only colors the paint already there. Click to unlock'
+                    : 'Lock its transparency: painting would only color the paint already there'
+                }
+              >
+                {layer.alphaLocked ? <Lock size={14} aria-hidden /> : <LockOpen size={14} aria-hidden />}
+              </button>
               {layer.hasOffPaper && (
                 <button
                   className="icon-button"

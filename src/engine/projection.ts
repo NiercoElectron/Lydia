@@ -1,7 +1,7 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
-import type { GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
+import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
 import type { GpuTiles } from './gpuTiles'
-import { activeIndex, type Layer, type LayerStack } from './layers'
+import { activeIndex, LOCKED_ALPHA, type Layer, type LayerStack } from './layers'
 import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the paper's
@@ -18,7 +18,19 @@ export const GHOST_ALPHA = 0.35
 
 // A stroke being painted, shown on the active layer before it is put into it (see brush.ts): its own tiles of paint
 // ("column,row" -> texture, white with the paint in its alpha), and how they go onto the layer
-export type ShownStroke = { tiles: Map<string, Texture>; color: string; opacity: number; erase: boolean }
+// A stroke being painted: its tiles, its color and opacity, whether it erases, and whether the layer's transparency is
+// locked (see layers.ts)
+export type ShownStroke = {
+  tiles: Map<string, Texture>
+  color: string
+  opacity: number
+  erase: boolean
+  alphaLocked: boolean
+}
+
+// How a stroke goes onto its layer: taking paint away, only over the paint there, or as any paint does
+export const strokeBlend = (shown: ShownStroke) =>
+  (shown.erase ? 'erase' : shown.alphaLocked ? LOCKED_ALPHA : 'normal') as BLEND_MODES
 
 export function createProjection(
   renderer: WebGLRenderer,
@@ -69,7 +81,7 @@ export function createProjection(
     withStrokePaint.texture = strokeTexture
     withStrokePaint.tint = shown.color
     withStrokePaint.alpha = shown.opacity
-    withStrokePaint.blendMode = shown.erase ? 'erase' : 'normal'
+    withStrokePaint.blendMode = strokeBlend(shown)
     renderer.render({ container: withStrokeRoot, target: withStrokeTexture, clear: true, clearColor: [0, 0, 0, 0] })
     return withStrokeTexture
   }
