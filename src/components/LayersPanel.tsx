@@ -1,4 +1,4 @@
-import { Box, Lock, LockOpen, ScanEye } from 'lucide-react'
+import { Box, CornerLeftDown, Lock, LockOpen, Paperclip, ScanEye } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 import type { BlendMode } from '../engine/layers'
@@ -18,6 +18,7 @@ type Props = {
   onVisibleChange: (id: number, visible: boolean) => void
   onOffPaperChange: (id: number, show: boolean) => void // show the layer's paint off the paper, or not
   onAlphaLockChange: (id: number, locked: boolean) => void // lock the layer's transparency, or unlock it
+  onClipChange: (id: number, clipped: boolean) => void // clip the layer to the layers under it, or unclip it
   onBlendModeChange: (id: number, mode: BlendMode) => void
   onOpacityChange: (id: number, opacity: number) => void
   onOpacityChangeEnd: () => void
@@ -85,6 +86,7 @@ export function LayersPanel({
   onVisibleChange,
   onOffPaperChange,
   onAlphaLockChange,
+  onClipChange,
   onBlendModeChange,
   onOpacityChange,
   onOpacityChangeEnd,
@@ -190,6 +192,7 @@ export function LayersPanel({
         {shown.map((layer, index) => {
           const classes = [
             layer.id === activeLayerId && 'active',
+            layer.clipped && 'clipped',
             drag?.isMoving && drag.id === layer.id && 'dragging',
             dropLineOf(index),
           ]
@@ -208,6 +211,9 @@ export function LayersPanel({
                 aria-label={`Show ${layer.name}`}
                 title={layer.visible ? 'Hide' : 'Show'}
               />
+              {layer.clipped && (
+                <CornerLeftDown className="clip-arrow" size={14} aria-label="Clipped to the layers under it" />
+              )}
               {renamingId === layer.id ? (
                 <NameInput
                   name={layer.name}
@@ -243,6 +249,21 @@ export function LayersPanel({
                 }
               >
                 {layer.alphaLocked ? <Lock size={14} aria-hidden /> : <LockOpen size={14} aria-hidden />}
+              </button>
+              <button
+                className="icon-button"
+                aria-pressed={layer.clipped}
+                disabled={layer.id === layers[0].id}
+                onClick={() => onClipChange(layer.id, !layer.clipped)}
+                title={
+                  layer.id === layers[0].id
+                    ? 'The bottom layer has nothing under it to be clipped to'
+                    : layer.clipped
+                      ? 'It is clipped: it shows only where the layer under it has paint. Click to unclip (Ctrl+Alt+G)'
+                      : 'Clip it to the layer under it: it would show only where that layer has paint (Ctrl+Alt+G)'
+                }
+              >
+                <Paperclip size={14} aria-hidden />
               </button>
               {layer.hasOffPaper && (
                 <button

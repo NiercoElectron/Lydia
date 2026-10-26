@@ -429,6 +429,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
           onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
           onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
+          onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}
           onBlendModeChange={(id, mode) => engine?.setLayerBlendMode(id, mode)}
           onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
           onOpacityChangeEnd={() => engine?.finishLayerOpacity()}

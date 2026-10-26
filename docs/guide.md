@@ -194,6 +194,11 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - The **lock** in each layer's row locks its transparency: the brush and the fill bucket then only color the paint
   already there (to shade or recolor inside the lines), and the eraser can't be used. Click it again to unlock. It is
   kept with the drawing.
+- The **clip** in each layer's row (or **Ctrl+Alt+G** for the active layer) clips the layer to the one under it: it
+  then shows only where that layer has paint. Clip shadows and lights to a layer with a part's flat color (filled
+  inside its lines), and they never go past that part; a layer with only the lines shows them on the lines only. The
+  row moves in, with an arrow down. Several layers in a row can be clipped to the same layer; hiding that layer hides
+  them too. Click the clip again to unclip. It can be undone, and is kept with the drawing.
 - A layer with paint off the paper (see [Move](#move)) has an icon at the right of its name: click it to show that
   paint, faded, around the paper, and again to hide it. It is kept with the drawing.
 - **Blend**, above the list, is how the active layer's paint goes onto what is under it:

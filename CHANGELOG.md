@@ -17,6 +17,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **Blend modes** for layers ([decision 56](docs/decisions.md#56-blend-modes)): Multiply, Screen, Overlay, Add, Darken,
   Lighten, Color Dodge, Color Burn, Soft Light, Hard Light, Difference, Hue, Saturation, Color and Luminosity, in a
   list above the opacity. Merging down uses them too.
+- **Clipping masks** ([decision 57](docs/decisions.md#57-clipping-masks)): the clip in a layer's row (or Ctrl+Alt+G)
+  makes it show only where the layer under it has paint, to color and shade inside the lines.
 
 ## [0.10.0] - 2026-10-26
 

@@ -8,7 +8,16 @@ import { decodeTip, type BrushTip } from './brushTip'
 import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings } from './fill'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
-import { activeIndex, createLayer, LOCKED_ALPHA, type BlendMode, type Layer, type LayerStack } from './layers'
+import {
+  activeIndex,
+  clipBaseIndex,
+  createLayer,
+  isClipped,
+  LOCKED_ALPHA,
+  type BlendMode,
+  type Layer,
+  type LayerStack,
+} from './layers'
 import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
@@ -74,6 +83,7 @@ export type EngineSnapshot = {
     hasOffPaper: boolean
     showsOffPaper: boolean
     alphaLocked: boolean
+    clipped: boolean // clipped to the layers under it (see isClipped in layers.ts)
   }[]
   activeLayerId: number
   canUndo: boolean
@@ -299,7 +309,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   function makeSnapshot(): EngineSnapshot {
     return {
-      layers: stack.layers.map(layer => ({
+      layers: stack.layers.map((layer, index) => ({
         id: layer.id,
         name: layer.name,
         visible: layer.visible,
@@ -309,6 +319,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
         alphaLocked: layer.alphaLocked,
+        clipped: isClipped(stack, index),
       })),
       activeLayerId: stack.active.id,
       canUndo: history.canUndo(),
@@ -445,11 +456,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function addLayer() {
     if (isBusy()) return
     const layer = createLayer(`Layer ${++layersCreated}`)
+    insideClipped(layer, activeIndex(stack) + 1)
     history.recordOrder(layer)
     stack.layers.splice(activeIndex(stack) + 1, 0, layer)
     stack.active = layer
     projection.markAllBelowStale() // "below" now has one more layer
     changed()
+  }
+
+  // A new layer put at this position, between clipped layers (see isClipped in layers.ts), is clipped too, so that
+  // they keep their base, as in Photoshop
+  function insideClipped(layer: Layer, index: number) {
+    layer.clipped = stack.layers[index]?.clipped === true
   }
 
   // Delete the active layer; the one under it becomes the active layer, like in Photoshop. The last layer can't be
@@ -463,6 +481,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     stack.active = stack.layers[Math.max(0, index - 1)]
     projection.markAllBelowStale() // "below" now has other layers
     if (layer.visible) projection.composeLayerTiles(layer)
+    projection.composeClippedTiles() // the layers clipped to it are clipped to another one now
     changed()
   }
 
@@ -477,6 +496,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     stack.layers.splice(index, 0, layer)
     projection.markAllBelowStale() // "below" may have other layers now
     if (layer.visible) projection.composeLayerTiles(layer)
+    projection.composeClippedTiles() // clipped layers may have another base now
     changed()
   }
 
@@ -501,6 +521,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       copy.blendMode = original.blendMode
       copy.showOffPaper = original.showOffPaper
       copy.alphaLocked = original.alphaLocked
+      copy.clipped = original.clipped
       if (original.smart) {
         const { source, bounds, corners, smooth } = original.smart
         const ownSource = createLayer(source.name, new Map(source.tiles))
@@ -525,8 +546,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Merge the active layer into the one under it, which becomes the active layer, as one step of undo. Its paint goes
   // on top of that layer's as it shows, at its opacity and with its blend mode (with the formulas the picture is put
-  // together with, see blendModes.ts); the layer under keeps its own opacity and blend mode, as in Photoshop. Tile by
-  // tile on the graphics card, a few every frame
+  // together with, see blendModes.ts), only where its base has paint when it is clipped; the layer under keeps its own
+  // opacity, blend mode and clipping, as in Photoshop. Tile by tile on the graphics card, a few every frame
   const mergeRoot = new Container() // PixiJS ignores the blend mode of what it is asked to render
   const mergeSprite = new Sprite()
   mergeRoot.addChild(mergeSprite)
@@ -536,6 +557,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const upper = stack.active
       const index = activeIndex(stack)
       const lower = stack.layers[index - 1]
+      const clipped = isClipped(stack, index)
+      const base = clipped ? stack.layers[clipBaseIndex(stack, index)] : null
+      const lowerClipped = isClipped(stack, index - 1)
+      const hasClippedAbove = !clipped && isClipped(stack, index + 1) // it is the base of clipped layers
       const pace = createPacer()
       mergeSprite.alpha = upper.opacity
       history.startGroup()
@@ -544,13 +569,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         const { column, row } = parseTileKey(key)
         const paint = gpu.getTexture(upper, column, row, false)
         if (!paint) continue
+        // Clipped to a base without paint here, or hidden: none of it shows
+        const mask = base ? (base.visible ? gpu.getTexture(base, column, row, false) : null) : undefined
+        if (mask === null) continue
         history.backUpTile(key)
         const target = gpu.getTexture(lower, column, row, true)!
-        if (upper.blendMode === 'normal') {
+        if (upper.blendMode === 'normal' && !mask) {
           mergeSprite.texture = paint
           renderer.render({ container: mergeRoot, target, clear: false })
         } else {
-          blender.blendOnto(target, paint, upper.opacity, upper.blendMode)
+          blender.blendOnto(target, paint, upper.opacity, upper.blendMode, mask)
         }
         gpu.markDirty(lower, key)
         await pace()
@@ -564,6 +592,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       // With Normal the picture looks the same. Another blend mode mixed the paint with the layer under only, and
       // where that layer doesn't cover fully, what was under it no longer takes part, as in Photoshop
       if (upper.blendMode !== 'normal') projection.composeLayerTiles(lower)
+      // Paint put into a clipped layer shows only where its base has paint
+      if (lowerClipped && !clipped) projection.composeLayerTiles(lower)
+      if (hasClippedAbove) projection.composeClippedTiles() // the layers clipped to it are clipped to another one now
       return true
     })
   }
@@ -601,6 +632,23 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     layer.visible = visible
     projection.composeLayerTiles(layer)
     changed()
+  }
+
+  // Clip a layer to the layers under it, or unclip it (see isClipped in layers.ts), as one step of undo. The bottom
+  // layer has nothing to be clipped to
+  function setLayerClipped(id: number, clipped: boolean) {
+    const layer = findLayer(id)
+    if (!layer || layer.clipped === clipped || stack.layers.indexOf(layer) === 0 || isBusy()) return
+    history.recordLayer(layer, propsOf(layer))
+    layer.clipped = clipped
+    if (layer.visible) projection.composeLayerTiles(layer)
+    projection.composeClippedTiles() // the layers clipped to it may have another base now
+    changed()
+  }
+
+  // Clip the active layer to the layers under it, or unclip it (Ctrl+Alt+G, as in Photoshop)
+  function toggleClipped() {
+    setLayerClipped(stack.active.id, !stack.active.clipped)
   }
 
   // Put a layer's paint onto what is under it in another way (see blendModes.ts), as one step of undo
@@ -775,21 +823,24 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
     // A smart object also keeps its source (see smartObject.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
-      stack.layers.map(async ({ name, visible, opacity, blendMode, showOffPaper, alphaLocked, tiles, smart }) => ({
-        name,
-        visible,
-        opacity,
-        blendMode,
-        showOffPaper,
-        alphaLocked,
-        tiles: await pack(tiles),
-        smart: smart && {
-          tiles: await pack(smart.source.tiles),
-          bounds: smart.bounds,
-          corners: smart.corners,
-          smooth: smart.smooth,
-        },
-      })),
+      stack.layers.map(
+        async ({ name, visible, opacity, blendMode, showOffPaper, alphaLocked, clipped, tiles, smart }) => ({
+          name,
+          visible,
+          opacity,
+          blendMode,
+          showOffPaper,
+          alphaLocked,
+          clipped,
+          tiles: await pack(tiles),
+          smart: smart && {
+            tiles: await pack(smart.source.tiles),
+            bounds: smart.bounds,
+            corners: smart.corners,
+            smooth: smart.smooth,
+          },
+        }),
+      ),
     )
     const paper = { ...project, exportScale }
     const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
@@ -1187,6 +1238,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
           // the projection keeps putting tiles together with the same layers under the active one as what it shows
           target = createLayer(done.name ?? `Layer ${++layersCreated}`)
+          insideClipped(target, stack.layers.indexOf(layer) + 1)
           history.recordOrder(target)
           stack.layers.splice(stack.layers.indexOf(layer) + 1, 0, target)
         }
@@ -1318,6 +1370,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setLayerOffPaper,
     setLayerAlphaLock,
     setLayerBlendMode,
+    setLayerClipped,
+    toggleClipped,
     duplicateLayer,
     mergeDown,
     setLayerOpacity,

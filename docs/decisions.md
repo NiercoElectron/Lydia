@@ -1531,11 +1531,49 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - While a part is moved (decision 41), the active layer's mode shows with the graphics card's closest blending
     (Multiply, Screen and Add); the others show as Normal until it is let go.
   - The fill bucket's **All layers** (decision 39) still finds its region in the layers put together as Normal.
+  - I don't accept these three differences: they go in 0.11.1, the version after this stage's.
 - **Checked:** the 16 modes against the formulas written again in the test on its own, over red, a blue gray, gray and
   the white paper; nothing changed where the layer has no paint; the list in the panel; Multiply at 50% while the
   slider moves and after; undo and redo of a mode; painting on the layer under a Multiply layer, multiplied while
   painting and after; saved with the drawing; merging down with the picture unchanged, the paint kept as it is where
   the layer under had none, and undo bringing both layers back.
+
+## 57. Clipping masks
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - A layer can be **clipped** to the layers under it, like Photoshop's clipping masks: it shows only where its
+    **base**, the nearest layer under it that isn't clipped, has paint. Coloring and shading inside the lines of a
+    part is then easy, without ever going past them. Several layers in a row can be clipped to the same base; the
+    bottom layer can't be clipped, having nothing under it.
+  - The clip is an icon in each layer's row (my choice, decision 54), and a clipped layer is moved in, with an arrow
+    down to the layers it is clipped to, as in Clip Studio and ibisPaint (my choice). **Ctrl+Alt+G** clips or unclips
+    the active layer, as in Photoshop.
+  - A clipped layer keeps its own opacity and blend mode, which mix it with all that is under it; the base's opacity
+    doesn't fade it. Hiding the base hides the layers clipped to it too, as in Photoshop.
+  - Clipping is a step of undo, is saved with the drawing, and a copy keeps it. A new layer added between a base and
+    its clipped layers is clipped too, so that they keep their base. When the base is deleted or moved away, they are
+    clipped to the next layer down that isn't clipped; a clipped layer that ends up at the bottom shows whole.
+  - **Merge down** puts a clipped layer's paint only where its base has paint.
+- **How:**
+  - The shader of blend modes (decision 56) takes the base's tile too, and takes the layer's paint only as much as the
+    base's paint covers. Clipped layers go through it like layers with a blend mode.
+  - Painting on the base shows more of the layers clipped to it while painting, and painting on a clipped layer is
+    clipped while painting, since both are put together like any stroke.
+  - While the opacity slider moves (decision 23), the clipped part of the layer is made once for each tile, and the
+    new opacity applies to it like to any layer.
+  - When a layer is deleted, moved, merged, clipped or unclipped, the tiles of every clipped layer are put together
+    again: their base may be another one.
+  - Two things don't follow clipping yet, and go in 0.11.1 with those of decision 56: while a part is moved (decision
+    41), a clipped layer shows whole, and the layers clipped to a moved base stay as they were, until it is let go;
+    the fill bucket's **All layers** sees clipped layers whole.
+- **Checked:** the bottom layer's clip not offered; clipping with the button, the row moved in with its arrow; only
+  the part over the base shown; painting on the clipped layer clipped while painting and after; painting on the base
+  showing more of it while painting; a hidden base hiding it; 50% opacity while the slider moves and after; Multiply on
+  a clipped layer; Ctrl+Alt+G and undo; a new layer inside the group clipped too; the base deleted, or the clipped
+  layer moved to the bottom, showing it whole, and undo; saved with the drawing; a copy clipped too; merging onto the
+  base with the picture unchanged, and undo.
 
 ## Open questions
 

@@ -179,14 +179,19 @@ export function useTransformShortcuts(engine: Engine | null) {
   }, [engine])
 }
 
-// The layers' shortcuts, as in Photoshop: Ctrl/Cmd + J duplicates the active layer, Ctrl/Cmd + E merges it down
+// The layers' shortcuts, as in Photoshop: Ctrl/Cmd + J duplicates the active layer, Ctrl/Cmd + E merges it down,
+// Ctrl/Cmd + Alt + G clips it to the layers under it or unclips it
 export function useLayerShortcuts(engine: Engine | null) {
   useEffect(() => {
     if (!engine) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target) || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
+      if (isTyping(e.target) || !(e.ctrlKey || e.metaKey) || e.shiftKey) return
       const key = e.key.toLowerCase()
-      if (key === 'j') engine.duplicateLayer()
+      if (e.altKey) {
+        // The key's place, not its letter: with Alt, a Mac types another letter
+        if (e.code === 'KeyG') engine.toggleClipped()
+        else return
+      } else if (key === 'j') engine.duplicateLayer()
       else if (key === 'e') engine.mergeDown()
       else return
       e.preventDefault() // stop the browser from using the shortcut itself (downloads, the search box)

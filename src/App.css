@@ -725,6 +725,16 @@ input.slider-value {
   border-bottom: 2px solid transparent;
 }
 
+/* a clipped layer is moved in, with an arrow down to the layer it is clipped to */
+.layers-list li.clipped {
+  padding-left: 14px;
+}
+
+.clip-arrow {
+  flex: none;
+  color: var(--muted);
+}
+
 .layers-list li.active {
   background: var(--accent-bg);
 }

@@ -1,4 +1,15 @@
-import { Container, Geometry, GlProgram, Mesh, RenderTexture, Shader, Sprite, Texture, UniformGroup } from 'pixi.js'
+import {
+  BufferImageSource,
+  Container,
+  Geometry,
+  GlProgram,
+  Mesh,
+  RenderTexture,
+  Shader,
+  Sprite,
+  Texture,
+  UniformGroup,
+} from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import type { BlendMode } from './layers'
 import { TILE_SIZE } from './tiles'
@@ -21,7 +32,10 @@ import { TILE_SIZE } from './tiles'
 // - Difference: how far apart the colors are (the same color gives black)
 // - Hue, Saturation, Color, Luminosity: take that much of the layer's color (its hue; its saturation; both; or its
 //   brightness), and the rest from what is under
-// The layers panel offers them grouped as Photoshop does (see LayersPanel.tsx)
+// The layers panel offers them grouped as Photoshop does (see LayersPanel.tsx).
+//
+// The same program clips a layer to its base (see isClipped in layers.ts): the layer's paint is then taken as much as
+// the base's paint covers, before the rest
 
 // Each mode's number in the shader below
 const MODE_NUMBERS: Record<BlendMode, number> = {
@@ -70,6 +84,7 @@ out vec4 finalColor;
 
 uniform sampler2D uBackdrop;
 uniform sampler2D uPaint;
+uniform sampler2D uMask;
 uniform float uOpacity;
 uniform float uMode;
 
@@ -151,7 +166,7 @@ vec3 blended(vec3 under, vec3 over) {
 
 void main(void) {
   vec4 under = texture(uBackdrop, vUV);
-  vec4 over = texture(uPaint, vUV) * uOpacity;
+  vec4 over = texture(uPaint, vUV) * (uOpacity * texture(uMask, vUV).a);
   vec3 underColor = under.a > 0.0 ? min(under.rgb / under.a, 1.0) : vec3(0.0);
   vec3 overColor = over.a > 0.0 ? min(over.rgb / over.a, 1.0) : vec3(0.0);
   vec3 mixed = clamp(blended(underColor, overColor), 0.0, 1.0);
@@ -160,6 +175,12 @@ void main(void) {
   finalColor = vec4(color, over.a + under.a * (1.0 - over.a));
 }
 `
+
+// One pixel of no paint at all, and one white pixel that covers fully, which stand for a whole tile of each
+const pixelTexture = (value: number) =>
+  new Texture({ source: new BufferImageSource({ resource: new Uint8Array(4).fill(value), width: 1, height: 1 }) })
+const NO_PAINT = pixelTexture(0)
+const NO_MASK = pixelTexture(255)
 
 export function createLayerBlender(renderer: WebGLRenderer) {
   const geometry = new Geometry({
@@ -172,7 +193,7 @@ export function createLayerBlender(renderer: WebGLRenderer) {
   })
   const shader = new Shader({
     glProgram: GlProgram.from({ vertex, fragment, name: 'layer-blend', preferredFragmentPrecision: 'highp' }),
-    resources: { blendUniforms: uniforms, uBackdrop: Texture.EMPTY.source, uPaint: Texture.EMPTY.source },
+    resources: { blendUniforms: uniforms, uBackdrop: NO_PAINT.source, uPaint: NO_PAINT.source, uMask: NO_MASK.source },
   })
   const mesh = new Mesh({ geometry, shader })
   mesh.blendMode = 'none' // the result replaces what the target had
@@ -186,20 +207,29 @@ export function createLayerBlender(renderer: WebGLRenderer) {
   copySprite.blendMode = 'none'
   copyRoot.addChild(copySprite)
 
-  // Put "paint" (a layer's tile) at this opacity onto "backdrop" (what is under it) with this mode, into "target".
-  // All three are whole tiles; "target" must be neither of the other two
-  function blend(backdrop: Texture, paint: Texture, opacity: number, mode: BlendMode, target: RenderTexture) {
+  // Put "paint" (a layer's tile) at this opacity onto "backdrop" (what is under it) with this mode, into "target",
+  // only as much as "mask" covers (the tile of the layer's base, when it is clipped). All are whole tiles; "target"
+  // must be none of the others
+  function blend(
+    backdrop: Texture,
+    paint: Texture,
+    opacity: number,
+    mode: BlendMode,
+    target: RenderTexture,
+    mask: Texture = NO_MASK,
+  ) {
     shader.resources.uBackdrop = backdrop.source
     shader.resources.uPaint = paint.source
+    shader.resources.uMask = mask.source
     uniforms.uniforms.uOpacity = opacity
     uniforms.uniforms.uMode = MODE_NUMBERS[mode]
     renderer.render({ container: root, target, clear: false })
   }
 
   // The same, with the result in "target" itself (merging a layer down onto the one under it)
-  function blendOnto(target: RenderTexture, paint: Texture, opacity: number, mode: BlendMode) {
+  function blendOnto(target: RenderTexture, paint: Texture, opacity: number, mode: BlendMode, mask?: Texture) {
     scratch ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
-    blend(target, paint, opacity, mode, scratch)
+    blend(target, paint, opacity, mode, scratch, mask)
     copySprite.texture = scratch
     renderer.render({ container: copyRoot, target, clear: false })
   }
@@ -212,7 +242,12 @@ export function createLayerBlender(renderer: WebGLRenderer) {
     scratch?.destroy(true)
   }
 
-  return { blend, blendOnto, destroy }
+  // Only the part of "paint" that "mask" covers, into "target" (a clipped layer's tile, shown on its own)
+  function clip(paint: Texture, mask: Texture, target: RenderTexture) {
+    blend(NO_PAINT, paint, 1, 'normal', target, mask)
+  }
+
+  return { blend, blendOnto, clip, destroy }
 }
 
 export type LayerBlender = ReturnType<typeof createLayerBlender>

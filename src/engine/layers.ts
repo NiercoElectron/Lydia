@@ -33,6 +33,7 @@ export type Layer = {
   // Its transparency is locked: painting only changes the colors of the paint already there, and the eraser can't
   // take any away (see LOCKED_ALPHA)
   alphaLocked: boolean
+  clipped: boolean // it is clipped to the layers under it (see isClipped)
   smart?: SmartObject // set when the layer is a smart object (see smartObject.ts): its tiles are then its source drawn
 }
 
@@ -54,6 +55,7 @@ export function createLayer(name: string, tiles = new Map<string, StoredTile>())
     blendMode: 'normal',
     showOffPaper: false,
     alphaLocked: false,
+    clipped: false,
   }
 }
 
@@ -61,6 +63,18 @@ export function createLayer(name: string, tiles = new Map<string, StoredTile>())
 // as the paint already there covers, and the transparency stays as it was. PixiJS has no such mode, so the engine
 // adds it (see engine.ts)
 export const LOCKED_ALPHA = 'locked-alpha'
+
+// Whether the layer at this position is clipped, like Photoshop's clipping masks: it shows only where its "base" has
+// paint, the nearest layer under it that isn't clipped itself, and its paint elsewhere stays hidden. Painting inside
+// the lines of the base is then easy. The bottom layer has nothing to be clipped to, so it never is
+export const isClipped = (stack: LayerStack, index: number) => index > 0 && stack.layers[index]?.clipped === true
+
+// The position of the base of the clipped layer at this position (see isClipped)
+export function clipBaseIndex(stack: LayerStack, index: number) {
+  let base = index - 1
+  while (isClipped(stack, base)) base--
+  return base
+}
 
 // The position of the active layer in the stack (0 = the bottom one)
 export function activeIndex(stack: LayerStack) {
