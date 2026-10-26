@@ -9,6 +9,7 @@ import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
 import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
+import { straightLineEnd } from './straightLine'
 import { tilesInRect, type Grid } from './tiles'
 import { isPaintTool, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
@@ -206,9 +207,20 @@ export function createView(
 
   // ----- What each tool does with the pointer -----
 
-  // The brush paints where the pen goes, or, with the stabilizer on, where the stabilizer lets it follow the pen
+  // The brush paints where the pen goes, or, with the stabilizer on, where the stabilizer lets it follow the pen. With
+  // Shift, a click paints a straight line from where the last stroke ended instead (see straightLineTo)
   function paint(e: PointerEvent): Gesture {
     hoverPoint = null
+    const line = e.shiftKey ? straightLineTo(onScreen(e)) : null
+    if (line) {
+      const changed = brush.paintLine(line.from, line.to, pressureOf(e))
+      return {
+        move() {},
+        up() {
+          if (changed) actions.onStrokeEnd()
+        },
+      }
+    }
     const point = { ...toPaper(e), pressure: pressureOf(e) }
     brush.startStroke(point.x, point.y, point.pressure)
     if (stabilizerSettings.strength > 0) {
@@ -428,8 +440,9 @@ export function createView(
 
   let tool: Tool = 'brush'
   let isSpaceDown = false
-  let isShiftDown = false // Shift and Alt as the last key or pointer event said
+  let isShiftDown = false // Shift, Alt and Ctrl (Cmd on a Mac) as the last key or pointer event said
   let isAltDown = false
+  let isCtrlDown = false
   let gesture: (Gesture & { pointerId: number; tool: Tool }) | null = null // the pointer that is down, if any
   let hoverPoint: Point | null = null // where the brush is waiting, or null when all is ready
   let transformCursor: string | null = null // the cursor over a transform's handles, where the pointer is
@@ -494,18 +507,21 @@ export function createView(
       showCursor()
     }
     // While the stabilizer holds the brush back, the outline is where the brush is, and a line joins it to the pen.
-    // The line shows even when the outline doesn't
+    // With Shift held, the straight line a click would paint shows, and the outline at its end. The lines show even
+    // when the outline doesn't
     const isLagging = stabilizer !== null && isPaintTool(used)
-    brushOutline.visible = isShown || (at !== null && isLagging)
+    const canLine = isShiftDown && !gesture && at !== null && isPaintTool(used) && actions.canUse(used)
+    const line = canLine && !actions.getTransform() ? straightLineTo(at) : null
+    brushOutline.visible = isShown || (at !== null && (isLagging || line !== null))
     if (!at || !brushOutline.visible) return
 
-    const center = stabilizer ? stabilizer.brushAt() : paperAt(at)
+    const center = line ? line.to : stabilizer ? stabilizer.brushAt() : paperAt(at)
     const tip = brush.getTip()
     const pixelTip = brush.getShape().pixel
     const isPixel = pixelTip !== 'none'
     const angle = brush.tipAngle()
     const { position, scale, rotation } = world
-    const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle]
+    const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle, line?.from.x, line?.from.y]
       .concat([position.x, position.y, scale.x, scale.y, rotation])
       .join()
     if (key === outlineKey && tip === outlineTip) return
@@ -534,8 +550,20 @@ export function createView(
     ]) {
       for (const loop of onScreenLoops) brushOutline.poly(loop, true)
       if (hasLine) brushOutline.poly([brushOnScreen, at], false)
+      if (line) brushOutline.poly([toScreen(line.from), brushOnScreen], false)
       brushOutline.stroke({ width, color })
     }
+  }
+
+  // ----- Straight lines -----
+
+  // A straight line from where the last stroke ended to this point of the screen, kept to a few angles while Ctrl is
+  // held (see straightLine.ts); null before the first stroke
+  function straightLineTo(screen: Point) {
+    const from = brush.getLastEnd()
+    if (!from) return null
+    const to = straightLineEnd(from, paperAt(screen), isCtrlDown, brush.getShape().pixel !== 'none')
+    return { from, to }
   }
 
   // Turn the brush's outline on or off. When off, the brush shows the cursor's cross
@@ -581,6 +609,7 @@ export function createView(
     if (e.key === 'Alt') e.preventDefault() // in some browsers, Alt alone moves the keyboard to the browser's menu
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    isCtrlDown = e.ctrlKey || e.metaKey
     showCursor()
     // Ctrl/Cmd + 0 shows the whole paper again, like in Photoshop
     if ((e.ctrlKey || e.metaKey) && e.key === '0') {
@@ -596,12 +625,13 @@ export function createView(
     if (e.key === 'Alt') e.preventDefault()
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    isCtrlDown = e.ctrlKey || e.metaKey
     showCursor()
   }
 
   // Keys let go in another window never come here
   function handleBlur() {
-    isSpaceDown = isShiftDown = isAltDown = false
+    isSpaceDown = isShiftDown = isAltDown = isCtrlDown = false
     showCursor()
   }
 
@@ -618,6 +648,7 @@ export function createView(
     // The keys may have changed while the window was in the background (Alt+Tab leaves Alt "down" here)
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    isCtrlDown = e.ctrlKey || e.metaKey
     const target = actions.getTransform()
     if (target && e.button === 0 && !isSpaceDown) {
       gesture = { ...transform(e, target), pointerId: e.pointerId, tool: 'move' }
@@ -640,6 +671,7 @@ export function createView(
     }
     isShiftDown = e.shiftKey
     isAltDown = e.altKey
+    isCtrlDown = e.ctrlKey || e.metaKey
     const target = actions.getTransform()
     transformCursor = target
       ? cursorFor(handleAt(target, onScreen(e), toPaper(e), toScreen), target, toScreen, e.ctrlKey || e.metaKey)

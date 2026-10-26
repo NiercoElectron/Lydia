@@ -35,6 +35,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Brushes are `.lydbrush` files: nine come with Lydia, and more can be added (Import…, or drop the files on the
   window), exported to share them, and deleted
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
+- Pixel-perfect strokes: pixel brushes can leave out the doubled corners of lines drawn by hand
+- Straight lines with Shift + click, kept to the angles of pixel art (or every 15°) with Ctrl
 - A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
 - Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
   brush list or as a file
@@ -55,15 +57,14 @@ How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
-stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, turning and flipping the view, the fill bucket, rectangle and lasso
+stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, pixel-perfect strokes, straight lines, turning and flipping the view, the fill bucket, rectangle and lasso
 selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Pixel art: pixel-perfect strokes (without the doubled corners of lines drawn by hand) and exporting enlarged (2×,
-      4×) without blurring
+- [ ] Pixel art: exporting enlarged (2×, 4×) without blurring (pixel-perfect strokes and straight lines are done)
 - [ ] Layers: folders of layers (a "Head" folder with the chin, the hair, the ears…), blend modes, clipping masks,
       alpha lock, duplicate and merge down
 - [ ] Selections: magic wand

@@ -8,6 +8,7 @@ import {
   useEngineSnapshot,
   useBrushOutline,
   usePixelGrid,
+  usePixelPerfect,
   useStabilizer,
   useTaper,
   useSelectionShortcuts,
@@ -258,6 +259,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
+  const [isPixelPerfectOn, togglePixelPerfect] = usePixelPerfect(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
   const [taper, changeTaper] = useTaper(engine)
   useDrawingShortcuts(engine, ALL_TOOLS, setTool, setSize, toggleGrid)
@@ -336,6 +338,8 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           taper={taper}
           isGridOn={isGridOn}
           isOutlineOn={isOutlineOn}
+          isPixelBrush={isPixelBrush}
+          isPixelPerfectOn={isPixelPerfectOn}
           onColorChange={setColor}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
@@ -344,6 +348,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onTaperChange={changeTaper}
           onGridToggle={toggleGrid}
           onOutlineToggle={toggleOutline}
+          onPixelPerfectToggle={togglePixelPerfect}
         />
         <div className="actions">
           <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">

@@ -134,6 +134,12 @@ export function createSelectionView(
     return !selection || selection.has(key)
   }
 
+  // Whether this tile is only partly selected, so that cutting a stroke's tile there takes some of it away
+  function isCut(key: string) {
+    const tile = getSelection()?.get(key)
+    return tile !== undefined && tile !== 'full'
+  }
+
   // The selection's tile at this key, to cut "texture" with: a mask of the tile's part on the paper, with its size;
   // undefined where nothing is selected, and "full" where all of the texture is. A layer's whole tile at the paper's
   // edge is never selected whole, even in a "full" tile: its part off the paper is never selected
@@ -314,7 +320,7 @@ export function createSelectionView(
     cutRoot.destroy({ children: true })
   }
 
-  return { canPaint, cut, cutAway, setOffset, update, destroy }
+  return { canPaint, isCut, cut, cutAway, setOffset, update, destroy }
 }
 
 export type SelectionView = ReturnType<typeof createSelectionView>

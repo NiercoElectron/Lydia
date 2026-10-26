@@ -43,6 +43,8 @@ type Props = {
   taper: TaperSettings
   isGridOn: boolean
   isOutlineOn: boolean
+  isPixelBrush: boolean
+  isPixelPerfectOn: boolean
   onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
@@ -51,10 +53,12 @@ type Props = {
   onTaperChange: (change: Partial<TaperSettings>) => void
   onGridToggle: () => void
   onOutlineToggle: () => void
+  onPixelPerfectToggle: () => void
 }
 
 // The settings of the chosen tool: the color, then the brush's size and opacity, with its stabilizer and taper under
-// Advanced, the fill bucket's settings, or the selection's. The move tool has none. While a transform is made, its own settings instead
+// Advanced and, for a pixel brush, Pixel-perfect; the fill bucket's settings, or the selection's. The move tool has
+// none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
   color,
@@ -67,6 +71,8 @@ export function Toolbar({
   taper,
   isGridOn,
   isOutlineOn,
+  isPixelBrush,
+  isPixelPerfectOn,
   onColorChange,
   onSizeChange,
   onOpacityChange,
@@ -75,6 +81,7 @@ export function Toolbar({
   onTaperChange,
   onGridToggle,
   onOutlineToggle,
+  onPixelPerfectToggle,
 }: Props) {
   const isSelecting = tool === 'select' || tool === 'lasso'
   const isMoving = tool === 'move'
@@ -142,6 +149,15 @@ export function Toolbar({
           <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
           <TaperControls taper={taper} onChange={onTaperChange} />
         </AdvancedMenu>
+      )}
+      {(tool === 'brush' || tool === 'eraser') && isPixelBrush && (
+        <button
+          aria-pressed={isPixelPerfectOn}
+          onClick={onPixelPerfectToggle}
+          title="Lines without doubled corners: each step of a line is a single pixel"
+        >
+          Pixel-perfect
+        </button>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />

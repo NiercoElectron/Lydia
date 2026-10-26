@@ -1,14 +1,25 @@
-import { Container, RenderTexture, Sprite } from 'pixi.js'
+import { Container, Rectangle, RenderTexture, Sprite, Texture } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import type { BrushShape } from './brushFile'
 import type { BrushTip } from './brushTip'
 import { createDabPainter } from './dabPainter'
-import { createDabPath, NO_TAPER, type Dab, type DabPath, type StrokePoint, type TaperSettings } from './dabs'
+import {
+  createDabPath,
+  isCorner,
+  NO_TAPER,
+  pixelLinePoints,
+  withoutCorners,
+  type Dab,
+  type DabPath,
+  type StrokePoint,
+  type TaperSettings,
+} from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
 import type { Projection, ShownStroke } from './projection'
+import type { Point } from './selection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
 import type { PaintTool } from './tools'
 
@@ -18,12 +29,14 @@ export type BrushSettings = {
   size: number // the tip's longer side, in pixels of the paper, at full pressure
   opacity: number // how much the whole stroke covers, from 0 to 1
   taper: TaperSettings // how the stroke's ends thin out (see dabs.ts)
+  pixelPerfect: boolean // whether a pixel brush leaves out the doubled corners of its lines (see dabs.ts)
 }
 
-// The selection, as the brush sees it (see selectionView.ts): whether a tile can be painted at all, and cutting a
-// stroke's tile to the selected part of it
+// The selection, as the brush sees it (see selectionView.ts): whether a tile can be painted at all, whether it is only
+// partly selected, and cutting a stroke's tile to the selected part of it
 export type StrokeCutter = {
   canPaint: (key: string) => boolean
+  isCut: (key: string) => boolean
   cut: (strokeTexture: RenderTexture, key: string) => void
 }
 
@@ -42,7 +55,14 @@ export function createBrush(
   startShape: BrushShape,
   selection: StrokeCutter,
 ) {
-  const settings: BrushSettings = { tool: 'brush', color: '#000000', size: 20, opacity: 1, taper: NO_TAPER }
+  const settings: BrushSettings = {
+    tool: 'brush',
+    color: '#000000',
+    size: 20,
+    opacity: 1,
+    taper: NO_TAPER,
+    pixelPerfect: false,
+  }
   let tip = startTip
   let shape = startShape
   const painter = createDabPainter(renderer, tip, shape)
@@ -71,6 +91,40 @@ export function createBrush(
     return strokeTexture
   }
 
+  // In a tile only partly selected, the stroke is painted into a tile of its own, and the stroke's tile shown is that
+  // one cut to the selection again after every change. Cut where it is painted, the soft edge of a selection would be
+  // cut again at every movement of the pen, its paint fading away (half selected: half of it, then a quarter...)
+  const uncutTiles = new Map<string, RenderTexture>()
+
+  // Where the stroke paints in this tile: its own tile, or the one uncut
+  function paintedTile(key: string, strokeTexture: RenderTexture) {
+    if (!selection.isCut(key)) return strokeTexture
+    let uncut = uncutTiles.get(key)
+    if (uncut) return uncut
+    const { width, height } = strokeTexture
+    const isFull = width === TILE_SIZE && height === TILE_SIZE
+    uncut = (isFull && spareStrokeTiles.pop()) || RenderTexture.create({ width, height })
+    renderer.render({ container: nothing, target: uncut, clear: true, clearColor: [0, 0, 0, 0] })
+    uncutTiles.set(key, uncut)
+    return uncut
+  }
+
+  // The stroke's tile shown, as the uncut one cut to the selection (if this tile has one)
+  function cutAgain(key: string) {
+    const uncut = uncutTiles.get(key)
+    if (!uncut) return
+    const strokeTexture = strokeTiles.get(key)!
+    copyPart(uncut, new Rectangle(0, 0, uncut.width, uncut.height), strokeTexture, 0, 0)
+    selection.cut(strokeTexture, key)
+  }
+
+  // Keep a stroke's tile for the next strokes, or let it go
+  function recycle(texture: RenderTexture) {
+    const isFull = texture.width === TILE_SIZE && texture.height === TILE_SIZE
+    if (isFull && spareStrokeTiles.length < SPARE_STROKE_TILES) spareStrokeTiles.push(texture)
+    else texture.destroy(true)
+  }
+
   // Put the finished stroke into the active layer, tile by tile, keeping each tile's pixels for undo first. The
   // projection already shows these tiles as they now are
   function mergeStroke(shown: ShownStroke) {
@@ -87,11 +141,11 @@ export function createBrush(
         renderer.render({ container: mergeRoot, target: gpu.getTexture(layer, column, row, true)!, clear: false })
         gpu.markDirty(layer, key)
       }
-      const isFull = strokeTexture.width === TILE_SIZE && strokeTexture.height === TILE_SIZE
-      if (isFull && spareStrokeTiles.length < SPARE_STROKE_TILES) spareStrokeTiles.push(strokeTexture)
-      else strokeTexture.destroy(true)
+      recycle(strokeTexture)
     }
     strokeTiles.clear()
+    for (const uncut of uncutTiles.values()) recycle(uncut)
+    uncutTiles.clear()
   }
 
   // Paint with another brush from now on
@@ -126,29 +180,119 @@ export function createBrush(
   }
 
   // Paint into each touched tile of the stroke only the dabs that touch it, shifted so that the tile's corner is at
-  // (0, 0), and keep only what is selected. "fresh": the tiles are cleared first, to be painted again from the start
-  function paintTiles(byTile: Map<string, Dab[]>, fresh = false) {
+  // (0, 0), and keep only what is selected. "fresh": the tiles are cleared first, to be painted again from the start.
+  // "backUpBefore": a dab to keep what is under it before it is painted (see paintDabs)
+  function paintTiles(byTile: Map<string, Dab[]>, fresh = false, backUpBefore: Dab | null = null) {
     for (const [key, tileDabs] of byTile) {
       if (!selection.canPaint(key)) continue
       const { column, row } = parseTileKey(key)
-      const strokeTexture = strokeTile(key, column, row)
-      if (fresh) renderer.render({ container: nothing, target: strokeTexture, clear: true, clearColor: [0, 0, 0, 0] })
-      painter.paint(strokeTexture, tileDabs, column * TILE_SIZE, row * TILE_SIZE)
-      selection.cut(strokeTexture, key)
+      const painted = paintedTile(key, strokeTile(key, column, row))
+      if (fresh) renderer.render({ container: nothing, target: painted, clear: true, clearColor: [0, 0, 0, 0] })
+      const left = column * TILE_SIZE
+      const top = row * TILE_SIZE
+      if (backUpBefore && tileDabs.at(-1) === backUpBefore) {
+        painter.paint(painted, tileDabs.slice(0, -1), left, top)
+        backUp(key, painted, backUpBefore, left, top)
+        painter.paint(painted, [backUpBefore], left, top)
+      } else {
+        painter.paint(painted, tileDabs, left, top)
+      }
+      cutAgain(key)
       projection.composeTile(column, row)
     }
   }
 
+  // A pixel-perfect stroke leaves out each dab that a new one turns into a doubled corner (see dabs.ts), even one
+  // already painted, and that one is always the latest dab painted. So before the last of each batch of dabs is
+  // painted, what is under it in each of its tiles is copied aside, and put back if it turns into a corner: as much
+  // work however long the stroke is
+  const backups = new Map<string, { texture: RenderTexture; frame: Rectangle }>() // by tile
+  const spareBackups: RenderTexture[] = []
+  // Draw the part "frame" of "from" into "target" at (x, y), in place of what was there: the blend mode "none" turns
+  // blending off, so its pixels are copied as they are. PixiJS ignores the blend mode of what it is asked to render,
+  // so the copy's sprite goes inside a container
+  const copyRoot = new Container()
+  const copySprite = new Sprite()
+  copySprite.blendMode = 'none'
+  copyRoot.addChild(copySprite)
+  function copyPart(from: Texture, frame: Rectangle, target: RenderTexture, x: number, y: number) {
+    const part = new Texture({ source: from.source, frame })
+    copySprite.texture = part
+    copySprite.position.set(x, y)
+    renderer.render({ container: copyRoot, target, clear: false })
+    part.destroy()
+  }
+
+  // Keep what the stroke has under this dab in this tile (whose corner is at "left", "top" on the paper), where it is
+  // painted (see paintedTile)
+  function backUp(key: string, painted: RenderTexture, dab: Dab, left: number, top: number) {
+    const half = dab.size / 2 // a pixel tip fits in a square of its size (see dabsByTile)
+    const x = Math.max(0, Math.floor(dab.x - half) - left)
+    const y = Math.max(0, Math.floor(dab.y - half) - top)
+    const width = Math.min(painted.width, Math.ceil(dab.x + half) - left) - x
+    const height = Math.min(painted.height, Math.ceil(dab.y + half) - top) - y
+    if (width <= 0 || height <= 0) return
+    const texture = spareBackups.pop() ?? RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    const frame = new Rectangle(x, y, width, height)
+    copyPart(painted, frame, texture, 0, 0)
+    backups.set(key, { texture, frame })
+  }
+
+  // Put back what was under the latest dab painted, taking it out of the stroke. Returns the tiles it was in, to show
+  // them again
+  function restoreBackups() {
+    for (const [key, { texture, frame }] of backups) {
+      const painted = uncutTiles.get(key) ?? strokeTiles.get(key)!
+      copyPart(texture, new Rectangle(0, 0, frame.width, frame.height), painted, frame.x, frame.y)
+      cutAgain(key)
+    }
+    return [...backups.keys()]
+  }
+
+  function forgetBackups() {
+    for (const { texture } of backups.values()) spareBackups.push(texture)
+    backups.clear()
+  }
+
+  // Add these dabs to the stroke and paint them, leaving out the doubled corners of a pixel-perfect stroke
   function paintDabs(dabs: Dab[]) {
-    strokeDabs.push(...dabs)
-    paintTiles(dabsByTile(dabs))
+    if (!strokeStart.pixelPerfect) {
+      strokeDabs.push(...dabs)
+      paintTiles(dabsByTile(dabs))
+      return
+    }
+    let painted = strokeDabs.length // how many of the stroke's dabs are painted
+    let isCornerPainted = false
+    for (const dab of dabs) {
+      const count = strokeDabs.length
+      if (count >= 2 && isCorner(strokeDabs[count - 2], strokeDabs[count - 1], dab)) {
+        strokeDabs.pop()
+        if (strokeDabs.length < painted) {
+          // Only the latest dab painted can be: once it is taken out, the one before it is followed by a new dab
+          isCornerPainted = true
+          painted = strokeDabs.length
+        }
+      }
+      strokeDabs.push(dab)
+    }
+    const added = strokeDabs.slice(painted)
+    if (added.length === 0) return // nothing taken out either, since that only happens with a new dab
+    const restored = isCornerPainted ? restoreBackups() : []
+    forgetBackups()
+    const byTile = dabsByTile(added)
+    paintTiles(byTile, false, added.at(-1)!)
+    for (const key of restored) {
+      if (byTile.has(key)) continue // shown again already
+      const { column, row } = parseTileKey(key)
+      projection.composeTile(column, row)
+    }
   }
 
   // Where the dabs of the stroke being painted go, or null when not painting
   let path: DabPath | null = null
   // The stroke being painted as it was started, its points and the dabs painted so far, to work it out again at its
   // end (see taperEnd)
-  let strokeStart = { size: 0, seed: 0, taper: NO_TAPER }
+  let strokeStart = { size: 0, seed: 0, taper: NO_TAPER, pixelPerfect: false }
   let strokePoints: StrokePoint[] = []
   let strokeDabs: Dab[] = []
 
@@ -157,7 +301,12 @@ export function createBrush(
     history.begin(stack.active)
     stroke = { tiles: strokeTiles, color: settings.color, opacity: settings.opacity, erase: settings.tool === 'eraser' }
     projection.showStroke(stroke)
-    strokeStart = { size: settings.size, seed: Math.floor(Math.random() * 2 ** 32), taper: settings.taper }
+    strokeStart = {
+      size: settings.size,
+      seed: Math.floor(Math.random() * 2 ** 32),
+      taper: settings.taper,
+      pixelPerfect: settings.pixelPerfect && shape.pixel !== 'none',
+    }
     strokePoints = [{ x, y, pressure }]
     strokeDabs = []
     path = createDabPath(shape, strokeStart.size, { ...strokeStart, tip: tip.image })
@@ -182,7 +331,8 @@ export function createBrush(
     const { taper } = strokeStart
     if (taper.start === 0 && taper.end === 0) return
     const again = createDabPath(shape, strokeStart.size, { ...strokeStart, length, tip: tip.image })
-    const tapered = [...again.start(strokePoints[0]), ...again.moveTo(strokePoints.slice(1)), ...again.end()]
+    const dabs = [...again.start(strokePoints[0]), ...again.moveTo(strokePoints.slice(1)), ...again.end()]
+    const tapered = strokeStart.pixelPerfect ? withoutCorners(dabs) : dabs
     let first = 0
     while (first < strokeDabs.length && first < tapered.length && isSameDab(strokeDabs[first], tapered[first])) first++
     if (first === strokeDabs.length && first === tapered.length) return
@@ -196,14 +346,34 @@ export function createBrush(
     if (path) {
       paintDabs(path.end())
       taperEnd(path.strokeLength())
+      lastEnd = strokePoints.at(-1)!
     }
     path = null
     strokePoints = []
     strokeDabs = []
+    forgetBackups()
     if (stroke) mergeStroke(stroke)
     projection.showStroke(null)
     stroke = null
     return history.end()
+  }
+
+  // Where the last stroke ended (where the brush was, with the stabilizer), for a straight line from there (see
+  // view.ts); null before the first one
+  let lastEnd: Point | null = null
+
+  // Paint a straight line from one point of the paper to another, at this pressure, as a stroke of its own. A pixel
+  // brush's goes along the pixels Bresenham's way (see dabs.ts). Returns whether it changed anything (and so was
+  // added to the undo history)
+  function paintLine(from: Point, to: Point, pressure: number) {
+    const start = { ...from, pressure }
+    const end = { ...to, pressure }
+    const points = shape.pixel === 'none' ? [start, end] : pixelLinePoints(shape, settings.size, start, end, tip.image)
+    startStroke(points[0].x, points[0].y, pressure)
+    continueStroke(points.slice(1))
+    const changed = endStroke()
+    lastEnd = to // exactly where it was asked to end, for the next line, even where the pixels are rounded
+    return changed
   }
 
   // How far from the pointer the brush can paint, in pixels of the paper. A pixel brush's tip can be up to a pixel
@@ -223,7 +393,10 @@ export function createBrush(
   function destroy() {
     painter.destroy()
     mergeRoot.destroy({ children: true })
-    for (const strokeTexture of [...strokeTiles.values(), ...spareStrokeTiles]) strokeTexture.destroy(true)
+    copyRoot.destroy({ children: true })
+    forgetBackups()
+    const textures = [...strokeTiles.values(), ...uncutTiles.values(), ...spareStrokeTiles, ...spareBackups]
+    for (const texture of textures) texture.destroy(true)
   }
 
   return {
@@ -235,6 +408,8 @@ export function createBrush(
     startStroke,
     continueStroke,
     endStroke,
+    paintLine,
+    getLastEnd: () => lastEnd,
     reach,
     isPainting: () => path !== null,
     destroy,

@@ -574,7 +574,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     the pen enters it. A dab at every edge the pen crosses, across and down, was tried first: it left holes where a
     line turns between mostly across and mostly down and, filled, about twice as many doubled corners near 45° (220
     instead of 95 in 208 simulated strokes; 126 with the start counted from the edge). Painting every pixel at once
-    and taking the doubled corners out afterwards is the pixel-perfect mode, planned with the pixel art stage.
+    and taking the doubled corners out afterwards is the pixel-perfect mode, planned with the pixel art stage (done
+    in decision 51).
   - A dab that would paint the same pixels as the one before is skipped.
   - The brush list shows the Pixel brush's sample stroke 4 times smaller, enlarged, so that its pixels show.
 - **Measured (RTX 4060 Ti):**
@@ -912,6 +913,11 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     selection after each step: what isn't selected is taken out of it with the "erase" blend, using a texture of the
     part not selected (made from the selected one on the graphics card). The screen shows the stroke cut already,
     and it goes into the layer cut.
+  - Since 0.10.0, in a tile only partly selected, the stroke is painted into a tile of its own, uncut, and the tile
+    shown is that one copied and cut again after each step. Cut where it was painted, a soft edge was cut again at
+    every step, so its paint faded away while the stroke went on in the same tile: half selected, a stroke given a
+    point at a time (200 of them) left #fefefe instead of #808080. Claude saw it reading the code, and I asked to check
+    it: it was already so in 0.8.5. Tiles selected whole, or with no selection, are painted as before.
   - The fill bucket multiplies its fill by how much each pixel is selected. Delete works in RAM like the fill
     (decision 39): both share the code that changes a layer's tiles a few every frame, as one step of undo.
 - **Measured (RTX 4060 Ti, 10000×10000):** a lasso of 2000 points round the whole paper is worked out in about
@@ -1329,6 +1335,81 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   and with paint off it; shown, red faded around the paper and nothing over it; hidden again, the gray; Ctrl+Z
   undoing the move before it, not the switch; while the layer is moved, only the ghost showing it; saved and opened
   again, still shown; brought back onto the paper, the icon gone; after a transform past the edge, the icon.
+
+## 51. Pixel-perfect strokes
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - A pixel brush's stroke can be **pixel-perfect**: without the doubled corners of lines drawn by hand. Where the
+    stroke steps a pixel across and then a pixel down (or down and then across), the pixel of the corner between them
+    is left out, so each step of the line is a single pixel, as pixel artists draw lines.
+  - It works with **every pixel brush** (my choice): the Pixel brush at any size and those drawn in the Brush
+    Designer. The corners are taken out of the path of the tip's center, so a thick line keeps the same width along
+    its diagonals too. Aseprite does it only for lines of one pixel.
+  - The corner **shows and then goes** (my choice), as in Aseprite: the pixel is painted as soon as the pen enters
+    it and taken out when the next one makes it a corner. Holding each pixel back until the next one is known would
+    have kept the stroke a pixel behind the pen.
+  - A **Pixel-perfect** button in the bar of the brush and the eraser, only with a pixel brush, off at first, as in
+    Aseprite, and remembered by the browser (my choice).
+- **Why:**
+  - The pixel brush paints one pixel in each column of a straight line (decision 33), but a line drawn by hand turns
+    between going mostly across and mostly down, and there it gets two pixels side by side, the doubled corner pixel
+    artists clean up by hand.
+- **How:**
+  - The rule is in `dabs.ts`: three dabs in a row, of the same size, where the middle one is a step across from one
+    and a step down from the other, make it a corner. A stroke stays unbroken without it, since the dabs on both
+    sides touch at their corners. Where the pen's pressure changes the size, nothing is taken out.
+  - The corner taken out is always the latest dab painted. So before the last dab of each movement of the pen is
+    painted, what the stroke has under it is copied aside (a few pixels), and put back if it turns into a corner
+    (`brush.ts`). Painting the touched tiles again from the start instead took longer the longer the stroke was: up
+    to 7 ms for each movement of the pen in a long scribble inside one tile (headless, painting on the CPU); with the
+    copy, under 1 ms, as without pixel-perfect.
+  - The tapered end (decision 47) works the stroke out again once it has ended, and takes the same corners out of
+    it.
+- **Checked:** the button only with pixel brushes, also with the eraser, off at first and remembered in a new
+  drawing; off, the doubled corners painted; on, none, the corner showing as the pen enters it and going while the
+  stroke goes on; one undo for the stroke, and redo; strokes given at exact places painting just the pixels the rule
+  leaves, at sizes 1 and 3 and across tiles, also with a tapered end; a stroke with a fading start given a point at a
+  time and all at once coming out the same, color for color; lines at about 45° drawn wobbly, at sizes 1, 3 and 4,
+  without corners or gaps; a straight line keeping every pixel.
+
+## 52. Straight lines
+
+- **Date:** 2026-10-26
+- **Status:** adopted
+- **Decision:**
+  - With the brush or the eraser, **Shift + click** paints a straight line from where the last stroke ended (my
+    choice, as in Photoshop, Krita and Aseprite). Shift + click again goes on from there, so several make a line
+    with corners. Before the first stroke, Shift + click paints as a click does.
+  - While Shift is held, the line a click would paint shows, from the end of the last stroke to the brush's outline
+    at its end.
+  - It works with **every brush and the eraser** (my choice), with the brush's taper, and at the pressure of the
+    click.
+  - With **Ctrl** held too, the line keeps to a few angles, **depending on the brush** (my choice): a pixel brush's
+    to the clean angles of pixel art, across, down, and 1 pixel across for 1, 2 or 3 down (or the other way round),
+    and a whole number of those steps long; the other brushes' to every 15°, as in Photoshop.
+  - A pixel brush's line goes along the pixels **as Bresenham's line algorithm** finds them (my choice): one pixel in
+    each column (or row), with no doubled corners even without Pixel-perfect (decision 51).
+- **Why:**
+  - Testing pixel-perfect strokes, I found a line at exactly 45° hard to draw by hand: off by a little, it gets
+    steps of two pixels here and there, which Pixel-perfect rightly leaves (they are no corners). Pixel artists draw
+    straight lines with the line tool, and Claude suggested Shift + click with the angles of pixel art.
+- **How:**
+  - The brush keeps where its last stroke ended, where the brush was (behind the pen, with the stabilizer), and a
+    line is a stroke of its own from there (`paintLine`, in `brush.ts`), one step of undo.
+  - A pixel brush's line is given to the dab path as one point for each pixel the tip's corner goes through
+    (`pixelLinePoints`, in `dabs.ts`), and the path paints one dab at each. Across the shorter side, each is the
+    pixel nearest to the line, ties going to the later one. A line of whole steps (2:1, 3:1, 1:1) has them all equal
+    from its start instead: rounding to the nearest, its first step and its last were shorter (a 2:1 line started
+    with one pixel and ended with two, and a 1:3 one had steps of 2, 3, 3 and 2).
+  - The angles are in `straightLine.ts`: for a pixel brush, the nearest of the clean directions, and the number of
+    its steps closest to the pointer; for the others, the angle rounded to 15°, as far along it as the pointer is.
+- **Checked:** the line rules on their own (2:1 and 1:3 with steps equal from the start, 7:3 the pixels nearest the
+  line, the other way round, size 4, the click's pressure, the angles); in the app, Shift + click before any stroke
+  painting a dot; the line shown while Shift is held and gone without it; Shift + Ctrl near 2:1 giving 31 pixels in
+  steps of 2; a line on from the end of the last one, one pixel in each column; undo taking only the last line; Hard
+  round at 27° with Ctrl painting along 30°; the eraser along a line.
 
 ## Open questions
 

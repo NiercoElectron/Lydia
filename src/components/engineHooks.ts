@@ -7,10 +7,12 @@ import { isTyping, type ViewState } from '../engine/view'
 import {
   loadBrushOutline,
   loadPixelGrid,
+  loadPixelPerfect,
   loadStabilizer,
   loadTaper,
   saveBrushOutline,
   savePixelGrid,
+  savePixelPerfect,
   saveStabilizer,
   saveTaper,
 } from '../settings'
@@ -75,6 +77,19 @@ export function useBrushOutline(engine: Engine | null) {
   }, [engine, isOn])
   const toggle = useCallback(() => {
     saveBrushOutline(!isOn)
+    setIsOn(!isOn)
+  }, [isOn])
+  return [isOn, toggle] as const
+}
+
+// Whether pixel brushes leave out the doubled corners of their lines, as chosen last time
+export function usePixelPerfect(engine: Engine | null) {
+  const [isOn, setIsOn] = useState(loadPixelPerfect)
+  useEffect(() => {
+    engine?.setBrush({ pixelPerfect: isOn })
+  }, [engine, isOn])
+  const toggle = useCallback(() => {
+    savePixelPerfect(!isOn)
     setIsOn(!isOn)
   }, [isOn])
   return [isOn, toggle] as const

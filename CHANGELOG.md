@@ -14,6 +14,14 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - A layer with paint off the paper has an icon in the layers that shows that paint, faded, around the paper, and hides
   it again ([decision 50](docs/decisions.md#50-showing-paint-off-the-paper)). It is off at first, and kept with the
   drawing.
+- Pixel-perfect strokes ([decision 51](docs/decisions.md#51-pixel-perfect-strokes)). With a pixel brush, the
+  **Pixel-perfect** button in the bar leaves out the doubled corners of lines drawn by hand, so each step of a line is a
+  single pixel. It works at every size and with pixel brushes drawn in the Brush Designer, is off at first, and the
+  browser remembers it.
+- Straight lines ([decision 52](docs/decisions.md#52-straight-lines)). With the brush or the eraser, **Shift + click**
+  paints a straight line from where the last stroke ended, shown while Shift is held; with **Ctrl** too, it keeps to
+  the clean angles of pixel art (1:1, 2:1, 3:1…) with a pixel brush, or to every 15° with the others. A pixel brush's
+  line has one pixel in each column, in steps as even as its angle lets them be.
 
 ### Changed
 
@@ -22,6 +30,12 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   meanwhile it shows faded around the paper. An image bigger than the paper keeps its size. Paint off the paper is
   saved: such a drawing is a version 4 `.lyd` file, which earlier versions of Lydia can't open (a drawing without any
   is saved as before).
+
+### Fixed
+
+- A stroke over the soft edge of a selection faded there the longer it went on in the same place, since the edge was
+  cut out of it again at every movement of the pen ([decision 40](docs/decisions.md#40-selections)). Now it gets as
+  much paint there as the edge lets through.
 
 ## [0.9.0] - 2026-10-25
 

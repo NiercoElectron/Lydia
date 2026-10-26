@@ -63,6 +63,10 @@ Every slider has its number next to it: click the number to type a value. Enter,
   Opacity is how much a stroke covers, however many times it passes over the same place.
 - With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
 - Hold **Alt** to pick a color from the drawing while painting.
+- **Straight lines:** **Shift + click** paints a straight line from where the last stroke ended, and again from
+  there; while Shift is held, the line shows. Hold **Ctrl** too to keep it to a few angles: with a pixel brush, the
+  clean angles of pixel art (1 pixel across for 1, 2 or 3 down, or the other way round, across and down), in equal
+  steps; with the others, every 15°.
 - **The outline:** over the drawing, the brush shows the outline of its tip instead of the cursor, as big as it paints
   at full pressure and turned as it paints (brushes like Dashes turn it with the stroke). The Pixel brush's outline
   goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
@@ -94,6 +98,9 @@ Every slider has its number next to it: click the number to type a value. Enter,
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
 - **The Pixel brush** is for pixel art: whole pixels with hard edges, from 1 pixel up. While it or any other pixel
   brush is chosen, new selections get hard edges (see [Selections](#selections)).
+- **Pixel-perfect**, in the bar while a pixel brush is chosen, leaves out the doubled corners of lines drawn by hand:
+  where a line steps a pixel across and then a pixel down, the pixel of the corner shows as the pen goes over it and
+  goes again, so each step is a single pixel. It works at every size, is off at first, and is remembered.
 - **Pixel brushes drawn in the Brush Designer** paint their tip as it was drawn, pixel by pixel, at 1×, 2×, 3×… its
   size: the **Size** goes to the nearest of them (a tip of 5 pixels paints 5 at sizes up to 7, 10 at sizes 8 to 12…).
   Choosing one sets the Size to 1×.
@@ -235,32 +242,34 @@ starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen
 
 ## All shortcuts
 
-| Shortcut                                     | What it does                                       |
-| -------------------------------------------- | -------------------------------------------------- |
-| B / E                                        | Brush / eraser                                     |
-| F / I                                        | Fill bucket / eyedropper                           |
-| S / L                                        | Rectangle select / lasso                           |
-| V                                            | Move                                               |
-| H / Z / R                                    | Hand / zoom / rotate view                          |
-| [ / ]                                        | Smaller / bigger brush                             |
-| Alt (hold), with the brush, eraser or bucket | Pick a color                                       |
-| G                                            | Pixel grid on / off                                |
-| Ctrl + Z                                     | Undo                                               |
-| Ctrl + Shift + Z, Ctrl + Y                   | Redo                                               |
-| Shift / Alt + drag, with S or L              | Add to / take away from the selection              |
-| Ctrl + A / Ctrl + D / Ctrl + Shift + I       | Select everything / nothing / invert the selection |
-| Delete, Backspace                            | Take out what is selected                          |
-| Shift + drag, with V                         | Move only across, or only up and down              |
-| Ctrl + T, or Transform in the bar            | Transform (in a browser, use the button)           |
-| Enter / Esc, while transforming              | Apply / cancel                                     |
-| Shift + drag a corner                        | Scale without keeping the proportions              |
-| Alt + drag a handle                          | Scale from the middle                              |
-| Ctrl + drag a corner / a side                | Distort / skew                                     |
-| Shift + drag outside, or with R              | Turn in steps of 15°                               |
-| Space + drag, or drag with the middle button | Move around                                        |
-| Mouse wheel, or two fingers on a trackpad    | Move around                                        |
-| Ctrl + mouse wheel, or pinch on a trackpad   | Zoom                                               |
-| Alt + click, with Z                          | Zoom out                                           |
-| Shift + Space + drag                         | Turn the view                                      |
-| M                                            | Flip the view                                      |
-| Ctrl + 0                                     | Show the whole drawing                             |
+| Shortcut                                       | What it does                                       |
+| ---------------------------------------------- | -------------------------------------------------- |
+| B / E                                          | Brush / eraser                                     |
+| F / I                                          | Fill bucket / eyedropper                           |
+| S / L                                          | Rectangle select / lasso                           |
+| V                                              | Move                                               |
+| H / Z / R                                      | Hand / zoom / rotate view                          |
+| [ / ]                                          | Smaller / bigger brush                             |
+| Alt (hold), with the brush, eraser or bucket   | Pick a color                                       |
+| Shift + click, with the brush or eraser        | Straight line from the end of the last stroke      |
+| Shift + Ctrl + click, with the brush or eraser | The same, keeping to a few angles                  |
+| G                                              | Pixel grid on / off                                |
+| Ctrl + Z                                       | Undo                                               |
+| Ctrl + Shift + Z, Ctrl + Y                     | Redo                                               |
+| Shift / Alt + drag, with S or L                | Add to / take away from the selection              |
+| Ctrl + A / Ctrl + D / Ctrl + Shift + I         | Select everything / nothing / invert the selection |
+| Delete, Backspace                              | Take out what is selected                          |
+| Shift + drag, with V                           | Move only across, or only up and down              |
+| Ctrl + T, or Transform in the bar              | Transform (in a browser, use the button)           |
+| Enter / Esc, while transforming                | Apply / cancel                                     |
+| Shift + drag a corner                          | Scale without keeping the proportions              |
+| Alt + drag a handle                            | Scale from the middle                              |
+| Ctrl + drag a corner / a side                  | Distort / skew                                     |
+| Shift + drag outside, or with R                | Turn in steps of 15°                               |
+| Space + drag, or drag with the middle button   | Move around                                        |
+| Mouse wheel, or two fingers on a trackpad      | Move around                                        |
+| Ctrl + mouse wheel, or pinch on a trackpad     | Zoom                                               |
+| Alt + click, with Z                            | Zoom out                                           |
+| Shift + Space + drag                           | Turn the view                                      |
+| M                                              | Flip the view                                      |
+| Ctrl + 0                                       | Show the whole drawing                             |

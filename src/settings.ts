@@ -92,6 +92,25 @@ export function saveBrushOutline(on: boolean) {
   }
 }
 
+// Whether pixel brushes leave out the doubled corners of their lines (see dabs.ts). They don't at first
+const PIXEL_PERFECT_KEY = 'lydia.pixelPerfect'
+
+export function loadPixelPerfect() {
+  try {
+    return localStorage.getItem(PIXEL_PERFECT_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function savePixelPerfect(on: boolean) {
+  try {
+    localStorage.setItem(PIXEL_PERFECT_KEY, on ? 'on' : 'off')
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // How strokes are smoothed (see stabilizer.ts). Off at first
 const STABILIZER_KEY = 'lydia.stabilizer'
 

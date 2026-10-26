@@ -31,6 +31,10 @@ const DIRECTION_MEMORY = 0.6
 // Seeds are whole numbers below this, small enough for the graphics card to get them exactly
 const SEEDS = 65536
 
+// A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time (a drawn tip's,
+// a whole multiple of its picture's longer side, "tipSide")
+const wholePixelSize = (size: number, tipSide: number) => Math.max(1, Math.round(size / tipSide)) * tipSide
+
 // Random numbers from a seed (mulberry32): the same seed always gives the same numbers, so that a stroke can be worked
 // out again exactly as it was painted (see brush.ts)
 function seededRandom(seed: number) {
@@ -97,11 +101,9 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
     return Math.max(TAPER_TIP, share)
   }
 
-  // A pixel brush's size is a whole number of pixels, so the pen's pressure changes it a pixel at a time (a drawn tip's,
-  // a whole multiple of its picture's size)
   const sizeAt = (pressure: number, taperShare: number) => {
     const dabSize = (shape.pressureSize ? size * pressure : size) * (thinsSize ? taperShare : 1)
-    return isPixel ? Math.max(1, Math.round(dabSize / tipSide)) * tipSide : dabSize
+    return isPixel ? wholePixelSize(dabSize, tipSide) : dabSize
   }
 
   // A dab at this point, "along" pixels from the start of the stroke
@@ -228,3 +230,70 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
 }
 
 export type DabPath = ReturnType<typeof createDabPath>
+
+// A pixel brush's straight line from one point of the paper to another, as the points to paint it through, at this
+// pressure: one for each place of the tip's corner along the line, a pixel further along its longer side each time,
+// so the line has one pixel in each column (or row). Across the shorter side, each is the pixel nearest to the line,
+// as Bresenham's line algorithm finds them (halfway, the later one). A line of whole steps (2 across for 1 down, 3
+// for 1, 1 for 1...), as Ctrl makes them (see straightLine.ts), has them all equal from its start instead: rounding to
+// the nearest, the first and the last would be shorter. Each point is where a dab with its corner there has its
+// center, so the dab path (see createDabPath) paints one dab at each of them
+export function pixelLinePoints(
+  shape: BrushShape,
+  size: number,
+  from: StrokePoint,
+  to: StrokePoint,
+  tip?: { width: number; height: number },
+): StrokePoint[] {
+  const isDrawn = shape.pixel === 'drawn' && tip !== undefined
+  const tipSide = isDrawn ? Math.max(tip.width, tip.height) : 1
+  const side = wholePixelSize(shape.pressureSize ? size * from.pressure : size, tipSide)
+  const width = isDrawn ? (side * tip.width) / tipSide : side
+  const height = isDrawn ? (side * tip.height) / tipSide : side
+  const x = Math.round(from.x - width / 2)
+  const y = Math.round(from.y - height / 2)
+  const endX = Math.round(to.x - width / 2)
+  const endY = Math.round(to.y - height / 2)
+  const isAcross = Math.abs(endX - x) >= Math.abs(endY - y)
+  const longer = Math.abs(isAcross ? endX - x : endY - y)
+  const shorter = Math.abs(isAcross ? endY - y : endX - x)
+  const longerSign = Math.sign(isAcross ? endX - x : endY - y)
+  const shorterSign = Math.sign(isAcross ? endY - y : endX - x)
+  const isWholeSteps = shorter > 0 && longer % shorter === 0
+  // How far across the shorter side the line is, "i" pixels along the longer one
+  const shorterAt = (i: number) =>
+    isWholeSteps ? Math.floor((i * shorter) / longer) : Math.ceil((2 * i * shorter - longer) / (2 * longer))
+  const points: StrokePoint[] = []
+  for (let i = 0; i <= longer; i++) {
+    const along = i * longerSign
+    const aside = longer === 0 ? 0 : shorterAt(i) * shorterSign
+    const cornerX = x + (isAcross ? along : aside)
+    const cornerY = y + (isAcross ? aside : along)
+    points.push({ x: cornerX + width / 2, y: cornerY + height / 2, pressure: from.pressure })
+  }
+  return points
+}
+
+// A pixel brush's stroke can be pixel-perfect: without the doubled corners of lines drawn by hand. Where the stroke
+// steps across and then down (or down and then across) to a pixel diagonal from the one before, the dab at the corner
+// between them is left out, so each step of the line is a single pixel, as pixel artists draw lines. The stroke stays
+// unbroken, since the dabs on both sides of the corner touch at theirs. Whether "b" is such a corner between "a" and
+// "c", the dabs before and after it, all of the same size (where the pen's pressure changes the size, it is no line of
+// one width)
+export function isCorner(a: Dab, b: Dab, c: Dab) {
+  if (a.size !== b.size || b.size !== c.size) return false
+  const isStep = (from: Dab, to: Dab) => Math.abs(to.x - from.x) + Math.abs(to.y - from.y) === 1
+  return isStep(a, b) && isStep(b, c) && a.x !== c.x && a.y !== c.y
+}
+
+// A stroke's dabs without its doubled corners, taken out in the order the dabs were placed, as the brush does while
+// painting (see brush.ts)
+export function withoutCorners(dabs: Dab[]) {
+  const kept: Dab[] = []
+  for (const dab of dabs) {
+    const count = kept.length
+    if (count >= 2 && isCorner(kept[count - 2], kept[count - 1], dab)) kept.pop()
+    kept.push(dab)
+  }
+  return kept
+}
