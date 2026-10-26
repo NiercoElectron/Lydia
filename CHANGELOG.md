@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-26
+
 ### Added
 
 - **What's New?** on the start screen, at the right: what changed in each version, read from this changelog, the
@@ -379,7 +381,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/NiercoElectron/Lydia/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/NiercoElectron/Lydia/compare/v0.8.3...v0.8.4
