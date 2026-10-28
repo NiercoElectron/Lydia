@@ -725,11 +725,7 @@ input.slider-value {
   border-bottom: 2px solid transparent;
 }
 
-/* a clipped layer is moved in, with an arrow down to the layer it is clipped to */
-.layers-list li.clipped {
-  padding-left: 14px;
-}
-
+/* a clipped layer is moved in (see LayersPanel.tsx), with an arrow down to the layer it is clipped to */
 .clip-arrow {
   flex: none;
   color: var(--muted);
@@ -749,6 +745,12 @@ input.slider-value {
 
 .layers-list li.drop-after {
   border-bottom-color: var(--accent);
+}
+
+/* a folder a dragged layer would go into */
+.layers-list li.drop-into {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .layer-name {

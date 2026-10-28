@@ -24,6 +24,7 @@ import { TOOLS } from './toolList'
 const startingSnapshot: EngineSnapshot = {
   layers: [],
   activeLayerId: 0,
+  canDelete: false,
   canUndo: false,
   canRedo: false,
   isModified: false,
@@ -180,7 +181,7 @@ export function useTransformShortcuts(engine: Engine | null) {
 }
 
 // The layers' shortcuts, as in Photoshop: Ctrl/Cmd + J duplicates the active layer, Ctrl/Cmd + E merges it down,
-// Ctrl/Cmd + Alt + G clips it to the layers under it or unclips it
+// Ctrl/Cmd + G puts it into a new folder, Ctrl/Cmd + Alt + G clips it to the layers under it or unclips it
 export function useLayerShortcuts(engine: Engine | null) {
   useEffect(() => {
     if (!engine) return
@@ -192,6 +193,7 @@ export function useLayerShortcuts(engine: Engine | null) {
         if (e.code === 'KeyG') engine.toggleClipped()
         else return
       } else if (key === 'j') engine.duplicateLayer()
+      else if (key === 'g') engine.groupActive()
       else if (key === 'e') engine.mergeDown()
       else return
       e.preventDefault() // stop the browser from using the shortcut itself (downloads, the search box)

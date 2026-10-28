@@ -1,5 +1,5 @@
-import { Application, CanvasSource, Container, Sprite, Texture, TilingSprite } from 'pixi.js'
-import type { RenderTexture, WebGLRenderer } from 'pixi.js'
+import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
+import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createLayerBlender } from './blendModes'
 import { createBrush, type BrushSettings } from './brush'
@@ -10,10 +10,16 @@ import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import {
   activeIndex,
+  blockStart,
   clipBaseIndex,
+  createFolder,
   createLayer,
   isClipped,
+  isFolder,
+  isInside,
+  isShown,
   LOCKED_ALPHA,
+  siblingBelow,
   type BlendMode,
   type Layer,
   type LayerStack,
@@ -84,8 +90,14 @@ export type EngineSnapshot = {
     showsOffPaper: boolean
     alphaLocked: boolean
     clipped: boolean // clipped to the layers under it (see isClipped in layers.ts)
+    canClip: boolean // it has a layer or folder under it in the same folder, to be clipped to
+    isFolder: boolean // see isFolder in layers.ts
+    isOpen: boolean // a folder that shows what is in it in the layers panel
+    parentId: number | null // the folder it is in
+    depth: number // how many folders it is in
   }[]
   activeLayerId: number
+  canDelete: boolean // deleting the active layer or folder leaves a layer to paint on
   canUndo: boolean
   canRedo: boolean
   isModified: boolean // changed since it was opened or last saved
@@ -173,7 +185,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const layers =
     project.layers.length > 0
       ? project.layers.map(({ smart, ...data }) => {
-          const layer: Layer = { ...createLayer(data.name, data.tiles), ...data }
+          const layer: Layer = { ...createLayer(data.name, data.tiles), ...data, parent: null } // set below
           if (smart) {
             const { tiles, bounds, corners, smooth } = smart
             layer.smart = { source: createLayer(`${data.name} (source)`, tiles), bounds, corners, smooth }
@@ -181,8 +193,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           return layer
         })
       : [createLayer('Layer 1')]
+  // Each layer's folder, from its position (see projectFile.ts)
+  project.layers.forEach(({ parent }, index) => {
+    if (parent !== undefined) layers[index].parent = layers[parent]
+  })
   const stack: LayerStack = { layers, active: layers[project.activeLayer] ?? layers[layers.length - 1] }
-  let layersCreated = layers.length // for naming new layers
+  let layersCreated = layers.filter(layer => !isFolder(layer)).length // for naming new layers
+  let foldersCreated = layers.length - layersCreated // and folders
   let exportScale = project.exportScale ?? 1
   let selection: Selection | null = null // see selection.ts
 
@@ -257,10 +274,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     onMove: (dx, dy) => dragMove(dx, dy),
     onMoveEnd: keep => releaseMove(keep),
     isWorking: () => task !== null,
-    // Smart objects can't be painted on (see smartObject.ts)
-    // A smart object can't be painted on, and the eraser can't take paint out of a layer whose transparency is locked
+    // A smart object (see smartObject.ts) or a folder can't be painted on, and the eraser can't take paint out of a layer
+    // whose transparency is locked
     canUse: tool =>
-      !(stack.active.smart && (isPaintTool(tool) || tool === 'fill')) &&
+      !((stack.active.smart || isFolder(stack.active)) && (isPaintTool(tool) || tool === 'fill')) &&
       !(tool === 'eraser' && stack.active.alphaLocked),
     getTransform: () => (transform ? { bounds: transform.object.bounds, corners: transform.corners } : null),
     onTransform: corners => setTransformCorners(corners),
@@ -304,6 +321,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const hasPaintOffPaper = (layer: Layer) =>
     [...gpu.tilesWithPaint(layer)].some(key => hasPaintOff(key, layer.tiles.get(key)))
 
+  // How many folders a layer is in
+  function depthOf(layer: Layer) {
+    let depth = 0
+    for (let folder = layer.parent; folder; folder = folder.parent) depth++
+    return depth
+  }
+
+  // The layers in a folder, and in the folders in it
+  const layersIn = (folder: Layer) => stack.layers.filter(layer => !isFolder(layer) && isInside(layer, folder))
+
   let snapshot = makeSnapshot()
   outside.update() // a drawing opened from a file may have layers that show their paint off the paper
 
@@ -320,8 +347,14 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         showsOffPaper: layer.showOffPaper,
         alphaLocked: layer.alphaLocked,
         clipped: isClipped(stack, index),
+        canClip: siblingBelow(stack, index) >= 0,
+        isFolder: isFolder(layer),
+        isOpen: layer.folder?.open === true,
+        parentId: layer.parent?.id ?? null,
+        depth: depthOf(layer),
       })),
       activeLayerId: stack.active.id,
+      canDelete: canDelete(),
       canUndo: history.canUndo(),
       canRedo: history.canRedo(),
       isModified,
@@ -411,12 +444,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     layer: Layer,
     keys: Iterable<string>,
     change: (key: string, tile: StoredTile | undefined) => StoredTile | null | undefined,
-    withSelection = false,
+    keep: { selection?: boolean; smart?: boolean } = {}, // what the undo step keeps too (see history.ts)
   ) {
     while (gpu.hasUnsaved()) await nextFrame() // every tile in RAM (nothing could paint since runTask waited)
     const pace = createPacer()
     const changedKeys: string[] = []
-    history.begin(layer, { selection: withSelection })
+    history.begin(layer, keep)
     for (const key of keys) {
       await pace()
       const tile = change(key, layer.tiles.get(key))
@@ -455,48 +488,116 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // A new empty layer above the active one, which becomes the active layer
   function addLayer() {
     if (isBusy()) return
-    const layer = createLayer(`Layer ${++layersCreated}`)
-    insideClipped(layer, activeIndex(stack) + 1)
-    history.recordOrder(layer)
-    stack.layers.splice(activeIndex(stack) + 1, 0, layer)
-    stack.active = layer
+    addItem(createLayer(`Layer ${++layersCreated}`))
+  }
+
+  // Add a layer right above the folder the active layer is in, or above the active folder: out of it, in the folder
+  // around it (if any), and make it the active one
+  function addLayerOutside() {
+    const active = stack.active
+    const folder = isFolder(active) ? active : active.parent
+    if (isBusy() || !folder) return
+    addItem(createLayer(`Layer ${++layersCreated}`), stack.layers.indexOf(folder) + 1, folder.parent)
+  }
+
+  // Add an empty folder (see isFolder in layers.ts), like a new layer
+  function addFolder() {
+    if (isBusy()) return
+    addItem(createFolder(`Folder ${++foldersCreated}`))
+  }
+
+  // Put a new layer or folder at this position, in this folder (null: none), and make it the active one. By default,
+  // above the active one, in the same folder, or on top of what is in the active folder when it is open. It is empty,
+  // so the picture doesn't change
+  function addItem(item: Layer, index?: number, parent?: Layer | null) {
+    const active = stack.active
+    const isInto = active.folder?.open === true
+    index ??= isInto ? activeIndex(stack) : activeIndex(stack) + 1
+    item.parent = parent !== undefined ? parent : isInto ? active : active.parent
+    insideClipped(item, index)
+    history.recordOrder(item)
+    stack.layers.splice(index, 0, item)
+    stack.active = item
     projection.markAllBelowStale() // "below" now has one more layer
     changed()
   }
 
-  // A new layer put at this position, between clipped layers (see isClipped in layers.ts), is clipped too, so that
-  // they keep their base, as in Photoshop
-  function insideClipped(layer: Layer, index: number) {
-    layer.clipped = stack.layers[index]?.clipped === true
+  // A new layer or folder put at this position, between clipped ones (see isClipped in layers.ts), is clipped too, so
+  // that they keep their base, as in Photoshop
+  function insideClipped(item: Layer, index: number) {
+    const above = stack.layers[index]
+    item.clipped = above?.parent === item.parent && above.clipped
   }
 
-  // Delete the active layer; the one under it becomes the active layer, like in Photoshop. The last layer can't be
-  // deleted
+  // Put the active layer, or folder, into a new folder at its place, which becomes the active one (Ctrl+G, as in
+  // Photoshop). A folder that lets what is in it pass through changes nothing in the picture
+  function groupActive() {
+    if (isBusy()) return
+    const item = stack.active
+    const folder = createFolder(`Folder ${++foldersCreated}`)
+    folder.parent = item.parent
+    folder.clipped = item.clipped
+    history.recordOrder(folder)
+    stack.layers.splice(activeIndex(stack) + 1, 0, folder)
+    item.parent = folder
+    stack.active = folder
+    projection.markAllBelowStale()
+    if (folder.clipped) projection.composeLayerTiles(folder) // it is clipped in place of the layer now
+    changed()
+  }
+
+  // Deleting the active layer, or folder with all that is in it, must leave a layer to paint on
+  function canDelete() {
+    const active = stack.active
+    return stack.layers.some(layer => !isFolder(layer) && layer !== active && !isInside(layer, active))
+  }
+
+  // Delete the active layer, or the active folder with all that is in it; the one under it becomes the active one, like
+  // in Photoshop. The last layer can't be deleted
   function deleteLayer() {
-    if (isBusy() || stack.layers.length === 1) return
-    const layer = stack.active
+    if (isBusy() || !canDelete()) return
+    const item = stack.active
     const index = activeIndex(stack)
-    history.recordOrder(layer) // the layer stays in the undo step, with its tiles, so it can come back
-    stack.layers.splice(index, 1)
-    stack.active = stack.layers[Math.max(0, index - 1)]
+    const start = blockStart(stack, index)
+    const before = [...stack.layers]
+    history.recordOrder(item) // what is deleted stays in the undo step, with its tiles, so it can come back
+    stack.layers.splice(start, index + 1 - start)
+    stack.active = stack.layers[Math.max(0, start - 1)]
     projection.markAllBelowStale() // "below" now has other layers
-    if (layer.visible) projection.composeLayerTiles(layer)
+    if (item.visible) projection.composeLayerTiles(item, before)
     projection.composeClippedTiles() // the layers clipped to it are clipped to another one now
     changed()
   }
 
-  // Move a layer to another place in the list. "index" counts from the bottom (0 = the bottom layer)
-  function moveLayer(id: number, index: number) {
-    const layer = findLayer(id)
-    if (!layer || isBusy() || index < 0 || index >= stack.layers.length) return
-    const from = stack.layers.indexOf(layer)
-    if (from === index) return
-    history.recordOrder(layer)
-    stack.layers.splice(from, 1)
-    stack.layers.splice(index, 0, layer)
+  // Move a layer, or a folder with all that is in it, into the folder "parentId" (null: none), right above the layer
+  // or folder "aboveId" in it, or at its bottom when "aboveId" is null
+  function moveLayer(id: number, parentId: number | null, aboveId: number | null) {
+    const item = findLayer(id)
+    const parent = parentId === null ? null : findLayer(parentId)
+    const above = aboveId === null ? null : findLayer(aboveId)
+    if (!item || isBusy() || parent === undefined || above === undefined) return
+    if (parent && (!isFolder(parent) || parent === item || isInside(parent, item))) return // not into itself
+    if (above && (above.parent !== parent || above === item)) return
+    const index = stack.layers.indexOf(item)
+    const block = stack.layers.slice(blockStart(stack, index), index + 1)
+    const rest = { layers: stack.layers.filter(layer => !block.includes(layer)), active: stack.active }
+    const at = above ? rest.layers.indexOf(above) + 1 : parent ? blockStart(rest, rest.layers.indexOf(parent)) : 0
+    const moved = [...rest.layers.slice(0, at), ...block, ...rest.layers.slice(at)]
+    if (item.parent === parent && moved.every((layer, i) => layer === stack.layers[i])) return // already there
+    history.recordOrder(item)
+    stack.layers.splice(0, stack.layers.length, ...moved)
+    item.parent = parent
     projection.markAllBelowStale() // "below" may have other layers now
-    if (layer.visible) projection.composeLayerTiles(layer)
+    if (item.visible) projection.composeLayerTiles(item)
     projection.composeClippedTiles() // clipped layers may have another base now
+    changed()
+  }
+
+  // Show what is in a folder in the layers panel, or not. It is no step of undo, but it is saved with the drawing
+  function setFolderOpen(id: number, open: boolean) {
+    const folder = findLayer(id)
+    if (!folder?.folder || folder.folder.open === open) return
+    folder.folder.open = open
     changed()
   }
 
@@ -511,24 +612,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Put a copy of the active layer above it, and make the copy the active layer. The copy shares the tiles in RAM,
   // which never change (a change makes new ones), so it costs no memory until one of them is painted. A smart object's
-  // copy is a smart object too, with a source of its own sharing the same tiles
+  // copy is a smart object too, with a source of its own sharing the same tiles. A folder's copy has copies of all
+  // that is in it
   function duplicateLayer() {
     return runTask('Duplicating…', async () => {
       const original = stack.active // every tile in RAM now (see runTask)
-      const copy = createLayer(`${original.name} copy`, new Map(original.tiles))
-      copy.visible = original.visible
-      copy.opacity = original.opacity
-      copy.blendMode = original.blendMode
-      copy.showOffPaper = original.showOffPaper
-      copy.alphaLocked = original.alphaLocked
-      copy.clipped = original.clipped
-      if (original.smart) {
-        const { source, bounds, corners, smooth } = original.smart
-        const ownSource = createLayer(source.name, new Map(source.tiles))
-        copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
+      const index = activeIndex(stack)
+      const copies = new Map<Layer, Layer>()
+      for (const layer of stack.layers.slice(blockStart(stack, index), index + 1)) {
+        copies.set(layer, copyOf(layer, layer === original ? `${layer.name} copy` : layer.name))
       }
+      for (const [layer, each] of copies) each.parent = layer === original ? layer.parent : copies.get(layer.parent!)!
+      const copy = copies.get(original)!
       history.recordOrder(copy)
-      stack.layers.splice(activeIndex(stack) + 1, 0, copy)
+      stack.layers.splice(index + 1, 0, ...copies.values())
       stack.active = copy
       projection.markAllBelowStale() // "below" now has one more layer
       if (copy.visible) projection.composeLayerTiles(copy)
@@ -536,12 +633,33 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     })
   }
 
-  // The active layer can be merged down when there is a layer under it, both are shown (a hidden layer's paint would
-  // appear or be lost), and the one under it isn't a smart object (it can't be painted on)
+  // A copy of a layer or folder, named "name", in no folder yet
+  function copyOf(layer: Layer, name: string) {
+    const copy = createLayer(name, new Map(layer.tiles))
+    copy.visible = layer.visible
+    copy.opacity = layer.opacity
+    copy.blendMode = layer.blendMode
+    copy.showOffPaper = layer.showOffPaper
+    copy.alphaLocked = layer.alphaLocked
+    copy.clipped = layer.clipped
+    if (layer.folder) copy.folder = { ...layer.folder }
+    if (layer.smart) {
+      const { source, bounds, corners, smooth } = layer.smart
+      const ownSource = createLayer(source.name, new Map(source.tiles))
+      copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
+    }
+    return copy
+  }
+
+  // The active layer can be merged down when there is a layer under it in the same folder, both are shown (a hidden
+  // layer's paint would appear or be lost), and the one under it isn't a smart object (it can't be painted on). A
+  // folder that shows can always be merged into one layer
   function canMergeDown() {
-    const index = activeIndex(stack)
-    const lower = stack.layers[index - 1]
-    return index > 0 && stack.active.visible && lower.visible && !lower.smart
+    const active = stack.active
+    if (isFolder(active)) return isShown(active)
+    const below = siblingBelow(stack, activeIndex(stack))
+    const lower = stack.layers[below]
+    return below >= 0 && !isFolder(lower) && isShown(active) && lower.visible && !lower.smart
   }
 
   // Merge the active layer into the one under it, which becomes the active layer, as one step of undo. Its paint goes
@@ -551,15 +669,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const mergeRoot = new Container() // PixiJS ignores the blend mode of what it is asked to render
   const mergeSprite = new Sprite()
   mergeRoot.addChild(mergeSprite)
+  let folderPaint: RenderTexture | null = null // a folder's layers put together, as the base of a clipped layer
   function mergeDown() {
     if (!canMergeDown()) return
+    if (isFolder(stack.active)) return mergeFolder()
     return runTask('Merging…', async () => {
       const upper = stack.active
       const index = activeIndex(stack)
-      const lower = stack.layers[index - 1]
+      const lowerIndex = siblingBelow(stack, index)
+      const lower = stack.layers[lowerIndex]
       const clipped = isClipped(stack, index)
       const base = clipped ? stack.layers[clipBaseIndex(stack, index)] : null
-      const lowerClipped = isClipped(stack, index - 1)
+      const lowerClipped = isClipped(stack, lowerIndex)
       const hasClippedAbove = !clipped && isClipped(stack, index + 1) // it is the base of clipped layers
       const pace = createPacer()
       mergeSprite.alpha = upper.opacity
@@ -570,7 +691,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         const paint = gpu.getTexture(upper, column, row, false)
         if (!paint) continue
         // Clipped to a base without paint here, or hidden: none of it shows
-        const mask = base ? (base.visible ? gpu.getTexture(base, column, row, false) : null) : undefined
+        let mask: Texture | null | undefined
+        if (base && !base.visible) mask = null
+        else if (base && isFolder(base)) {
+          folderPaint ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+          projection.composeFolder(base, column, row, folderPaint)
+          mask = folderPaint
+        } else if (base) mask = gpu.getTexture(base, column, row, false)
         if (mask === null) continue
         history.backUpTile(key)
         const target = gpu.getTexture(lower, column, row, true)!
@@ -599,6 +726,42 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     })
   }
 
+  // Merge the active folder into one layer in its place, as it shows when put together on its own (Ctrl+E, like
+  // Photoshop's Merge Group), as one step of undo. The layer gets the folder's name, opacity, blend mode (Normal for
+  // one that lets what is in it pass through) and clipping; hidden layers in it are left out
+  function mergeFolder() {
+    return runTask('Merging…', async () => {
+      const folder = stack.active
+      const index = activeIndex(stack)
+      const start = blockStart(stack, index)
+      const layer = createLayer(folder.name)
+      layer.parent = folder.parent
+      layer.opacity = folder.opacity
+      layer.blendMode = folder.blendMode === 'pass-through' ? 'normal' : folder.blendMode
+      layer.clipped = folder.clipped
+      const keys = new Set(layersIn(folder).flatMap(inside => [...gpu.tilesWithPaint(inside)]))
+      const pace = createPacer()
+      history.startGroup()
+      history.begin(layer)
+      for (const key of keys) {
+        const { column, row } = parseTileKey(key)
+        history.backUpTile(key)
+        projection.composeFolder(folder, column, row, gpu.getTexture(layer, column, row, true)!)
+        gpu.markDirty(layer, key)
+        await pace()
+      }
+      history.end()
+      history.recordOrder(layer) // the folder and all that was in it stay in this step, so undo brings them back
+      history.endGroup()
+      stack.layers.splice(start, index + 1 - start, layer)
+      stack.active = layer
+      projection.markAllBelowStale() // "below" now has other layers
+      projection.composeLayerTiles(layer) // put together on its own, the folder may look a little different
+      projection.composeClippedTiles()
+      return true
+    })
+  }
+
   function selectLayer(id: number) {
     const layer = findLayer(id)
     if (!layer || layer === stack.active || isBusy()) return
@@ -607,17 +770,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     changed(false) // the drawing itself didn't change
   }
 
-  // Show a layer's paint off the paper, faded around the paper, or not (see outsideView.ts). It is only a way of
-  // looking at the drawing, so it is no step of undo, but it is saved with the drawing
   // Lock a layer's transparency, or unlock it (see layers.ts). It changes how the layer takes paint, not the drawing,
-  // so it is no step of undo, but it is saved with the drawing
+  // so it is no step of undo, but it is saved with the drawing. A folder has no paint to lock
   function setLayerAlphaLock(id: number, locked: boolean) {
     const layer = findLayer(id)
-    if (!layer || layer.alphaLocked === locked) return
+    if (!layer || isFolder(layer) || layer.alphaLocked === locked) return
     layer.alphaLocked = locked
     changed()
   }
 
+  // Show a layer's paint off the paper, faded around the paper, or not (see outsideView.ts). It is only a way of
+  // looking at the drawing, so it is no step of undo, but it is saved with the drawing
   function setLayerOffPaper(id: number, show: boolean) {
     const layer = findLayer(id)
     if (!layer || layer.showOffPaper === show) return
@@ -634,11 +797,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     changed()
   }
 
-  // Clip a layer to the layers under it, or unclip it (see isClipped in layers.ts), as one step of undo. The bottom
-  // layer has nothing to be clipped to
+  // Clip a layer or folder to the ones under it, or unclip it (see isClipped in layers.ts), as one step of undo. The
+  // bottom one in a folder (or in none) has nothing to be clipped to
   function setLayerClipped(id: number, clipped: boolean) {
     const layer = findLayer(id)
-    if (!layer || layer.clipped === clipped || stack.layers.indexOf(layer) === 0 || isBusy()) return
+    if (!layer || layer.clipped === clipped || siblingBelow(stack, stack.layers.indexOf(layer)) < 0 || isBusy()) return
     history.recordLayer(layer, propsOf(layer))
     layer.clipped = clipped
     if (layer.visible) projection.composeLayerTiles(layer)
@@ -655,6 +818,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function setLayerBlendMode(id: number, mode: BlendMode) {
     const layer = findLayer(id)
     if (!layer || layer.blendMode === mode || isBusy()) return
+    if (mode === 'pass-through' && !isFolder(layer)) return // only a folder lets what is in it pass through
     history.recordLayer(layer, propsOf(layer))
     layer.blendMode = mode
     if (layer.visible) projection.composeLayerTiles(layer)
@@ -675,7 +839,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
     layer.opacity = opacity
     // A hidden layer changes nothing on the screen: it is put together with its new opacity when it is shown again
-    if (layer.visible && !projection.showOpacityLive(layer, gpu.tilesWithPaint(layer))) {
+    if (isShown(layer) && !projection.showOpacityLive(layer, gpu.tilesWithPaint(layer))) {
       projection.composeLayerTiles(layer)
     }
     changed()
@@ -695,7 +859,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Remove all the paint from the active layer. It can be undone like a stroke
   function clearLayer() {
-    if (isBusy() || stack.active.smart) return
+    if (isBusy() || stack.active.smart || isFolder(stack.active)) return
     const layer = stack.active
     history.begin(layer)
     for (const key of gpu.tilesWithPaint(layer)) {
@@ -822,25 +986,26 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       return packed.filter(tile => tile !== null)
     }
     // A smart object also keeps its source (see smartObject.ts)
+    // A folder is saved with "folder", and what is in a folder with the position of the folder (see projectFile.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
-      stack.layers.map(
-        async ({ name, visible, opacity, blendMode, showOffPaper, alphaLocked, clipped, tiles, smart }) => ({
-          name,
-          visible,
-          opacity,
-          blendMode,
-          showOffPaper,
-          alphaLocked,
-          clipped,
-          tiles: await pack(tiles),
-          smart: smart && {
-            tiles: await pack(smart.source.tiles),
-            bounds: smart.bounds,
-            corners: smart.corners,
-            smooth: smart.smooth,
-          },
-        }),
-      ),
+      stack.layers.map(async layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        opacity: layer.opacity,
+        blendMode: layer.blendMode,
+        showOffPaper: layer.showOffPaper,
+        alphaLocked: layer.alphaLocked,
+        clipped: layer.clipped,
+        folder: layer.folder && { ...layer.folder },
+        parent: layer.parent ? stack.layers.indexOf(layer.parent) : undefined,
+        tiles: await pack(layer.tiles),
+        smart: layer.smart && {
+          tiles: await pack(layer.smart.source.tiles),
+          bounds: layer.smart.bounds,
+          corners: layer.smart.corners,
+          smooth: layer.smart.smooth,
+        },
+      })),
     )
     const paper = { ...project, exportScale }
     const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
@@ -884,7 +1049,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const reference =
         fillSettings.reference === 'layer'
           ? [{ tiles: layer.tiles, opacity: 1 }]
-          : stack.layers.filter(other => other.visible).map(({ tiles, opacity }) => ({ tiles, opacity }))
+          : stack.layers
+              .filter(other => !isFolder(other) && isShown(other))
+              .map(({ tiles, opacity }) => ({ tiles, opacity }))
       const { tolerance, expand } = fillSettings
       const region = await findFillRegion(grid, reference, memory, seedX, seedY, tolerance, expand)
       const { color, opacity } = brush.settings
@@ -955,7 +1122,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // A hidden layer doesn't show, so it isn't moved
   function startMove() {
-    if (isBusy() || !stack.active.visible) return
+    if (isBusy() || !isShown(stack.active)) return
     moveDrag = { dx: 0, dy: 0, follow: null, release: null }
   }
 
@@ -985,13 +1152,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // tiles every frame: what is left of the layer where it loses paint ("lifted"), and the layers above where they have
   // paint. With "withPictures", also pictures of the part it loses there, to move along; a smart object being
   // transformed draws itself instead. What the layer keeps off the paper shows faded meanwhile (see the ghost in
-  // projection.ts). Tiles shown live would show through all that
+  // projection.ts). Tiles shown live would show through all that. For a folder, the pictures are of all its layers put
+  // together
   async function prepareLift(layer: Layer, cut: Selection | null, lifted: string[], withPictures: boolean) {
     projection.finishLive()
     outsideHidden = layer
     outside.update(layer)
     const isLifted = new Set(lifted)
-    const offPaper = [...gpu.tilesWithPaint(layer)].filter(key => {
+    const painted = new Set(isFolder(layer) ? layersIn(layer).flatMap(inside => [...gpu.tilesWithPaint(inside)]) : [])
+    const offPaper = [...(isFolder(layer) ? painted : gpu.tilesWithPaint(layer))].filter(key => {
       const { column, row } = parseTileKey(key)
       return !isOnPaper(grid, column, row)
     })
@@ -999,7 +1168,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     for (const key of new Set([...lifted, ...(lifted.length > 0 ? offPaper : []), ...projection.paintedAbove()])) {
       await pace()
       const { column, row } = parseTileKey(key)
-      const texture = layer.visible ? gpu.getTexture(layer, column, row, false) : null
+      const shows = isShown(layer) && (!isFolder(layer) || painted.has(key))
+      const texture = !shows
+        ? null
+        : isFolder(layer)
+          ? folderTexture(layer, column, row)
+          : gpu.getTexture(layer, column, row, false)
       const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
       // All of the tile moves when it is selected whole, and, with a selection (which is only on the paper), all of it
       // is on the paper
@@ -1021,16 +1195,28 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
   }
 
+  // A folder's layers put together at a tile (see composeFolder in projection.ts), in a texture reused for each tile:
+  // it is copied right away
+  let liftedFolder: RenderTexture | null = null
+  function folderTexture(folder: Layer, column: number, row: number) {
+    liftedFolder ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    projection.composeFolder(folder, column, row, liftedFolder)
+    return liftedFolder
+  }
+
   // Lift the selected part of the active layer, or all of it when nothing is selected, show it on its own while it is
   // dragged, and put it down where the pointer comes up (see move.ts), as one undo step together with the selection,
-  // which moves along
+  // which moves along. A folder moves all its layers together, hidden ones too, as in Photoshop; the smart objects in
+  // it move whole, so only when nothing is selected
   async function moveLifted(drag: MoveDrag, released: Promise<boolean>) {
-    const layer = stack.active
+    const item = stack.active
     const cut = selection
-    const lifted = [...gpu.tilesWithPaint(layer)].filter(key => !cut || cut.has(key))
+    const movers = isFolder(item) ? layersIn(item).filter(layer => !cut || !layer.smart) : [item]
+    const liftedOf = (layer: Layer) => [...gpu.tilesWithPaint(layer)].filter(key => !cut || cut.has(key))
+    const lifted = [...new Set(movers.flatMap(liftedOf))]
     if (lifted.length === 0) return released.then(() => false) // nothing to move
     try {
-      await prepareLift(layer, cut, lifted, true)
+      await prepareLift(item, cut, lifted, true)
       const follow = (dx: number, dy: number) => {
         projection.setMoveOffset(dx, dy)
         selectionView.setOffset(dx, dy)
@@ -1042,9 +1228,22 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const keep = await released
       const { dx, dy } = drag
       if (!keep || (dx === 0 && dy === 0)) return false
-      const before = new Map(layer.tiles) // the tiles change one by one, and each new one needs the old ones
-      const keys = movedKeys(grid, lifted, dx, dy)
-      const didChange = await changeTiles(layer, keys, key => movedTile(grid, before, cut, key, dx, dy, memory), true)
+      let didChange = false
+      history.startGroup()
+      for (const [i, layer] of movers.entries()) {
+        const before = new Map(layer.tiles) // the tiles change one by one, and each new one needs the old ones
+        const keys = movedKeys(grid, liftedOf(layer), dx, dy)
+        const move = (key: string) => movedTile(grid, before, cut, key, dx, dy, memory)
+        // The selection is kept once, with the first layer; a smart object keeps its corners from before
+        const moved = await changeTiles(layer, keys, move, { selection: i === 0, smart: layer.smart !== undefined })
+        // Moved by whole pixels, a smart object's tiles are its source drawn at its corners moved as much
+        if (moved && layer.smart) {
+          const corners = layer.smart.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) as Quad
+          layer.smart = { ...layer.smart, corners }
+        }
+        didChange ||= moved
+      }
+      history.endGroup()
       if (didChange && cut) selection = shiftSelection(grid, cut, dx, dy)
       return didChange
     } finally {
@@ -1100,7 +1299,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // "Transforming…" in the bar; the handles show once it is ready
   function startTransform() {
     const layer = stack.active
-    if (isBusy() || !layer.visible) return
+    if (isBusy() || !isShown(layer) || isFolder(layer)) return
     const cut = layer.smart ? null : selection
     return runTask('Transforming…', async () => {
       const pace = createPacer()
@@ -1238,6 +1437,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
           // the projection keeps putting tiles together with the same layers under the active one as what it shows
           target = createLayer(done.name ?? `Layer ${++layersCreated}`)
+          target.parent = layer.parent
           insideClipped(target, stack.layers.indexOf(layer) + 1)
           history.recordOrder(target)
           stack.layers.splice(stack.layers.indexOf(layer) + 1, 0, target)
@@ -1362,8 +1562,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     redo,
     clearLayer,
     addLayer,
+    addFolder,
+    addLayerOutside,
+    groupActive,
     deleteLayer,
     moveLayer,
+    setFolderOpen,
     renameLayer,
     selectLayer,
     setLayerVisible,

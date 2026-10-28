@@ -35,11 +35,13 @@ import { TILE_SIZE } from './tiles'
 // The layers panel offers them grouped as Photoshop does (see LayersPanel.tsx).
 //
 // The same program clips a layer to its base (see isClipped in layers.ts): the layer's paint is then taken as much as
-// the base's paint covers, before the rest
+// the base's paint covers, before the rest. And it mixes two pictures of the same place, for a folder that lets what
+// is in it pass through (see isFolder in layers.ts) at less than full opacity
 
-// Each mode's number in the shader below
+// Each mode's number in the shader below. "pass-through" is only a folder's, which is never blended as a layer
 const MODE_NUMBERS: Record<BlendMode, number> = {
   normal: 0,
+  'pass-through': 0,
   multiply: 1,
   screen: 2,
   overlay: 3,
@@ -56,6 +58,7 @@ const MODE_NUMBERS: Record<BlendMode, number> = {
   color: 14,
   luminosity: 15,
 }
+const MIX = 16
 
 // A square the size of a tile, drawn over the whole target tile
 const vertex = `#version 300 es
@@ -165,6 +168,11 @@ vec3 blended(vec3 under, vec3 over) {
 }
 
 void main(void) {
+  if (int(uMode + 0.5) == 16) {
+    // Mixing two pictures: as much of the second as the opacity, where the mask covers
+    finalColor = mix(texture(uBackdrop, vUV), texture(uPaint, vUV), uOpacity * texture(uMask, vUV).a);
+    return;
+  }
   vec4 under = texture(uBackdrop, vUV);
   vec4 over = texture(uPaint, vUV) * (uOpacity * texture(uMask, vUV).a);
   vec3 underColor = under.a > 0.0 ? min(under.rgb / under.a, 1.0) : vec3(0.0);
@@ -207,6 +215,15 @@ export function createLayerBlender(renderer: WebGLRenderer) {
   copySprite.blendMode = 'none'
   copyRoot.addChild(copySprite)
 
+  // Draw into "target", then let go of the tiles read: one of them may be deleted later, which PixiJS warns about while
+  // a program still holds it
+  function draw(target: RenderTexture) {
+    renderer.render({ container: root, target, clear: false })
+    shader.resources.uBackdrop = NO_PAINT.source
+    shader.resources.uPaint = NO_PAINT.source
+    shader.resources.uMask = NO_MASK.source
+  }
+
   // Put "paint" (a layer's tile) at this opacity onto "backdrop" (what is under it) with this mode, into "target",
   // only as much as "mask" covers (the tile of the layer's base, when it is clipped). All are whole tiles; "target"
   // must be none of the others
@@ -223,7 +240,17 @@ export function createLayerBlender(renderer: WebGLRenderer) {
     shader.resources.uMask = mask.source
     uniforms.uniforms.uOpacity = opacity
     uniforms.uniforms.uMode = MODE_NUMBERS[mode]
-    renderer.render({ container: root, target, clear: false })
+    draw(target)
+  }
+
+  // "before" and "after" mixed into "target": as much of "after" as the opacity, where "mask" covers
+  function mix(before: Texture, after: Texture, opacity: number, target: RenderTexture, mask: Texture = NO_MASK) {
+    shader.resources.uBackdrop = before.source
+    shader.resources.uPaint = after.source
+    shader.resources.uMask = mask.source
+    uniforms.uniforms.uOpacity = opacity
+    uniforms.uniforms.uMode = MIX
+    draw(target)
   }
 
   // The same, with the result in "target" itself (merging a layer down onto the one under it)
@@ -247,7 +274,7 @@ export function createLayerBlender(renderer: WebGLRenderer) {
     blend(NO_PAINT, paint, 1, 'normal', target, mask)
   }
 
-  return { blend, blendOnto, clip, destroy }
+  return { blend, blendOnto, mix, clip, destroy }
 }
 
 export type LayerBlender = ReturnType<typeof createLayerBlender>

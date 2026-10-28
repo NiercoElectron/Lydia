@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
@@ -8,6 +9,39 @@ import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
+
+type ColorInputProps = {
+  color: string
+  disabled: boolean
+  onChange: (color: string) => void
+}
+
+// The brush's color. While a color is dragged in the browser's picker, it tells every step, often several in one
+// frame, and the whole screen would be drawn again for each: the picker itself then stutters. So the new color shows
+// here at once, but is handed on at most once a frame
+function ColorInput({ color, disabled, onChange }: ColorInputProps) {
+  const [shown, setShown] = useState(color)
+  const [given, setGiven] = useState(color) // the color from outside (the eyedropper changes it too)
+  if (color !== given) {
+    setGiven(color)
+    setShown(color)
+  }
+  const latest = useRef(color)
+  const frame = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+
+  function handleChange(value: string) {
+    setShown(value)
+    latest.current = value
+    if (frame.current) return // already handed on in this frame
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0
+      onChange(latest.current)
+    })
+  }
+
+  return <input type="color" value={shown} disabled={disabled} onChange={e => handleChange(e.target.value)} />
+}
 
 // The selection's settings and commands, shown with the selection tools
 export type SelectionControls = {
@@ -44,6 +78,7 @@ type Props = {
   isGridOn: boolean
   isOutlineOn: boolean
   isAlphaLocked: boolean // the active layer's transparency is locked: the eraser can't be used
+  isFolder: boolean // the active one is a folder, which can't be painted on (see isFolder in layers.ts)
   isPixelBrush: boolean
   isPixelPerfectOn: boolean
   onColorChange: (color: string) => void
@@ -73,6 +108,7 @@ export function Toolbar({
   isGridOn,
   isOutlineOn,
   isAlphaLocked,
+  isFolder,
   isPixelBrush,
   isPixelPerfectOn,
   onColorChange,
@@ -100,7 +136,7 @@ export function Toolbar({
     <div className="toolbar">
       <label>
         Color
-        <input type="color" value={color} disabled={tool === 'eraser'} onChange={e => onColorChange(e.target.value)} />
+        <ColorInput color={color} disabled={tool === 'eraser'} onChange={onColorChange} />
       </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {isSelecting && <SelectionButtons selection={selection} />}
@@ -119,6 +155,9 @@ export function Toolbar({
             Convert to pixels
           </button>
         </>
+      )}
+      {isFolder && (tool === 'brush' || tool === 'eraser' || tool === 'fill') && (
+        <span className="notice">This is a folder: choose a layer in it to paint on.</span>
       )}
       {tool === 'eraser' && isAlphaLocked && !isBlocked && (
         <span className="notice">This layer's transparency is locked: the eraser can't take paint away.</span>

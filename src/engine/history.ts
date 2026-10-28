@@ -32,7 +32,8 @@ type TilesStep = {
   selection?: Selection | null
   smart?: SmartObject | null
 }
-type OrderStep = { kind: 'order'; layers: Layer[]; active: Layer; layer: Layer }
+// "parents": the folder each one of "layers" is in (see isFolder in layers.ts)
+type OrderStep = { kind: 'order'; layers: Layer[]; parents: (Layer | null)[]; active: Layer; layer: Layer }
 type LayerStep = { kind: 'layer'; layer: Layer; props: LayerProps }
 type SelectionStep = { kind: 'selection'; selection: Selection | null }
 // Kept in the order to swap them in next: last first for undo. Each swap turns the order round for the next one
@@ -97,9 +98,11 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     return true
   }
 
-  // Call before adding, deleting or moving "layer": keeps the list of layers and the active layer as they are now
+  // Call before adding, deleting or moving "layer" (or a folder, with all that is in it): keeps the list of layers,
+  // the folders they are in and the active layer as they are now
   function recordOrder(layer: Layer) {
-    add({ kind: 'order', layers: [...stack.layers], active: stack.active, layer })
+    const layers = [...stack.layers]
+    add({ kind: 'order', layers, parents: layers.map(each => each.parent), active: stack.active, layer })
   }
 
   // Keep the values a layer had before it was hidden, shown or renamed, or got another opacity
@@ -243,13 +246,20 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
   // Put the kept list of layers and active layer back, and keep the current ones in the step instead
   function swapOrder(step: OrderStep) {
     const layers = [...stack.layers]
+    const parents = layers.map(layer => layer.parent)
     const active = stack.active
     stack.layers.splice(0, stack.layers.length, ...step.layers)
+    step.layers.forEach((layer, index) => (layer.parent = step.parents[index]))
     stack.active = step.active
     step.layers = layers
+    step.parents = parents
     step.active = active
     projection.markAllBelowStale() // "below" may have other layers now
-    if (step.layer.visible) projection.composeLayerTiles(step.layer)
+    if (step.layer.visible) {
+      // A folder's layers are in one of the two lists, or both
+      projection.composeLayerTiles(step.layer, stack.layers)
+      projection.composeLayerTiles(step.layer, layers)
+    }
     projection.composeClippedTiles() // they may be clipped to other layers now
   }
 

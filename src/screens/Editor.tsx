@@ -344,6 +344,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           isGridOn={isGridOn}
           isOutlineOn={isOutlineOn}
           isAlphaLocked={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.alphaLocked ?? false}
+          isFolder={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isFolder ?? false}
           isPixelBrush={isPixelBrush}
           isPixelPerfectOn={isPixelPerfectOn}
           onColorChange={setColor}
@@ -418,15 +419,19 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         <LayersPanel
           layers={snapshot.layers}
           activeLayerId={snapshot.activeLayerId}
+          canDelete={snapshot.canDelete}
           canMergeDown={snapshot.canMergeDown}
           onAdd={() => engine?.addLayer()}
+          onAddFolder={() => engine?.addFolder()}
+          onAddOutside={() => engine?.addLayerOutside()}
           onDelete={() => engine?.deleteLayer()}
           onDuplicate={() => engine?.duplicateLayer()}
           onMergeDown={() => engine?.mergeDown()}
           onSelect={id => engine?.selectLayer(id)}
-          onMove={(id, index) => engine?.moveLayer(id, index)}
+          onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
           onRename={(id, name) => engine?.renameLayer(id, name)}
           onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
+          onOpenChange={(id, open) => engine?.setFolderOpen(id, open)}
           onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
           onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
           onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}

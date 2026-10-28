@@ -19,6 +19,15 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   list above the opacity. Merging down uses them too.
 - **Clipping masks** ([decision 57](docs/decisions.md#57-clipping-masks)): the clip in a layer's row (or Ctrl+Alt+G)
   makes it show only where the layer under it has paint, to color and shade inside the lines.
+- **Folders of layers** ([decision 58](docs/decisions.md#58-folders-of-layers)), folders in folders too: New folder,
+  Ctrl+G, dragging layers onto a folder to put them in. A folder lets what is in it pass through, or takes a blend
+  mode of its own; it can be hidden, faded, clipped, copied, merged into one layer, deleted and moved with the move
+  tool as one.
+
+### Fixed
+
+- Dragging quickly in the color picker made it stutter: the whole screen was drawn again for each step of the drag.
+  Now it is drawn again at most once a frame.
 
 ## [0.10.0] - 2026-10-26
 

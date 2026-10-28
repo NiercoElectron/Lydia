@@ -1575,6 +1575,62 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   layer moved to the bottom, showing it whole, and undo; saved with the drawing; a copy clipped too; merging onto the
   base with the picture unchanged, and undo.
 
+## 58. Folders of layers
+
+- **Date:** 2026-10-28
+- **Status:** adopted
+- **Decision:**
+  - Layers can be kept in **folders**, and folders in folders, with no limit (my choice, decision 54): a "Character"
+    folder holding "Head", which holds "Hair"... as my artist friend asked.
+  - A folder lets what is in it **pass through** by default, as in Photoshop and Clip Studio (my choice): it only keeps
+    the layers in order, and a layer in it with a blend mode mixes with all that is under it, in the folder or not. A
+    folder can take a blend mode of its own instead: what is in it is then put together on its own first, like one
+    layer.
+  - Hiding a folder hides all that is in it, and its opacity applies to all of it. A folder can be the base of clipped
+    layers (its layers' paint is the base), and can be clipped itself, as in Photoshop (my choice).
+  - **New folder** adds an empty folder; dragging a layer onto a folder's row puts it in, on top, and dragging it
+    between rows puts it there, in or out of folders; **Ctrl+G** puts the active layer into a new folder (my choice).
+    A new layer goes into the active folder when it is open, on top, and above it when it is closed; **New layer
+    outside** adds one above the folder the active layer is in, or above the active folder, out of it (my choice,
+    after a folder made with Ctrl+G kept every new layer in it). The arrow in a folder's row opens and closes it in
+    the panel.
+  - The **move tool** moves all of a folder's layers together, hidden ones too, as in Photoshop (my choice); with a
+    selection, the selected part of each, and the smart objects in it (which move whole) only when nothing is
+    selected. A folder can't be painted on (the bar says so), and transforming (Ctrl+T) is for layers only.
+  - **Duplicate** copies a folder with all that is in it, **Merge folder** (Ctrl+E) merges it into one layer as it
+    looks put together on its own (Photoshop's Merge Group), and **Delete folder** deletes it with all that is in it;
+    the last layer to paint on stays. Merge down only merges a layer into the one under it in the same folder.
+  - All of it can be undone, and is saved with the drawing; opening or closing a folder is saved too, but is no step
+    of undo.
+- **How:**
+  - In the list of layers, a folder is like a layer without paint, with all that is in it right under it, so the rest
+    of Lydia keeps working with one list: a folder and what is in it (its "block") always move together. Each layer
+    knows the folder it is in.
+  - Putting a tile together now goes through the folders (`composer.ts`): the layers of a folder that passes through
+    go right onto what is under them; at less than full opacity, or clipped, the picture from before the folder is
+    kept and mixed with the one after it. A folder with its own mode is put together on its own, into a tile of its
+    own, which then goes on like a layer. Only folders that need it take the extra steps.
+  - The "below" tiles (decision 10) now stop under the outermost folder holding the active layer, which is put
+    together whole while painting.
+  - The live opacity (decision 23) works for a layer in folders that change nothing (at full opacity, not clipped);
+    otherwise the tiles are put together at each step.
+  - While a folder is moved, its layers are shown put together as one picture.
+  - An undo step of the order of layers keeps the folder each layer was in.
+  - In the file, a folder has "folder", and what is in a folder has the position of its folder ("parent"); Lydia
+    checks that each folder is above what is in it, with nothing else between them.
+- **Not yet:** like a single layer's (decisions 56 and 57), a moved folder with blend modes in it shows them as Normal
+  until it is let go, and the fill bucket's **All layers** sees all the layers as Normal, folders or not. Both go in
+  0.11.1 with the rest.
+- **Checked:** a new folder, and a new layer going into it while it is open and above it once closed; Multiply in a
+  folder that passes through darkening the layer outside it, and only the folder's own layers once the folder has a
+  mode of its own; a folder that passes through at 50%; Pass Through offered for folders only; a hidden folder hiding
+  its layers; no painting on a folder, with the notice; Ctrl+G with the picture unchanged; a layer moved out of its
+  folder and back with undo; a folder moved into another, and not into one in it; dragging a layer onto a folder,
+  which lights up; a layer clipped to a folder, and the clipped layer put in a folder that is clipped instead, with the
+  picture unchanged; a layer's opacity in a folder while the slider moves and after; a folder's copy with its layers;
+  Merge folder with the picture unchanged, and undo; the move tool moving a folder, shown while dragging, and undo;
+  Delete folder with its layers, and undo; saved with the drawing.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

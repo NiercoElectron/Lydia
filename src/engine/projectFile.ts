@@ -39,6 +39,8 @@ export type LayerData = {
   showOffPaper?: boolean // its paint off the paper shows around the paper (see outsideView.ts)
   alphaLocked?: boolean // its transparency is locked (see layers.ts)
   clipped?: boolean // it is clipped to the layers under it (see layers.ts)
+  folder?: { open: boolean } // set for a folder (see isFolder in layers.ts), which has no tiles
+  parent?: number // the position of the folder it is in, if any
   tiles: Map<string, StoredTile> // "column,row" -> tile
   smart?: SmartData<Map<string, StoredTile>> // for a smart object
 }
@@ -107,7 +109,10 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // Lydia can open it. A layer's "showOffPaper" (since 0.10) says it shows its paint off the paper; it is false when
 // missing, its "alphaLocked" (since 0.11) that its transparency is locked, and its "clipped" (since 0.11) that it is
 // clipped to the layers under it, both false when missing. Its "blendMode" is
-// one of LAYER_BLEND_MODES (before 0.11, only "normal" or "multiply"). The header's
+// one of LAYER_BLEND_MODES (before 0.11, only "normal" or "multiply"), or "pass-through" for a folder. Since 0.11,
+// "folder" makes a layer a folder (see isFolder in layers.ts), with no tiles, and "parent" is the position of the
+// folder a layer or folder is in: a folder is above what is in it, and all that is between them is in it too. The
+// header's
 // "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
 
 const MAGIC = 'LYDIAPRJ'
@@ -184,6 +189,27 @@ export function serializeProject(
   return new Blob([start, headerBytes, ...data] as BlobPart[], { type: 'application/octet-stream' })
 }
 
+// Whether each layer's folder is a folder above it, with all that is between them in it too (see isFolder in
+// layers.ts)
+function areFoldersWhole(layers: LayerData[]) {
+  const isAbove = layers.every(
+    ({ parent }, index) => parent === undefined || (parent > index && parent < layers.length),
+  )
+  if (!isAbove) return false // checked first, so that going from folder to folder always goes up, and ends
+  const isIn = (index: number, folder: number) => {
+    for (let parent = layers[index].parent; parent !== undefined; parent = layers[parent].parent) {
+      if (parent === folder) return true
+    }
+    return false
+  }
+  return layers.every(({ parent }, index) => {
+    if (parent === undefined) return true
+    if (!layers[parent].folder) return false
+    for (let between = index + 1; between < parent; between++) if (!isIn(between, parent)) return false
+    return true
+  })
+}
+
 // Read the contents of a .lyd file back into a drawing. Throws an Error with a message for the user if the file can't
 // be opened
 export function parseProject(file: ArrayBuffer): ProjectData {
@@ -258,7 +284,10 @@ export function parseProject(file: ArrayBuffer): ProjectData {
         typeof layer.visible !== 'boolean' ||
         typeof layer.opacity !== 'number' ||
         !(layer.opacity >= 0 && layer.opacity <= 1) ||
-        !LAYER_BLEND_MODES.includes(layer.blendMode as BlendMode) ||
+        !(
+          (LAYER_BLEND_MODES as readonly unknown[]).includes(layer.blendMode) ||
+          (layer.blendMode === 'pass-through' && layer.folder !== undefined)
+        ) ||
         !Array.isArray(layer.tiles)
       ) {
         throw damaged()
@@ -269,6 +298,17 @@ export function parseProject(file: ArrayBuffer): ProjectData {
       if (layer.showOffPaper === true) data.showOffPaper = true
       if (layer.alphaLocked === true) data.alphaLocked = true
       if (layer.clipped === true) data.clipped = true
+      if (layer.folder !== undefined) {
+        const { folder } = layer
+        if (!isObject(folder) || typeof folder.open !== 'boolean' || data.tiles.size > 0 || layer.smart !== undefined) {
+          throw damaged()
+        }
+        data.folder = { open: folder.open }
+      }
+      if (layer.parent !== undefined) {
+        if (!isInteger(layer.parent)) throw damaged()
+        data.parent = layer.parent
+      }
       if (layer.smart !== undefined) {
         const smart = layer.smart
         if (
@@ -291,6 +331,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     }),
     activeLayer: 0,
   }
+  if (!areFoldersWhole(project.layers)) throw damaged()
   if (isInteger(activeLayer) && activeLayer >= 0 && activeLayer < project.layers.length) {
     project.activeLayer = activeLayer
   }

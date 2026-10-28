@@ -1,12 +1,17 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
 import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
 import type { LayerBlender } from './blendModes'
+import { createComposer, type PaintOf } from './composer'
 import type { GpuTiles } from './gpuTiles'
 import {
   activeIndex,
-  clipBaseIndex,
+  blockStart,
   isClipped,
+  isFolder,
+  isInside,
+  isShown,
   LOCKED_ALPHA,
+  splitIndex,
   type BlendMode,
   type Layer,
   type LayerStack,
@@ -16,7 +21,8 @@ import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tileSize, typ
 // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the paper's
 // color and all the visible layers already put together, like Krita does. To put a tile together quickly while
 // painting, "below" keeps the paper and every layer under the active one already put together as well, so only the
-// active layer and the layers above it need to be added. "background" is the paper's color, or null when the paper is
+// active layer and the layers above it need to be added (when the active layer is in a folder, "below" stops under
+// the outermost folder it is in, which is put together whole: see splitIndex in layers.ts). "background" is the paper's color, or null when the paper is
 // transparent: then the tiles are transparent where nothing is painted. The projection only covers the paper: layers'
 // tiles off the paper (see tiles.ts) are never put together, and only show faded while the move tool or a transform
 // moves them (see "ghost")
@@ -69,11 +75,9 @@ export function createProjection(
   // The order to work through the waiting tiles in (see cachedFirst); null = to be worked out again
   let waitingOrder: string[] | null = null
 
-  const composeRoot = new Container()
   const paperTile = new Graphics()
   if (background !== null) paperTile.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(background)
   const belowSprite = new Sprite()
-  const layerSprites: Sprite[] = [] // reused between tiles instead of creating new sprites every time
 
   let stroke: ShownStroke | null = null
   // The active layer's tile with the stroke on it, as it will be once the stroke is put into the layer. One tile at a
@@ -101,15 +105,17 @@ export function createProjection(
     stroke = shown
   }
 
-  // Layers with a blend mode other than normal, and clipped layers (see isClipped in layers.ts), go onto what is under
-  // them through blendModes.ts: what is put together so far is drawn into one of these two whole tiles, the layer is
-  // blended with it into the other, and the layers above go on top of that
-  const blendTiles = [0, 1].map(() => RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE }))
-  const blendedSprite = new Sprite()
-  const otherBlendTile = (tile: RenderTexture | null) => (tile === blendTiles[0] ? blendTiles[1] : blendTiles[0])
+  const composer = createComposer(renderer, stack, gpu, blender)
 
-  // Put the tiles at this column and row of the layers from "first" to "last" (not included) on top of "base",
-  // into "target"
+  // A layer's paint at this column and row, with the stroke being painted on it, if any
+  const paintOf: PaintOf = (layer, column, row) => {
+    const texture = gpu.getTexture(layer, column, row, false)
+    const strokeTexture = layer === stack.active ? stroke?.tiles.get(tileKey(column, row)) : undefined
+    return stroke && strokeTexture ? withStroke(texture, strokeTexture, stroke) : texture
+  }
+
+  // Put the tiles at this column and row of the layers and folders from "first" to "last" (not included) on top of
+  // "base", into "target" (see composer.ts)
   function composeLayers(
     base: Container,
     first: number,
@@ -118,62 +124,8 @@ export function createProjection(
     row: number,
     target: RenderTexture,
   ) {
-    composeRoot.removeChildren()
-    composeRoot.addChild(base)
-    let blended: RenderTexture | null = null // the blend tile with what is put together so far, if any
-    // The paint here of the last layer that isn't clipped, the base of the clipped layers above it (null: none, or
-    // hidden). Undefined until there is one: the base is then under "first"
-    let clipMask: Texture | null | undefined
-    let count = 0
-    for (let i = first; i < last; i++) {
-      const layer = stack.layers[i]
-      const clipped = isClipped(stack, i)
-      if (!layer.visible) {
-        if (!clipped) clipMask = null // the layers clipped to a hidden layer are hidden too, as in Photoshop
-        continue
-      }
-      let texture = gpu.getTexture(layer, column, row, false)
-      const strokeTexture = layer === stack.active ? stroke?.tiles.get(tileKey(column, row)) : undefined
-      if (stroke && strokeTexture) texture = withStroke(texture, strokeTexture, stroke)
-      if (!clipped) clipMask = texture
-      if (!texture) continue // no paint on this layer here
-      const mask = clipped ? (clipMask === undefined ? baseTexture(i, column, row) : clipMask) : undefined
-      if (mask === null) continue // clipped to a base without paint here
-      if (layer.blendMode !== 'normal' || mask) {
-        // What is put together so far, in a blend tile, unless it is all in one already
-        if (!blended || composeRoot.children.length > 1) {
-          const into = otherBlendTile(blended)
-          renderer.render({ container: composeRoot, target: into, clear: true })
-          blended = into
-        }
-        const into = otherBlendTile(blended)
-        blender.blend(blended, texture, layer.opacity, layer.blendMode, into, mask)
-        blended = into
-        blendedSprite.texture = into
-        composeRoot.removeChildren()
-        composeRoot.addChild(blendedSprite)
-        continue
-      }
-      let sprite = layerSprites[count]
-      if (!sprite) {
-        sprite = new Sprite()
-        layerSprites[count] = sprite
-      }
-      sprite.texture = texture
-      sprite.alpha = layer.opacity
-      composeRoot.addChild(sprite)
-      count++
-    }
-    renderer.render({ container: composeRoot, target, clear: true })
+    composer.compose(base, first, last, column, row, target, paintOf)
     gpu.trim()
-  }
-
-  // The paint at this column and row of the base of the clipped layer at this position (see isClipped in layers.ts),
-  // or null when it has none there or is hidden. A base being painted on is among the layers put together, so this is
-  // only for one under them, which never has a stroke on it
-  function baseTexture(index: number, column: number, row: number) {
-    const base = stack.layers[clipBaseIndex(stack, index)]
-    return base.visible ? gpu.getTexture(base, column, row, false) : null
   }
 
   // Put together again the tiles of every clipped layer: after a change of the layers they are clipped to (a layer
@@ -182,17 +134,17 @@ export function createProjection(
     for (const layer of stack.layers) if (layer.clipped && layer.visible) composeLayerTiles(layer)
   }
 
-  // The "below" tile = the paper + every layer under the active one
+  // The "below" tile = the paper + every layer under the active one, or under the outermost folder it is in
   function composeBelowTile(column: number, row: number) {
-    composeLayers(paperTile, 0, activeIndex(stack), column, row, below.get(tileKey(column, row))!)
+    composeLayers(paperTile, 0, splitIndex(stack), column, row, below.get(tileKey(column, row))!)
   }
 
-  // The projection tile = the "below" tile + the active layer + the layers above it, put together into "target"
+  // The projection tile = the "below" tile + the layers from there up, put together into "target"
   function composeTileInto(column: number, row: number, target: RenderTexture) {
     const key = tileKey(column, row)
     if (staleBelow.delete(key)) composeBelowTile(column, row) // delete() returns true if the key was in the set
     belowSprite.texture = below.get(key)!
-    composeLayers(belowSprite, activeIndex(stack), stack.layers.length, column, row, target)
+    composeLayers(belowSprite, splitIndex(stack), stack.layers.length, column, row, target)
   }
 
   // Put a projection tile together right away, on the screen (while painting, after undoing a stroke...). A tile off
@@ -219,9 +171,15 @@ export function createProjection(
   // and showing each tile as soon as it is ready makes the change spread over the picture like a short video. So the
   // new versions are put together out of sight, a few every frame (see composeWaiting), and once they are all ready
   // the screen shows them at once
-  function composeLayerTiles(layer: Layer) {
+  // A folder changes the tiles where the layers in it have paint: "list" is where to find them (the list from before,
+  // for a folder just deleted)
+  function composeLayerTiles(layer: Layer, list: Layer[] = stack.layers) {
+    if (isFolder(layer)) {
+      for (const inside of list) if (!isFolder(inside) && isInside(inside, layer)) composeLayerTiles(inside)
+      return
+    }
     const index = stack.layers.indexOf(layer) // -1 for a layer that was just deleted, which may have been in "below"
-    const isBelowActive = index < activeIndex(stack)
+    const isBelowActive = index < splitIndex(stack)
     for (const key of onPaper(gpu.tilesWithPaint(layer))) {
       if (isBelowActive) markBelowStale(key)
       dropPrepared(key) // a version prepared before this change is out of date
@@ -352,8 +310,8 @@ export function createProjection(
   // card. Tiles that are already ready cost almost nothing
   function prepareTile(column: number, row: number) {
     if (staleBelow.delete(tileKey(column, row))) composeBelowTile(column, row)
-    for (let i = activeIndex(stack); i < stack.layers.length; i++) {
-      if (stack.layers[i].visible) gpu.getTexture(stack.layers[i], column, row, false)
+    for (const layer of stack.layers.slice(splitIndex(stack))) {
+      if (!isFolder(layer) && isShown(layer)) gpu.getTexture(layer, column, row, false)
     }
   }
 
@@ -367,12 +325,14 @@ export function createProjection(
   // Starting a tile needs every layer at its place, so with many big layers, starting all of them at once would
   // freeze the screen: they start a few every frame instead (see composeWaiting), out of sight, and are shown all at
   // once when they are all ready
-  // "clipped" is the layer's tile as it shows when it is clipped (see isClipped in layers.ts)
+  // "clipped" is the layer's tile as it shows when it is clipped (see isClipped in layers.ts), and "under" what is under
+  // it when it is in a folder (see underActive): both made for the live tile
   type LiveTile = {
     sprites: Container
     layerSprite: Sprite
     above: RenderTexture | null
     clipped: RenderTexture | null
+    under: RenderTexture | null
   }
   const live = new Map<string, LiveTile>() // "column,row" -> the tile shown live
   const startingLive = new Set<string>() // tiles waiting to be shown live
@@ -390,12 +350,15 @@ export function createProjection(
   // Show the active layer's tiles at "keys" with its current opacity. Returns false when that can't be done this way,
   // and the tiles must be put together again instead
   function showOpacityLive(layer: Layer, keys: Iterable<string>) {
-    if (layer !== stack.active) return false // "below" only has the layers under the active one
-    // The layers above are put together on their own, without what is under them, and the layer goes onto "below" as
-    // the graphics card blends. That only gives the same picture when the layer and the ones above it all use the
-    // normal blend mode: the others (like multiply) depend on what is under them
-    if (stack.layers.slice(activeIndex(stack)).some(other => other.visible && other.blendMode !== 'normal')) {
-      return false
+    if (layer !== stack.active || isFolder(layer)) return false // "below" only has the layers under the active one
+    // The layers above are put together on their own, without what is under them, and the layer goes onto what is under
+    // it as the graphics card blends. That only gives the same picture when the layer and the ones above it use the
+    // normal blend mode, or are folders that let what is in them pass through: the other modes (like multiply) depend on
+    // what is under them. And the folders the layer is in must change nothing, at full opacity and not clipped
+    const plain = (other: Layer) => !other.visible || other.blendMode === 'normal' || other.blendMode === 'pass-through'
+    if (!stack.layers.slice(activeIndex(stack)).every(plain)) return false
+    for (let folder = layer.parent; folder; folder = folder.parent) {
+      if (folder.opacity < 1 || isClipped(stack, stack.layers.indexOf(folder))) return false
     }
     if (liveLayer !== layer) {
       finishLive()
@@ -411,6 +374,30 @@ export function createProjection(
     return true
   }
 
+  // What is under the active layer, or under the active folder's block, at a tile: its "below" tile, with the layers
+  // between that and the active one put together on it when the active one is in a folder ("made", a texture of the
+  // caller's from then on)
+  function underActive(column: number, row: number, key: string) {
+    if (staleBelow.delete(key)) composeBelowTile(column, row)
+    const start = blockStart(stack, activeIndex(stack))
+    const split = splitIndex(stack)
+    if (start === split) return { texture: below.get(key)!, made: null }
+    const made = takeTexture(tileSize(grid, column, row))
+    belowSprite.texture = below.get(key)!
+    composeLayers(belowSprite, split, start, column, row, made)
+    return { texture: made, made }
+  }
+
+  // The layers above the active one at a tile, put together on their own into a texture of the caller's, or null when
+  // none of them has paint there
+  function aboveActive(column: number, row: number, key: string) {
+    const first = activeIndex(stack) + 1
+    if (!stack.layers.slice(first).some(other => isShown(other) && hasPaint(other, key))) return null
+    const above = takeTexture(tileSize(grid, column, row))
+    composeLayers(emptyBase, first, stack.layers.length, column, row, above)
+    return above
+  }
+
   // Get a live tile ready, out of sight until the others are ready too (see showStartedLive)
   function startLive(layer: Layer, key: string) {
     const { column, row } = parseTileKey(key)
@@ -420,30 +407,26 @@ export function createProjection(
     let clipped: RenderTexture | null = null
     if (isClipped(stack, index)) {
       // Only the part of the layer its base covers, once: the opacity then applies to it as to any layer
-      const mask = baseTexture(index, column, row)
-      if (!mask) return // nothing of the layer shows here
       clipped = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
-      blender.clip(texture, mask, clipped)
+      if (!composer.composeAlone(index, column, row, clipped, paintOf)) {
+        spareTextures.push(clipped)
+        return // nothing of the layer shows here
+      }
       texture = clipped
     }
-    if (staleBelow.delete(key)) composeBelowTile(column, row)
-    const first = index + 1
-    let above: RenderTexture | null = null
-    if (stack.layers.slice(first).some(other => other.visible && hasPaint(other, key))) {
-      above = takeTexture(tileSize(grid, column, row))
-      composeLayers(emptyBase, first, stack.layers.length, column, row, above)
-    }
+    const under = underActive(column, row, key)
+    const above = aboveActive(column, row, key)
 
     const sprites = new Container()
     sprites.position.set(column * TILE_SIZE, row * TILE_SIZE)
     const layerSprite = new Sprite(texture)
-    sprites.addChild(new Sprite(below.get(key)!), layerSprite)
+    sprites.addChild(new Sprite(under.texture), layerSprite)
     if (above) sprites.addChild(new Sprite(above))
     for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
     layerSprite.alpha = layer.opacity
     sprites.visible = false
     liveContainer.addChild(sprites)
-    live.set(key, { sprites, layerSprite, above, clipped })
+    live.set(key, { sprites, layerSprite, above, clipped, under: under.made })
     startedLive.push(key)
   }
 
@@ -465,7 +448,7 @@ export function createProjection(
     if (!tile) return
     tile.sprites.destroy({ children: true }) // only the sprites: their textures belong to the layer and to "below"
     // Freed later, a few every frame (see composeWaiting)
-    for (const texture of [tile.above, tile.clipped]) if (texture) spareTextures.push(texture)
+    for (const texture of [tile.above, tile.clipped, tile.under]) if (texture) spareTextures.push(texture)
     tileSprites.get(key)!.visible = true
     live.delete(key)
     releaseLiveLayerIfDone()
@@ -540,11 +523,11 @@ export function createProjection(
   const closestBlend = (mode: BlendMode): BLEND_MODES =>
     mode === 'multiply' || mode === 'screen' || mode === 'add' ? mode : 'normal'
 
-  // The tiles on the paper where a visible layer above the active one has paint
+  // The tiles on the paper where a layer that shows, above the active one, has paint
   function paintedAbove() {
     const keys = new Set<string>()
     for (const layer of stack.layers.slice(activeIndex(stack) + 1)) {
-      if (layer.visible) for (const key of onPaper(gpu.tilesWithPaint(layer))) keys.add(key)
+      if (isShown(layer)) for (const key of onPaper(gpu.tilesWithPaint(layer))) keys.add(key)
     }
     return keys
   }
@@ -569,15 +552,12 @@ export function createProjection(
     }
     let above: RenderTexture | null = null
     if (isOnPaper(grid, column, row)) {
-      if (staleBelow.delete(key)) composeBelowTile(column, row)
-      add(moveUnder, below.get(key)!, false)
+      const under = underActive(column, row, key)
+      add(moveUnder, under.texture, false)
+      if (under.made) tile.textures.push(under.made)
       if (left) add(moveUnder, left, true)
-      const first = activeIndex(stack) + 1
-      if (stack.layers.slice(first).some(other => other.visible && hasPaint(other, key))) {
-        above = takeTexture(tileSize(grid, column, row))
-        composeLayers(emptyBase, first, stack.layers.length, column, row, above)
-        add(moveAbove, above, false)
-      }
+      above = aboveActive(column, row, key)
+      if (above) add(moveAbove, above, false)
     }
     if (lifted) add(moved, lifted, true)
     if (left) add(ghostLeft, left, false)
@@ -712,12 +692,14 @@ export function createProjection(
 
   function destroy() {
     endMove()
-    for (const tile of live.values()) for (const texture of [tile.above, tile.clipped]) texture?.destroy(true)
+    for (const tile of live.values()) {
+      for (const texture of [tile.above, tile.clipped, tile.under]) texture?.destroy(true)
+    }
     for (const texture of [...prepared.values(), ...spareTextures]) texture.destroy(true)
-    for (const texture of [...projection.values(), ...below.values(), ...blendTiles]) texture.destroy(true)
+    for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
     container.destroy({ children: true })
     ghost.destroy({ children: true })
-    composeRoot.destroy()
+    composer.destroy()
     withStrokeRoot.destroy({ children: true })
     withStrokeTexture?.destroy(true)
     paperTile.destroy()
@@ -732,6 +714,7 @@ export function createProjection(
     composeLayerTiles,
     composeClippedTiles,
     composeLater,
+    composeFolder: composer.composeFolder,
     composeWaiting,
     finishWaiting,
     isUpdating: () => waiting.size > 0 || startingLive.size > 0 || prepared.size > 0,

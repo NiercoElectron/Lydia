@@ -43,7 +43,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Pixel brushes drawn in the Brush Designer, pixel by pixel, that paint their tip at 1×, 2×, 3×… its size
 - Layers: add, delete, duplicate, merge down, choose, move (drag them in the list), rename (double-click), hide and
   show, change the opacity and the blend mode (Multiply, Screen, Overlay… 16 in all), lock their transparency, clip
-  them to the layer under them,
+  them to the layer under them, keep them in folders (folders in folders too),
   and show their paint off the paper
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)

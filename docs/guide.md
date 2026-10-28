@@ -186,8 +186,21 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - **New layer** adds an empty layer above the active one; **Delete layer** deletes the active one (the last layer
   stays).
 - **Duplicate** (Ctrl+J) puts a copy of the active layer above it. **Merge down** (Ctrl+E) puts the active layer's
-  paint onto the layer under it, as it shows; that layer keeps its own opacity and blend mode. Both layers must
-  be shown, and the one under can't be a smart object.
+  paint onto the layer under it in the same folder, as it shows; that layer keeps its own opacity and blend mode.
+  Both layers must be shown, and the one under can't be a smart object.
+- **Folders** keep layers in order, and can hold other folders:
+  - **New folder** adds one; **Ctrl+G** puts the active layer into a new folder. With an open folder active, a new
+    layer goes into it, on top. **New layer outside** adds one above the folder the active layer is in (or above the
+    active folder), out of it.
+  - **Drag** a layer onto a folder's row to put it in (the row lights up), or between rows to put it there, in or out
+    of folders. Dragging a folder moves all that is in it.
+  - The arrow in a folder's row opens and closes it in the list.
+  - Hiding a folder hides all that is in it, and its **Opacity** applies to all of it. Its **Blend** is **Pass
+    Through** at first: the layers in it mix with all that is under them, as if there were no folder. Give it another
+    mode, and what is in it is put together on its own first, like one layer.
+  - A folder can't be painted on: choose a layer in it. The **move tool** moves all of its layers together.
+  - **Duplicate** copies it with all that is in it, **Merge folder** (Ctrl+E) makes it one layer, and **Delete
+    folder** deletes it with all that is in it.
 - Click a layer to paint on it. **Drag** it up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
@@ -198,7 +211,8 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
   then shows only where that layer has paint. Clip shadows and lights to a layer with a part's flat color (filled
   inside its lines), and they never go past that part; a layer with only the lines shows them on the lines only. The
   row moves in, with an arrow down. Several layers in a row can be clipped to the same layer; hiding that layer hides
-  them too. Click the clip again to unclip. It can be undone, and is kept with the drawing.
+  them too. A folder can be clipped too, or be what layers are clipped to. Click the clip again to unclip. It can be
+  undone, and is kept with the drawing.
 - A layer with paint off the paper (see [Move](#move)) has an icon at the right of its name: click it to show that
   paint, faded, around the paper, and again to hide it. It is kept with the drawing.
 - **Blend**, above the list, is how the active layer's paint goes onto what is under it:

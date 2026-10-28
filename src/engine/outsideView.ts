@@ -1,6 +1,6 @@
 import { Container, Sprite } from 'pixi.js'
 import type { GpuTiles } from './gpuTiles'
-import type { Layer, LayerStack } from './layers'
+import { isInside, isShown, type Layer, type LayerStack } from './layers'
 import { GHOST_ALPHA } from './projection'
 import { isOnPaper, parseTileKey, TILE_SIZE, tileSize, type Grid } from './tiles'
 
@@ -19,7 +19,7 @@ export function createOutsideView(grid: Grid, stack: LayerStack, gpu: GpuTiles) 
     container.removeChildren()
     let count = 0
     for (const layer of stack.layers) {
-      if (!layer.showOffPaper || !layer.visible || layer === hidden) continue
+      if (!layer.showOffPaper || !isShown(layer) || layer === hidden || (hidden && isInside(layer, hidden))) continue
       for (const key of gpu.tilesWithPaint(layer)) {
         const { column, row } = parseTileKey(key)
         if (isOnPaper(grid, column, row)) {

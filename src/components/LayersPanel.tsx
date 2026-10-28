@@ -1,4 +1,15 @@
-import { Box, CornerLeftDown, Lock, LockOpen, Paperclip, ScanEye } from 'lucide-react'
+import {
+  Box,
+  ChevronDown,
+  ChevronRight,
+  CornerLeftDown,
+  Folder,
+  FolderOpen,
+  Lock,
+  LockOpen,
+  Paperclip,
+  ScanEye,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
 import type { BlendMode } from '../engine/layers'
@@ -7,15 +18,20 @@ import { SliderValue } from './SliderValue'
 type Props = {
   layers: EngineSnapshot['layers'] // from the bottom to the top
   activeLayerId: number
+  canDelete: boolean
   canMergeDown: boolean
   onAdd: () => void
+  onAddFolder: () => void
+  onAddOutside: () => void // a layer above the folder the active one is in, out of it
   onDelete: () => void
   onDuplicate: () => void
   onMergeDown: () => void
   onSelect: (id: number) => void
-  onMove: (id: number, index: number) => void // index from the bottom, 0 = the bottom layer
+  // Move a layer or folder into the folder "parentId" (null: none), right above "aboveId" in it, or at its bottom
+  onMove: (id: number, parentId: number | null, aboveId: number | null) => void
   onRename: (id: number, name: string) => void
   onVisibleChange: (id: number, visible: boolean) => void
+  onOpenChange: (id: number, open: boolean) => void // show what is in a folder, or not
   onOffPaperChange: (id: number, show: boolean) => void // show the layer's paint off the paper, or not
   onAlphaLockChange: (id: number, locked: boolean) => void // lock the layer's transparency, or unlock it
   onClipChange: (id: number, clipped: boolean) => void // clip the layer to the layers under it, or unclip it
@@ -25,7 +41,8 @@ type Props = {
 }
 
 // The blend modes offered (see blendModes.ts), in groups as in Photoshop: those that darken, those that lighten, those
-// that add contrast, the comparison, and those that take part of a color
+// that add contrast, the comparison, and those that take part of a color. A folder also offers Pass Through (see
+// isFolder in layers.ts)
 const BLEND_MODE_GROUPS: { label: string; modes: [BlendMode, string][] }[] = [
   { label: 'Normal', modes: [['normal', 'Normal']] },
   {
@@ -67,16 +84,23 @@ const BLEND_MODE_GROUPS: { label: string; modes: [BlendMode, string][] }[] = [
 
 const DRAG_START_PX = 4 // how far a layer must be dragged before it starts moving, so a click stays a click
 const MAX_NAME_LENGTH = 100
+const INDENT_PX = 14 // how far a row is moved in for each folder it is in, and for being clipped
 
-// A layer being dragged to another place in the list. "gap" is where it would go: before the shown row with this
-// number (or after the last row when it equals the number of rows)
-type Drag = { id: number; pointerId: number; startY: number; isMoving: boolean; gap: number }
+type Row = EngineSnapshot['layers'][number]
+
+// Where a dragged layer would go: into a folder (on top of what is in it), or into the gap before the shown row with
+// this number (after the last row when it equals the number of rows)
+type Drop = { into: number } | { gap: number }
+type Drag = { id: number; pointerId: number; startY: number; isMoving: boolean; drop: Drop | null }
 
 export function LayersPanel({
   layers,
   activeLayerId,
+  canDelete,
   canMergeDown,
   onAdd,
+  onAddFolder,
+  onAddOutside,
   onDelete,
   onDuplicate,
   onMergeDown,
@@ -84,6 +108,7 @@ export function LayersPanel({
   onMove,
   onRename,
   onVisibleChange,
+  onOpenChange,
   onOffPaperChange,
   onAlphaLockChange,
   onClipChange,
@@ -91,31 +116,55 @@ export function LayersPanel({
   onOpacityChange,
   onOpacityChangeEnd,
 }: Props) {
-  const active = layers.find(layer => layer.id === activeLayerId)
-  const shown = [...layers].reverse() // from the top to the bottom, like in Photoshop and Krita
+  const byId = new Map(layers.map(layer => [layer.id, layer]))
+  const active = byId.get(activeLayerId)
+  // From the top to the bottom, like in Photoshop and Krita, without what is in closed folders
+  const isRowShown = (row: Row) => {
+    for (let id = row.parentId; id !== null; id = byId.get(id)!.parentId) if (!byId.get(id)!.isOpen) return false
+    return true
+  }
+  const shown = [...layers].reverse().filter(isRowShown)
   const rows = useRef<(HTMLLIElement | null)[]>([])
   const [drag, setDrag] = useState<Drag | null>(null)
   const [renamingId, setRenamingId] = useState<number | null>(null)
 
-  // The gap between rows nearest to a height on the screen
-  function gapAt(y: number) {
-    let gap = 0
-    for (const row of rows.current.slice(0, shown.length)) {
-      const box = row?.getBoundingClientRect()
-      if (box && y > box.top + box.height / 2) gap++
-    }
-    return gap
+  // Whether a row is the dragged layer or folder, or in it
+  const isInDragged = (row: Row | undefined, id: number) => {
+    for (let at = row; at; at = at.parentId === null ? undefined : byId.get(at.parentId)) if (at.id === id) return true
+    return false
   }
 
-  // Where the dragged layer would end up among the shown rows, once it is taken out of its own place
-  function dropTarget({ id, gap }: Drag) {
-    const from = shown.findIndex(layer => layer.id === id)
-    return { from, to: gap > from ? gap - 1 : gap }
+  // Where a layer dragged to this height on the screen would go: into a folder when over the middle of its row, or into
+  // the gap between rows nearest to it. Null when it would go into itself, or stay where it is
+  function dropAt(y: number, id: number): Drop | null {
+    let gap = 0
+    for (const [index, element] of rows.current.slice(0, shown.length).entries()) {
+      const box = element?.getBoundingClientRect()
+      if (!box) continue
+      const row = shown[index]
+      const isOver = y >= box.top + box.height / 4 && y <= box.bottom - box.height / 4
+      if (row.isFolder && isOver) return isInDragged(row, id) ? null : { into: row.id }
+      if (y > box.top + box.height / 2) gap++
+    }
+    const below = shown[gap]
+    if (below && isInDragged(below, id)) return null // above itself, or inside itself
+    if (shown[gap - 1]?.id === id) return null // right under itself: where it is
+    return { gap }
+  }
+
+  // The folder and the layer or folder it would go right above, for a drop
+  function placeOf(drop: Drop) {
+    if ('into' in drop) {
+      const top = layers.findLast(layer => layer.parentId === drop.into)
+      return { parentId: drop.into, aboveId: top?.id ?? null }
+    }
+    const below = shown[drop.gap]
+    return below ? { parentId: below.parentId, aboveId: below.id } : { parentId: null, aboveId: null }
   }
 
   function handlePointerDown(e: React.PointerEvent, id: number) {
     if (e.button !== 0) return
-    setDrag({ id, pointerId: e.pointerId, startY: e.clientY, isMoving: false, gap: 0 })
+    setDrag({ id, pointerId: e.pointerId, startY: e.clientY, isMoving: false, drop: null })
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -124,52 +173,77 @@ export function LayersPanel({
       if (Math.abs(e.clientY - drag.startY) < DRAG_START_PX) return
       e.currentTarget.setPointerCapture(e.pointerId) // keep getting the pointer's moves outside the row
     }
-    setDrag({ ...drag, isMoving: true, gap: gapAt(e.clientY) })
+    setDrag({ ...drag, isMoving: true, drop: dropAt(e.clientY, drag.id) })
   }
 
   function handlePointerUp(e: React.PointerEvent) {
     if (!drag || drag.pointerId !== e.pointerId) return
-    if (drag.isMoving) {
-      const { from, to } = dropTarget(drag)
-      if (to !== from) onMove(drag.id, shown.length - 1 - to)
+    if (drag.isMoving && drag.drop) {
+      const { parentId, aboveId } = placeOf(drag.drop)
+      onMove(drag.id, parentId, aboveId)
     }
     setDrag(null)
   }
 
-  // The line that shows where a dragged layer would go
+  // How a row shows where a dragged layer would go: a line before or after it, or the row lit as the folder to go in
   function dropLineOf(index: number) {
-    if (!drag?.isMoving) return undefined
-    const { from, to } = dropTarget(drag)
-    if (to === from) return undefined
-    if (drag.gap === index) return 'drop-before'
-    if (drag.gap === shown.length && index === shown.length - 1) return 'drop-after'
+    const drop = drag?.isMoving ? drag.drop : null
+    if (!drop) return undefined
+    if ('into' in drop) return drop.into === shown[index].id ? 'drop-into' : undefined
+    if (drop.gap === index) return 'drop-before'
+    if (drop.gap === shown.length && index === shown.length - 1) return 'drop-after'
     return undefined
   }
+
+  const blendGroups = active?.isFolder
+    ? [{ label: 'Folder', modes: [['pass-through', 'Pass Through']] as [BlendMode, string][] }, ...BLEND_MODE_GROUPS]
+    : BLEND_MODE_GROUPS
 
   return (
     <aside className="layers-panel">
       <h2>Layers</h2>
       <div className="layers-actions">
         <button onClick={onAdd}>New layer</button>
-        <button onClick={onDelete} disabled={layers.length <= 1} title="Delete the active layer">
-          Delete layer
+        <button
+          onClick={onAddFolder}
+          title="Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)"
+        >
+          New folder
         </button>
-        <button onClick={onDuplicate} title="Copy the active layer above it (Ctrl+J)">
+        <button
+          onClick={onAddOutside}
+          disabled={!active || (!active.isFolder && active.parentId === null)}
+          title="Add a layer above the folder the active layer is in (or above the active folder), out of it"
+        >
+          New layer outside
+        </button>
+        <button onClick={onDuplicate} title="Copy the active layer or folder above it (Ctrl+J)">
           Duplicate
         </button>
         <button
           onClick={onMergeDown}
           disabled={!canMergeDown}
-          title="Merge the active layer into the one under it (Ctrl+E). Both must be shown"
+          title={
+            active?.isFolder
+              ? 'Merge all that is in the active folder into one layer (Ctrl+E)'
+              : 'Merge the active layer into the one under it (Ctrl+E). Both must be shown'
+          }
         >
-          Merge down
+          {active?.isFolder ? 'Merge folder' : 'Merge down'}
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={!canDelete}
+          title={active?.isFolder ? 'Delete the active folder with all that is in it' : 'Delete the active layer'}
+        >
+          {active?.isFolder ? 'Delete folder' : 'Delete layer'}
         </button>
       </div>
       {active && (
         <label className="layer-blend" title="How the active layer's paint goes onto what is under it">
           Blend
           <select value={active.blendMode} onChange={e => onBlendModeChange(active.id, e.target.value as BlendMode)}>
-            {BLEND_MODE_GROUPS.map(({ label, modes }) => (
+            {blendGroups.map(({ label, modes }) => (
               <optgroup key={label} label={label}>
                 {modes.map(([mode, name]) => (
                   <option key={mode} value={mode}>
@@ -193,6 +267,7 @@ export function LayersPanel({
           const classes = [
             layer.id === activeLayerId && 'active',
             layer.clipped && 'clipped',
+            layer.isFolder && 'folder',
             drag?.isMoving && drag.id === layer.id && 'dragging',
             dropLineOf(index),
           ]
@@ -203,6 +278,7 @@ export function LayersPanel({
                 rows.current[index] = row
               }}
               className={classes.filter(Boolean).join(' ') || undefined}
+              style={{ paddingLeft: (layer.depth + (layer.clipped ? 1 : 0)) * INDENT_PX }}
             >
               <input
                 type="checkbox"
@@ -213,6 +289,16 @@ export function LayersPanel({
               />
               {layer.clipped && (
                 <CornerLeftDown className="clip-arrow" size={14} aria-label="Clipped to the layers under it" />
+              )}
+              {layer.isFolder && (
+                <button
+                  className="icon-button folder-toggle"
+                  aria-expanded={layer.isOpen}
+                  onClick={() => onOpenChange(layer.id, !layer.isOpen)}
+                  title={layer.isOpen ? 'Close the folder' : 'Open the folder'}
+                >
+                  {layer.isOpen ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
+                </button>
               )}
               {renamingId === layer.id ? (
                 <NameInput
@@ -226,7 +312,11 @@ export function LayersPanel({
                 <button
                   className="layer-name"
                   aria-pressed={layer.id === activeLayerId}
-                  title="Drag to move, double-click to rename"
+                  title={
+                    layer.isFolder
+                      ? 'Drag to move with all that is in it, or drop a layer on it to put it in; double-click to rename'
+                      : 'Drag to move (onto a folder to put it in), double-click to rename'
+                  }
                   onClick={() => onSelect(layer.id)}
                   onDoubleClick={() => setRenamingId(layer.id)}
                   onPointerDown={e => handlePointerDown(e, layer.id)}
@@ -234,30 +324,38 @@ export function LayersPanel({
                   onPointerUp={handlePointerUp}
                   onPointerCancel={() => setDrag(null)}
                 >
+                  {layer.isFolder &&
+                    (layer.isOpen ? (
+                      <FolderOpen className="smart-icon" size={14} aria-label="Folder" />
+                    ) : (
+                      <Folder className="smart-icon" size={14} aria-label="Folder" />
+                    ))}
                   {layer.isSmart && <Box className="smart-icon" size={14} aria-label="Smart object" />}
                   {layer.name}
                 </button>
               )}
-              <button
-                className="icon-button"
-                aria-pressed={layer.alphaLocked}
-                onClick={() => onAlphaLockChange(layer.id, !layer.alphaLocked)}
-                title={
-                  layer.alphaLocked
-                    ? 'Its transparency is locked: painting only colors the paint already there. Click to unlock'
-                    : 'Lock its transparency: painting would only color the paint already there'
-                }
-              >
-                {layer.alphaLocked ? <Lock size={14} aria-hidden /> : <LockOpen size={14} aria-hidden />}
-              </button>
+              {!layer.isFolder && (
+                <button
+                  className="icon-button"
+                  aria-pressed={layer.alphaLocked}
+                  onClick={() => onAlphaLockChange(layer.id, !layer.alphaLocked)}
+                  title={
+                    layer.alphaLocked
+                      ? 'Its transparency is locked: painting only colors the paint already there. Click to unlock'
+                      : 'Lock its transparency: painting would only color the paint already there'
+                  }
+                >
+                  {layer.alphaLocked ? <Lock size={14} aria-hidden /> : <LockOpen size={14} aria-hidden />}
+                </button>
+              )}
               <button
                 className="icon-button"
                 aria-pressed={layer.clipped}
-                disabled={layer.id === layers[0].id}
+                disabled={!layer.canClip}
                 onClick={() => onClipChange(layer.id, !layer.clipped)}
                 title={
-                  layer.id === layers[0].id
-                    ? 'The bottom layer has nothing under it to be clipped to'
+                  !layer.canClip
+                    ? 'The bottom one, here, has nothing under it to be clipped to'
                     : layer.clipped
                       ? 'It is clipped: it shows only where the layer under it has paint. Click to unclip (Ctrl+Alt+G)'
                       : 'Clip it to the layer under it: it would show only where that layer has paint (Ctrl+Alt+G)'
