@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-28
+
 ### Added
 
 - **Duplicate** (Ctrl+J) and **Merge down** (Ctrl+E) in the layers ([decision 54](docs/decisions.md#54-duplicating-and-merging-layers)).
@@ -403,7 +405,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/NiercoElectron/Lydia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/NiercoElectron/Lydia/compare/v0.8.4...v0.8.5

@@ -57,7 +57,8 @@ How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 ## Roadmap
 
-Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity), undo and redo of
+Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity, duplicate, merge down,
+blend modes, clipping masks, alpha lock, folders), undo and redo of
 everything, brushes as files and the Brush Designer, the Pixel brush and a pixel grid, brushes with filtered noise,
 stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, pixel-perfect strokes, straight lines, turning and flipping the view, the fill bucket, rectangle and lasso
 selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
@@ -66,8 +67,6 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Layers: folders of layers (a "Head" folder with the chin, the hair, the ears…), blend modes, clipping masks,
-      alpha lock, duplicate and merge down
 - [ ] Selections: magic wand
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
       the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
