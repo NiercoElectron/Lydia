@@ -1797,10 +1797,16 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Status:** adopted
 - **Problem:** everything in Lydia was in English, which keeps out the people who don't read it.
 - **Decision:** the interface comes in English, Brazilian Portuguese and Spanish: every button, title and hint, the
-  tasks ("Moving…"), the errors of files that can't be opened, the names of new layers and folders, and the history
-  of versions in **What's New?**. On the start screen, **Language** offers **System**, **Português (Brasil)**,
-  **English** and **Español**. System follows the browser's first language (Portuguese or Spanish, English for any
-  other) and changes with it. The browser remembers the choice. The docs, the README and the code stay in English.
+  tasks ("Moving…"), the names of new layers and folders, and the history of versions in **What's New?**. On the
+  start screen, **Language** offers **System**, **Português (Brasil)**, **English** and **Español**. System follows the
+  browser's first language (Portuguese or Spanish, English for any other) and changes with it. The browser remembers
+  the choice. The docs, the README and the code stay in English.
+- **Errors aren't translated** (my choice): each has a code, like `LYD-201`, and its message in English, in every
+  language. A message reads the same for everyone, so a code or a message given in a report or searched for always
+  means the same thing, and a new error needs no translation. The first digit of a code says where the error comes
+  from (Claude's suggestion): 0 inside Lydia, 1 projects, 2 brushes, 3 images and the tray, 4 the browser and the
+  graphics card. The list, with what each one means, is in [errors.md](errors.md). At first the errors were translated
+  too; I changed it the same day.
 - **How:**
   - Lydia's own small dictionary for each language, without a library (`src/translations/pt-BR.ts` and `es.ts`). The
     key is the English text as the code has it, and a text missing from a dictionary shows in English. A value such
@@ -1809,18 +1815,23 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     (`blend.Screen`, "Divisão", the name Photoshop gives it in Portuguese).
   - `src/i18n.ts` keeps the choice and gives the screens their texts (`useLanguage`). Choosing another language
     changes them at once, without opening the drawing again.
-  - Errors of files (a brush, a project, an image that can't be opened) are `LocalizedError`s
-    (`src/localizedError.ts`): they keep the English message for the console, and are translated when shown, in the
-    language chosen then.
+  - The codes and their messages are in `src/errors.ts`, and Lydia's errors are `LydiaError`s, made from a code
+    ("LYD-104: This project file is damaged."). An error Lydia didn't expect, from the browser or from a mistake in
+    Lydia, is shown under the code of what was being done, with its own message in parentheses ("LYD-106: Could not
+    save the project. (…)"), and goes to the browser's console too. Before codes, such an error only said that
+    something had failed, which no one could have reported.
   - A new layer or folder is named in the language chosen when it is made ("Camada 2"). Names already given, by me or
     by Lydia, stay as they were, and so does the drawing file.
   - The history of versions is translated in `src/translations/changelog.pt-BR.md` and `changelog.es.md`. A version
     not translated yet shows in English.
 - **Known:** each new text in the interface needs its translation in both dictionaries (the test below finds the ones
-  missing), and each new version its lines in both translated histories.
+  missing), and each new version its lines in both translated histories. A new error needs a code of its own, in
+  `src/errors.ts` and in `errors.md`. A code is never given to another error.
 - **Checked:** `tests/app/language.mjs`: the choice, the system's language, the places for values, the two meanings
-  of Screen, and that every text the code translates is in both dictionaries with the same places; and
-  `tests/app/language-ui.mjs`: switching the language in the app, in each language. The other tests start Chrome in
+  of Screen, and that every text the code translates is in both dictionaries with the same places;
+  `tests/app/language-ui.mjs`: switching the language in the app, in each language, and an error in English with its
+  code; `tests/app/errors.mjs`: every code in its form, in `errors.md` with the same message, used in the code and in
+  no dictionary, and how a message is made, an unexpected one too. The other tests start Chrome in
   English (`LAUNCH` in `tests/app/setup.mjs`), since they find buttons by their English names: on my computer, in
   Portuguese, 34 of them failed once Lydia followed its language.
 

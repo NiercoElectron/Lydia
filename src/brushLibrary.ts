@@ -1,4 +1,4 @@
-import { LocalizedError, type ImportProblem } from './localizedError'
+import { LydiaError, type ImportProblem } from './errors'
 import { BRUSH_EXTENSION, MAX_BRUSH_FILE_BYTES, parseBrushFile, type BrushPreset } from './engine/brushFile'
 import { decodeTip, type BrushTip } from './engine/brushTip'
 
@@ -44,7 +44,7 @@ function orderOf(brush: LibraryBrush) {
 // One of the brushes that come with Lydia, by its file name ("soft-round")
 export function builtInBrush(name: string) {
   const brush = builtInBrushes.find(b => b.id === `built-in/${name}`)
-  if (!brush) throw new LocalizedError('Lydia has no brush called "{name}".', { name })
+  if (!brush) throw new LydiaError('LYD-214', { name })
   return brush
 }
 
@@ -127,12 +127,12 @@ export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
   for (const file of files) {
     try {
       if (!file.name.toLowerCase().endsWith(BRUSH_EXTENSION)) {
-        throw new LocalizedError('Only Lydia brushes ({extension} files) can be added.', { extension: BRUSH_EXTENSION })
+        throw new LydiaError('LYD-206', { extension: BRUSH_EXTENSION })
       }
-      if (file.size > MAX_BRUSH_FILE_BYTES) throw new LocalizedError('This file is too big to be a brush.')
+      if (file.size > MAX_BRUSH_FILE_BYTES) throw new LydiaError('LYD-207')
       const text = await file.text()
       if ([...library, ...added].some(brush => brush.file === text)) {
-        throw new LocalizedError('This brush is already in the list.')
+        throw new LydiaError('LYD-208')
       }
       const preset = parseBrushFile(text, file.name.slice(0, -BRUSH_EXTENSION.length))
       await decodeTip(preset.tip) // a tip that can't be painted with is found now, not at the first stroke

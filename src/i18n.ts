@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
-import { interpolate, LocalizedError } from './localizedError'
 import { ptBR } from './translations/pt-BR'
 import { es } from './translations/es'
+
+// The interface's texts in the language chosen (decision 63). Errors are not translated: see errors.ts
 
 export type LanguageChoice = 'system' | 'en' | 'pt-BR' | 'es'
 export type Locale = Exclude<LanguageChoice, 'system'>
@@ -24,6 +25,13 @@ export function resolveLocale(choice: LanguageChoice, languages: readonly string
   if (/^pt(?:-|$)/i.test(preferred)) return 'pt-BR'
   if (/^es(?:-|$)/i.test(preferred)) return 'es'
   return 'en'
+}
+
+// Put the values in the places like {name}, leaving a place with no value as it is
+function interpolate(source: string, values: Record<string, string | number>) {
+  return source.replace(/\{(\w+)\}/g, (place, key: string) =>
+    Object.hasOwn(values, key) ? String(values[key]) : place,
+  )
 }
 
 let choice = loadChoice()
@@ -80,12 +88,6 @@ function subscribe(listener: () => void) {
 
 export function useLanguage() {
   return useSyncExternalStore(subscribe, () => current)
-}
-
-// Resolve at the time the error is shown, so asynchronous work uses the latest language choice.
-export function translateError(error: unknown, fallback: string) {
-  if (error instanceof LocalizedError) return current.t(error.source, error.values)
-  return current.t(fallback)
 }
 
 // For new default names stored in the drawing, without recreating the engine when the language changes.

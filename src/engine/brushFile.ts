@@ -1,4 +1,4 @@
-import { LocalizedError } from '../localizedError'
+import { LydiaError } from '../errors'
 
 export const BRUSH_EXTENSION = '.lydbrush'
 export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each side
@@ -111,23 +111,20 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   try {
     data = JSON.parse(text)
   } catch {
-    throw new LocalizedError('This is not a Lydia brush.')
+    throw new LydiaError('LYD-201')
   }
-  if (!isRecord(data) || data.format !== FORMAT) throw new LocalizedError('This is not a Lydia brush.')
+  if (!isRecord(data) || data.format !== FORMAT) throw new LydiaError('LYD-201')
   if (typeof data.version !== 'number' || data.version > VERSION) {
-    throw new LocalizedError('This brush was made by a newer version of Lydia. Update Lydia to use it.')
+    throw new LydiaError('LYD-202')
   }
 
   if (typeof data.tip !== 'string' || !data.tip.startsWith(PNG_DATA_URL)) {
-    throw new LocalizedError('The tip of this brush is not a PNG image.')
+    throw new LydiaError('LYD-203')
   }
   const tip = fromBase64(data.tip.slice(PNG_DATA_URL.length))
   const { width, height } = pngSize(tip)
   if (width > MAX_TIP_SIZE || height > MAX_TIP_SIZE) {
-    throw new LocalizedError(
-      'The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}.',
-      { width, height, max: MAX_TIP_SIZE },
-    )
+    throw new LydiaError('LYD-204', { width, height, max: MAX_TIP_SIZE })
   }
 
   const shape = { ...DEFAULT_SHAPE }
@@ -176,7 +173,7 @@ function pngSize(png: Uint8Array) {
     String.fromCharCode(...png.subarray(12, 16)) === 'IHDR'
   const width = isPng ? view.getUint32(16) : 0
   const height = isPng ? view.getUint32(20) : 0
-  if (width === 0 || height === 0) throw new LocalizedError('The tip of this brush is not a PNG image.')
+  if (width === 0 || height === 0) throw new LydiaError('LYD-203')
   return { width, height }
 }
 
@@ -185,7 +182,7 @@ function fromBase64(text: string) {
   try {
     binary = atob(text)
   } catch {
-    throw new LocalizedError('The tip of this brush is not a PNG image.')
+    throw new LydiaError('LYD-203')
   }
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)

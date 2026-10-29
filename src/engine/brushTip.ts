@@ -1,4 +1,4 @@
-import { LocalizedError } from '../localizedError'
+import { LydiaError } from '../errors'
 
 // A brush tip ready to paint with: a white picture with the amount of paint in its alpha, so the brush can tint it
 // with any color
@@ -16,7 +16,7 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
     const blob = new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' })
     bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })
   } catch {
-    throw new LocalizedError('The tip of this brush is not a PNG image.')
+    throw new LydiaError('LYD-203')
   }
   const { width, height } = bitmap
   const image = document.createElement('canvas')
@@ -44,7 +44,7 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
       farthest = Math.max(farthest, Math.hypot(cornerX, cornerY))
     }
   }
-  if (farthest === 0) throw new LocalizedError('The tip of this brush has no paint.')
+  if (farthest === 0) throw new LydiaError('LYD-205')
   ctx.putImageData(pixels, 0, 0)
   return { image, reach: farthest / halfSide }
 }
@@ -119,6 +119,6 @@ export async function tipFromPicture(picture: Blob, pixel = false): Promise<Uint
     )
   }
   const png = await new Promise<Blob | null>(resolve => tip.toBlob(resolve, 'image/png'))
-  if (!png) throw new LocalizedError('Could not make a picture of the tip.')
+  if (!png) throw new LydiaError('LYD-213')
   return new Uint8Array(await png.arrayBuffer())
 }

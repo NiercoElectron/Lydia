@@ -1,4 +1,5 @@
-import { translateError, useLanguage, type LanguageChoice } from '../i18n'
+import { errorMessage } from '../errors'
+import { useLanguage, type LanguageChoice } from '../i18n'
 import { useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
@@ -43,7 +44,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
     try {
       onOpenProject(parseProject(await file.arrayBuffer()))
     } catch (error) {
-      alert(translateError(error, 'Could not open the project.'))
+      alert(errorMessage(error, 'LYD-105'))
     } finally {
       setIsOpening(false)
     }

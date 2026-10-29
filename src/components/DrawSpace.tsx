@@ -1,4 +1,4 @@
-import { translateError } from '../i18n'
+import { errorMessage } from '../errors'
 import { useEffect, useRef } from 'react'
 import { createEngine, type Engine } from '../engine/engine'
 import type { ProjectData } from '../engine/projectFile'
@@ -32,7 +32,7 @@ export function DrawSpace({ project, gpuMemory, onEngineChange }: Props) {
         }
       },
       error => {
-        if (!cancelled) alert(translateError(error, 'Could not start the drawing.'))
+        if (!cancelled) alert(errorMessage(error, 'LYD-402'))
       },
     )
     return () => {

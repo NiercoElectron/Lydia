@@ -30,7 +30,6 @@ try {
       eraser: 'Borracha',
       multiply: 'Multiplicar',
       tray: 'Bandeja',
-      error: 'Este arquivo não é um projeto do Lydia.',
       designer: 'Editor de pincéis',
       myBrush: 'Meu pincel',
       spacing: 'Espaçamento',
@@ -51,7 +50,6 @@ try {
       eraser: 'Borrador',
       multiply: 'Multiplicar',
       tray: 'Bandeja',
-      error: 'Este archivo no es un proyecto de Lydia.',
       designer: 'Editor de pinceles',
       myBrush: 'Mi pincel',
       spacing: 'Espaciado',
@@ -126,7 +124,8 @@ try {
     const projectInput = await other.$('input[type=file]')
     await projectInput.uploadFile(OUT + '/invalid-language.lyd')
     await other.waitForFunction(() => !document.querySelector('.home-actions button:nth-child(2)').disabled)
-    assert.equal(alerts.pop(), words.error)
+    // Errors stay in English, with their code, whatever the language (see src/errors.ts)
+    assert.equal(alerts.pop(), 'LYD-101: This file is not a Lydia project.')
     await other.click('.designer-start > button')
     await other.waitForSelector('.designer-panel')
     await other.waitForFunction(() => window.lydia?.engine)

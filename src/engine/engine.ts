@@ -1,5 +1,5 @@
 import { translate } from '../i18n'
-import { LocalizedError } from '../localizedError'
+import { LydiaError } from '../errors'
 import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
@@ -181,7 +181,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   blendModes[LOCKED_ALPHA] = [gl.DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE]
   if (!(renderer.gl instanceof WebGL2RenderingContext)) {
     app.destroy(KEEP_GLOBAL_RESOURCES)
-    throw new LocalizedError('Lydia needs WebGL 2, which this browser or graphics card does not support.')
+    throw new LydiaError('LYD-401')
   }
   app.canvas.style.display = 'block'
   app.canvas.style.touchAction = 'none' // the pen and the fingers paint instead of scrolling the page
@@ -949,7 +949,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canvas.width = grid.width * scale
     canvas.height = grid.height * scale
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new LocalizedError('This image is too big for this browser.')
+    if (!ctx) throw new LydiaError('LYD-304')
     ctx.imageSmoothingEnabled = false // enlarged, each pixel copied as a square, not blended with its neighbors
     // A tile's place and size in the image
     const drawTile = (picture: CanvasImageSource, column: number, row: number, width: number, height: number) =>
@@ -985,7 +985,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       drawTile(tileCanvas, column, row, width, height) // over white paper for a JPEG
     }
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
-    if (!blob) throw new LocalizedError('This image is too big for this browser.')
+    if (!blob) throw new LydiaError('LYD-304')
     // As many times more pixels in an inch, so that on paper it is as big as before, only sharper
     return withResolution(blob, project.dpi * scale)
   }

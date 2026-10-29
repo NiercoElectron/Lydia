@@ -1,3 +1,4 @@
+import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
@@ -147,8 +148,8 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
       setSavedId(id)
       setSavedFile(file)
       saveBrushId(id)
-    } catch {
-      alert(t('Could not save the brush in this browser.'))
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-212'))
     }
   }
 

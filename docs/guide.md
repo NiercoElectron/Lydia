@@ -17,6 +17,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Undo and redo](#undo-and-redo)
 - [Saving and exporting](#saving-and-exporting)
 - [The Brush Designer](#the-brush-designer)
+- [When something goes wrong](#when-something-goes-wrong)
 - [All shortcuts](#all-shortcuts)
 
 ## The start screen
@@ -287,6 +288,12 @@ Opened from the start screen, it draws the tip of a new brush.
 Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
 The tip is cut to its painted pixels. The settings that turn the tip or give it noise are left out; the new brush
 starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
+
+## When something goes wrong
+
+A message about something that went wrong starts with a code, like `LYD-201`, and is in English whatever the
+language chosen. [errors.md](errors.md) lists every code with what it means. When asking for help or reporting a
+problem, give the code, and what is in parentheses after the message if there is something.
 
 ## All shortcuts
 

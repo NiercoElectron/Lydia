@@ -1,4 +1,4 @@
-import { LocalizedError, type ImportProblem } from './localizedError'
+import { LydiaError, type ImportProblem } from './errors'
 
 // The tray (decision 43): images imported to put into drawings, kept while Lydia is open so they can be dragged onto
 // a drawing again and again without importing them again. Each keeps its file (compressed, so small) and a small
@@ -32,7 +32,7 @@ export async function makeTrayImages(files: File[]) {
     try {
       image = await createImageBitmap(file)
     } catch {
-      problems.push({ name: file.name, error: new LocalizedError('Not an image Lydia can open.') })
+      problems.push({ name: file.name, error: new LydiaError('LYD-301') })
       continue
     }
     const { width, height } = image

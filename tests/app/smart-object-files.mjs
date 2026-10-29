@@ -334,7 +334,7 @@ const damaged = await page.evaluate(
 )
 check(
   'a smart object with corners folded over itself is a damaged file',
-  damaged === 'This project file is damaged.',
+  damaged === 'LYD-104: This project file is damaged.',
   damaged,
 )
 

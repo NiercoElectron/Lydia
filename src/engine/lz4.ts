@@ -1,4 +1,4 @@
-import { LocalizedError } from '../localizedError'
+import { LydiaError } from '../errors'
 
 // LZ4, a very fast way to compress bytes. When some bytes already appeared a little earlier (a row of pixels of the
 // same color, a transparent area), it stores "copy N bytes from D bytes back" instead of the bytes themselves.
@@ -124,6 +124,5 @@ export function decompress(packed: Uint8Array, target: Bytes) {
       out += matchLength
     }
   }
-  if (out !== target.length)
-    throw new LocalizedError('Unpacked {actual} bytes, expected {expected}', { actual: out, expected: target.length })
+  if (out !== target.length) throw new LydiaError('LYD-001', { actual: out, expected: target.length })
 }

@@ -4,13 +4,6 @@ import { readFileSync, readdirSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 
-const errors = { exports: {} }
-vm.runInNewContext(
-  ts.transpileModule(readFileSync(new URL('../../src/localizedError.ts', import.meta.url), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS },
-  }).outputText,
-  errors,
-)
 const translations = { exports: {} }
 vm.runInNewContext(
   ts.transpileModule(readFileSync(new URL('../../src/translations/pt-BR.ts', import.meta.url), 'utf8'), {
@@ -31,12 +24,7 @@ function setup(saved = null, languages = ['pt-BR'], blocked = false) {
   const storage = new Map(saved === null ? [] : [['lydia.language', saved]])
   const context = {
     exports: {},
-    require: name =>
-      name === 'react'
-        ? { useSyncExternalStore: (_subscribe, get) => get() }
-        : name === './localizedError'
-          ? errors.exports
-          : translations.exports,
+    require: name => (name === 'react' ? { useSyncExternalStore: (_subscribe, get) => get() } : translations.exports),
     navigator: { languages, language: languages[0] },
     document: { documentElement: {} },
     window: {
@@ -66,22 +54,6 @@ assert.equal(api.useLanguage().locale, 'pt-BR')
 assert.equal(context.document.documentElement.lang, 'pt-BR')
 assert.equal(api.useLanguage().t('Language'), 'Idioma')
 assert.equal(api.useLanguage().t('Missing'), 'Missing')
-assert.equal(
-  api.translateError(new errors.exports.LocalizedError('This file is not a Lydia project.'), 'Failed'),
-  'Este arquivo não é um projeto do Lydia.',
-)
-assert.equal(
-  api.translateError(new Error('Internal browser detail'), 'Could not complete the operation.'),
-  'Não foi possível concluir a operação.',
-)
-const oversized = new errors.exports.LocalizedError(
-  'The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}.',
-  { width: 2048, height: 1024, max: 1024 },
-)
-assert.equal(oversized.message, 'The tip of this brush is too big (2048×1024 pixels). The biggest is 1024×1024.')
-assert.ok(
-  api.translateError(oversized, 'Failed').startsWith('A ponta deste pincel é grande demais (2048×1024 pixels).'),
-)
 assert.equal(api.useLanguage().t('Screen'), 'Tela')
 assert.equal(api.useLanguage().t('Screen', {}, 'blend'), 'Divisão')
 assert.equal(api.useLanguage().t('Show {name}', { name: 'Color' }), 'Mostrar Color')
@@ -101,10 +73,6 @@ assert.equal(spanish.api.useLanguage().t('Screen'), 'Pantalla')
 assert.equal(spanish.api.useLanguage().t('Screen', {}, 'blend'), 'Trama')
 assert.equal(spanish.api.useLanguage().t('Show {name}', { name: '$& {width}' }), 'Mostrar $& {width}')
 assert.equal(spanish.api.useLanguage().t('Missing'), 'Missing')
-assert.equal(
-  spanish.api.translateError(new errors.exports.LocalizedError('This file is not a Lydia project.'), 'Failed'),
-  'Este archivo no es un proyecto de Lydia.',
-)
 spanish.api.setLanguageChoice('es')
 spanish.context.navigator.languages = ['pt-BR']
 spanish.events.languagechange()
@@ -166,15 +134,8 @@ for (const dictionary of dictionaries) {
         entry.name.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
       )
       function visit(node) {
-        const isTranslation =
-          ts.isCallExpression(node) && ['t', 'translate', 'translateError'].includes(node.expression.getText(ast))
-        const isError = ts.isNewExpression(node) && node.expression.getText(ast) === 'LocalizedError'
-        const argument =
-          isTranslation && node.expression.getText(ast) === 'translateError'
-            ? node.arguments[1]
-            : isTranslation || isError
-              ? node.arguments?.[0]
-              : null
+        const isTranslation = ts.isCallExpression(node) && ['t', 'translate'].includes(node.expression.getText(ast))
+        const argument = isTranslation ? node.arguments[0] : null
         if (argument && ts.isStringLiteral(argument) && argument.text)
           assert.ok(Object.hasOwn(dictionary, argument.text), `Missing translation in ${entry.name}: ${argument.text}`)
         ts.forEachChild(node, visit)

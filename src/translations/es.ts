@@ -7,7 +7,6 @@ export const es: Record<string, string> = {
   'New project…': 'Nuevo proyecto…',
   'Opening…': 'Abriendo…',
   'Open project': 'Abrir proyecto',
-  'Could not open the project.': 'No se pudo abrir el proyecto.',
   "The colors of Lydia's buttons and panels (System: as the computer is set). The drawing never changes":
     'Los colores de los botones y paneles de Lydia (Sistema: según la configuración del equipo). El dibujo no cambia',
   'Brush Designer': 'Editor de pinceles',
@@ -254,10 +253,8 @@ export const es: Record<string, string> = {
   'or hold Space': 'o mantén Espacio',
   'Alt + click zooms out, dragging zooms smoothly': 'Alt + clic reduce el zoom; arrastrar ajusta el zoom suavemente',
   'or hold Shift + Space; Shift turns in steps of 15°': 'o mantén Shift + Espacio; Shift gira en pasos de 15°',
-  'Could not use this brush.': 'No se pudo usar este pincel.',
   'No brush was added.': 'No se añadió ningún pincel.',
   'Some files were not added.': 'No se añadieron algunos archivos.',
-  'Could not delete the brush.': 'No se pudo eliminar el pincel.',
   'No image was added.': 'No se añadió ninguna imagen.',
   'Exporting…': 'Exportando…',
   'Saving…': 'Guardando…',
@@ -266,8 +263,6 @@ export const es: Record<string, string> = {
     '¿Descartar los cambios de este dibujo y volver a la pantalla inicial?',
   'Delete the brush "{name}" from Lydia? Its file can be imported again.':
     '¿Eliminar el pincel "{name}" de Lydia? Su archivo se puede volver a importar.',
-  'Could not put {name} into the drawing.': 'No se pudo insertar {name} en el dibujo.',
-  '{label} failed.': 'Error en {label}.',
   'Pixel grid, shown from {zoom}% zoom (G)': 'Cuadrícula de píxeles, visible a partir de un zoom del {zoom}% (G)',
   'Add brushes from {extension} files (or drop the files on the window)':
     'Añadir pinceles desde archivos {extension} (o soltar los archivos en la ventana)',
@@ -349,7 +344,6 @@ export const es: Record<string, string> = {
   "What's New?": 'Novedades',
   Lydia: 'Lydia',
   'My brush': 'Mi pincel',
-  'Could not save the brush in this browser.': 'No se pudo guardar el pincel en este navegador.',
   'Leave the Brush Designer? This brush has changes that are not saved.':
     '¿Salir del editor de pinceles? Este pincel tiene cambios sin guardar.',
   'Tip: {width}×{height} pixels, the painted part of the paper.':
@@ -361,34 +355,6 @@ export const es: Record<string, string> = {
   'Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.':
     'Pinta la punta en el papel: el negro pinta, el gris pinta suavemente y el blanco no pinta.',
   'Click to type a value': 'Pulsa para escribir un valor',
-  'This is not a Lydia brush.': 'Este archivo no es un pincel de Lydia.',
-  'This brush was made by a newer version of Lydia. Update Lydia to use it.':
-    'Este pincel se creó con una versión más reciente de Lydia. Actualiza Lydia para usarlo.',
-  'The tip of this brush is not a PNG image.': 'La punta de este pincel no es una imagen PNG.',
-  'The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}.':
-    'La punta de este pincel es demasiado grande ({width}×{height} píxeles). El máximo es {max}×{max}.',
-  'Unpacked {actual} bytes, expected {expected}': 'Se descomprimieron {actual} bytes; se esperaban {expected}',
-  'This project was made with Lydia 0.1, and this version of Lydia can no longer open it.':
-    'Este proyecto se creó con Lydia 0.1 y ya no se puede abrir en esta versión de Lydia.',
-  'This file is not a Lydia project.': 'Este archivo no es un proyecto de Lydia.',
-  'This project file is damaged.': 'Este archivo de proyecto está dañado.',
-  'This project was made with a newer version of Lydia. Update Lydia to open it.':
-    'Este proyecto se creó con una versión más reciente de Lydia. Actualiza Lydia para abrirlo.',
-  'Lydia needs WebGL 2, which this browser or graphics card does not support.':
-    'Lydia necesita WebGL 2, que no es compatible con este navegador o tarjeta gráfica.',
-  'This image is too big for this browser.': 'Esta imagen es demasiado grande para este navegador.',
-  'Lydia has no brush called "{name}".': 'Lydia no tiene ningún pincel llamado "{name}".',
-  'Only Lydia brushes ({extension} files) can be added.':
-    'Solo se pueden añadir pinceles de Lydia (archivos {extension}).',
-  'This file is too big to be a brush.': 'Este archivo es demasiado grande para ser un pincel.',
-  'This brush is already in the list.': 'Este pincel ya está en la lista.',
-  'The tip of this brush has no paint.': 'La punta de este pincel no tiene pintura.',
-  'Could not make a picture of the tip.': 'No se pudo crear una imagen de la punta.',
-  'Not an image Lydia can open.': 'Lydia no puede abrir esta imagen.',
-  'Could not import this file.': 'No se pudo importar este archivo.',
-  'Could not put the image into the drawing.': 'No se pudo insertar la imagen en el dibujo.',
-  'Could not complete the operation.': 'No se pudo completar la operación.',
-  'Could not start the drawing.': 'No se pudo iniciar el dibujo.',
   'brush.Soft round': 'Redondo suave',
   'brush.Hard round': 'Redondo duro',
   'brush.Airbrush': 'Aerógrafo',

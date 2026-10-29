@@ -1,4 +1,5 @@
-import { translateError, useLanguage } from '../i18n'
+import { errorMessage, type ErrorCode } from '../errors'
+import { useLanguage } from '../i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
@@ -116,7 +117,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         // A drawn pixel brush starts at 1×, its tip as it was drawn (see dabs.ts)
         if (brush.preset.pixel === 'drawn') setSize(Math.max(tip.image.width, tip.image.height))
       },
-      error => alert(translateError(error, 'Could not use this brush.')),
+      error => alert(errorMessage(error, 'LYD-210')),
     )
     return () => {
       cancelled = true
@@ -140,7 +141,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       if (problems.length > 0) {
         const title = added.length === 0 ? 'No brush was added.' : 'Some files were not added.'
         alert(
-          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${translateError(problem.error, 'Could not import this file.')}`).join('\n')}`,
+          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${errorMessage(problem.error, 'LYD-209')}`).join('\n')}`,
         )
       }
     },
@@ -160,8 +161,8 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       return
     try {
       await removeBrush(chosen)
-    } catch {
-      alert(t('Could not delete the brush.'))
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-211'))
       return
     }
     setBrushes(list => list.filter(b => b !== chosen))
@@ -180,7 +181,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       if (problems.length > 0) {
         const title = added.length === 0 ? 'No image was added.' : 'Some files were not added.'
         alert(
-          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${translateError(problem.error, 'Could not import this file.')}`).join('\n')}`,
+          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${errorMessage(problem.error, 'LYD-302')}`).join('\n')}`,
         )
       }
       return added
@@ -201,7 +202,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       try {
         await engine.placeImage(await createImageBitmap(image.file), image.name, at)
       } catch (error) {
-        alert(translateError(error, 'Could not put the image into the drawing.'))
+        alert(errorMessage(error, 'LYD-303'))
       }
     },
     [engine],
@@ -289,12 +290,12 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   }, [snapshot.isModified])
 
   // Run a slow task (saving, exporting), showing what is being done meanwhile
-  async function runTask(label: string, task: () => Promise<void>) {
+  async function runTask(label: string, failed: ErrorCode, task: () => Promise<void>) {
     setBusy(label)
     try {
       await task()
     } catch (error) {
-      alert(translateError(error, 'Could not complete the operation.'))
+      alert(errorMessage(error, failed))
     } finally {
       setBusy(null)
     }
@@ -306,12 +307,14 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
     // An enlarged image says how many times in its name, as "@4x"
     const scale = snapshot.exportScales.includes(snapshot.exportScale) ? snapshot.exportScale : 1
     const name = `lydia-${timestamp()}${scale > 1 ? `@${scale}x` : ''}.${extension}`
-    runTask('Exporting…', async () => downloadBlob(await engine.exportImage(type), name))
+    runTask('Exporting…', 'LYD-305', async () => downloadBlob(await engine.exportImage(type), name))
   }
 
   function handleSave() {
     if (!engine) return
-    runTask('Saving…', async () => downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`))
+    runTask('Saving…', 'LYD-106', async () =>
+      downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`),
+    )
   }
 
   function handleBack() {

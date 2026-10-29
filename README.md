@@ -71,6 +71,9 @@ labels that need different translations. The translated release histories are in
 `src/translations/changelog.es.md`; new releases fall back to English until a translation is added. `npm run test:app -- language language-ui` checks
 language preferences, translation coverage, release history and switching languages in the interface.
 
+Error messages are not translated: they stay in English, each starting with a code such as `LYD-201`, listed with
+what each means in [docs/errors.md](docs/errors.md).
+
 ## Roadmap
 
 Done: tiled canvases up to 10000×10000, layers (add, delete, reorder, rename, hide, opacity, duplicate, merge down,

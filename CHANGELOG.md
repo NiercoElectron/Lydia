@@ -11,9 +11,13 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 - Spanish throughout the interface and release history, with an Español option and automatic detection of
   Spanish system language variants such as es-ES, es-MX and es-AR.
-- Brazilian Portuguese throughout the interface, including the Brush Designer, release history and file errors.
+- Brazilian Portuguese throughout the interface, including the Brush Designer and the release history.
   The start screen offers System, Português (Brasil) and English, remembers the choice, and detects Portuguese from
   the browser's preferred language. New layer and folder names use the chosen language; user names stay unchanged.
+- **Error codes**: every error message starts with a code, like LYD-201, and stays in English whatever the
+  language, so that it can be looked up in [docs/errors.md](docs/errors.md) or given in a report
+  ([decision 63](docs/decisions.md#63-lydia-in-portuguese-and-spanish)). An error Lydia didn't expect is told under the
+  code of what was being done, with its cause in parentheses.
 
 ## [0.11.1] - 2026-10-29
 
