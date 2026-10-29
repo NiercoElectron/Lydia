@@ -68,6 +68,8 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 Next, roughly in this order:
 
 - [ ] Selections: magic wand
+- [ ] Colors: a color triangle (a ring of hues around a triangle of shades) in place of the color picker
+- [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
       the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
       that bend the picture where each one is dragged), pen tilt (the brush follows how the pen leans, like a
