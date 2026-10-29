@@ -1,4 +1,5 @@
 import changelog from '../CHANGELOG.md?raw'
+import changelogPtBR from './translations/changelog.pt-BR.md?raw'
 
 // What changed in each version, for the start screen's "What's New?" (see WhatsNew.tsx), read from CHANGELOG.md as
 // it is when Lydia is built, so it follows every new version by itself
@@ -47,3 +48,10 @@ export function readReleases(text: string): Release[] {
 }
 
 export const releases = readReleases(changelog)
+
+const portugueseReleases = new Map(readReleases(changelogPtBR).map(release => [release.version, release]))
+
+// New releases remain visible in English until their translation is added.
+export function releasesFor(locale: string): Release[] {
+  return locale === 'pt-BR' ? releases.map(release => portugueseReleases.get(release.version) ?? release) : releases
+}

@@ -7,6 +7,12 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- Brazilian Portuguese throughout the interface, including the Brush Designer, release history and file errors.
+  The start screen offers System, Português (Brasil) and English, remembers the choice, and detects Portuguese from
+  the browser's preferred language. New layer and folder names use the chosen language; user names stay unchanged.
+
 ## [0.11.1] - 2026-10-29
 
 ### Changed

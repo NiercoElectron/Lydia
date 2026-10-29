@@ -1,3 +1,4 @@
+import { LocalizedError, type ImportProblem } from './localizedError'
 import { BRUSH_EXTENSION, MAX_BRUSH_FILE_BYTES, parseBrushFile, type BrushPreset } from './engine/brushFile'
 import { decodeTip, type BrushTip } from './engine/brushTip'
 
@@ -43,7 +44,7 @@ function orderOf(brush: LibraryBrush) {
 // One of the brushes that come with Lydia, by its file name ("soft-round")
 export function builtInBrush(name: string) {
   const brush = builtInBrushes.find(b => b.id === `built-in/${name}`)
-  if (!brush) throw new Error(`Lydia has no brush called "${name}".`)
+  if (!brush) throw new LocalizedError('Lydia has no brush called "{name}".', { name })
   return brush
 }
 
@@ -122,23 +123,23 @@ export async function loadBrushes(): Promise<LibraryBrush[]> {
 // out with a message saying why
 export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
   const added: LibraryBrush[] = []
-  const problems: string[] = []
+  const problems: ImportProblem[] = []
   for (const file of files) {
     try {
       if (!file.name.toLowerCase().endsWith(BRUSH_EXTENSION)) {
-        throw new Error(`Only Lydia brushes (${BRUSH_EXTENSION} files) can be added.`)
+        throw new LocalizedError('Only Lydia brushes ({extension} files) can be added.', { extension: BRUSH_EXTENSION })
       }
-      if (file.size > MAX_BRUSH_FILE_BYTES) throw new Error('This file is too big to be a brush.')
+      if (file.size > MAX_BRUSH_FILE_BYTES) throw new LocalizedError('This file is too big to be a brush.')
       const text = await file.text()
       if ([...library, ...added].some(brush => brush.file === text)) {
-        throw new Error('This brush is already in the list.')
+        throw new LocalizedError('This brush is already in the list.')
       }
       const preset = parseBrushFile(text, file.name.slice(0, -BRUSH_EXTENSION.length))
       await decodeTip(preset.tip) // a tip that can't be painted with is found now, not at the first stroke
       const id = await withStore('readwrite', store => store.add({ file: text }))
       added.push({ id: `added/${id}`, isBuiltIn: false, preset, file: text })
     } catch (error) {
-      problems.push(`${file.name}: ${error instanceof Error ? error.message : 'could not be added.'}`)
+      problems.push({ name: file.name, error })
     }
   }
   return { added, problems }

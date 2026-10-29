@@ -1,3 +1,4 @@
+import { translateError, useLanguage } from '../i18n'
 import { useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
@@ -25,6 +26,7 @@ type Props = {
 }
 
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
+  const { t, locale, choice, setChoice } = useLanguage()
   const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
   const [isOpening, setIsOpening] = useState(false)
   const [isPixelTip, setIsPixelTip] = useState(false) // the Brush Designer makes a pixel brush
@@ -41,7 +43,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
     try {
       onOpenProject(parseProject(await file.arrayBuffer()))
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Could not open the project.')
+      alert(translateError(error, 'Could not open the project.'))
     } finally {
       setIsOpening(false)
     }
@@ -52,30 +54,40 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
       <div className="home-choices">
         <h1>Lydia v{version}</h1>
         <div className="home-actions">
-          <button onClick={() => setIsChoosingNew(true)}>New project…</button>
+          <button onClick={() => setIsChoosingNew(true)}>{t('New project…')}</button>
           <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
-            {isOpening ? 'Opening…' : 'Open project'}
+            {isOpening ? t('Opening…') : t('Open project')}
           </button>
         </div>
         <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
         <div
           className="button-group theme-choice"
-          title="The colors of Lydia's buttons and panels (System: as the computer is set). The drawing never changes"
+          title={t(
+            "The colors of Lydia's buttons and panels (System: as the computer is set). The drawing never changes",
+          )}
         >
-          Interface
+          {t('Interface')}
           {THEME_CHOICES.map(([value, label]) => (
             <button key={value} aria-pressed={theme.choice === value} onClick={() => setThemeChoice(value)}>
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
+        <label className="theme-choice">
+          {t('Language')}
+          <select value={choice} onChange={e => setChoice(e.target.value as 'system' | 'en' | 'pt-BR')}>
+            <option value="system">{t('System')}</option>
+            <option value="pt-BR">Português (Brasil)</option>
+            <option value="en">English</option>
+          </select>
+        </label>
         {isChoosingNew && <NewProjectDialog onCreate={onNewProject} onCancel={() => setIsChoosingNew(false)} />}
 
         <section className="designer-start">
-          <h2>Brush Designer</h2>
-          <p className="hint">Draw the tip of a new brush, try it, and save it to your brushes or as a file.</p>
+          <h2>{t('Brush Designer')}</h2>
+          <p className="hint">{t('Draw the tip of a new brush, try it, and save it to your brushes or as a file.')}</p>
           <label>
-            Brush
+            {t('Brush')}
             <span className="button-group">
               <button
                 aria-pressed={!isPixelTip}
@@ -83,9 +95,9 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
                   setIsPixelTip(false)
                   setTipSize(DEFAULT_TIP_SIZE)
                 }}
-                title="A brush for painting: its tip is resized to any size, smoothly"
+                title={t('A brush for painting: its tip is resized to any size, smoothly')}
               >
-                Smooth
+                {t('Smooth')}
               </button>
               <button
                 aria-pressed={isPixelTip}
@@ -93,54 +105,58 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
                   setIsPixelTip(true)
                   setTipSize(DEFAULT_PIXEL_TIP_SIZE)
                 }}
-                title="A brush for pixel art: its tip is drawn pixel by pixel, and paints at 1×, 2×, 3×… its size"
+                title={t('A brush for pixel art: its tip is drawn pixel by pixel, and paints at 1×, 2×, 3×… its size')}
               >
-                Pixel
+                {t('Pixel')}
               </button>
             </span>
           </label>
           <label>
-            Tip paper
+            {t('Tip paper')}
             <select value={tipSize} onChange={e => setTipSize(Number(e.target.value))}>
               {(isPixelTip ? PIXEL_TIP_SIZES : TIP_SIZES).map(tip => (
                 <option key={tip} value={tip}>
                   {tip}×{tip}
-                  {tip === (isPixelTip ? DEFAULT_PIXEL_TIP_SIZE : DEFAULT_TIP_SIZE) ? ' (default)' : ''}
+                  {tip === (isPixelTip ? DEFAULT_PIXEL_TIP_SIZE : DEFAULT_TIP_SIZE) ? t(' (default)') : ''}
                 </option>
               ))}
             </select>
           </label>
-          <button onClick={() => onOpenDesigner(tipSize, isPixelTip)}>Open Brush Designer</button>
+          <button onClick={() => onOpenDesigner(tipSize, isPixelTip)}>{t('Open Brush Designer')}</button>
         </section>
 
         <section className="gpu-memory">
-          <h2>Graphics card memory</h2>
+          <h2>{t('Graphics card memory')}</h2>
           <label>
-            Memory Lydia may use to keep layers ready
+            {t('Memory Lydia may use to keep layers ready')}
             <select value={gpuMemory} onChange={e => onGpuMemoryChange(Number(e.target.value))}>
               {GPU_MEMORY_CHOICES.map(gigabytes => (
                 <option key={gigabytes} value={gigabytes}>
-                  {gigabytes} GB ({tilesInGigabytes(gigabytes).toLocaleString('en-US')} tiles
-                  {gigabytes === DEFAULT_GPU_MEMORY ? ', default' : ''})
+                  {gigabytes.toLocaleString(locale)} GB ({tilesInGigabytes(gigabytes).toLocaleString(locale)}{' '}
+                  {t('tiles')}
+                  {gigabytes === DEFAULT_GPU_MEMORY ? t(', default') : ''})
                 </option>
               ))}
             </select>
           </label>
           <p className="hint">
-            A tile is a square of 256×256 pixels of a layer. A full layer of 10000×10000 has 1,600 tiles.
+            {t('A tile is a square of 256×256 pixels of a layer. A full layer of 10000×10000 has 1,600 tiles.')}
           </p>
           <div className="danger">
             <p className="danger-title">
-              <span aria-hidden="true">⚠️</span> Too much can crash Lydia or slow down your whole computer
+              <span aria-hidden="true">⚠️</span> {t('Too much can crash Lydia or slow down your whole computer')}
             </p>
             <p>
-              Lydia uses this much on top of about 1 GB for the drawing itself. If your graphics card doesn't have that
-              much free memory, the computer starts using its RAM instead and everything becomes very slow, or the
-              browser loses the graphics card: the drawing stops working and changes that weren't saved are lost.
+              {t(
+                "Lydia uses this much on top of about 1 GB for the drawing itself. If your graphics card doesn't have that much free memory, the computer starts using its RAM instead and everything becomes very slow, or the browser loses the graphics card: the drawing stops working and changes that weren't saved are lost.",
+              )}
             </p>
             <p>
-              <strong>Choose at most half of your graphics card's memory.</strong> To see it on Windows: Task Manager →
-              Performance → GPU → Dedicated GPU memory. If you're not sure, keep {DEFAULT_GPU_MEMORY} GB.
+              <strong>{t("Choose at most half of your graphics card's memory.")}</strong>{' '}
+              {t(
+                'To see it on Windows: Task Manager → Performance → GPU → Dedicated GPU memory. If you are unsure, keep',
+              )}{' '}
+              {DEFAULT_GPU_MEMORY} GB.
             </p>
           </div>
         </section>

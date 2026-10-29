@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import {
   Box,
   ChevronDown,
@@ -116,6 +117,7 @@ export function LayersPanel({
   onOpacityChange,
   onOpacityChangeEnd,
 }: Props) {
+  const { t } = useLanguage()
   const byId = new Map(layers.map(layer => [layer.id, layer]))
   const active = byId.get(activeLayerId)
   // From the top to the bottom, like in Photoshop and Krita, without what is in closed folders
@@ -201,53 +203,53 @@ export function LayersPanel({
 
   return (
     <aside className="layers-panel">
-      <h2>Layers</h2>
+      <h2>{t('Layers')}</h2>
       <div className="layers-actions">
-        <button onClick={onAdd}>New layer</button>
+        <button onClick={onAdd}>{t('New layer')}</button>
         <button
           onClick={onAddFolder}
-          title="Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)"
+          title={t('Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)')}
         >
-          New folder
+          {t('New folder')}
         </button>
         <button
           onClick={onAddOutside}
           disabled={!active || (!active.isFolder && active.parentId === null)}
-          title="Add a layer above the folder the active layer is in (or above the active folder), out of it"
+          title={t('Add a layer above the folder the active layer is in (or above the active folder), out of it')}
         >
-          New layer outside
+          {t('New layer outside')}
         </button>
-        <button onClick={onDuplicate} title="Copy the active layer or folder above it (Ctrl+J)">
-          Duplicate
+        <button onClick={onDuplicate} title={t('Copy the active layer or folder above it (Ctrl+J)')}>
+          {t('Duplicate')}
         </button>
         <button
           onClick={onMergeDown}
           disabled={!canMergeDown}
           title={
             active?.isFolder
-              ? 'Merge all that is in the active folder into one layer (Ctrl+E)'
-              : 'Merge the active layer into the one under it (Ctrl+E). Both must be shown'
+              ? t('Merge all that is in the active folder into one layer (Ctrl+E)')
+              : t('Merge the active layer into the one under it (Ctrl+E). Both must be shown')
           }
         >
-          {active?.isFolder ? 'Merge folder' : 'Merge down'}
+          {t(active?.isFolder ? 'Merge folder' : 'Merge down')}
         </button>
         <button
           onClick={onDelete}
           disabled={!canDelete}
-          title={active?.isFolder ? 'Delete the active folder with all that is in it' : 'Delete the active layer'}
+          title={active?.isFolder ? t('Delete the active folder with all that is in it') : t('Delete the active layer')}
         >
-          {active?.isFolder ? 'Delete folder' : 'Delete layer'}
+          {t(active?.isFolder ? 'Delete folder' : 'Delete layer')}
         </button>
       </div>
       {active && (
-        <label className="layer-blend" title="How the active layer's paint goes onto what is under it">
-          Blend
+        <label className="layer-blend" title={t("How the active layer's paint goes onto what is under it")}>
+          {t('Blend')}
           <select value={active.blendMode} onChange={e => onBlendModeChange(active.id, e.target.value as BlendMode)}>
             {blendGroups.map(({ label, modes }) => (
-              <optgroup key={label} label={label}>
+              <optgroup key={label} label={t(label)}>
                 {modes.map(([mode, name]) => (
                   <option key={mode} value={mode}>
-                    {name}
+                    {t(name, {}, 'blend')}
                   </option>
                 ))}
               </optgroup>
@@ -284,18 +286,18 @@ export function LayersPanel({
                 type="checkbox"
                 checked={layer.visible}
                 onChange={e => onVisibleChange(layer.id, e.target.checked)}
-                aria-label={`Show ${layer.name}`}
-                title={layer.visible ? 'Hide' : 'Show'}
+                aria-label={t('Show {name}', { name: layer.name })}
+                title={layer.visible ? t('Hide') : t('Show')}
               />
               {layer.clipped && (
-                <CornerLeftDown className="clip-arrow" size={14} aria-label="Clipped to the layers under it" />
+                <CornerLeftDown className="clip-arrow" size={14} aria-label={t('Clipped to the layers under it')} />
               )}
               {layer.isFolder && (
                 <button
                   className="icon-button folder-toggle"
                   aria-expanded={layer.isOpen}
                   onClick={() => onOpenChange(layer.id, !layer.isOpen)}
-                  title={layer.isOpen ? 'Close the folder' : 'Open the folder'}
+                  title={layer.isOpen ? t('Close the folder') : t('Open the folder')}
                 >
                   {layer.isOpen ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
                 </button>
@@ -314,8 +316,10 @@ export function LayersPanel({
                   aria-pressed={layer.id === activeLayerId}
                   title={
                     layer.isFolder
-                      ? 'Drag to move with all that is in it, or drop a layer on it to put it in; double-click to rename'
-                      : 'Drag to move (onto a folder to put it in), double-click to rename'
+                      ? t(
+                          'Drag to move with all that is in it, or drop a layer on it to put it in; double-click to rename',
+                        )
+                      : t('Drag to move (onto a folder to put it in), double-click to rename')
                   }
                   onClick={() => onSelect(layer.id)}
                   onDoubleClick={() => setRenamingId(layer.id)}
@@ -326,11 +330,11 @@ export function LayersPanel({
                 >
                   {layer.isFolder &&
                     (layer.isOpen ? (
-                      <FolderOpen className="smart-icon" size={14} aria-label="Folder" />
+                      <FolderOpen className="smart-icon" size={14} aria-label={t('Folder')} />
                     ) : (
-                      <Folder className="smart-icon" size={14} aria-label="Folder" />
+                      <Folder className="smart-icon" size={14} aria-label={t('Folder')} />
                     ))}
-                  {layer.isSmart && <Box className="smart-icon" size={14} aria-label="Smart object" />}
+                  {layer.isSmart && <Box className="smart-icon" size={14} aria-label={t('Smart object')} />}
                   {layer.name}
                 </button>
               )}
@@ -341,8 +345,8 @@ export function LayersPanel({
                   onClick={() => onAlphaLockChange(layer.id, !layer.alphaLocked)}
                   title={
                     layer.alphaLocked
-                      ? 'Its transparency is locked: painting only colors the paint already there. Click to unlock'
-                      : 'Lock its transparency: painting would only color the paint already there'
+                      ? t('Its transparency is locked: painting only colors the paint already there. Click to unlock')
+                      : t('Lock its transparency: painting would only color the paint already there')
                   }
                 >
                   {layer.alphaLocked ? <Lock size={14} aria-hidden /> : <LockOpen size={14} aria-hidden />}
@@ -355,10 +359,12 @@ export function LayersPanel({
                 onClick={() => onClipChange(layer.id, !layer.clipped)}
                 title={
                   !layer.canClip
-                    ? 'The bottom one, here, has nothing under it to be clipped to'
+                    ? t('The bottom one, here, has nothing under it to be clipped to')
                     : layer.clipped
-                      ? 'It is clipped: it shows only where the layer under it has paint. Click to unclip (Ctrl+Alt+G)'
-                      : 'Clip it to the layer under it: it would show only where that layer has paint (Ctrl+Alt+G)'
+                      ? t(
+                          'It is clipped: it shows only where the layer under it has paint. Click to unclip (Ctrl+Alt+G)',
+                        )
+                      : t('Clip it to the layer under it: it would show only where that layer has paint (Ctrl+Alt+G)')
                 }
               >
                 <Paperclip size={14} aria-hidden />
@@ -370,8 +376,8 @@ export function LayersPanel({
                   onClick={() => onOffPaperChange(layer.id, !layer.showsOffPaper)}
                   title={
                     layer.showsOffPaper
-                      ? 'Hide the paint of this layer that is off the paper'
-                      : 'This layer has paint off the paper: show it, faded, around the paper'
+                      ? t('Hide the paint of this layer that is off the paper')
+                      : t('This layer has paint off the paper: show it, faded, around the paper')
                   }
                 >
                   <ScanEye size={14} aria-hidden />
@@ -392,13 +398,14 @@ type NameInputProps = {
 
 // Typing a new name: Enter or clicking elsewhere keeps it, Escape keeps the old one
 function NameInput({ name, onDone }: NameInputProps) {
+  const { t } = useLanguage()
   return (
     <input
       className="layer-name"
       type="text"
       defaultValue={name}
       maxLength={MAX_NAME_LENGTH}
-      aria-label="Layer name"
+      aria-label={t('Layer name')}
       autoFocus
       onFocus={e => e.currentTarget.select()}
       onBlur={e => onDone(e.currentTarget.value)}
@@ -417,6 +424,7 @@ type OpacitySliderProps = {
 }
 
 function OpacitySlider({ opacity, onChange, onChangeEnd }: OpacitySliderProps) {
+  const { t } = useLanguage()
   const percent = Math.round(opacity * 100)
   const input = useRef<HTMLInputElement>(null)
 
@@ -430,7 +438,7 @@ function OpacitySlider({ opacity, onChange, onChangeEnd }: OpacitySliderProps) {
 
   return (
     <label className="opacity">
-      Opacity
+      {t('Opacity')}
       <input
         ref={input}
         type="range"

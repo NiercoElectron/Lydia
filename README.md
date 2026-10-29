@@ -52,8 +52,23 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Save and open projects as `.lyd` files
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)
 - A light or a dark interface, or as the computer is set (on the start screen)
+- English or Brazilian Portuguese, selected on the start screen or detected from the system language; the browser
+  remembers the choice
 
 How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
+
+## Language
+
+On the start screen, **Language / Idioma** offers **System / Sistema**, **Português (Brasil)** and **English**.
+System uses Brazilian Portuguese when the browser's first preferred language is Portuguese, and English otherwise.
+The choice is remembered between visits and follows system language changes while System is selected.
+Names you give to layers and brushes stay as you wrote them; default names for new layers use the current language.
+
+Interface translations are in `src/translations/pt-BR.ts`, with English source text as keys. Values such as
+`{name}` are substituted without translating user data. Context keys (for example, `blend.Screen`) distinguish
+labels that need different translations. The translated release history is in `src/translations/changelog.pt-BR.md`;
+new releases fall back to English until a translation is added. `npm run test:app -- language language-ui` checks
+language preferences, translation coverage, release history and switching languages in the interface.
 
 ## Roadmap
 

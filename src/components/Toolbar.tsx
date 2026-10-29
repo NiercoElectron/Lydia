@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
@@ -121,6 +122,7 @@ export function Toolbar({
   onOutlineToggle,
   onPixelPerfectToggle,
 }: Props) {
+  const { t } = useLanguage()
   const isSelecting = tool === 'select' || tool === 'lasso'
   const isMoving = tool === 'move'
   if (transform.transform) {
@@ -135,7 +137,7 @@ export function Toolbar({
   return (
     <div className="toolbar">
       <label>
-        Color
+        {t('Color')}
         <ColorInput color={color} disabled={tool === 'eraser'} onChange={onColorChange} />
       </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
@@ -143,28 +145,28 @@ export function Toolbar({
       {(isSelecting || isMoving) && (
         <button
           onClick={transform.onStart}
-          title="Scale, turn, skew or distort what is selected, or the layer (Ctrl+T)"
+          title={t('Scale, turn, skew or distort what is selected, or the layer (Ctrl+T)')}
         >
-          Transform
+          {t('Transform')}
         </button>
       )}
       {isBlocked && (
         <>
-          <span className="notice">This layer is a smart object: it can't be painted on.</span>
-          <button onClick={transform.onConvertToPixels} title="It keeps its pixels, but no longer its original">
-            Convert to pixels
+          <span className="notice">{t("This layer is a smart object: it can't be painted on.")}</span>
+          <button onClick={transform.onConvertToPixels} title={t('It keeps its pixels, but no longer its original')}>
+            {t('Convert to pixels')}
           </button>
         </>
       )}
       {isFolder && (tool === 'brush' || tool === 'eraser' || tool === 'fill') && (
-        <span className="notice">This is a folder: choose a layer in it to paint on.</span>
+        <span className="notice">{t('This is a folder: choose a layer in it to paint on.')}</span>
       )}
       {tool === 'eraser' && isAlphaLocked && !isBlocked && (
-        <span className="notice">This layer's transparency is locked: the eraser can't take paint away.</span>
+        <span className="notice">{t("This layer's transparency is locked: the eraser can't take paint away.")}</span>
       )}
       {tool !== 'fill' && !isSelecting && !isMoving && (
-        <label title="Brush size ([ and ])">
-          Size
+        <label title={t('Brush size ([ and ])')}>
+          {t('Size')}
           <input
             type="range"
             min={MIN_BRUSH_SIZE}
@@ -176,8 +178,8 @@ export function Toolbar({
         </label>
       )}
       {!isSelecting && !isMoving && (
-        <label title="How much a stroke or a fill covers, however many times a stroke passes over a place">
-          Opacity
+        <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
+          {t('Opacity')}
           <input
             type="range"
             min={1}
@@ -198,9 +200,9 @@ export function Toolbar({
         <button
           aria-pressed={isPixelPerfectOn}
           onClick={onPixelPerfectToggle}
-          title="Lines without doubled corners: each step of a line is a single pixel"
+          title={t('Lines without doubled corners: each step of a line is a single pixel')}
         >
-          Pixel-perfect
+          {t('Pixel-perfect')}
         </button>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
@@ -216,10 +218,11 @@ function FillControls({
   fill: FillSettings
   onFillChange: (change: Partial<FillSettings>) => void
 }) {
+  const { t } = useLanguage()
   return (
     <>
-      <label title="How far a color can be from the one clicked and still be filled, from 0 to 255">
-        Tolerance
+      <label title={t('How far a color can be from the one clicked and still be filled, from 0 to 255')}>
+        {t('Tolerance')}
         <input
           type="range"
           min={0}
@@ -229,17 +232,21 @@ function FillControls({
         />
         <SliderValue value={fill.tolerance} min={0} max={255} onChange={tolerance => onFillChange({ tolerance })} />
       </label>
-      <span className="button-group" title="What the fill looks at to find where to stop">
-        Look at
+      <span className="button-group" title={t('What the fill looks at to find where to stop')}>
+        {t('Look at')}
         <button aria-pressed={fill.reference === 'all'} onClick={() => onFillChange({ reference: 'all' })}>
-          All layers
+          {t('All layers')}
         </button>
         <button aria-pressed={fill.reference === 'layer'} onClick={() => onFillChange({ reference: 'layer' })}>
-          This layer
+          {t('This layer')}
         </button>
       </span>
-      <label title="At most how many pixels the fill goes past its edge, behind the soft edge of the lines around it, up to where they are darkest">
-        Expand
+      <label
+        title={t(
+          'At most how many pixels the fill goes past its edge, behind the soft edge of the lines around it, up to where they are darkest',
+        )}
+      >
+        {t('Expand')}
         <input
           type="range"
           min={0}
@@ -260,51 +267,60 @@ function FillControls({
 }
 
 function SelectionButtons({ selection }: { selection: SelectionControls }) {
+  const { t } = useLanguage()
   return (
     <>
-      <span className="button-group" title="Edges of new selections: soft, or whole pixels for pixel art">
-        Edges
+      <span className="button-group" title={t('Edges of new selections: soft, or whole pixels for pixel art')}>
+        {t('Edges')}
         <button aria-pressed={!selection.hardEdges} onClick={() => selection.onHardEdgesChange(false)}>
-          Soft
+          {t('Soft')}
         </button>
         <button aria-pressed={selection.hardEdges} onClick={() => selection.onHardEdgesChange(true)}>
-          Hard
+          {t('Hard')}
         </button>
       </span>
-      <button onClick={selection.onSelectAll} title="Select everything (Ctrl+A)">
-        Select all
+      <button onClick={selection.onSelectAll} title={t('Select everything (Ctrl+A)')}>
+        {t('Select all')}
       </button>
-      <button onClick={selection.onDeselect} disabled={!selection.hasSelection} title="Select nothing (Ctrl+D)">
-        Deselect
+      <button onClick={selection.onDeselect} disabled={!selection.hasSelection} title={t('Select nothing (Ctrl+D)')}>
+        {t('Deselect')}
       </button>
-      <button onClick={selection.onInvert} title="Select what isn't selected, and the other way round (Ctrl+Shift+I)">
-        Invert
+      <button
+        onClick={selection.onInvert}
+        title={t("Select what isn't selected, and the other way round (Ctrl+Shift+I)")}
+      >
+        {t('Invert')}
       </button>
     </>
   )
 }
 
 function TransformButtons({ controls, smooth }: { controls: TransformControls; smooth: boolean }) {
+  const { t } = useLanguage()
   return (
     <>
       <span className="notice">
-        Drag the corners or the sides to scale (Shift changes the proportions, Alt from the middle), outside to turn,
-        with Ctrl to distort or skew
+        {t(
+          'Drag the corners or the sides to scale (Shift changes the proportions, Alt from the middle), outside to turn, with Ctrl to distort or skew',
+        )}
       </span>
-      <span className="button-group" title="How the pixels are worked out: smoothly, or as whole pixels for pixel art">
-        Pixels
+      <span
+        className="button-group"
+        title={t('How the pixels are worked out: smoothly, or as whole pixels for pixel art')}
+      >
+        {t('Pixels')}
         <button aria-pressed={smooth} onClick={() => controls.onSmoothChange(true)}>
-          Smooth
+          {t('Smooth')}
         </button>
         <button aria-pressed={!smooth} onClick={() => controls.onSmoothChange(false)}>
-          Whole
+          {t('Whole')}
         </button>
       </span>
-      <button onClick={controls.onApply} title="Apply (Enter)">
-        Apply
+      <button onClick={controls.onApply} title={t('Apply (Enter)')}>
+        {t('Apply')}
       </button>
-      <button onClick={controls.onCancel} title="Cancel (Esc)">
-        Cancel
+      <button onClick={controls.onCancel} title={t('Cancel (Esc)')}>
+        {t('Cancel')}
       </button>
     </>
   )
@@ -318,11 +334,12 @@ export function StabilizerControls({
   stabilizer: StabilizerSettings
   onChange: (change: Partial<StabilizerSettings>) => void
 }) {
+  const { t } = useLanguage()
   const { mode, strength } = stabilizer
   return (
     <>
-      <label title="Smoother strokes: the brush follows the pen instead of being exactly where it is. 0 is off">
-        Stabilizer
+      <label title={t('Smoother strokes: the brush follows the pen instead of being exactly where it is. 0 is off')}>
+        {t('Stabilizer')}
         <input
           type="range"
           min={0}
@@ -336,16 +353,18 @@ export function StabilizerControls({
         <button
           aria-pressed={mode === 'smooth'}
           onClick={() => onChange({ mode: 'smooth' })}
-          title="The brush chases the pen, lagging behind it, and keeps going when the pen holds still"
+          title={t('The brush chases the pen, lagging behind it, and keeps going when the pen holds still')}
         >
-          Smooth
+          {t('Smooth')}
         </button>
         <button
           aria-pressed={mode === 'string'}
           onClick={() => onChange({ mode: 'string' })}
-          title="The pen pulls the brush on a string: the brush only moves when the pen goes further than the string"
+          title={t(
+            'The pen pulls the brush on a string: the brush only moves when the pen goes further than the string',
+          )}
         >
-          String
+          {t('String')}
         </button>
       </span>
     </>
@@ -366,10 +385,11 @@ export function TaperControls({
   taper: TaperSettings
   onChange: (change: Partial<TaperSettings>) => void
 }) {
+  const { t } = useLanguage()
   return (
     <>
-      <label title="Over how many pixels of the paper the stroke's start thins out. 0 is not at all">
-        Taper start
+      <label title={t("Over how many pixels of the paper the stroke's start thins out. 0 is not at all")}>
+        {t('Taper start')}
         <input
           type="range"
           min={0}
@@ -379,8 +399,12 @@ export function TaperControls({
         />
         <SliderValue value={taper.start} min={0} max={MAX_TAPER} unit=" px" onChange={start => onChange({ start })} />
       </label>
-      <label title="Over how many pixels of the paper the stroke's end thins out, once the pen comes up. 0 is not at all">
-        Taper end
+      <label
+        title={t(
+          "Over how many pixels of the paper the stroke's end thins out, once the pen comes up. 0 is not at all",
+        )}
+      >
+        {t('Taper end')}
         <input
           type="range"
           min={0}
@@ -390,11 +414,11 @@ export function TaperControls({
         />
         <SliderValue value={taper.end} min={0} max={MAX_TAPER} unit=" px" onChange={end => onChange({ end })} />
       </label>
-      <span className="button-group" title="What thins out toward the stroke's ends">
-        Thins
+      <span className="button-group" title={t("What thins out toward the stroke's ends")}>
+        {t('Thins')}
         {THINS.map(({ value, label }) => (
           <button key={value} aria-pressed={taper.thins === value} onClick={() => onChange({ thins: value })}>
-            {label}
+            {t(label)}
           </button>
         ))}
       </span>
@@ -404,18 +428,24 @@ export function TaperControls({
 
 // Turns the pixel grid on and off. Also used by the Brush Designer
 export function GridButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
+  const { t } = useLanguage()
   return (
-    <button aria-pressed={isOn} onClick={onToggle} title={`Pixel grid, shown from ${PIXEL_GRID_ZOOM * 100}% zoom (G)`}>
-      Grid
+    <button
+      aria-pressed={isOn}
+      onClick={onToggle}
+      title={t('Pixel grid, shown from {zoom}% zoom (G)', { zoom: PIXEL_GRID_ZOOM * 100 })}
+    >
+      {t('Grid')}
     </button>
   )
 }
 
 // Shows the outline of the brush's tip under the pointer, or the cursor's cross. Also used by the Brush Designer
 export function OutlineButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
+  const { t } = useLanguage()
   return (
-    <button aria-pressed={isOn} onClick={onToggle} title="The outline of the brush under the pointer">
-      Outline
+    <button aria-pressed={isOn} onClick={onToggle} title={t('The outline of the brush under the pointer')}>
+      {t('Outline')}
     </button>
   )
 }

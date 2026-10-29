@@ -1,3 +1,5 @@
+import { translate } from '../i18n'
+import { LocalizedError } from '../localizedError'
 import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
 import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
@@ -179,7 +181,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   blendModes[LOCKED_ALPHA] = [gl.DST_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE]
   if (!(renderer.gl instanceof WebGL2RenderingContext)) {
     app.destroy(KEEP_GLOBAL_RESOURCES)
-    throw new Error('Lydia needs WebGL 2, which this browser or graphics card does not support.')
+    throw new LocalizedError('Lydia needs WebGL 2, which this browser or graphics card does not support.')
   }
   app.canvas.style.display = 'block'
   app.canvas.style.touchAction = 'none' // the pen and the fingers paint instead of scrolling the page
@@ -201,7 +203,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           }
           return layer
         })
-      : [createLayer('Layer 1')]
+      : [createLayer(translate('Layer {number}', { number: 1 }))]
   // Each layer's folder, from its position (see projectFile.ts)
   project.layers.forEach(({ parent }, index) => {
     if (parent !== undefined) layers[index].parent = layers[parent]
@@ -511,7 +513,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // A new empty layer above the active one, which becomes the active layer
   function addLayer() {
     if (isBusy()) return
-    addItem(createLayer(`Layer ${++layersCreated}`))
+    addItem(createLayer(translate('Layer {number}', { number: ++layersCreated })))
   }
 
   // Add a layer right above the folder the active layer is in, or above the active folder: out of it, in the folder
@@ -520,13 +522,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const active = stack.active
     const folder = isFolder(active) ? active : active.parent
     if (isBusy() || !folder) return
-    addItem(createLayer(`Layer ${++layersCreated}`), stack.layers.indexOf(folder) + 1, folder.parent)
+    addItem(
+      createLayer(translate('Layer {number}', { number: ++layersCreated })),
+      stack.layers.indexOf(folder) + 1,
+      folder.parent,
+    )
   }
 
   // Add an empty folder (see isFolder in layers.ts), like a new layer
   function addFolder() {
     if (isBusy()) return
-    addItem(createFolder(`Folder ${++foldersCreated}`))
+    addItem(createFolder(translate('Folder {number}', { number: ++foldersCreated })))
   }
 
   // Put a new layer or folder at this position, in this folder (null: none), and make it the active one. By default,
@@ -557,7 +563,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function groupActive() {
     if (isBusy()) return
     const item = stack.active
-    const folder = createFolder(`Folder ${++foldersCreated}`)
+    const folder = createFolder(translate('Folder {number}', { number: ++foldersCreated }))
     folder.parent = item.parent
     folder.clipped = item.clipped
     history.recordOrder(folder)
@@ -643,7 +649,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const index = activeIndex(stack)
       const copies = new Map<Layer, Layer>()
       for (const layer of stack.layers.slice(blockStart(stack, index), index + 1)) {
-        copies.set(layer, copyOf(layer, layer === original ? `${layer.name} copy` : layer.name))
+        copies.set(
+          layer,
+          copyOf(layer, layer === original ? translate('{name} copy', { name: layer.name }) : layer.name),
+        )
       }
       for (const [layer, each] of copies) each.parent = layer === original ? layer.parent : copies.get(layer.parent!)!
       const copy = copies.get(original)!
@@ -940,7 +949,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canvas.width = grid.width * scale
     canvas.height = grid.height * scale
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('This image is too big for this browser.')
+    if (!ctx) throw new LocalizedError('This image is too big for this browser.')
     ctx.imageSmoothingEnabled = false // enlarged, each pixel copied as a square, not blended with its neighbors
     // A tile's place and size in the image
     const drawTile = (picture: CanvasImageSource, column: number, row: number, width: number, height: number) =>
@@ -976,7 +985,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       drawTile(tileCanvas, column, row, width, height) // over white paper for a JPEG
     }
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, `image/${type}`, JPEG_QUALITY))
-    if (!blob) throw new Error('This image is too big for this browser.')
+    if (!blob) throw new LocalizedError('This image is too big for this browser.')
     // As many times more pixels in an inch, so that on paper it is as big as before, only sharper
     return withResolution(blob, project.dpi * scale)
   }
@@ -1524,7 +1533,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         if (kind === 'part' || kind === 'image') {
           // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
           // the projection keeps putting tiles together with the same layers under the active one as what it shows
-          target = createLayer(done.name ?? `Layer ${++layersCreated}`)
+          target = createLayer(done.name ?? translate('Layer {number}', { number: ++layersCreated }))
           target.parent = layer.parent
           insideClipped(target, stack.layers.indexOf(layer) + 1)
           history.recordOrder(target)

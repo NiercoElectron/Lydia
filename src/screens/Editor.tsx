@@ -1,3 +1,4 @@
+import { translateError, useLanguage } from '../i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
@@ -40,6 +41,7 @@ type Props = {
 }
 
 export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props) {
+  const { t } = useLanguage()
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<Tool>('brush')
@@ -114,7 +116,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         // A drawn pixel brush starts at 1×, its tip as it was drawn (see dabs.ts)
         if (brush.preset.pixel === 'drawn') setSize(Math.max(tip.image.width, tip.image.height))
       },
-      error => alert(error instanceof Error ? error.message : 'Could not use this brush.'),
+      error => alert(translateError(error, 'Could not use this brush.')),
     )
     return () => {
       cancelled = true
@@ -137,10 +139,12 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       }
       if (problems.length > 0) {
         const title = added.length === 0 ? 'No brush was added.' : 'Some files were not added.'
-        alert(`${title}\n\n${problems.join('\n')}`)
+        alert(
+          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${translateError(problem.error, 'Could not import this file.')}`).join('\n')}`,
+        )
       }
     },
-    [brushes],
+    [brushes, t],
   )
 
   function exportBrush(chosen: LibraryBrush) {
@@ -148,11 +152,16 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   }
 
   async function deleteBrush(chosen: LibraryBrush) {
-    if (!window.confirm(`Delete the brush "${chosen.preset.name}" from Lydia? Its file can be imported again.`)) return
+    if (
+      !window.confirm(
+        t('Delete the brush "{name}" from Lydia? Its file can be imported again.', { name: chosen.preset.name }),
+      )
+    )
+      return
     try {
       await removeBrush(chosen)
     } catch {
-      alert('Could not delete the brush.')
+      alert(t('Could not delete the brush.'))
       return
     }
     setBrushes(list => list.filter(b => b !== chosen))
@@ -170,11 +179,13 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       }
       if (problems.length > 0) {
         const title = added.length === 0 ? 'No image was added.' : 'Some files were not added.'
-        alert(`${title}\n\n${problems.join('\n')}`)
+        alert(
+          `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${translateError(problem.error, 'Could not import this file.')}`).join('\n')}`,
+        )
       }
       return added
     },
-    [onTrayChange],
+    [onTrayChange, t],
   )
 
   function removeFromTray(image: TrayImage) {
@@ -190,7 +201,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       try {
         await engine.placeImage(await createImageBitmap(image.file), image.name, at)
       } catch (error) {
-        alert(error instanceof Error ? error.message : `Could not put ${image.name} into the drawing.`)
+        alert(translateError(error, 'Could not put the image into the drawing.'))
       }
     },
     [engine],
@@ -283,7 +294,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
     try {
       await task()
     } catch (error) {
-      alert(error instanceof Error ? error.message : `${label} failed.`)
+      alert(translateError(error, 'Could not complete the operation.'))
     } finally {
       setBusy(null)
     }
@@ -306,7 +317,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   function handleBack() {
     if (
       snapshot.isModified &&
-      !window.confirm('Discard the changes to this drawing and go back to the start screen?')
+      !window.confirm(t('Discard the changes to this drawing and go back to the start screen?'))
     ) {
       return
     }
@@ -358,24 +369,24 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onPixelPerfectToggle={togglePixelPerfect}
         />
         <div className="actions">
-          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">
-            Undo
+          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title={t('Undo (Ctrl+Z)')}>
+            {t('Undo')}
           </button>
-          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title="Redo (Ctrl+Shift+Z)">
-            Redo
+          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title={t('Redo (Ctrl+Shift+Z)')}>
+            {t('Redo')}
           </button>
           <button onClick={() => engine?.clearLayer()} disabled={!engine}>
-            Clear layer
+            {t('Clear layer')}
           </button>
           <ViewControls engine={engine} />
           <button onClick={() => handleExport('png')} disabled={!engine || busy !== null}>
-            Export PNG
+            {t('Export PNG')}
           </button>
           <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null}>
-            Export JPEG
+            {t('Export JPEG')}
           </button>
-          <label title="How many times bigger images are exported, each pixel a square of pixels (for pixel art)">
-            Scale
+          <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>
+            {t('Scale')}
             <select
               value={snapshot.exportScale}
               disabled={!engine || snapshot.exportScales.length < 2}
@@ -389,14 +400,14 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
             </select>
           </label>
           <button onClick={handleSave} disabled={!engine || busy !== null}>
-            Save
+            {t('Save')}
           </button>
-          <button onClick={handleBack}>Back</button>
+          <button onClick={handleBack}>{t('Back')}</button>
           {(busy || snapshot.task || snapshot.isUpdating) && (
             <span className="busy">
-              {busy ?? snapshot.task ?? 'Updating…'}
+              {t(busy ?? snapshot.task ?? 'Updating…')}
               {!busy && snapshot.task && snapshot.progress !== null && (
-                <progress value={snapshot.progress} aria-label={snapshot.task} />
+                <progress value={snapshot.progress} aria-label={t(snapshot.task)} />
               )}
             </span>
           )}
@@ -447,7 +458,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       </div>
       {isDroppingFiles && (
         <div className="drop-hint">
-          Drop brush files or images to add them to Lydia (an image dropped on the drawing goes into it)
+          {t('Drop brush files or images to add them to Lydia (an image dropped on the drawing goes into it)')}
         </div>
       )}
     </div>

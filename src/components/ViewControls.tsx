@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import type { Engine } from '../engine/engine'
 import { MAX_ZOOM, MIN_ZOOM } from '../engine/view'
 import { useViewState } from './engineHooks'
@@ -12,6 +13,7 @@ function percent(zoom: number) {
 // How the drawing is shown: its zoom and rotation, which can be typed in, with buttons to turn it straight again, flip
 // it like in a mirror and show all of it
 export function ViewControls({ engine }: { engine: Engine | null }) {
+  const { t } = useLanguage()
   const view = useViewState(engine)
   return (
     <span className="view-controls">
@@ -21,7 +23,7 @@ export function ViewControls({ engine }: { engine: Engine | null }) {
         max={MAX_ZOOM * 100}
         step={0}
         unit="%"
-        hint="Zoom (Ctrl + mouse wheel, or the zoom tool: Z)"
+        hint={t('Zoom (Ctrl + mouse wheel, or the zoom tool: Z)')}
         disabled={!engine}
         onChange={value => engine?.zoomView(value / 100)}
       />
@@ -31,27 +33,27 @@ export function ViewControls({ engine }: { engine: Engine | null }) {
         max={360}
         step={0}
         unit="°"
-        hint="How far the view is turned (the rotate tool: R, or Shift + Space + drag)"
+        hint={t('How far the view is turned (the rotate tool: R, or Shift + Space + drag)')}
         disabled={!engine}
         onChange={degrees => engine?.turnView(degrees)}
       />
       <button
         onClick={() => engine?.straightenView()}
         disabled={!engine || view.rotation === 0}
-        title="Turn the view straight again"
+        title={t('Turn the view straight again')}
       >
-        Straighten
+        {t('Straighten')}
       </button>
       <button
         aria-pressed={view.flipped}
         onClick={() => engine?.flipView()}
         disabled={!engine}
-        title="Flip the view like in a mirror; the drawing itself doesn't change (M)"
+        title={t("Flip the view like in a mirror; the drawing itself doesn't change (M)")}
       >
-        Flip
+        {t('Flip')}
       </button>
-      <button onClick={() => engine?.fitToScreen()} disabled={!engine} title="Show the whole drawing (Ctrl+0)">
-        Fit
+      <button onClick={() => engine?.fitToScreen()} disabled={!engine} title={t('Show the whole drawing (Ctrl+0)')}>
+        {t('Fit')}
       </button>
     </span>
   )

@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import type { BrushShape } from '../engine/brushFile'
 import type { BrushTip } from '../engine/brushTip'
@@ -18,6 +19,7 @@ type Props = {
 // A place to try a brush while it is being made. It starts with a sample stroke, and every stroke drawn on it is
 // painted again whenever the brush changes, to compare
 export function BrushTestArea({ tip, shape }: Props) {
+  const { t } = useLanguage()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState(40)
   const [clears, setClears] = useState(0) // goes up when the area is cleared, to paint it again
@@ -102,7 +104,7 @@ export function BrushTestArea({ tip, shape }: Props) {
   const pixelRatio = window.devicePixelRatio || 1
   return (
     <div className="test-area">
-      {!tip && <p className="hint">Paint the tip on the paper to try the brush here.</p>}
+      {!tip && <p className="hint">{t('Paint the tip on the paper to try the brush here.')}</p>}
       <canvas
         ref={canvasRef}
         className="test-canvas"
@@ -115,7 +117,7 @@ export function BrushTestArea({ tip, shape }: Props) {
       />
       <div className="test-controls">
         <label>
-          Size
+          {t('Size')}
           <input
             type="range"
             min={MIN_SIZE}
@@ -125,7 +127,7 @@ export function BrushTestArea({ tip, shape }: Props) {
           />
           <SliderValue value={size} min={MIN_SIZE} max={MAX_SIZE} onChange={setSize} />
         </label>
-        <button onClick={handleClear}>Clear</button>
+        <button onClick={handleClear}>{t('Clear')}</button>
       </div>
     </div>
   )
