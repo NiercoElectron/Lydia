@@ -1632,6 +1632,24 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Merge folder with the picture unchanged, and undo; the move tool moving a folder, shown while dragging, and undo;
   Delete folder with its layers, and undo; saved with the drawing.
 
+## 59. The tests of the app in the repository
+
+- **Date:** 2026-10-28
+- **Status:** adopted
+- **Decision:** the tests Claude wrote along with each feature, which use Lydia in Chrome as a person would (clicking,
+  painting with the mouse, reading the colors on the screen, saving and opening files), are kept in the repository,
+  in `tests/app`, and run with `npm run test:app` (my choice). They were in a temporary folder of Claude's, where they
+  could be lost, and no one else could run them. The 31 that still apply came, each named after what it checks; the
+  older ones were measurements made once, or were replaced by these.
+- **How:** each test starts a development server of its own (port 5198, with a Vite cache of its own) and opens Chrome
+  without a window through puppeteer-core, a development dependency. `tests/app/setup.mjs` finds Chrome, or the
+  browser in `CHROME_PATH`; what the tests make goes into `tests/app/output`, which isn't kept in git, and drawings
+  saved by older versions, which Lydia must still open, are kept in `tests/app/files`. How to run and write them is in
+  `tests/app/README.md`.
+- **Known:** a test that measures time (`move-tool`) can fail now and then on a busy computer. puppeteer-core 24 brings
+  a package that `npm audit` warns about (basic-ftp, for downloading browsers), which the tests never use and which
+  isn't part of Lydia; version 25 changes how it is used, for later.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

@@ -102,6 +102,7 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 | `npm run lint`         | Run ESLint                                 |
 | `npm run format`       | Format all files with Prettier             |
 | `npm run format:check` | Check that all files follow the code style |
+| `npm run test:app`     | Run the tests of the app in Chrome         |
 
 ## Project structure
 
@@ -117,6 +118,8 @@ src/
 └── App.tsx          Chooses which screen to show
 scripts/
 └── make-brushes.mjs Makes the files in src/brushes (node scripts/make-brushes.mjs)
+tests/
+└── app/             Tests that use the app in Chrome as a person would (see tests/app/README.md)
 ```
 
 Dependencies only go one way: `screens` → `components` → `engine`. Code in `engine/` must not import React.

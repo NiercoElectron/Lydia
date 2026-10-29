@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# What the tests of the app write (see tests/app/README.md)
+tests/app/output
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
