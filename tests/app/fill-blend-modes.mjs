@@ -2,7 +2,7 @@
 // paint that doesn't show doesn't stop it, and paint that shows does
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, CHROME, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 
 // ----- In the app -----
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
+const browser = await puppeteer.launch(LAUNCH)
 const page = await browser.newPage()
 const problems = []
 page.on('pageerror', e => problems.push('PAGE ERROR ' + e))

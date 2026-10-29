@@ -2,7 +2,7 @@
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import fs from 'fs'
-import { CACHE_DIR, CHROME, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
 
 const server = await createServer({
   root: ROOT,
@@ -12,7 +12,7 @@ const server = await createServer({
   logLevel: 'silent',
 })
 await server.listen()
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
+const browser = await puppeteer.launch(LAUNCH)
 const page = await browser.newPage()
 const problems = []
 page.on('pageerror', e => problems.push('PAGE ERROR ' + e))

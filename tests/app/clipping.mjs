@@ -2,7 +2,7 @@
 // blend mode, undo, a new layer inside the group, deleting and moving the base, saved, copied, merged down
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, CHROME, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 
 // ----- In the app -----
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
+const browser = await puppeteer.launch(LAUNCH)
 const page = await browser.newPage()
 const problems = []
 page.on('pageerror', e => problems.push('PAGE ERROR ' + e))

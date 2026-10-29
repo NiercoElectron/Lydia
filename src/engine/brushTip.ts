@@ -1,4 +1,5 @@
 import { LocalizedError } from '../localizedError'
+
 // A brush tip ready to paint with: a white picture with the amount of paint in its alpha, so the brush can tint it
 // with any color
 export type BrushTip = {

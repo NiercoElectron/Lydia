@@ -5,7 +5,7 @@ import fs from 'node:fs'
 // dragged; Shift keeping it straight; paint moved off the paper; a click doing nothing; and a whole 10000² layer
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, CHROME, FILES, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, FILES, LAUNCH, OUT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -14,7 +14,7 @@ const server = await createServer({
   logLevel: 'silent',
 })
 await server.listen()
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
+const browser = await puppeteer.launch(LAUNCH)
 const page = await browser.newPage()
 const problems = []
 page.on('pageerror', e => problems.push('PAGE ERROR ' + e))

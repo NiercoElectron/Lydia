@@ -1,4 +1,5 @@
 import { LocalizedError } from '../localizedError'
+
 export const BRUSH_EXTENSION = '.lydbrush'
 export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each side
 export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip of 1024×1024 full of detail is well under this

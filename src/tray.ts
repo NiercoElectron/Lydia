@@ -1,4 +1,5 @@
 import { LocalizedError, type ImportProblem } from './localizedError'
+
 // The tray (decision 43): images imported to put into drawings, kept while Lydia is open so they can be dragged onto
 // a drawing again and again without importing them again. Each keeps its file (compressed, so small) and a small
 // picture to show; the image itself is decoded again every time it goes into a drawing, so the tray holds no big

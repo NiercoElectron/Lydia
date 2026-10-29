@@ -32,4 +32,5 @@ drawings with many layers.
 Copy a test close to what you want to check: they all start the same way (the server, the browser, and small helpers
 to click buttons, paint, read colors), then check one feature. The page gives tests a way in: `window.lydia` has the
 engine, the projection, the stack of layers and the view (see `src/components/DrawSpace.tsx`). Paths come from
-[setup.mjs](setup.mjs).
+[setup.mjs](setup.mjs), and so does the way to start Chrome (`LAUNCH`), in English whatever the computer's language,
+since the tests find buttons by their English names.

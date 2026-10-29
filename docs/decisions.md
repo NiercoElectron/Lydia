@@ -1650,9 +1650,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   older ones were measurements made once, or were replaced by these.
 - **How:** each test starts a development server of its own (port 5198, with a Vite cache of its own) and opens Chrome
   without a window through puppeteer-core, a development dependency. `tests/app/setup.mjs` finds Chrome, or the
-  browser in `CHROME_PATH`; what the tests make goes into `tests/app/output`, which isn't kept in git, and drawings
-  saved by older versions, which Lydia must still open, are kept in `tests/app/files`. How to run and write them is in
-  `tests/app/README.md`.
+  browser in `CHROME_PATH`, and starts it in English (decision 63); what the tests make goes into
+  `tests/app/output`, which isn't kept in git, and drawings saved by older versions, which Lydia must still open, are
+  kept in `tests/app/files`. How to run and write them is in `tests/app/README.md`.
 - **Known:** a test that measures time (`move-tool`) can fail now and then on a busy computer. puppeteer-core 24 brings
   a package that `npm audit` warns about (basic-ftp, for downloading browsers), which the tests never use and which
   isn't part of Lydia; version 25 changes how it is used, for later.
@@ -1790,6 +1790,39 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Checked:** `tests/app/fill-blend-modes.mjs`: a yellow stripe in Multiply over red, which doesn't show, doesn't stop
   the fill, and stops it once Normal; a stripe clipped to a band, where it doesn't show over the paper, doesn't stop it,
   and the band does; a stripe in a folder at 0% doesn't stop it. The three failed with the fill as it was.
+
+## 63. Lydia in Portuguese and Spanish
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** everything in Lydia was in English, which keeps out the people who don't read it.
+- **Decision:** the interface comes in English, Brazilian Portuguese and Spanish: every button, title and hint, the
+  tasks ("Moving…"), the errors of files that can't be opened, the names of new layers and folders, and the history
+  of versions in **What's New?**. On the start screen, **Language** offers **System**, **Português (Brasil)**,
+  **English** and **Español**. System follows the browser's first language (Portuguese or Spanish, English for any
+  other) and changes with it. The browser remembers the choice. The docs, the README and the code stay in English.
+- **How:**
+  - Lydia's own small dictionary for each language, without a library (`src/translations/pt-BR.ts` and `es.ts`). The
+    key is the English text as the code has it, and a text missing from a dictionary shows in English. A value such
+    as a number or a name goes in a place like `{name}`, so it isn't translated. When one English word needs two
+    translations, a context goes before it: "Screen" is a group of paper sizes ("Tela"), and a blend mode
+    (`blend.Screen`, "Divisão", the name Photoshop gives it in Portuguese).
+  - `src/i18n.ts` keeps the choice and gives the screens their texts (`useLanguage`). Choosing another language
+    changes them at once, without opening the drawing again.
+  - Errors of files (a brush, a project, an image that can't be opened) are `LocalizedError`s
+    (`src/localizedError.ts`): they keep the English message for the console, and are translated when shown, in the
+    language chosen then.
+  - A new layer or folder is named in the language chosen when it is made ("Camada 2"). Names already given, by me or
+    by Lydia, stay as they were, and so does the drawing file.
+  - The history of versions is translated in `src/translations/changelog.pt-BR.md` and `changelog.es.md`. A version
+    not translated yet shows in English.
+- **Known:** each new text in the interface needs its translation in both dictionaries (the test below finds the ones
+  missing), and each new version its lines in both translated histories.
+- **Checked:** `tests/app/language.mjs`: the choice, the system's language, the places for values, the two meanings
+  of Screen, and that every text the code translates is in both dictionaries with the same places; and
+  `tests/app/language-ui.mjs`: switching the language in the app, in each language. The other tests start Chrome in
+  English (`LAUNCH` in `tests/app/setup.mjs`), since they find buttons by their English names: on my computer, in
+  Portuguese, 34 of them failed once Lydia followed its language.
 
 ## Open questions
 

@@ -26,3 +26,7 @@ const CHROME_PLACES = {
 }
 export const CHROME = process.env.CHROME_PATH ?? (CHROME_PLACES[process.platform] ?? []).find(path => existsSync(path))
 if (!CHROME) throw new Error('Google Chrome was not found: set CHROME_PATH to the browser to run the tests with.')
+
+// How the tests start Chrome: in English whatever the computer's language, since Lydia follows the browser's language
+// (see src/i18n.ts) and the tests find buttons and read texts by their English words
+export const LAUNCH = { executablePath: CHROME, headless: true, args: ['--lang=en-US'] }

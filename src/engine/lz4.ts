@@ -1,4 +1,5 @@
 import { LocalizedError } from '../localizedError'
+
 // LZ4, a very fast way to compress bytes. When some bytes already appeared a little earlier (a row of pixels of the
 // same color, a transparent area), it stores "copy N bytes from D bytes back" instead of the bytes themselves.
 // Unpacking is little more than copying, which matters because tiles are unpacked while the user paints. The bytes

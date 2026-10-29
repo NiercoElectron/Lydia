@@ -36,6 +36,9 @@ On a Mac, Cmd works wherever Ctrl is written.
   16, 32 or 64 for a pixel brush.
 - **Interface**: the colors of Lydia's buttons and panels: **System** (as the computer is set, changing with it),
   **Light** or **Dark**. The drawing never changes color.
+- **Language**: **System** (the browser's language: Brazilian Portuguese or Spanish, English for any other, changing
+  with it), **Português (Brasil)**, **English** or **Español**. Names given to layers and brushes stay as they were;
+  new layers and folders are named in the language chosen.
 - **What's New?**, at the right (below, in a narrow window): what changed in each version, the newest open. Click a
   version to open or close it.
 - **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes

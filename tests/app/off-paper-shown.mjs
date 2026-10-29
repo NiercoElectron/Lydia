@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, CHROME, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -12,7 +12,7 @@ const server = await createServer({
   logLevel: 'silent',
 })
 await server.listen()
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
+const browser = await puppeteer.launch(LAUNCH)
 const page = await browser.newPage()
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }])
 const problems = []
