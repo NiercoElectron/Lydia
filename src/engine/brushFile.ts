@@ -1,3 +1,4 @@
+import { LocalizedError } from '../localizedError'
 export const BRUSH_EXTENSION = '.lydbrush'
 export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each side
 export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip of 1024×1024 full of detail is well under this
@@ -109,21 +110,22 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error('This is not a Lydia brush.')
+    throw new LocalizedError('This is not a Lydia brush.')
   }
-  if (!isRecord(data) || data.format !== FORMAT) throw new Error('This is not a Lydia brush.')
+  if (!isRecord(data) || data.format !== FORMAT) throw new LocalizedError('This is not a Lydia brush.')
   if (typeof data.version !== 'number' || data.version > VERSION) {
-    throw new Error('This brush was made by a newer version of Lydia. Update Lydia to use it.')
+    throw new LocalizedError('This brush was made by a newer version of Lydia. Update Lydia to use it.')
   }
 
   if (typeof data.tip !== 'string' || !data.tip.startsWith(PNG_DATA_URL)) {
-    throw new Error('The tip of this brush is not a PNG image.')
+    throw new LocalizedError('The tip of this brush is not a PNG image.')
   }
   const tip = fromBase64(data.tip.slice(PNG_DATA_URL.length))
   const { width, height } = pngSize(tip)
   if (width > MAX_TIP_SIZE || height > MAX_TIP_SIZE) {
-    throw new Error(
-      `The tip of this brush is too big (${width}×${height} pixels). The biggest is ${MAX_TIP_SIZE}×${MAX_TIP_SIZE}.`,
+    throw new LocalizedError(
+      'The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}.',
+      { width, height, max: MAX_TIP_SIZE },
     )
   }
 
@@ -173,7 +175,7 @@ function pngSize(png: Uint8Array) {
     String.fromCharCode(...png.subarray(12, 16)) === 'IHDR'
   const width = isPng ? view.getUint32(16) : 0
   const height = isPng ? view.getUint32(20) : 0
-  if (width === 0 || height === 0) throw new Error('The tip of this brush is not a PNG image.')
+  if (width === 0 || height === 0) throw new LocalizedError('The tip of this brush is not a PNG image.')
   return { width, height }
 }
 
@@ -182,7 +184,7 @@ function fromBase64(text: string) {
   try {
     binary = atob(text)
   } catch {
-    throw new Error('The tip of this brush is not a PNG image.')
+    throw new LocalizedError('The tip of this brush is not a PNG image.')
   }
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)

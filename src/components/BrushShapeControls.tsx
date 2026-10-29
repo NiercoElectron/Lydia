@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import type { BrushShape, NoiseMode } from '../engine/brushFile'
 import { SliderValue } from './SliderValue'
 
@@ -16,14 +17,15 @@ type Props = {
 // The settings of a brush, in the Brush Designer. Fractions in the file are shown as percents. A pixel brush's tip is
 // never turned and has no noise, so those settings are left out for it
 export function BrushShapeControls({ shape, onChange }: Props) {
+  const { t } = useLanguage()
   const change = (changes: Partial<BrushShape>) => onChange({ ...shape, ...changes })
   const hasNoise = shape.noiseAmount > 0
   const isPixel = shape.pixel !== 'none'
   return (
     <div className="shape-controls">
       <Slider
-        label="Spacing"
-        hint="The distance between copies of the tip, compared with the brush size"
+        label={t('Spacing')}
+        hint={t('The distance between copies of the tip, compared with the brush size')}
         min={1}
         max={300}
         value={percent(shape.spacing)}
@@ -33,8 +35,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
       {!isPixel && (
         <>
           <Slider
-            label="Angle"
-            hint="How much the tip is turned, clockwise"
+            label={t('Angle')}
+            hint={t('How much the tip is turned, clockwise')}
             min={0}
             max={359}
             value={Math.round(shape.angle)}
@@ -42,13 +44,13 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             onChange={value => change({ angle: value })}
           />
           <Check
-            label="Turn with the stroke"
+            label={t('Turn with the stroke')}
             checked={shape.followStroke}
             onChange={checked => change({ followStroke: checked })}
           />
           <Slider
-            label="Random angle"
-            hint="Each copy is turned by a random amount: up to a full turn at 100%"
+            label={t('Random angle')}
+            hint={t('Each copy is turned by a random amount: up to a full turn at 100%')}
             min={0}
             max={100}
             value={percent(shape.angleJitter)}
@@ -58,8 +60,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
         </>
       )}
       <Slider
-        label="Scatter"
-        hint="Each copy is moved by a random amount, up to this much of the brush size"
+        label={t('Scatter')}
+        hint={t('Each copy is moved by a random amount, up to this much of the brush size')}
         min={0}
         max={300}
         step={5}
@@ -68,8 +70,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
         onChange={value => change({ scatter: value / 100 })}
       />
       <Slider
-        label="Flow"
-        hint="How much paint each copy puts down"
+        label={t('Flow')}
+        hint={t('How much paint each copy puts down')}
         min={1}
         max={100}
         value={percent(shape.flow)}
@@ -78,53 +80,57 @@ export function BrushShapeControls({ shape, onChange }: Props) {
       />
       {!isPixel && (
         <Check
-          label="Wash"
-          hint="The stroke doesn't pile up over itself: each place keeps the most paint one copy gave it, so the texture of the tip shows inside the stroke too"
+          label={t('Wash')}
+          hint={t(
+            "The stroke doesn't pile up over itself: each place keeps the most paint one copy gave it, so the texture of the tip shows inside the stroke too",
+          )}
           checked={shape.wash}
           onChange={checked => change({ wash: checked })}
         />
       )}
       <Check
-        label="Pen pressure changes the size"
+        label={t('Pen pressure changes the size')}
         checked={shape.pressureSize}
         onChange={checked => change({ pressureSize: checked })}
       />
       <Check
-        label="Pen pressure changes the flow"
+        label={t('Pen pressure changes the flow')}
         checked={shape.pressureFlow}
         onChange={checked => change({ pressureFlow: checked })}
       />
       {!isPixel && (
         <>
-          <h3>Noise</h3>
+          <h3>{t('Noise')}</h3>
           <Slider
-            label="Amount"
-            hint="How much of the paint the noise decides (with Drops: how many drops there are). At 0% there is no noise"
+            label={t('Amount')}
+            hint={t(
+              'How much of the paint the noise decides (with Drops: how many drops there are). At 0% there is no noise',
+            )}
             min={0}
             max={100}
             value={percent(shape.noiseAmount)}
             unit="%"
             onChange={value => change({ noiseAmount: value / 100 })}
           />
-          <div className="slider-row" title="How the noise forms each copy of the tip">
-            <span>Kind</span>
+          <div className="slider-row" title={t('How the noise forms each copy of the tip')}>
+            <span>{t('Kind')}</span>
             <span className="button-group">
               {NOISE_MODES.map(([mode, label, hint]) => (
                 <button
                   key={mode}
-                  title={hint}
+                  title={t(hint ?? '')}
                   aria-pressed={shape.noiseMode === mode}
                   disabled={!hasNoise}
                   onClick={() => change({ noiseMode: mode })}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </span>
           </div>
           <Slider
-            label="Grain"
-            hint="How many grains fit across the tip: fewer are bigger"
+            label={t('Grain')}
+            hint={t('How many grains fit across the tip: fewer are bigger')}
             min={1}
             max={64}
             value={shape.noiseGrain}
@@ -133,8 +139,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             onChange={value => change({ noiseGrain: value })}
           />
           <Slider
-            label="Layers"
-            hint="Layers of finer grains added on top, for a more natural texture (with Drops: rougher edges)"
+            label={t('Layers')}
+            hint={t('Layers of finer grains added on top, for a more natural texture (with Drops: rougher edges)')}
             min={1}
             max={4}
             value={shape.noiseLayers}
@@ -143,8 +149,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             onChange={value => change({ noiseLayers: value })}
           />
           <Slider
-            label="Stretch"
-            hint="How many times longer than tall the grains are: streaks across the tip"
+            label={t('Stretch')}
+            hint={t('How many times longer than tall the grains are: streaks across the tip')}
             min={1}
             max={16}
             value={shape.noiseStretch}
@@ -153,8 +159,8 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             onChange={value => change({ noiseStretch: value })}
           />
           <Slider
-            label="Contrast"
-            hint="Low keeps the noise soft, high turns it into sharp specks"
+            label={t('Contrast')}
+            hint={t('Low keeps the noise soft, high turns it into sharp specks')}
             min={10}
             max={1000}
             step={10}
@@ -164,8 +170,10 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             onChange={value => change({ noiseContrast: value / 100 })}
           />
           <Check
-            label="New noise for each stroke, not each copy"
-            hint="The same noise all along a stroke, so its streaks run along it, like bristles (with Wash, they show inside the stroke)"
+            label={t('New noise for each stroke, not each copy')}
+            hint={t(
+              'The same noise all along a stroke, so its streaks run along it, like bristles (with Wash, they show inside the stroke)',
+            )}
             checked={shape.noisePerStroke}
             disabled={!hasNoise}
             onChange={checked => change({ noisePerStroke: checked })}
@@ -191,9 +199,10 @@ type SliderProps = {
 }
 
 function Slider({ label, hint, min, max, step = 1, value, unit, disabled = false, onChange }: SliderProps) {
+  const { t } = useLanguage()
   return (
-    <label className="slider-row" title={hint}>
-      <span>{label}</span>
+    <label className="slider-row" title={t(hint ?? '')}>
+      <span>{t(label)}</span>
       <input
         type="range"
         min={min}
@@ -217,10 +226,11 @@ type CheckProps = {
 }
 
 function Check({ label, hint, checked, disabled = false, onChange }: CheckProps) {
+  const { t } = useLanguage()
   return (
-    <label className="check-row" title={hint}>
+    <label className="check-row" title={t(hint ?? '')}>
       <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
-      {label}
+      {t(label)}
     </label>
   )
 }

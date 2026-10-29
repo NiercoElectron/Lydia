@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
 import { BrushShapeControls } from '../components/BrushShapeControls'
@@ -64,6 +65,7 @@ type Props = {
 // it, and keep it in the brushes or as a file (decision 30). A pixel brush's tip paints fully or not at all: it is
 // drawn in black only, and its edges, strength and the settings that turn the tip are left out
 export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
+  const { t } = useLanguage()
   const [paper] = useState(() => newProject(tipSize, tipSize))
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
@@ -71,7 +73,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   const [edge, setEdge] = useState<Edge>('hard')
   const [strength, setStrength] = useState(100)
   const [size, setSize] = useState(pixel ? 1 : Math.round(tipSize / 8))
-  const [name, setName] = useState(DEFAULT_NAME)
+  const [name, setName] = useState(() => t(DEFAULT_NAME))
   const [shape, setShape] = useState<BrushShape>(pixel ? PIXEL_SHAPE : DEFAULT_SHAPE)
   const [tipPng, setTipPng] = useState<Uint8Array | null>(null) // the tip as it goes in the file
   const [tip, setTip] = useState<BrushTip | null>(null) // the same tip, ready to paint with
@@ -123,8 +125,8 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
 
   // The brush's file as it is now, or null while nothing is painted
   const file = useMemo(
-    () => (tipPng ? serializeBrushFile({ name: name.trim() || DEFAULT_NAME, tip: tipPng, ...shape }) : null),
-    [name, tipPng, shape],
+    () => (tipPng ? serializeBrushFile({ name: name.trim() || t(DEFAULT_NAME), tip: tipPng, ...shape }) : null),
+    [name, tipPng, shape, t],
   )
   const isSaved = file !== null && file === savedFile
   const isUnsaved = file !== null && file !== savedFile
@@ -146,7 +148,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
       setSavedFile(file)
       saveBrushId(id)
     } catch {
-      alert('Could not save the brush in this browser.')
+      alert(t('Could not save the brush in this browser.'))
     }
   }
 
@@ -155,7 +157,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   }
 
   function handleBack() {
-    if (isUnsaved && !window.confirm('Leave the Brush Designer? This brush has changes that are not saved.')) return
+    if (isUnsaved && !window.confirm(t('Leave the Brush Designer? This brush has changes that are not saved.'))) return
     onBack()
   }
 
@@ -163,25 +165,25 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
     <div className="editor">
       <header className="editor-bar">
         <div className="toolbar">
-          <button aria-pressed={tool === 'brush'} onClick={() => setTool('brush')} title="Brush (B)">
-            Brush
+          <button aria-pressed={tool === 'brush'} onClick={() => setTool('brush')} title={t('Brush (B)')}>
+            {t('Brush')}
           </button>
-          <button aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser (E)">
-            Eraser
+          <button aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title={t('Eraser (E)')}>
+            {t('Eraser')}
           </button>
           {!pixel && (
             <>
               <span className="button-group">
-                Edge
+                {t('Edge')}
                 <button aria-pressed={edge === 'soft'} onClick={() => setEdge('soft')}>
-                  Soft
+                  {t('Soft', {}, 'brushEdge')}
                 </button>
                 <button aria-pressed={edge === 'hard'} onClick={() => setEdge('hard')}>
-                  Hard
+                  {t('Hard', {}, 'brushEdge')}
                 </button>
               </span>
-              <label title="How much the brush paints: black paints fully, gray paints lightly">
-                Strength
+              <label title={t('How much the brush paints: black paints fully, gray paints lightly')}>
+                {t('Strength')}
                 <input
                   type="range"
                   min={1}
@@ -201,8 +203,8 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
               </label>
             </>
           )}
-          <label title="Brush size ([ and ])">
-            Size
+          <label title={t('Brush size ([ and ])')}>
+            {t('Size')}
             <input
               type="range"
               min={MIN_BRUSH_SIZE}
@@ -220,49 +222,51 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
           <OutlineButton isOn={isOutlineOn} onToggle={toggleOutline} />
         </div>
         <div className="actions">
-          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title="Undo (Ctrl+Z)">
-            Undo
+          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title={t('Undo (Ctrl+Z)')}>
+            {t('Undo')}
           </button>
-          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title="Redo (Ctrl+Shift+Z)">
-            Redo
+          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title={t('Redo (Ctrl+Shift+Z)')}>
+            {t('Redo')}
           </button>
           <button onClick={() => engine?.clearLayer()} disabled={!engine}>
-            Clear paper
+            {t('Clear paper')}
           </button>
-          <button onClick={() => engine?.fitToScreen()} disabled={!engine} title="Show the whole paper (Ctrl+0)">
-            Fit
+          <button onClick={() => engine?.fitToScreen()} disabled={!engine} title={t('Show the whole paper (Ctrl+0)')}>
+            {t('Fit')}
           </button>
-          <button onClick={handleBack}>Back</button>
+          <button onClick={handleBack}>{t('Back')}</button>
         </div>
       </header>
       <div className="editor-main">
         <DrawSpace project={paper} gpuMemory={gpuMemory} onEngineChange={setEngine} />
         <aside className="designer-panel">
-          <h2>Brush Designer</h2>
+          <h2>{t('Brush Designer')}</h2>
           <label className="name-row">
-            Name
+            {t('Name')}
             <input type="text" value={name} maxLength={MAX_NAME_LENGTH} onChange={e => setName(e.target.value)} />
           </label>
           <p className="hint">
             {tip
-              ? `Tip: ${tip.image.width}×${tip.image.height} pixels, the painted part of the paper.` +
-                (pixel ? ' It paints at 1×, 2×, 3×… this size, as the brush size comes nearest.' : '')
+              ? t('Tip: {width}×{height} pixels, the painted part of the paper.', {
+                  width: tip.image.width,
+                  height: tip.image.height,
+                }) + (pixel ? t(' It paints at 1×, 2×, 3×… this size, as the brush size comes nearest.') : '')
               : pixel
-                ? 'Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.'
-                : 'Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.'}
+                ? t('Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.')
+                : t('Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.')}
           </p>
           <BrushShapeControls shape={shape} onChange={setShape} />
-          <h2>Try it</h2>
+          <h2>{t('Try it')}</h2>
           <BrushTestArea tip={tip} shape={shape} />
           <div className="designer-actions">
             <button onClick={handleSave} disabled={!file || isSaved}>
-              Save to my brushes
+              {t('Save to my brushes')}
             </button>
             <button onClick={handleExport} disabled={!file}>
-              Export file
+              {t('Export file')}
             </button>
           </div>
-          {isSaved && <p className="hint">Saved to your brushes. Open a drawing to paint with it.</p>}
+          {isSaved && <p className="hint">{t('Saved to your brushes. Open a drawing to paint with it.')}</p>}
         </aside>
       </div>
     </div>

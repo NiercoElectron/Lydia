@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { Pin, PinOff } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { loadAdvancedPinned, saveAdvancedPinned } from '../settings'
@@ -6,6 +7,7 @@ import { loadAdvancedPinned, saveAdvancedPinned } from '../settings'
 // Clicking elsewhere, or Esc, closes it, unless it is pinned: then it stays open, also when this tool is chosen again
 // and on the next visit
 export function AdvancedMenu({ children }: { children: ReactNode }) {
+  const { t } = useLanguage()
   const [isPinned, setIsPinned] = useState(loadAdvancedPinned)
   const [isOpen, setIsOpen] = useState(false)
   const menu = useRef<HTMLDivElement>(null)
@@ -45,18 +47,18 @@ export function AdvancedMenu({ children }: { children: ReactNode }) {
 
   return (
     <div className="advanced-menu" ref={menu}>
-      <button aria-expanded={isShown} onClick={toggle} title="More settings of the brush">
-        Advanced ▾
+      <button aria-expanded={isShown} onClick={toggle} title={t('More settings of the brush')}>
+        {t('Advanced ▾')}
       </button>
       {isShown && (
         <div className="advanced-panel">
           <div className="advanced-header">
-            Advanced
+            {t('Advanced')}
             <button
               className="icon-button"
               aria-pressed={isPinned}
               onClick={() => pin(!isPinned)}
-              title={isPinned ? 'Unpin: close it when clicking elsewhere' : 'Pin: keep it open'}
+              title={isPinned ? t('Unpin: close it when clicking elsewhere') : t('Pin: keep it open')}
             >
               {isPinned ? <PinOff size={14} aria-hidden /> : <Pin size={14} aria-hidden />}
             </button>

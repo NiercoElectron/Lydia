@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { useRef, useState } from 'react'
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
 // clicking elsewhere, keeps it (within the range, on its steps), and Esc leaves it as it was. While the number is typed,
 // the keyboard's shortcuts leave it alone (see isTyping in view.ts)
 export function SliderValue({ value, min, max, step = 1, unit = '', hint, disabled = false, onChange, onDone }: Props) {
+  const { t, locale } = useLanguage()
   const [text, setText] = useState<string | null>(null) // what is being typed, or null when not typing
   const isCancelled = useRef(false)
 
@@ -36,13 +38,13 @@ export function SliderValue({ value, min, max, step = 1, unit = '', hint, disabl
         type="button"
         className="slider-value"
         disabled={disabled}
-        title={hint ? `${hint}. Click to type a value` : 'Click to type a value'}
+        title={hint ? `${hint}. ${t('Click to type a value')}` : t('Click to type a value')}
         onClick={() => {
           isCancelled.current = false
           setText(String(value))
         }}
       >
-        {value}
+        {value.toLocaleString(locale, { maximumFractionDigits: 10, useGrouping: false })}
         {unit}
       </button>
     )

@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n'
 import { useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_BACKGROUND,
@@ -56,6 +57,7 @@ type Props = {
 // The window for a new drawing: its size, from a list of common sizes or typed in, its resolution on paper, and its
 // background, a color or transparent. It opens with the choices made the last time
 export function NewProjectDialog({ onCreate, onCancel }: Props) {
+  const { t, locale } = useLanguage()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [last] = useState(loadNewProjectChoice)
   const [width, setWidth] = useState(String(last?.width ?? 800))
@@ -118,9 +120,12 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
 
   // The size on paper, at the chosen resolution
   const onPaper = (pixels: string, unit: number, digits: number) =>
-    ((Number(pixels) / dpiValue!) * unit).toFixed(digits)
+    ((Number(pixels) / dpiValue!) * unit).toLocaleString(locale, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    })
   const paperSize = isValid
-    ? `On paper: ${onPaper(width, CM_PER_INCH, 1)} × ${onPaper(height, CM_PER_INCH, 1)} cm ` +
+    ? `${t('On paper:')} ${onPaper(width, CM_PER_INCH, 1)} × ${onPaper(height, CM_PER_INCH, 1)} cm ` +
       `(${onPaper(width, 1, 2)} × ${onPaper(height, 1, 2)} in).`
     : ''
 
@@ -135,25 +140,25 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
   return (
     <dialog ref={dialogRef} className="new-project" onClose={onCancel}>
       <form onSubmit={handleSubmit}>
-        <h2>New project</h2>
+        <h2>{t('New project')}</h2>
         <label className="new-project-row">
-          Size
+          {t('Size')}
           <select value={chosen ?? CUSTOM} onChange={e => chooseSize(e.target.value)}>
-            <option value={CUSTOM}>Custom</option>
-            <optgroup label={`Paper, at ${dpiValue ?? DEFAULT_DPI} DPI`}>
+            <option value={CUSTOM}>{t('Custom')}</option>
+            <optgroup label={`${t('Paper, at')} ${dpiValue ?? DEFAULT_DPI} DPI`}>
               {papers.map(p => {
                 const fits = p.width <= MAX_SIZE && p.height <= MAX_SIZE
                 return (
                   <option key={p.name} value={p.name} disabled={!fits}>
-                    {p.name} ({p.width}×{p.height}){fits ? '' : ', too big at this resolution'}
+                    {t(p.name)} ({p.width}×{p.height}){fits ? '' : t(', too big at this resolution')}
                   </option>
                 )
               })}
             </optgroup>
-            <optgroup label="Screen">
+            <optgroup label={t('Screen')}>
               {SCREENS.map(s => (
                 <option key={s.name} value={s.name}>
-                  {s.name} ({s.width}×{s.height})
+                  {t(s.name)} ({s.width}×{s.height})
                 </option>
               ))}
             </optgroup>
@@ -161,7 +166,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         </label>
         <div className="new-project-row">
           <label>
-            Width
+            {t('Width')}
             <input
               type="number"
               min={MIN_SIZE}
@@ -171,7 +176,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
             />
           </label>
           <label>
-            Height
+            {t('Height')}
             <input
               type="number"
               min={MIN_SIZE}
@@ -182,8 +187,8 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
           </label>
         </div>
         <div className="new-project-row">
-          <label title="How many pixels make an inch on paper. It matters for printing; the screen ignores it">
-            Resolution
+          <label title={t('How many pixels make an inch on paper. It matters for printing; the screen ignores it')}>
+            {t('Resolution')}
             <input type="number" min={MIN_DPI} max={MAX_DPI} value={dpi} onChange={e => changeDpi(e.target.value)} />
             DPI
           </label>
@@ -199,19 +204,19 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
           ))}
         </div>
         <p className="hint">
-          From {MIN_SIZE} to {MAX_SIZE} pixels on each side. {paperSize}
+          {t('From')} {MIN_SIZE} {t('to')} {MAX_SIZE} {t('pixels on each side.')} {paperSize}
         </p>
         <fieldset className="new-project-row">
-          <legend>Background</legend>
+          <legend>{t('Background')}</legend>
           <input
             type="color"
-            aria-label="Background color"
+            aria-label={t('Background color')}
             value={color}
             disabled={isTransparent}
             onChange={e => setColor(e.target.value)}
           />
           <button type="button" aria-pressed={isTransparent} onClick={() => setIsTransparent(t => !t)}>
-            Transparent
+            {t('Transparent')}
           </button>
         </fieldset>
         <div className="paper-preview-box">
@@ -221,10 +226,10 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         </div>
         <div className="dialog-actions">
           <button type="button" onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button type="submit" disabled={!isValid}>
-            Create
+            {t('Create')}
           </button>
         </div>
       </form>

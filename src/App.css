@@ -650,13 +650,19 @@ input.slider-value {
 .test-controls label {
   display: flex;
   flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 6px;
 }
 
-.test-controls input {
+.test-controls input[type='range'] {
   flex: 1;
+  width: 0;
   min-width: 0;
+}
+
+.test-controls > button {
+  flex-shrink: 0;
 }
 
 .designer-actions {

@@ -1,15 +1,20 @@
-import { releases, REPOSITORY_FILES } from '../whatsNew'
+import { useLanguage } from '../i18n'
+import { releasesFor, REPOSITORY_FILES } from '../whatsNew'
 
 // The start screen's "What's New?": the changes of each version (see whatsNew.ts), the newest open and the others
 // closed below it, each opening with a click
 export function WhatsNew() {
+  const { t, locale } = useLanguage()
   return (
     <aside className="whats-new">
-      <h2>What's New?</h2>
-      {releases.map((release, i) => (
+      <h2>{t("What's New?")}</h2>
+      {releasesFor(locale).map((release, i) => (
         <details key={release.version} open={i === 0}>
           <summary>
-            Lydia {release.version} <span className="hint">{release.date}</span>
+            Lydia {release.version}{' '}
+            <span className="hint">
+              {new Date(`${release.date}T12:00:00Z`).toLocaleDateString(locale, { timeZone: 'UTC' })}
+            </span>
           </summary>
           {release.summary && (
             <p>
@@ -18,7 +23,7 @@ export function WhatsNew() {
           )}
           {release.sections.map(section => (
             <section key={section.title}>
-              <h3>{section.title}</h3>
+              <h3>{t(section.title)}</h3>
               <ul>
                 {section.items.map((item, j) => (
                   <li key={j}>

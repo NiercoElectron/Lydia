@@ -1,3 +1,4 @@
+import { LocalizedError } from '../localizedError'
 import { LAYER_BLEND_MODES, type BlendMode } from './layers'
 import { decompress } from './lz4'
 import type { StoredTile } from './memory'
@@ -219,11 +220,11 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   if (!startsWith(MAGIC)) {
     // Lydia 0.1 saved projects as plain JSON text
     if (startsWith('{"format":"lydia"')) {
-      throw new Error('This project was made with Lydia 0.1, and this version of Lydia can no longer open it.')
+      throw new LocalizedError('This project was made with Lydia 0.1, and this version of Lydia can no longer open it.')
     }
-    throw new Error('This file is not a Lydia project.')
+    throw new LocalizedError('This file is not a Lydia project.')
   }
-  const damaged = () => new Error('This project file is damaged.')
+  const damaged = () => new LocalizedError('This project file is damaged.')
   if (bytes.length < 12) throw damaged()
 
   const headerLength = new DataView(file).getUint32(8, true)
@@ -237,7 +238,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   }
   if (!isObject(header) || header.format !== FORMAT) throw damaged()
   if (typeof header.version !== 'number' || header.version > VERSION) {
-    throw new Error('This project was made with a newer version of Lydia. Update Lydia to open it.')
+    throw new LocalizedError('This project was made with a newer version of Lydia. Update Lydia to open it.')
   }
 
   const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, layers } = header
