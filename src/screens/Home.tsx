@@ -1,4 +1,4 @@
-import { translateError, useLanguage } from '../i18n'
+import { translateError, useLanguage, type LanguageChoice } from '../i18n'
 import { useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
@@ -75,10 +75,11 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
         </div>
         <label className="theme-choice">
           {t('Language')}
-          <select value={choice} onChange={e => setChoice(e.target.value as 'system' | 'en' | 'pt-BR')}>
+          <select value={choice} onChange={e => setChoice(e.target.value as LanguageChoice)}>
             <option value="system">{t('System')}</option>
             <option value="pt-BR">Português (Brasil)</option>
             <option value="en">English</option>
+            <option value="es">Español</option>
           </select>
         </label>
         {isChoosingNew && <NewProjectDialog onCreate={onNewProject} onCancel={() => setIsChoosingNew(false)} />}

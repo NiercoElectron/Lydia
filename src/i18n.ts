@@ -1,15 +1,17 @@
 import { useSyncExternalStore } from 'react'
 import { interpolate, LocalizedError } from './localizedError'
 import { ptBR } from './translations/pt-BR'
+import { es } from './translations/es'
 
-export type LanguageChoice = 'system' | 'en' | 'pt-BR'
-export type Locale = 'en' | 'pt-BR'
+export type LanguageChoice = 'system' | 'en' | 'pt-BR' | 'es'
+export type Locale = Exclude<LanguageChoice, 'system'>
+const dictionaries: Record<Exclude<Locale, 'en'>, Record<string, string>> = { 'pt-BR': ptBR, es }
 const STORAGE_KEY = 'lydia.language'
 
 function loadChoice(): LanguageChoice {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return saved === 'en' || saved === 'pt-BR' ? saved : 'system'
+    return saved === 'en' || saved === 'pt-BR' || saved === 'es' ? saved : 'system'
   } catch {
     return 'system'
   }
@@ -18,7 +20,10 @@ function loadChoice(): LanguageChoice {
 export function resolveLocale(choice: LanguageChoice, languages: readonly string[]): Locale {
   if (choice !== 'system') return choice
   // The first preferred language determines the UI; English is the fallback for unsupported languages.
-  return /^pt(?:-|$)/i.test(languages[0] ?? '') ? 'pt-BR' : 'en'
+  const preferred = languages[0] ?? ''
+  if (/^pt(?:-|$)/i.test(preferred)) return 'pt-BR'
+  if (/^es(?:-|$)/i.test(preferred)) return 'es'
+  return 'en'
 }
 
 let choice = loadChoice()
@@ -30,7 +35,8 @@ function snapshot() {
     locale,
     t: (source: string, values: Record<string, string | number> = {}, context?: string) => {
       const key = context ? `${context}.${source}` : source
-      const translated = locale === 'pt-BR' ? (ptBR[key] ?? ptBR[source] ?? source) : source
+      const dictionary = locale === 'en' ? undefined : dictionaries[locale]
+      const translated = dictionary?.[key] ?? dictionary?.[source] ?? source
       return interpolate(translated, values)
     },
     setChoice: setLanguageChoice,

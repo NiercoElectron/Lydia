@@ -9,6 +9,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ### Added
 
+- Spanish throughout the interface and release history, with an Español option and automatic detection of
+  Spanish system language variants such as es-ES, es-MX and es-AR.
 - Brazilian Portuguese throughout the interface, including the Brush Designer, release history and file errors.
   The start screen offers System, Português (Brasil) and English, remembers the choice, and detects Portuguese from
   the browser's preferred language. New layer and folder names use the chosen language; user names stay unchanged.
