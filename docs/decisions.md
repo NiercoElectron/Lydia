@@ -235,7 +235,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Designer (decisions 45 to 48). 0.10.0 brought the Pixel art stage: pixel-perfect strokes, straight lines and
   exporting enlarged (decisions 51 to 53), with layers that keep paint off the paper (decisions 49 and 50). 0.11.0
   brought the Layers stage: duplicating and merging, locking transparency, blend modes, clipping masks and folders
-  (decisions 54 to 58). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
+  (decisions 54 to 58), and 0.11.1 showed the live opacity, moving and the fill bucket right with them (decisions 60
+  to 62). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
   [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version

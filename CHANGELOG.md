@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-29
+
 ### Changed
 
 - The **opacity shows live** while its slider moves whatever the blend modes of the layer, of the layers above it and
@@ -421,7 +423,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/NiercoElectron/Lydia/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/NiercoElectron/Lydia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/NiercoElectron/Lydia/compare/v0.8.5...v0.9.0
