@@ -19,6 +19,9 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - On big drawings, the move starts showing at once (it took a few frames, which skipped), a new position costs a
   few milliseconds, and the live opacity is drawn faster too. Once a move is let go, a **bar** next to "Moving…" shows
   how far it is from being put down.
+- The fill bucket's **All layers** sees the layers as the screen shows them, with blend modes, clipping and folders
+  ([decision 62](docs/decisions.md#62-the-fill-bucket-sees-the-layers-as-they-show)): paint that doesn't show, like
+  a clipped layer's outside its base, no longer stops the fill.
 
 ## [0.11.0] - 2026-10-28
 

@@ -5,7 +5,15 @@ import { createLayerBlender } from './blendModes'
 import { createBrush, type BrushSettings } from './brush'
 import { parseBrushFile, type BrushShape } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
-import { createPacer, DEFAULT_FILL, fillTile, findFillRegion, type FillSettings } from './fill'
+import {
+  createPacer,
+  DEFAULT_FILL,
+  fillTile,
+  findFillRegion,
+  layersReference,
+  type FillSettings,
+  type TileReference,
+} from './fill'
 import { createGpuTiles } from './gpuTiles'
 import { createHistory, propsOf, type LayerProps } from './history'
 import {
@@ -1063,12 +1071,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const layer = stack.active
       const reference =
         fillSettings.reference === 'layer'
-          ? [{ tiles: layer.tiles, opacity: 1 }]
-          : stack.layers
-              .filter(other => !isFolder(other) && isShown(other))
-              .map(({ tiles, opacity }) => ({ tiles, opacity }))
+          ? layersReference([{ tiles: layer.tiles, opacity: 1 }], memory)
+          : allLayersReference()
       const { tolerance, expand } = fillSettings
-      const region = await findFillRegion(grid, reference, memory, seedX, seedY, tolerance, expand)
+      const region = await findFillRegion(grid, reference, seedX, seedY, tolerance, expand)
       const { color, opacity } = brush.settings
       return changeTiles(layer, region.keys(), (key, tile) => {
         const selected = selection ? selection.get(key) : 'full'
@@ -1078,6 +1084,38 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         return fillTile(grid, key, tile, region.get(key)!, color, opacity, memory, amounts, layer.alphaLocked)
       })
     })
+  }
+
+  // What the fill bucket's "All layers" looks at: the visible layers put together, without the paper, as the screen
+  // puts them together. When they all go on as Normal layers (Normal, not clipped, in folders that let what is in them
+  // pass through at full opacity, or in none), the processor puts them together from RAM. Otherwise blend modes,
+  // clipping and folders change how they look, so the graphics card puts each tile the fill reaches together, as it
+  // does for the screen, and it is read back from it (see readLayers in projection.ts); a tile where no visible layer
+  // has paint is transparent, with nothing to read
+  function allLayersReference(): TileReference {
+    const shown = stack.layers.filter(other => !isFolder(other) && isShown(other))
+    const isPlain = stack.layers.every((item, index) => {
+      if (!isShown(item)) return true
+      if (isClipped(stack, index)) return false
+      return isFolder(item) ? item.blendMode === 'pass-through' && item.opacity === 1 : item.blendMode === 'normal'
+    })
+    if (isPlain) return layersReference(shown, memory)
+    // Where every layer is a single color (or has nothing), all of the tile is one color, the same wherever the
+    // layers have the same colors: it is read once for each such set of colors
+    const colors = new Map<string, number>()
+    return key => {
+      const here = shown.map(other => other.tiles.get(key))
+      if (here.every(tile => !tile)) return 0
+      const { column, row } = parseTileKey(key)
+      if (!here.every(tile => !tile || tile.color !== undefined)) return projection.readLayers(column, row, false)
+      const set = here.map(tile => tile?.color ?? '').join(' ')
+      let color = colors.get(set)
+      if (color === undefined) {
+        color = projection.readLayers(column, row, true) as number
+        colors.set(set, color)
+      }
+      return color
+    }
   }
 
   // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes

@@ -1134,6 +1134,27 @@ export function createProjection(
     return `#${hex(pixel[0])}${hex(pixel[1])}${hex(pixel[2])}`
   }
 
+  // The visible layers put together at this tile, without the paper, as the fill bucket's "All layers" sees them when
+  // they have blend modes, clipping or folders that change something (see allLayersReference in engine.ts): each pixel
+  // of the tile's part on the paper as one number (red, green, blue and alpha, the color multiplied by the alpha, as in
+  // RAM), or one number for all of them when they are all the same. They are put together on the graphics card like a
+  // projection tile, and read back from it, which makes the processor wait for it. "isOneColor": every layer is a
+  // single color there (or has nothing), so all of it is too, whatever the blend modes, and one pixel is read
+  let readTile: RenderTexture | null = null
+  function readLayers(column: number, row: number, isOneColor: boolean) {
+    readTile ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    composeLayers(emptyBase, 0, stack.layers.length, column, row, readTile)
+    const { width, height } = isOneColor ? { width: 1, height: 1 } : tileSize(grid, column, row)
+    const pixels = new Uint8Array(width * height * 4)
+    const renderTarget = renderer.renderTarget.getRenderTarget(readTile)
+    const glRenderTarget = renderer.renderTarget.getGpuRenderTarget(renderTarget) as GlRenderTarget
+    ;(renderer.renderTarget.adaptor as GlRenderTargetAdaptor).bindFramebuffer(glRenderTarget.resolveTargetFramebuffer)
+    const gl = renderer.gl
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+    const colors = new Uint32Array(pixels.buffer)
+    return colors.every(color => color === colors[0]) ? colors[0] : colors
+  }
+
   // ----- Zoom -----
 
   // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
@@ -1191,6 +1212,7 @@ export function createProjection(
     composer.destroy()
     withStrokeRoot.destroy({ children: true })
     withStrokeTexture?.destroy(true)
+    readTile?.destroy(true)
     paperTile.destroy()
     emptyBase.destroy()
     drawRoot.destroy()
@@ -1233,6 +1255,7 @@ export function createProjection(
     holdMove,
     endMove,
     colorAt,
+    readLayers,
     setZoom,
     destroy,
   }

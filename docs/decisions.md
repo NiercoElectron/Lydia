@@ -869,7 +869,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     with the color. That helps everywhere big flat areas are shown or undone.
   - A fill of more than 32 tiles is put together out of sight and shown all at once, like a layer change
     (decision 26); a smaller one shows right away.
-  - The layers are put together with the normal blend, the only one Lydia has on the screen so far.
+  - The layers are put together with the normal blend, the only one Lydia has on the screen so far. Since 0.11.1, with
+    their blend modes, clipping and folders (decision 62).
 - **Measured (RTX 4060 Ti, 10000×10000):** an empty layer, about 0.5 s from the click until the fill is on the
   screen; with six long lines across the paper, about 1.5 s. The longest frame meanwhile: 42 ms. Before the work was
   spread over frames and done in RAM, the same fill took 3.6 s and stopped the screen for up to 300 ms.
@@ -1533,8 +1534,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - While a part is moved (decision 41), the active layer's mode showed with the graphics card's closest blending
     (Multiply, Screen and Add), and the others as Normal, until it was let go. Since 0.11.1 a move shows as it will be
     (decision 61).
-  - The fill bucket's **All layers** (decision 39) still finds its region in the layers put together as Normal.
-  - I don't accept these differences: they go in 0.11.1, the version after this stage's (the first two are done).
+  - The fill bucket's **All layers** (decision 39) found its region in the layers put together as Normal. Since 0.11.1
+    it sees them as they show (decision 62).
+  - I didn't accept these differences: they went in 0.11.1, the version after this stage's.
 - **Checked:** the 16 modes against the formulas written again in the test on its own, over red, a blue gray, gray and
   the white paper; nothing changed where the layer has no paint; the list in the panel; Multiply at 50% while the
   slider moves and after; undo and redo of a mode; painting on the layer under a Multiply layer, multiplied while
@@ -1568,9 +1570,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     new opacity applies to it like to any layer. Since 0.11.1 the layers clipped to it show live too (decision 60).
   - When a layer is deleted, moved, merged, clipped or unclipped, the tiles of every clipped layer are put together
     again: their base may be another one.
-  - The fill bucket's **All layers** doesn't follow clipping yet, and goes in 0.11.1 with that of decision 56: it sees
-    clipped layers whole. While a part was moved (decision 41), a clipped layer showed whole and the layers clipped to
-    a moved base stayed as they were, until it was let go; since 0.11.1 a move shows as it will be (decision 61).
+  - Two things didn't follow clipping, until 0.11.1 with those of decision 56: while a part was moved (decision 41), a
+    clipped layer showed whole and the layers clipped to a moved base stayed as they were, until it was let go (a move
+    now shows as it will be, decision 61); and the fill bucket's **All layers** saw clipped layers whole (it now sees
+    the layers as they show, decision 62).
 - **Checked:** the bottom layer's clip not offered; clipping with the button, the row moved in with its arrow; only
   the part over the base shown; painting on the clipped layer clipped while painting and after; painting on the base
   showing more of it while painting; a hidden base hiding it; 50% opacity while the slider moves and after; Multiply on
@@ -1622,9 +1625,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - An undo step of the order of layers keeps the folder each layer was in.
   - In the file, a folder has "folder", and what is in a folder has the position of its folder ("parent"); Lydia
     checks that each folder is above what is in it, with nothing else between them.
-- **Not yet:** like a single layer's (decisions 56 and 57), the fill bucket's **All layers** sees all the layers as
-  Normal, folders or not; it goes in 0.11.1 with the rest. A moved folder with blend modes in it showed them as Normal
-  until it was let go; since 0.11.1 a move shows as it will be (decision 61).
+- **Until 0.11.1:** like a single layer's (decisions 56 and 57), a moved folder with blend modes in it showed them as
+  Normal until it was let go (a move now shows as it will be, decision 61), and the fill bucket's **All layers** saw
+  all the layers as Normal, folders or not (it now sees them as they show, decision 62).
 - **Checked:** a new folder, and a new layer going into it while it is open and above it once closed; Multiply in a
   folder that passes through darkening the layer outside it, and only the folder's own layers once the folder has a
   mode of its own; a folder that passes through at 50%; Pass Through offered for folders only; a hidden folder hiding
@@ -1751,6 +1754,41 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   clipped to; a selected part, and that part transformed into a new layer; a whole layer transformed; on a transparent
   paper. By me: the screenshot in Multiply moved on a 10000×10000 drawing, grabbing, dragging and letting go with the
   bar; transforming with the button and Enter.
+
+## 62. The fill bucket sees the layers as they show
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** the fill bucket's **All layers** (decision 39) found its region in the visible layers put together as
+  Normal layers, in RAM. With blend modes, clipping and folders (decisions 56 to 58) that isn't how they show: I saw a
+  fill follow scribbles of a clipped layer that didn't show, and fill the base in their shape. I didn't accept that
+  (decision 56).
+- **Decision:** **All layers** looks at the visible layers put together as the screen puts them together, with their
+  blend modes, clipping and folders, still without the paper. Paint that doesn't show doesn't stop the fill. Of the two
+  ways of doing it, the formulas of the 16 modes written again for the processor, or reading what the graphics card puts
+  together, I chose reading it (Claude's recommendation): one set of formulas, so the fill can't differ from the
+  screen.
+- **How:**
+  - When all the visible layers go on as Normal ones (Normal, not clipped, in folders that let what is in them pass
+    through at full opacity, or in none), nothing changes: the processor puts them together from RAM, which is exact
+    there and fast.
+  - Otherwise, the first time the fill reaches a tile, the graphics card puts the layers together there over nothing,
+    the way it puts a projection tile together (decision 10), and the tile is read back into RAM (`readLayers` in
+    `projection.ts`, `allLayersReference` in `engine.ts`). Reading makes the processor wait for the graphics card, about
+    a millisecond for a tile.
+  - A tile where no visible layer has paint is transparent, with nothing to read. Where every layer is a single color
+    (or has nothing), all of the tile is one color whatever the modes: one pixel is read, once for each set of colors,
+    and the fill handles the tile whole at once, as before (decision 39). A tile read whole that comes out all one color
+    is handled whole too.
+- **Known:** without the paper, paint that only disappears over the paper still counts: a black line on a Screen layer
+  doesn't show over a white paper, but stops the fill, as a Multiply layer's white does over nothing. It was so with
+  **All layers** before too.
+- **Measured (headless, RTX 4060 Ti, 10000×10000, two layers filled whole, a fill over all of it):** 0.74 s with the
+  top layer in Multiply, 0.64 s with it Normal (the processor's way); the longest frame 28 ms. A first version, which
+  read every tile whole, took 6 s. A tile whose paint varies takes ~1.1 ms more to put together and read.
+- **Checked:** `tests/app/fill-blend-modes.mjs`: a yellow stripe in Multiply over red, which doesn't show, doesn't stop
+  the fill, and stops it once Normal; a stripe clipped to a band, where it doesn't show over the paper, doesn't stop it,
+  and the band does; a stripe in a folder at 0% doesn't stop it. The three failed with the fill as it was.
 
 ## Open questions
 

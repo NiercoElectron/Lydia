@@ -2,9 +2,9 @@ import { toStoredTile, type StoredTile, type TileMemory } from './memory'
 import { paperPart, TILE_SIZE, tileKey, tileSize, wholeTileMask, type Grid } from './tiles'
 
 // The fill bucket (decision 39): it fills the region around the point clicked whose colors are close to the color
-// there, and goes on under the soft edge of the lines around it. The region is worked out by the processor from the
-// tiles in RAM, a few milliseconds every frame so the screen never stops, and so are the layer's new pixels (see
-// fillTile)
+// there, and goes on under the soft edge of the lines around it. The region is worked out by the processor, a few
+// milliseconds every frame so the screen never stops, from what each tile looks like to it (see TileReference), and so
+// are the layer's new pixels (see fillTile)
 
 // What the fill looks at to find where to stop: only the active layer, or the visible layers put together (without
 // the paper)
@@ -27,6 +27,10 @@ const BEHIND = 2
 
 // A layer as the fill sees it: its tiles in RAM, and how much it shows
 export type ReferenceLayer = { tiles: Map<string, StoredTile>; opacity: number }
+
+// What the fill looks at in the tile "column,row": one color for all of it, or the color of each pixel of its part on
+// the paper ("width" × "height"), as one number each (see channel)
+export type TileReference = (key: string, width: number, height: number) => number | Uint32Array
 
 const BUDGET_MS = 6 // at most this much of each frame goes to the fill
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -73,6 +77,13 @@ function coloredPaint(below: number, color: string, opacity: number) {
   }
   return result >>> 0
 }
+
+// What the fill looks at, from these layers in RAM put together on top of each other, each at its opacity, as Normal
+// layers go (see TileReference)
+export const layersReference =
+  (layers: ReferenceLayer[], memory: TileMemory): TileReference =>
+  (key, width, height) =>
+    referenceOf(layers, memory, key, width, height)
 
 // What the fill looks at in a tile: the layers put together, as one color when every one of them is a single color
 // there (or has nothing), or as the color of each pixel of the tile's part on the paper ("width" × "height"; the
@@ -131,8 +142,7 @@ type TileState = {
 // Returns "column,row" -> the mask of each tile it touches
 export async function findFillRegion(
   grid: Grid,
-  layers: ReferenceLayer[],
-  memory: TileMemory,
+  referenceAt: TileReference,
   x: number,
   y: number,
   tolerance: number,
@@ -144,7 +154,7 @@ export async function findFillRegion(
   const seedColumn = Math.floor(x / TILE_SIZE)
   const seedRow = Math.floor(y / TILE_SIZE)
   const { width: seedWidth, height: seedHeight } = tileSize(grid, seedColumn, seedRow)
-  const seedReference = referenceOf(layers, memory, tileKey(seedColumn, seedRow), seedWidth, seedHeight)
+  const seedReference = referenceAt(tileKey(seedColumn, seedRow), seedWidth, seedHeight)
   const seed =
     typeof seedReference === 'number'
       ? seedReference
@@ -165,7 +175,7 @@ export async function findFillRegion(
     let tile = tiles[index]
     if (tile) return tile
     const { width, height } = tileSize(grid, column, row)
-    const reference = referenceOf(layers, memory, tileKey(column, row), width, height)
+    const reference = referenceAt(tileKey(column, row), width, height)
     const left = column * TILE_SIZE
     const top = row * TILE_SIZE
     if (typeof reference === 'number') {

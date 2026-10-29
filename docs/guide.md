@@ -119,8 +119,9 @@ or the fill bucket does the same.
 **Fill (F)**: click to fill an area of one color with the brush's color.
 
 - **Tolerance** (0 to 255): how different a color can be from the one clicked and still be filled.
-- **Look at:** **All layers** finds the area in what the screen shows (with every layer as Normal); **This layer**
-  only in the active layer. The fill always goes into the active layer.
+- **Look at:** **All layers** finds the area in the layers as the screen shows them (with their blend modes, clipping
+  and folders), without the paper; **This layer** only in the active layer. The fill always goes into the active
+  layer.
 - **Expand** (0 to 50 pixels): how far the fill goes past its edge, behind the soft edge of the lines around it, up to
   where they are darkest, so that no light rim is left between the color and the line.
 - With a selection, only what is selected is filled. Hold **Alt** to pick a color.
