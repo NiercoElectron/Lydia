@@ -30,6 +30,7 @@ const startingSnapshot: EngineSnapshot = {
   isModified: false,
   isUpdating: false,
   task: null,
+  progress: null,
   hasSelection: false,
   transform: null,
   canMergeDown: false,

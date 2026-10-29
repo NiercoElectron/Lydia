@@ -964,9 +964,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     places where nothing is left are copied row by row. The screen keeps showing the move until the new tiles are put
     together, and changes over to them in the same frame.
   - An undo step of a layer's pixels can also keep the selection from before, so undoing a move brings both back.
-  - Until it is let go, two things look a little different from the result: layers above with a blend mode other than
-    normal (they are put together on their own, as with the live opacity, decision 23), and the moved part over what
-    is left of a layer at less than full opacity.
+  - Until it is let go, two things looked a little different from the result: layers above with a blend mode other
+    than normal (they are put together on their own, as with the live opacity, decision 23), and the moved part over
+    what is left of a layer at less than full opacity. Since 0.11.1 a move shows as it will be (decision 61).
   - Making the pictures of a selection's edge for the marching ants was slow (each pixel's four bytes were written one
     by one): it now writes each pixel as one number, about 9 times faster, for every new selection.
 - **Measured (RTX 4060 Ti, 10000×10000, a layer with pixels in all 1600 tiles):** the moved layer shows about 0.2 s
@@ -1530,10 +1530,11 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     go on top of that. Only the tiles where such a layer has paint take the extra passes.
   - The live opacity (decision 23) needed the layer itself to be Normal too: otherwise its tiles were put together at
     each step, as with a layer above with another mode. Since 0.11.1 it works with any mode (decision 60).
-  - While a part is moved (decision 41), the active layer's mode shows with the graphics card's closest blending
-    (Multiply, Screen and Add); the others show as Normal until it is let go.
+  - While a part is moved (decision 41), the active layer's mode showed with the graphics card's closest blending
+    (Multiply, Screen and Add), and the others as Normal, until it was let go. Since 0.11.1 a move shows as it will be
+    (decision 61).
   - The fill bucket's **All layers** (decision 39) still finds its region in the layers put together as Normal.
-  - I don't accept these differences: they go in 0.11.1, the version after this stage's (the first one is done).
+  - I don't accept these differences: they go in 0.11.1, the version after this stage's (the first two are done).
 - **Checked:** the 16 modes against the formulas written again in the test on its own, over red, a blue gray, gray and
   the white paper; nothing changed where the layer has no paint; the list in the panel; Multiply at 50% while the
   slider moves and after; undo and redo of a mode; painting on the layer under a Multiply layer, multiplied while
@@ -1567,9 +1568,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     new opacity applies to it like to any layer. Since 0.11.1 the layers clipped to it show live too (decision 60).
   - When a layer is deleted, moved, merged, clipped or unclipped, the tiles of every clipped layer are put together
     again: their base may be another one.
-  - Two things don't follow clipping yet, and go in 0.11.1 with those of decision 56: while a part is moved (decision
-    41), a clipped layer shows whole, and the layers clipped to a moved base stay as they were, until it is let go;
-    the fill bucket's **All layers** sees clipped layers whole.
+  - The fill bucket's **All layers** doesn't follow clipping yet, and goes in 0.11.1 with that of decision 56: it sees
+    clipped layers whole. While a part was moved (decision 41), a clipped layer showed whole and the layers clipped to
+    a moved base stayed as they were, until it was let go; since 0.11.1 a move shows as it will be (decision 61).
 - **Checked:** the bottom layer's clip not offered; clipping with the button, the row moved in with its arrow; only
   the part over the base shown; painting on the clipped layer clipped while painting and after; painting on the base
   showing more of it while painting; a hidden base hiding it; 50% opacity while the slider moves and after; Multiply on
@@ -1621,9 +1622,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - An undo step of the order of layers keeps the folder each layer was in.
   - In the file, a folder has "folder", and what is in a folder has the position of its folder ("parent"); Lydia
     checks that each folder is above what is in it, with nothing else between them.
-- **Not yet:** like a single layer's (decisions 56 and 57), a moved folder with blend modes in it shows them as Normal
-  until it is let go, and the fill bucket's **All layers** sees all the layers as Normal, folders or not. Both go in
-  0.11.1 with the rest.
+- **Not yet:** like a single layer's (decisions 56 and 57), the fill bucket's **All layers** sees all the layers as
+  Normal, folders or not; it goes in 0.11.1 with the rest. A moved folder with blend modes in it showed them as Normal
+  until it was let go; since 0.11.1 a move shows as it will be (decision 61).
 - **Checked:** a new folder, and a new layer going into it while it is open and above it once closed; Multiply in a
   folder that passes through darkening the layer outside it, and only the folder's own layers once the folder has a
   mode of its own; a folder that passes through at 50%; Pass Through offered for folders only; a hidden folder hiding
@@ -1676,7 +1677,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - Only one case still puts the tiles together at each step, as before: layers clipped to a folder that the layer is
     in, since that folder's paint, which clips them, changes with the opacity too.
   - The pictures are copies, so the layer's own tiles no longer have to stay on the graphics card while the slider is
-    held.
+    held. Since decision 61, the picture without the layer is the "below" tile itself (decision 10) when nothing goes
+    between them, and the tiles are drawn on the screen in one go, which made a frame much shorter (see there).
   - The first time a graphics card's driver meets a program, it turns it into its own code. On Windows, where Chrome
     goes through Direct3D, that took 3 seconds for a first version of the program with the formulas written out for
     each step, and froze the screen at the first move of the slider. With the steps in a loop it takes a tenth of a
@@ -1692,6 +1694,63 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   through; a layer under 8 Overlay and Soft Light layers (more steps than the screen does); a layer clipped to the
   folder (put together again instead); on a transparent paper. Color Dodge at 99% and 100% also showed how its formula
   jumps: a channel exactly at 0 under it can't be brightened (Photoshop and Krita do the same).
+
+## 61. Showing a move as it will be
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** since blend modes, clipping and folders (decisions 56 to 58), the move tool and transforming (decisions
+  41 and 42) showed some layers differently until they were let go: the moved layer's mode as Normal (or the graphics
+  card's closest blending), a clipped layer whole, the layers clipped to it where they were, and a folder's modes as
+  Normal. I didn't accept that (decision 56).
+- **Decision:** while a layer, a part of it or a folder is dragged or transformed, the screen shows it as it will be
+  once let go, whatever the blend modes, the opacity, clipping and folders. Once let go, a bar next to "Moving…" (or
+  "Transforming…") shows how far Lydia is from having put it down; until then it can't be painted on, as before.
+- **How:**
+  - The move shows in one of two ways (`planMove` in `projection.ts`). When the layer is Normal at full opacity, isn't
+    clipped and has nothing clipped to it, in folders that change nothing, under Normal layers only, the old way is
+    exact and stays: the moved part on its own, between what is under it and what is over it (decision 41).
+  - Otherwise, for each tile it changes, Lydia writes down once what the tile needs (`moveProgram` in `composer.ts`):
+    a picture of what is under the layer, the paint of the base it is clipped to, and the steps above it, the same
+    steps as the live opacity's (decision 60), with the layers clipped to the moving layer marked to take its paint
+    where it is now. A small program on the graphics card (`createTileMover` in `blendModes.ts`) then works out each
+    tile on the screen on every frame: the layer's paint at its new place (what stays of it, with the moved pictures
+    of the four tiles around), onto what is under it with its mode, opacity and clipping, and the steps above. A new
+    position is only two new numbers. What a transform draws goes in too, into the layer or into the new layer above.
+  - In a folder letting what is in it pass through, with blend modes in it, the folder's layers can't move as one
+    picture: each is drawn where it is now and the tile is put together again for each new position, as are tiles with
+    more steps than the program does (4). When layers are clipped to a folder the moving layer is in, that folder is
+    what is worked out (as for the live opacity).
+  - Showing hundreds of tiles with programs of our own, one object each, PixiJS went through all that a program needs
+    for each of them, which took most of a frame. They are now drawn in one go (`createTileSet` in `blendModes.ts`,
+    with PixiJS's `RenderContainer`): what is the same for all the tiles is done once a frame, and each tile only gives
+    its own pictures and numbers. The live opacity's tiles are drawn the same way.
+  - Starting a move was slow because of the work it gave the graphics card, not the processor: a copy of each moving
+    tile, one pass each, a few hundred every frame on a big layer, which the graphics card couldn't keep up with. With
+    no selection, the move now takes the layer's tiles themselves off the graphics card's copies (`detach` in
+    `gpuTiles.ts`): they are all in RAM too before a move starts, so the layer gets them back from RAM when it needs
+    them again. The "below" tile (decision 10) is used as the picture of what is under the layer when nothing goes
+    between them, instead of a copy; the live opacity uses it the same way.
+  - Once let go, the layer's tiles are put together again while the move still shows. That too gave the graphics card
+    more passes in a frame than it could do (up to 250 on a 10000×10000 layer), and the screen skipped frames. Lydia
+    now counts the passes (in `composer.ts`, the blender and `gpuTiles.ts`) and, while a move is let go, does at most
+    80 in a frame (my choice, among 40, 80 and no limit): putting it down takes longer, so the bar shows how far it is
+    (my request), from the tiles worked out in RAM, then those put together.
+- **Measured (RTX 4060 Ti, 10000×10000, a Multiply layer filled whole over a Normal one; headless, without the
+  profiler, which pauses the page when it starts):**
+  - Starting the move: 585 ms before the moved layer showed, with frames of up to 63 ms on the way, before; 33 ms now,
+    with no long frame. In my Chrome, from 100 ms with frames of 21–28 ms to 37 ms with one frame of 21 ms.
+  - Dragging: ~28 ms for each new position before; 3.8 ms a frame now (a Normal layer: 2.5 ms).
+  - The live opacity, with its tiles drawn in one go: 1.1 ms a frame under a Normal layer (9.3 ms before), 6.2 ms under
+    an Overlay one (12.9 ms).
+  - Letting go: busy for 2.7 s with the limit, 1.7 s without, at the 72 frames a second of the headless browser.
+- **Checked:** `tests/app/move-blend-modes.mjs` compares the whole screen while dragging with the drawing once let go,
+  in 17 cases (14 of them showed differently in 0.11.0): Normal, Multiply and Difference at 60% layers; under an
+  Overlay one; with Normal and Hard Light layers clipped to it; clipped itself; in a Multiply folder at 80%, and that
+  folder; a Pass Through folder with a Multiply layer in it, and that layer; a layer in a folder that a layer is
+  clipped to; a selected part, and that part transformed into a new layer; a whole layer transformed; on a transparent
+  paper. By me: the screenshot in Multiply moved on a 10000×10000 drawing, grabbing, dragging and letting go with the
+  bar; transforming with the button and Enter.
 
 ## Open questions
 

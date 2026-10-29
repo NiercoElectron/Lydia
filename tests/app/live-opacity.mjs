@@ -126,8 +126,7 @@ const shown = points =>
     ])
   }, points)
 // How many tiles the screen shows live (see showOpacityLive in projection.ts)
-const liveTiles = () =>
-  page.evaluate(() => window.lydia.projection.container.children.at(-2).children.filter(c => c.visible).length)
+const liveTiles = () => page.evaluate(() => window.lydia.projection.liveShown())
 
 const POINTS = [
   [60, 30],

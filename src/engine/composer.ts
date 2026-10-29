@@ -1,4 +1,4 @@
-import { Container, RenderTexture, Sprite, type Texture, type WebGLRenderer } from 'pixi.js'
+import { Container, RenderTexture, Sprite, Texture, type WebGLRenderer } from 'pixi.js'
 import type { LayerBlender } from './blendModes'
 import type { GpuTiles } from './gpuTiles'
 import { blockStart, clipBaseIndex, isClipped, isFolder, type BlendMode, type Layer, type LayerStack } from './layers'
@@ -8,20 +8,31 @@ import { TILE_SIZE } from './tiles'
 // it, if any (see projection.ts)
 export type PaintOf = (layer: Layer, column: number, row: number) => Texture | null
 
-// A step of a tile shown live (see live): how "the picture" (all that is put together so far) goes on
+// A step of a tile shown live (see live), or while a layer moves (see moveProgram): how "the picture" (all that is put
+// together so far) goes on. "ownMask": clipped to the layer that moves, where its paint is now (see OWN_PAINT)
 export type LiveStep =
   // the picture with "paint" on top of it, at this opacity, with this mode
-  | { kind: 'onto'; paint: RenderTexture; opacity: number; mode: BlendMode }
+  | { kind: 'onto'; paint: RenderTexture; opacity: number; mode: BlendMode; ownMask?: boolean }
   // the picture, the paint of a folder with its own blend mode, onto "under" (what is under the folder)
   | { kind: 'into'; under: RenderTexture; opacity: number; mode: BlendMode; mask: RenderTexture | null }
   // the picture mixed with "before", or with the picture kept by the last "keep" step when there is none (a folder
   // that lets what is in it pass through, at less than full opacity or clipped)
-  | { kind: 'mix'; before: RenderTexture | null; opacity: number; mask: RenderTexture | null }
+  | { kind: 'mix'; before: RenderTexture | null; opacity: number; mask: RenderTexture | null; ownMask?: boolean }
   | { kind: 'keep' }
 
 // A tile of a layer or folder shown live while its opacity changes (see projection.ts): the picture with it at no
-// opacity and at full opacity, and the steps still to do after mixing the two. All the tiles belong to it
-export type LivePicture = { zero: RenderTexture; one: RenderTexture; steps: LiveStep[] }
+// opacity and at full opacity, and the steps still to do after mixing the two. All the tiles belong to it, but "zero"
+// when "ownsZero" is false: it is then the caller's (see live)
+export type LivePicture = { zero: RenderTexture; ownsZero: boolean; one: RenderTexture; steps: LiveStep[] }
+
+// A tile shown while a layer or folder moves (see projection.ts): what is under it, the paint of the base it is
+// clipped to, and the steps above it. All the tiles belong to it, but "under" when "ownsUnder" is false: it is then
+// the caller's (see moveProgram)
+export type MovePicture = { under: RenderTexture; ownsUnder: boolean; mask: RenderTexture | null; steps: LiveStep[] }
+
+// Stands for the paint of the layer that moves, as the base of layers clipped to it: it is only known once it is
+// where the pointer has it (see showMoved)
+const OWN_PAINT: Texture = new Texture()
 
 // The blend modes that only add and multiply what is under them, so a picture made with them changes in a straight
 // line with what is under it
@@ -50,6 +61,8 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
   // Sprites reused for each tile put together, instead of new ones every time
   const sprites: Sprite[] = []
   let spriteCount = 0
+  // The layer or folder that moves, while the steps of a tile are written down for it (see record)
+  let moving: Layer | null = null
 
   function sprite(texture: Texture, alpha = 1) {
     let next = sprites[spriteCount]
@@ -81,10 +94,17 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
     level.isPending = false
   }
 
+  // How many times the graphics card has been asked to draw into a tile here, the blender's and the layers' tiles' too
+  // (see gpuTiles.ts): each one is a "pass". Each takes the processor little time, but the graphics card more, and with
+  // too many of them in a frame it falls behind and the screen skips frames (see composeWaiting in projection.ts)
+  let passCount = 0
+  const passes = () => passCount + blender.passes() + gpu.passes()
+
   // A picture of all that the level has put together: its tile, drawn first when it doesn't have everything yet
   function settle(level: Level) {
     if (level.tile && !level.isPending) return level.tile
     const into = takeTile()
+    passCount++
     renderer.render({ container: level.root, target: into, clear: true })
     showTile(level, into)
     return into
@@ -100,7 +120,10 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
 
   // Draw all the level has put together into "target", and give its tiles back
   function finishLevel(level: Level, target: RenderTexture | null) {
-    if (target) renderer.render({ container: level.root, target, clear: true })
+    if (target) {
+      passCount++
+      renderer.render({ container: level.root, target, clear: true })
+    }
     if (level.tile) spareTiles.push(level.tile)
     level.root.removeChildren()
     spareRoots.push(level.root)
@@ -110,6 +133,15 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
   function copyOf(paint: Texture, mask?: Texture) {
     const tile = takeTile()
     blender.clip(paint, tile, mask)
+    return tile
+  }
+
+  // A tile with nothing in it
+  const emptyRoot = new Container()
+  function nothing() {
+    const tile = takeTile()
+    passCount++
+    renderer.render({ container: emptyRoot, target: tile, clear: true })
     return tile
   }
 
@@ -133,7 +165,8 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
   function blendIn(level: Level, paint: Texture, opacity: number, mode: BlendMode, mask?: Texture) {
     if (level.steps) {
       writeNormalLayers(level)
-      level.steps.push({ kind: 'onto', paint: copyOf(paint, mask), opacity, mode })
+      if (mask === OWN_PAINT) level.steps.push({ kind: 'onto', paint: copyOf(paint), opacity, mode, ownMask: true })
+      else level.steps.push({ kind: 'onto', paint: copyOf(paint, mask), opacity, mode })
       return
     }
     const under = settle(level)
@@ -155,7 +188,8 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
   function mixKept(level: Level, before: RenderTexture | null, opacity: number, mask?: Texture) {
     if (!before) {
       writeNormalLayers(level)
-      level.steps!.push({ kind: 'mix', before: null, opacity, mask: mask ? copyOf(mask) : null })
+      const ownMask = mask === OWN_PAINT
+      level.steps!.push({ kind: 'mix', before: null, opacity, mask: mask && !ownMask ? copyOf(mask) : null, ownMask })
       return
     }
     const after = settle(level)
@@ -176,7 +210,7 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
 
   // Put the layers and folders from position "first" to "last" (not included) onto the level, from the bottom up. A
   // folder whose block starts before "first" (when the range starts inside it) is left out, with what is in it added
-  // like any other layers: the callers make sure that changes nothing (see prepareMoveTile in projection.ts)
+  // like any other layers: the callers make sure that changes nothing (see planMove in projection.ts)
   function addItems(level: Level, first: number, last: number, column: number, row: number, paintOf: PaintOf) {
     // The last layer or folder that isn't clipped, the base of the clipped ones above it: null when there is none or
     // it is hidden, undefined until one is found in the range. Its paint here is worked out when a clipped one needs it
@@ -193,6 +227,7 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
       if (base === undefined) setBase(stack.layers[clipBaseIndex(stack, index)])
       if (basePaint !== undefined) return basePaint
       if (!base?.visible) basePaint = null
+      else if (base === moving) basePaint = OWN_PAINT
       else if (isFolder(base)) {
         baseTile = folderPaint(stack.layers.indexOf(base), column, row, paintOf)
         basePaint = baseTile
@@ -294,22 +329,30 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
 
   // ----- Tiles shown live while an opacity changes -----
 
-  // Whether the tiles of the layer or folder at this position can be shown live (see live): not when layers are clipped
-  // to a folder it is in, since that folder's paint, which clips them, changes with its opacity too. Its tiles are then
-  // put together again for each new opacity
-  function canShowLive(index: number) {
+  // ----- Tiles shown while a layer changes: its opacity, or where its paint is -----
+
+  // The outermost folder holding the layer or folder at this position that layers are clipped to (null: none). Its
+  // paint, which clips them, changes with the layer: then it is the one whose tiles must be worked out
+  function clippedAround(index: number) {
+    let found: number | null = null
     for (let folder = stack.layers[index].parent; folder; folder = folder.parent) {
       const at = stack.layers.indexOf(folder)
       for (let above = at + 1; above < stack.layers.length; above++) {
-        if (stack.layers[above].visible && isClipped(stack, above) && clipBaseIndex(stack, above) === at) return false
+        if (stack.layers[above].visible && isClipped(stack, above) && clipBaseIndex(stack, above) === at) found = at
       }
     }
-    return true
+    return found
   }
 
+  // Whether the tiles of the layer or folder at this position can be shown live while its opacity changes (see live):
+  // not when layers are clipped to a folder it is in (see clippedAround). Its tiles are then put together again for
+  // each new opacity
+  const canShowLive = (index: number) => clippedAround(index) === null
+
   // The steps from "start" on, into a tile of the caller's ("target", for the last one) or a new one: the result. The
-  // tiles in between are given back, but never "start"
-  function runSteps(start: RenderTexture, steps: LiveStep[], target?: RenderTexture) {
+  // tiles in between are given back, but never "start". "own" is the paint of the layer that moves, for the steps
+  // clipped to it
+  function runSteps(start: RenderTexture, steps: LiveStep[], target?: RenderTexture, own?: Texture) {
     let picture = start
     const kept: RenderTexture[] = []
     const done = (tile: RenderTexture) => {
@@ -321,12 +364,13 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
         return
       }
       const into = target && i === steps.length - 1 ? target : takeTile()
-      if (step.kind === 'onto') blender.blend(picture, step.paint, step.opacity, step.mode, into)
-      else if (step.kind === 'into') {
+      if (step.kind === 'onto') {
+        blender.blend(picture, step.paint, step.opacity, step.mode, into, step.ownMask ? own : undefined)
+      } else if (step.kind === 'into') {
         blender.blend(step.under, picture, step.opacity, step.mode, into, step.mask ?? undefined)
       } else {
         const before = step.before ?? kept.pop()!
-        blender.mix(before, picture, step.opacity, into, step.mask ?? undefined)
+        blender.mix(before, picture, step.opacity, into, step.ownMask ? own : (step.mask ?? undefined))
         if (!step.before && before !== picture) done(before)
       }
       done(picture)
@@ -335,8 +379,12 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
     return picture
   }
 
-  // Every tile of a picture shown live
-  const texturesOf = (picture: LivePicture) => [picture.zero, picture.one, ...texturesOfSteps(picture.steps)]
+  // Every tile that belongs to a picture shown live
+  const texturesOf = (picture: LivePicture) => [
+    ...(picture.ownsZero ? [picture.zero] : []),
+    picture.one,
+    ...texturesOfSteps(picture.steps),
+  ]
 
   function texturesOfSteps(steps: LiveStep[]) {
     const textures: RenderTexture[] = []
@@ -349,31 +397,28 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
     return textures
   }
 
-  // The tile at this column and row with the layer or folder at "index" shown live while its opacity changes, from
-  // "base" (the paper and the layers under position "first", where the outermost folder it is in starts: see splitIndex
-  // in layers.ts). Null when it changes nothing there.
-  // The tile is the picture of everything with the layer at no opacity, mixed with the picture with it at full opacity
-  // as much as its opacity: the layer goes onto what is under it that way, whatever its blend mode, and so do the layers
-  // and folders above it as long as they only add and multiply (see STRAIGHT_MODES; a folder letting what is in it
-  // pass through only mixes). Up to the first one that does something else, both pictures are made here; that one and
-  // the rest are written down as steps, with pictures of the other layers they need, and done again for each new
-  // opacity (see showLive). The steps go up through the folders the layer is in: what is above it in its folder, then
-  // the folder going onto what is under it, and so on
-  function live(
+  // What a tile at this column and row needs, written down once, to show the layer or folder at "index" changing: what
+  // is under it in its folder ("under"), the paint of the base it is clipped to ("mask", a copy), and the steps above it
+  // (see LiveStep), up through the folders it is in: what is above it in its folder, then the folder going onto what is
+  // under it, and so on. From "base", the paper and the layers under position "first", where the outermost folder it
+  // is in starts (see splitIndex in layers.ts). With "isMoving", the layers clipped to it take its paint where it is
+  // (see OWN_PAINT). "made" has every tile made here. Null when it shows nothing there: clipped to a base with no paint
+  // there, or in a folder that is. "baseTile" is a picture of "base" the caller has, if any: what is under the layer
+  // or folder is then that picture itself when nothing goes between them
+  function record(
     index: number,
     column: number,
     row: number,
     base: Container,
     first: number,
     paintOf: PaintOf,
-  ): LivePicture | null {
-    spriteCount = 0
-    const made: RenderTexture[] = [] // every tile made here: those the picture doesn't use are given back at the end
+    isMoving: boolean,
+    baseTile?: RenderTexture,
+  ) {
+    const made: RenderTexture[] = []
     const steps: LiveStep[] = []
-    const giveBack = (keep: RenderTexture[] = []) => {
-      const tiles = new Set([...made, ...texturesOfSteps(steps)])
-      for (const tile of keep) tiles.delete(tile)
-      spareTiles.push(...tiles)
+    const giveBack = () => {
+      spareTiles.push(...new Set([...made, ...texturesOfSteps(steps)]))
       return null
     }
 
@@ -396,46 +441,110 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
       return tile
     }
 
-    // The tile with the layer at full opacity (with no opacity, it is what is under it)
-    const item = stack.layers[index]
-    const mask = maskOf(index, column, row, paintOf, made)
-    if (mask === null) return giveBack() // clipped, and none of it shows here
-    const under = before(index)
-    const one = takeTile()
-    made.push(one)
-    if (isFolder(item) && item.blendMode === 'pass-through') {
-      const level = startLevel(sprite(under))
-      addItems(level, blockStart(stack, index), index, column, row, paintOf)
-      blender.mix(under, settle(level), 1, one, mask)
-      finishLevel(level, null)
-    } else {
-      const paint = paintAt(index, column, row, paintOf, made)
-      if (!paint) return giveBack() // no paint here
-      blender.blend(under, paint, 1, item.blendMode, one, mask)
-    }
+    const ownBase = maskOf(index, column, row, paintOf, made)
+    // Clipped to a base with no paint here, it shows nothing; while it moves, a new layer above it may still show
+    // (see showMoved), so its mask is then a tile with nothing
+    if (ownBase === null && !isMoving) return giveBack()
+    const mask = ownBase ? copyOf(ownBase) : ownBase === null ? nothing() : null
+    if (mask) made.push(mask)
+    const isOnBase = baseTile !== undefined && !stack.layers[index].parent && blockStart(stack, index) === first
+    const under = isOnBase ? baseTile : before(index)
 
-    // The steps above it, in its folder and then in the folders around it
     const level = startLevel(null, steps)
-    for (let at = index; ;) {
-      const parent = stack.layers[at].parent
-      const end = parent ? stack.layers.indexOf(parent) : stack.layers.length
-      addItems(level, at + 1, end, column, row, paintOf)
-      writeNormalLayers(level)
-      if (!parent) break
-      const parentMask = maskOf(end, column, row, paintOf, made)
-      if (parentMask === null) {
-        finishLevel(level, null)
-        return giveBack() // the folder it is in is clipped, and none of it shows here
+    moving = isMoving ? stack.layers[index] : null
+    try {
+      for (let at = index; ;) {
+        const parent = stack.layers[at].parent
+        const end = parent ? stack.layers.indexOf(parent) : stack.layers.length
+        addItems(level, at + 1, end, column, row, paintOf)
+        writeNormalLayers(level)
+        if (!parent) break
+        const parentBase = maskOf(end, column, row, paintOf, made)
+        if (parentBase === null) {
+          finishLevel(level, null)
+          return giveBack() // the folder it is in is clipped, and none of it shows here
+        }
+        const parentMask = parentBase ? copyOf(parentBase) : null
+        if (parent.blendMode !== 'pass-through') {
+          steps.push({
+            kind: 'into',
+            under: before(end),
+            opacity: parent.opacity,
+            mode: parent.blendMode,
+            mask: parentMask,
+          })
+        } else if (parent.opacity < 1 || parentMask) {
+          steps.push({ kind: 'mix', before: before(end), opacity: parent.opacity, mask: parentMask })
+        }
+        at = end
       }
-      const ownMask = parentMask ? copyOf(parentMask) : null
-      if (parent.blendMode !== 'pass-through') {
-        steps.push({ kind: 'into', under: before(end), opacity: parent.opacity, mode: parent.blendMode, mask: ownMask })
-      } else if (parent.opacity < 1 || ownMask) {
-        steps.push({ kind: 'mix', before: before(end), opacity: parent.opacity, mask: ownMask })
-      }
-      at = end
+    } finally {
+      moving = null
     }
     finishLevel(level, null)
+    return { under, mask, steps, made }
+  }
+
+  // Put the layer or folder at "index" onto "under" at this opacity, with its blend mode, where "mask" covers, into
+  // "target". Its paint is "paint" when given (a folder's then counts as one picture), else its own. False when it has
+  // no paint here
+  function itemOnto(
+    index: number,
+    under: Texture,
+    opacity: number,
+    mask: Texture | null,
+    column: number,
+    row: number,
+    paintOf: PaintOf,
+    target: RenderTexture,
+    paint?: Texture,
+  ) {
+    const item = stack.layers[index]
+    if (!paint && isFolder(item) && item.blendMode === 'pass-through') {
+      const level = startLevel(sprite(under))
+      addItems(level, blockStart(stack, index), index, column, row, paintOf)
+      blender.mix(under, settle(level), opacity, target, mask ?? undefined)
+      finishLevel(level, null)
+      return true
+    }
+    const owned = !paint && isFolder(item) ? folderPaint(index, column, row, paintOf) : null
+    const ownPaint = paint ?? owned ?? paintOf(item, column, row)
+    // A folder that lets what is in it pass through, as one picture, goes on as Normal ("pass-through" is Normal's
+    // number in the shader)
+    if (ownPaint) blender.blend(under, ownPaint, opacity, item.blendMode, target, mask ?? undefined)
+    if (owned) spareTiles.push(owned)
+    return ownPaint !== null
+  }
+
+  // The tile at this column and row with the layer or folder at "index" shown live while its opacity changes. Null
+  // when it changes nothing there.
+  // The tile is the picture of everything with the layer at no opacity, mixed with the picture with it at full opacity
+  // as much as its opacity: the layer goes onto what is under it that way, whatever its blend mode, and so do the layers
+  // and folders above it as long as they only add and multiply (see STRAIGHT_MODES; a folder letting what is in it
+  // pass through only mixes). Up to the first one that does something else, both pictures are made here; that one and
+  // the rest stay steps (see record), done again for each new opacity (see createTileMixer in blendModes.ts, and
+  // showLive). "baseTile" is a whole picture of "base" that stays as it is while the tile shows live: when nothing goes
+  // between them, it is used as it is for what is under the layer, instead of a copy (and is then "zero" itself, when
+  // nothing is above)
+  function live(
+    index: number,
+    column: number,
+    row: number,
+    base: Container,
+    first: number,
+    paintOf: PaintOf,
+    baseTile?: RenderTexture,
+  ): LivePicture | null {
+    spriteCount = 0
+    const recorded = record(index, column, row, base, first, paintOf, false, baseTile)
+    if (!recorded) return null
+    const { under, mask, steps, made } = recorded
+    const one = takeTile()
+    made.push(one)
+    if (!itemOnto(index, under, 1, mask, column, row, paintOf, one)) {
+      spareTiles.push(...new Set([...made, ...texturesOfSteps(steps)]))
+      return null // no paint here
+    }
 
     // Where the straight line ends: at the first step that doesn't go in one, or at the "keep" step before it whose
     // picture would be needed
@@ -450,8 +559,10 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
       }
     }
     const done = steps.slice(0, cut)
-    const picture = { zero: runSteps(under, done), one: runSteps(one, done), steps: steps.slice(cut) }
-    giveBack(texturesOf(picture))
+    const zero = runSteps(under, done)
+    const picture = { zero, ownsZero: zero !== baseTile, one: runSteps(one, done), steps: steps.slice(cut) }
+    const used = new Set(texturesOf(picture))
+    spareTiles.push(...[...new Set([...made, ...texturesOfSteps(steps)])].filter(tile => !used.has(tile)))
     return picture
   }
 
@@ -463,13 +574,107 @@ export function createComposer(renderer: WebGLRenderer, stack: LayerStack, gpu: 
     spareTiles.push(start)
   }
 
+  // What a tile at this column and row needs while the layer or folder at "index" moves (see record), or null when it
+  // shows nothing there. "baseTile" is a whole picture of "base" that stays as it is while the layer moves: when
+  // nothing goes between them, it is used as it is for what is under the layer, instead of a copy
+  function moveProgram(
+    index: number,
+    column: number,
+    row: number,
+    base: Container,
+    first: number,
+    paintOf: PaintOf,
+    baseTile?: RenderTexture,
+  ): MovePicture | null {
+    spriteCount = 0
+    const recorded = record(index, column, row, base, first, paintOf, true, baseTile)
+    if (!recorded) return null
+    const { under, mask, steps, made } = recorded
+    const picture = { under, ownsUnder: under !== baseTile, mask, steps }
+    const used = new Set(texturesOfMove(picture))
+    spareTiles.push(...[...new Set([...made, ...texturesOfSteps(steps)])].filter(tile => !used.has(tile)))
+    return picture
+  }
+
+  // How a new layer right above the layer or folder at "index" is clipped (see showMoved): when the one above it is
+  // (see insideClipped in engine.ts), to the base this one is clipped to, or to this one when it isn't clipped
+  function clipAbove(index: number): 'none' | 'layer' | 'base' {
+    const next = stack.layers[index + 1]
+    if (!next || next.parent !== stack.layers[index].parent || !next.clipped) return 'none'
+    return isClipped(stack, index) ? 'base' : 'layer'
+  }
+
+  // The tile at this column and row while the layer or folder at "index" moves, into "target": its paint where it is
+  // now ("paint": the layer's, or a folder's as one picture), or the paint of the layers in it, where they are now
+  // ("paintOf"), onto what is under it, and the steps above. "above" is what goes into a new layer right above it (a
+  // transformed part, or an image placed: see engine.ts), Normal, and clipped like the layers around it
+  function showMoved(
+    picture: MovePicture,
+    index: number,
+    column: number,
+    row: number,
+    paintOf: PaintOf,
+    target: RenderTexture,
+    paint?: Texture,
+    above?: RenderTexture,
+  ) {
+    spriteCount = 0
+    const item = stack.layers[index]
+    const owned: RenderTexture[] = []
+    let steps = picture.steps
+    if (above) {
+      const clip = clipAbove(index)
+      let step: LiveStep = { kind: 'onto', paint: above, opacity: 1, mode: 'normal', ownMask: clip === 'layer' }
+      if (clip === 'base') {
+        const clipped = takeTile()
+        owned.push(clipped)
+        blender.clip(above, clipped, picture.mask ?? undefined)
+        step = { kind: 'onto', paint: clipped, opacity: 1, mode: 'normal' }
+      }
+      steps = [step, ...steps]
+    }
+    const into = steps.length > 0 ? takeTile() : target
+    if (!itemOnto(index, picture.under, item.opacity, picture.mask, column, row, paintOf, into, paint)) {
+      blender.clip(picture.under, into) // no paint there now
+    }
+    if (into === target) return
+    // The steps clipped to it need its paint where it is now
+    const needsOwn = steps.some(step => (step.kind === 'onto' || step.kind === 'mix') && step.ownMask)
+    const ownTile = needsOwn && !paint ? folderPaint(index, column, row, paintOf) : null
+    if (ownTile) owned.push(ownTile)
+    runSteps(into, steps, target, paint ?? ownTile ?? undefined)
+    spareTiles.push(into, ...owned)
+  }
+
+  // Every tile that belongs to a picture shown during a move
+  const texturesOfMove = (picture: MovePicture) => [
+    ...(picture.ownsUnder ? [picture.under] : []),
+    ...(picture.mask ? [picture.mask] : []),
+    ...texturesOfSteps(picture.steps),
+  ]
+
   function destroy() {
     for (const tile of spareTiles) tile.destroy(true)
     for (const root of spareRoots) root.destroy()
     for (const each of sprites) each.destroy()
+    emptyRoot.destroy()
   }
 
-  return { compose, composeFolder, canShowLive, live, showLive, texturesOf, destroy }
+  return {
+    compose,
+    composeFolder,
+    clippedAround,
+    canShowLive,
+    live,
+    showLive,
+    texturesOf,
+    moveProgram,
+    clipAbove,
+    showMoved,
+    texturesOfMove,
+    passes,
+    destroy,
+  }
 }
 
 export type Composer = ReturnType<typeof createComposer>

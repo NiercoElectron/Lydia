@@ -141,6 +141,8 @@ or the fill bucket does the same.
 selection moves along.
 
 - Hold **Shift** to move only across, or only up and down.
+- While it is dragged, it shows as it will be, with the blend modes, clipping and folders. Once let go, a bar next to
+  **Moving…** in the top bar shows how far it is from being put down; you can paint again when it is gone.
 - On a smart object, it moves the whole object, without losing anything.
 - Paint moved off the paper is kept, hidden: move it back and it comes back. While the layer is moved (or
   transformed), what is off the paper shows faded around it, and the layer's icon in the [layers](#layers) shows it

@@ -13,6 +13,12 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   of the folders it is in, clipped or not, and for a folder too
   ([decision 60](docs/decisions.md#60-the-live-opacity-with-any-blend-mode)). It used to be put together again a few
   tiles at a time, showing late on big drawings.
+- **Moving and transforming show as they will be** while dragged, whatever the blend modes, the opacity, clipping
+  and folders ([decision 61](docs/decisions.md#61-showing-a-move-as-it-will-be)). They used to show some layers as
+  Normal, or clipped ones whole, until let go.
+- On big drawings, the move starts showing at once (it took a few frames, which skipped), a new position costs a
+  few milliseconds, and the live opacity is drawn faster too. Once a move is let go, a **bar** next to "Moving…" shows
+  how far it is from being put down.
 
 ## [0.11.0] - 2026-10-28
 

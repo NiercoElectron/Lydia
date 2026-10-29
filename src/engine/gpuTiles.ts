@@ -39,8 +39,11 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
 
   // ----- Textures -----
 
+  let passCount = 0 // how many times it has drawn into a texture (see passes in composer.ts)
+
   const emptyContainer = new Container()
   function clearTexture(texture: RenderTexture) {
+    passCount++
     renderer.render({ container: emptyContainer, target: texture, clear: true })
   }
 
@@ -56,6 +59,7 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
   // Draw one texture into another, inside the graphics card
   function copyInto(source: Texture, target: RenderTexture) {
     copySprite.texture = source
+    passCount++
     renderer.render({ container: copySprite, target, clear: true })
   }
 
@@ -68,6 +72,7 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
     if (tile.color !== undefined) {
       tile.lastUsed = performance.now()
       const color = [0, 1, 2, 3].map(i => ((tile.color! >>> (i * 8)) & 255) / 255)
+      passCount++
       renderer.render({ container: emptyContainer, target, clear: true, clearColor: color })
       uploadCount++
       return
@@ -170,6 +175,19 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
     else cached.layer.tiles.delete(cached.key)
     cached.dirty = false
     dirtyTiles.delete(cached)
+  }
+
+  // Take a layer's tile off the graphics card's copies, with its texture, which belongs to the caller from then on (a
+  // move shows it as it was: see prepareLift in engine.ts): the next time the tile is needed, it is sent again from
+  // RAM. Only a tile whose pixels are all in RAM can be taken: null for one painted on the graphics card since, or not
+  // on it
+  function detach(layer: Layer, column: number, row: number) {
+    const id = `${layer.id}/${tileKey(column, row)}`
+    const cached = cache.get(id)
+    if (!cached || cached.dirty || cached.reading) return null
+    cache.delete(id)
+    pinned.delete(cached)
+    return cached.texture
   }
 
   // Tiles that sprites on the screen show too (paint off the paper, see outsideView.ts): they stay on the graphics card
@@ -373,6 +391,8 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
     markDirty,
     markClean,
     pin,
+    detach,
+    passes: () => passCount,
     unpinAll,
     trim,
     tilesWithPaint,

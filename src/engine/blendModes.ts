@@ -1,12 +1,16 @@
 import {
+  BindGroup,
   BufferImageSource,
   Container,
   Geometry,
   GlProgram,
+  Matrix,
   Mesh,
+  RenderContainer,
   RenderTexture,
   Shader,
   Sprite,
+  State,
   Texture,
   UniformGroup,
 } from 'pixi.js'
@@ -78,7 +82,8 @@ void main(void) {
 }
 `
 
-// The formulas, shared by the program that blends tiles and the one that shows tiles live (see createTileMixer). The
+// The formulas, shared by the program that blends tiles and the ones that show tiles on the screen (see
+// createTileMixer and createTileMover). The
 // graphics card keeps colors multiplied by their alpha: the formulas need them as they are, so that is undone first,
 // and done again in the result
 const FORMULAS = `
@@ -223,9 +228,12 @@ export function createLayerBlender(renderer: WebGLRenderer) {
   copySprite.blendMode = 'none'
   copyRoot.addChild(copySprite)
 
+  let passCount = 0 // how many times it has drawn into a tile (see passes in composer.ts)
+
   // Draw into "target", then let go of the tiles read: one of them may be deleted later, which PixiJS warns about while
   // a program still holds it
   function draw(target: RenderTexture) {
+    passCount++
     renderer.render({ container: root, target, clear: false })
     shader.resources.uBackdrop = NO_PAINT.source
     shader.resources.uPaint = NO_PAINT.source
@@ -266,6 +274,7 @@ export function createLayerBlender(renderer: WebGLRenderer) {
     scratch ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
     blend(target, paint, opacity, mode, scratch, mask)
     copySprite.texture = scratch
+    passCount++
     renderer.render({ container: copyRoot, target, clear: false })
   }
 
@@ -283,59 +292,54 @@ export function createLayerBlender(renderer: WebGLRenderer) {
   }
 
   compileNow(renderer, root)
-  return { blend, blendOnto, mix, clip, destroy }
+  return { blend, blendOnto, mix, clip, passes: () => passCount, destroy }
 }
 
 export type LayerBlender = ReturnType<typeof createLayerBlender>
 
-// How many steps a tile shown live can do on the screen (see createTileMixer): each one reads up to two tiles, and with
-// the two pictures mixed first that is 16, the fewest a graphics card with WebGL 2 can read at once
-const MIXER_STEPS = 7
-// How the mixer's program tells the steps apart (see LiveStep in composer.ts): none, onto, into, mixed with a picture,
+// How the programs below tell the steps apart (see LiveStep in composer.ts): none, onto, into, mixed with a picture,
 // keep, mixed with the picture kept
 const STEP_KINDS = { none: 0, onto: 1, into: 2, mix: 3, keep: 4, mixKept: 5 }
-const STEP_NUMBERS = Array.from({ length: MIXER_STEPS }, (_, i) => i)
 
-// For each step in "uSteps": "x" its kind, "y" its mode, "z" its opacity, "w" 1 when it has a mask (its second tile).
-// The tiles are read first, each by its own name (a program can't choose a tile by a number it works out), and the
-// steps then go in a loop, so the formulas are in the program once: the graphics card's driver turns the program
-// into its own code the first time it is used, and with the formulas written out for every step, that took seconds.
-// Only the tiles of the steps there are ("uCount") are read, and the masks there are.
-// Two pictures can be kept at once, which is enough for a folder letting what is in it pass through inside another one
-const mixerFragment = `#version 300 es
-precision highp float;
-
-in vec2 vUV;
-out vec4 finalColor;
-
-uniform sampler2D uZero;
-uniform sampler2D uOne;
-uniform float uAmount;
-uniform vec4 uSteps[${MIXER_STEPS}];
+// A program showing a tile on the screen that ends with steps (see LiveStep in composer.ts), up to "count" of them:
+// "start" works out the picture they start from ("picture"), and the paint of the layer that moves ("own"), which the
+// steps clipped to it take.
+// For each step in "uSteps": "x" its kind, "y" its mode, "z" its opacity, "w" 1 when it has a mask (its second tile),
+// 2 when it is clipped to the layer that moves. The tiles are read first, each by its own name (a program can't
+// choose a tile by a number it works out), and the steps then go in a loop, so the formulas are in the program once:
+// the graphics card's driver turns the program into its own code the first time it is used, and with the formulas
+// written out for every step, that took seconds. Only the tiles of the steps there are ("uCount") are read, and the
+// masks there are. Two pictures can be kept at once, which is enough for a folder letting what is in it pass through
+// inside another one. With no steps ("count" 0), the program only works out the picture
+function stepsFragment(count: number, header: string, start: string) {
+  const numbers = Array.from({ length: count }, (_, i) => i)
+  const declarations = `uniform vec4 uSteps[${count}];
 uniform float uCount;
-${STEP_NUMBERS.map(i => `uniform sampler2D uFirst${i};\nuniform sampler2D uSecond${i};`).join('\n')}
-${FORMULAS}
-void main(void) {
-  int count = int(uCount + 0.5);
-${STEP_NUMBERS.map(
-  i => `  vec4 first${i} = vec4(0.0);
+${numbers.map(i => `uniform sampler2D uFirst${i};\nuniform sampler2D uSecond${i};`).join('\n')}`
+  const steps = `  int stepCount = int(uCount + 0.5);
+${numbers
+  .map(
+    i => `  vec4 first${i} = vec4(0.0);
   float mask${i} = 1.0;
-  if (count > ${i}) {
+  if (stepCount > ${i}) {
     first${i} = texture(uFirst${i}, vUV);
-    if (uSteps[${i}].w > 0.5) mask${i} = texture(uSecond${i}, vUV).a;
+    if (uSteps[${i}].w > 1.5) mask${i} = own.a;
+    else if (uSteps[${i}].w > 0.5) mask${i} = texture(uSecond${i}, vUV).a;
   }`,
-).join('\n')}
-  vec4 picture = mix(texture(uZero, vUV), texture(uOne, vUV), uAmount);
+  )
+  .join('\n')}
   vec4 kept = vec4(0.0);
   vec4 keptBefore = vec4(0.0);
-  for (int i = 0; i < ${MIXER_STEPS}; i++) {
-    if (i >= count) break;
-    vec4 first = ${STEP_NUMBERS.slice(0, -1)
+  for (int i = 0; i < ${count}; i++) {
+    if (i >= stepCount) break;
+    vec4 first = ${numbers
+      .slice(0, -1)
       .map(i => `i == ${i} ? first${i} : `)
-      .join('')}first${MIXER_STEPS - 1};
-    float mask = ${STEP_NUMBERS.slice(0, -1)
+      .join('')}first${count - 1};
+    float mask = ${numbers
+      .slice(0, -1)
       .map(i => `i == ${i} ? mask${i} : `)
-      .join('')}mask${MIXER_STEPS - 1};
+      .join('')}mask${count - 1};
     int kind = int(uSteps[i].x + 0.5);
     float amount = uSteps[i].z * mask;
     if (kind == 4) {
@@ -350,19 +354,32 @@ ${STEP_NUMBERS.map(
       vec4 over = (kind == 1 ? first : picture) * amount;
       picture = blendOnto(under, over, int(uSteps[i].y + 0.5));
     }
-  }
+  }`
+  return `#version 300 es
+precision highp float;
+
+in vec2 vUV;
+out vec4 finalColor;
+
+${count > 0 ? declarations : ''}
+${header}
+${FORMULAS}
+void main(void) {
+${start}
+${count > 0 ? steps : ''}
   finalColor = picture;
 }
 `
+}
 
-// What the mixer's program needs for these steps: the numbers of the steps and the tiles they read. Null when there
-// are too many, or more pictures kept at once than it can keep
-function mixerSteps(steps: LiveStep[]) {
-  if (steps.length > MIXER_STEPS) return null
-  const numbers = new Float32Array(MIXER_STEPS * 4)
+// What a program from stepsFragment needs for these steps: the numbers of the steps and the tiles they read, by name.
+// Null when there are more than "count", or more pictures kept at once than it can keep
+function stepsUniforms(steps: LiveStep[], count: number) {
+  if (steps.length > count) return null
+  const numbers = new Float32Array(count * 4)
   const tiles: Record<string, TextureSource> = {}
   let keptCount = 0
-  for (const i of STEP_NUMBERS) {
+  for (let i = 0; i < count; i++) {
     const step = steps[i]
     let values = [STEP_KINDS.none, 0, 0, 0]
     let first: Texture = NO_PAINT
@@ -384,6 +401,7 @@ function mixerSteps(steps: LiveStep[]) {
       if (++keptCount > 2) return null
     }
     if (second) values[3] = 1
+    if ((step?.kind === 'onto' || step?.kind === 'mix') && step.ownMask) values[3] = 2
     numbers.set(values, i * 4)
     tiles[`uFirst${i}`] = first.source
     tiles[`uSecond${i}`] = (second ?? NO_MASK).source
@@ -391,78 +409,335 @@ function mixerSteps(steps: LiveStep[]) {
   return { numbers, tiles }
 }
 
-// Tiles shown on the screen as a mix of two pictures of the same place: as much of the second as "amount", the same
-// for all of them, followed by the steps still to do (a layer's opacity changing live: see projection.ts and live in
-// composer.ts). The graphics card works it all out on every frame, so a new amount costs nothing more. The pictures
-// are whole tiles; a tile at the paper's edge only shows the part on the paper
-export function createTileMixer(renderer: WebGLRenderer) {
-  const geometry = new Geometry({
-    attributes: { aPosition: { buffer: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), format: 'float32x2' } },
-    indexBuffer: new Uint32Array([0, 1, 2, 0, 2, 3]),
-  })
-  const glProgram = GlProgram.from({
-    vertex: `#version 300 es
+// The square of a tile whose corner is at "uCorner" on the paper, of which only "uPart" shows: a tile at the paper's
+// edge only shows the part on the paper
+const tileVertex = `#version 300 es
 in vec2 aPosition;
 
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
 uniform mat3 uTransformMatrix;
+uniform vec2 uCorner;
 uniform vec2 uPart;
 
 out vec2 vUV;
 
 void main(void) {
   vUV = aPosition * uPart;
-  vec3 position = vec3(vUV * ${TILE_SIZE}.0, 1.0);
+  vec3 position = vec3(uCorner + vUV * ${TILE_SIZE}.0, 1.0);
   gl_Position = vec4((uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix * position).xy, 0.0, 1.0);
 }
-`,
-    fragment: mixerFragment,
-    name: 'tile-mix',
-    preferredFragmentPrecision: 'highp',
-  })
-  const amount = new UniformGroup({ uAmount: { value: 0, type: 'f32' } })
+`
 
-  // A tile mixing these two pictures and doing these steps, "width" and "height" of it on the paper. Null when the
-  // steps are more than the program can do
-  function show(zero: Texture, one: Texture, steps: LiveStep[], width: number, height: number) {
-    const forSteps = mixerSteps(steps)
+const squareGeometry = () =>
+  new Geometry({
+    attributes: { aPosition: { buffer: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), format: 'float32x2' } },
+    indexBuffer: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  })
+
+// A program for a set of tiles (see createTileSet): the names of the tiles it reads, and of the numbers each tile
+// has of its own
+type TileProgram = { glProgram: GlProgram; samplers: string[]; uniforms: string[] }
+
+// A tile of a set: its corner on the paper, the tiles it reads (as its program names them), and its own numbers
+export type ShownTile = {
+  visible: boolean
+  program: TileProgram
+  corner: Float32Array
+  textures: TextureSource[]
+  values: (number | Float32Array)[]
+}
+
+// Where a program's uniforms are, found once for each program
+type Places = { corner: WebGLUniformLocation; samplers: WebGLUniformLocation[]; uniforms: WebGLUniformLocation[] }
+const placesOf = new WeakMap<WebGLProgram, Places>()
+
+// Tiles drawn on the screen by programs of our own, hundreds at once on every frame (see createTileMixer and
+// createTileMover). Shown as one object each, PixiJS would go through all that a program needs for each of them, which
+// took longer than all the rest of a frame with a big drawing on the screen. Here that is done once for each program
+// on every frame, the way PixiJS does it for one object (see MeshPipe in PixiJS), and then each tile only gives its
+// own tiles and numbers. "shared" holds the numbers that are the same for all the tiles
+function createTileSet(shared: UniformGroup, programs: TileProgram[]) {
+  const tiles = new Set<ShownTile>()
+  const geometry = squareGeometry()
+  const state = State.for2d()
+  const local = new UniformGroup({ uTransformMatrix: { value: new Matrix(), type: 'mat3x3<f32>' } })
+  const localGroup = new BindGroup({ 0: local })
+  const shaders = new Map(
+    programs.map(program => [program, new Shader({ glProgram: program.glProgram, resources: { shared } })]),
+  )
+  const container = new RenderContainer({ render: renderer => draw(renderer as WebGLRenderer) })
+
+  function draw(renderer: WebGLRenderer) {
+    local.uniforms.uTransformMatrix = container.groupTransform
+    local.update()
+    const gl = renderer.gl
+    for (const program of programs) {
+      let places: Places | null = null
+      for (const tile of tiles) {
+        if (!tile.visible || tile.program !== program) continue
+        places ??= start(renderer, program)
+        for (const [unit, source] of tile.textures.entries()) renderer.texture.bindSource(source, unit)
+        gl.uniform2fv(places.corner, tile.corner)
+        for (const [i, value] of tile.values.entries()) {
+          const place = places.uniforms[i]
+          if (typeof value === 'number') gl.uniform1f(place, value)
+          else if (value.length === 2) gl.uniform2fv(place, value)
+          else gl.uniform4fv(place, value)
+        }
+        renderer.geometry.draw('triangle-list', 6, 0)
+      }
+    }
+  }
+
+  // Get the graphics card ready to draw tiles with this program: the program with the numbers shared by all the
+  // tiles, and the tiles it reads each on a texture unit of its own, in the order of its names
+  function start(renderer: WebGLRenderer, program: TileProgram) {
+    const shader = shaders.get(program)!
+    shader.groups[100] = renderer.globalUniforms.bindGroup
+    shader.groups[101] = localGroup
+    renderer.shader.bind(shader)
+    renderer.geometry.bind(geometry, program.glProgram)
+    renderer.state.set(state)
+    const gl = renderer.gl
+    const glProgram = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram
+    let places = placesOf.get(glProgram)
+    if (!places) {
+      const find = (name: string) => gl.getUniformLocation(glProgram, name)!
+      places = { corner: find('uCorner'), samplers: program.samplers.map(find), uniforms: program.uniforms.map(find) }
+      placesOf.set(glProgram, places)
+    }
+    for (const [unit, place] of places.samplers.entries()) gl.uniform1i(place, unit)
+    return places
+  }
+
+  // A tile of the set with this program, at this column and row, out of sight. "textures" are the tiles it reads by
+  // name (a name left out: none), "values" its own numbers, in the order of the program's names
+  function add(
+    program: TileProgram,
+    column: number,
+    row: number,
+    textures: Record<string, TextureSource>,
+    values: (number | Float32Array)[],
+  ): ShownTile {
+    const tile = {
+      visible: false,
+      program,
+      corner: new Float32Array([column * TILE_SIZE, row * TILE_SIZE]),
+      textures: program.samplers.map(name => textures[name] ?? NO_PAINT.source),
+      values,
+    }
+    tiles.add(tile)
+    return tile
+  }
+
+  function remove(tile: ShownTile) {
+    tiles.delete(tile)
+  }
+
+  // The programs stay: PixiJS keeps one for each source code, shared by every drawing opened
+  function destroy() {
+    tiles.clear()
+    if (!container.destroyed) container.destroy() // already, with the projection's (see projection.ts)
+    geometry.destroy()
+    for (const shader of shaders.values()) shader.destroy()
+  }
+
+  return { container, add, remove, destroy }
+}
+
+// A program for createTileSet: its fragment program, the tiles it reads besides the steps' ("samplers"), and the
+// numbers of its own each tile has besides "uPart" and the steps' (see stepsFragment)
+function tileProgram(name: string, fragment: string, count: number, samplers: string[], uniforms: string[] = []) {
+  const steps = Array.from({ length: count }, (_, i) => [`uFirst${i}`, `uSecond${i}`]).flat()
+  return {
+    glProgram: GlProgram.from({ vertex: tileVertex, fragment, name, preferredFragmentPrecision: 'highp' }),
+    samplers: [...samplers, ...steps],
+    uniforms: ['uPart', ...(count > 0 ? ['uSteps', 'uCount'] : []), ...uniforms],
+  }
+}
+
+// The numbers of a tile for a program from tileProgram: "width" and "height" of it on the paper, and its steps
+function tileValues(width: number, height: number, steps: LiveStep[], forSteps: { numbers: Float32Array }) {
+  const part = new Float32Array([width / TILE_SIZE, height / TILE_SIZE])
+  return forSteps.numbers.length > 0 ? [part, forSteps.numbers, steps.length] : [part]
+}
+
+// Draw a sample of each program into a tiny tile now (see compileNow), from a sample tile of each
+function compileSet(renderer: WebGLRenderer, set: ReturnType<typeof createTileSet>, samples: ShownTile[]) {
+  for (const tile of samples) tile.visible = true
+  compileNow(renderer, set.container)
+  for (const tile of samples) set.remove(tile)
+}
+
+// How many steps a tile shown live can do on the screen (see createTileMixer): each one reads up to two tiles, and with
+// the two pictures mixed first that is 16, the fewest a graphics card with WebGL 2 can read at once. A tile with no
+// steps has a program of its own, which reads only the two pictures
+const MIXER_STEPS = 7
+
+// Tiles shown on the screen as a mix of two pictures of the same place: as much of the second as "amount", the same
+// for all of them, followed by the steps still to do (a layer's opacity changing live: see projection.ts and live in
+// composer.ts). The graphics card works it all out on every frame, so a new amount costs nothing more. The pictures
+// are whole tiles; a tile at the paper's edge only shows the part on the paper
+export function createTileMixer(renderer: WebGLRenderer) {
+  const program = (count: number) =>
+    tileProgram(
+      `tile-mix-${count}`,
+      stepsFragment(
+        count,
+        `uniform sampler2D uZero;
+uniform sampler2D uOne;
+uniform float uAmount;`,
+        `  vec4 picture = mix(texture(uZero, vUV), texture(uOne, vUV), uAmount);
+  vec4 own = vec4(0.0);`,
+      ),
+      count,
+      ['uZero', 'uOne'],
+    )
+  const programs = { none: program(0), some: program(MIXER_STEPS) }
+  const amount = new UniformGroup({ uAmount: { value: 0, type: 'f32' } })
+  const set = createTileSet(amount, [programs.none, programs.some])
+
+  // A tile mixing these two pictures and doing these steps, at this column and row, "width" and "height" of it on the
+  // paper, out of sight. Null when the steps are more than the program can do
+  function show(
+    zero: Texture,
+    one: Texture,
+    steps: LiveStep[],
+    column: number,
+    row: number,
+    width: number,
+    height: number,
+  ) {
+    const count = steps.length > 0 ? MIXER_STEPS : 0
+    const forSteps = stepsUniforms(steps, count)
     if (!forSteps) return null
-    const tile = new UniformGroup({
-      uPart: { value: new Float32Array([width / TILE_SIZE, height / TILE_SIZE]), type: 'vec2<f32>' },
-      uSteps: { value: forSteps.numbers, type: 'vec4<f32>', size: MIXER_STEPS },
-      uCount: { value: steps.length, type: 'f32' },
-    })
-    const shader = new Shader({
-      glProgram,
-      resources: { mixAmount: amount, mixTile: tile, uZero: zero.source, uOne: one.source, ...forSteps.tiles },
-    })
-    return new Mesh({ geometry, shader })
+    const textures = { uZero: zero.source, uOne: one.source, ...forSteps.tiles }
+    return set.add(
+      count > 0 ? programs.some : programs.none,
+      column,
+      row,
+      textures,
+      tileValues(width, height, steps, forSteps),
+    )
   }
 
   function setAmount(value: number) {
     amount.uniforms.uAmount = value
   }
 
-  // Take a tile off the screen
-  function remove(tile: Mesh<Geometry, Shader>) {
-    const shader = tile.shader!
-    tile.destroy()
-    shader.destroy()
-  }
-
-  // The program stays: PixiJS keeps one for each source code, shared by every drawing opened
-  function destroy() {
-    geometry.destroy()
-  }
-
-  const sample = new Container()
-  sample.addChild(show(NO_PAINT, NO_PAINT, [], 1, 1)!)
-  compileNow(renderer, sample)
-  remove(sample.children[0] as Mesh<Geometry, Shader>)
-  sample.destroy()
-  return { show, setAmount, remove, destroy }
+  compileSet(renderer, set, [
+    show(NO_PAINT, NO_PAINT, [], 0, 0, 1, 1)!,
+    show(NO_PAINT, NO_PAINT, [{ kind: 'keep' }], 0, 0, 1, 1)!,
+  ])
+  return { container: set.container, show, setAmount, remove: set.remove, destroy: set.destroy }
 }
+
+export type TileMixer = ReturnType<typeof createTileMixer>
+
+// How many steps a tile shown while a layer moves can do on the screen (see createTileMover): with the 8 tiles it
+// reads first, 16 again. A tile with no steps has a program of its own, which reads only those 8
+const MOVER_STEPS = 4
+
+// How what a transform draws goes in, for the program of createTileMover: none, into the layer, into a new layer
+// above it (Normal), that one clipped to the layer, or to the base the layer is clipped to
+export const DRAWN = { none: 0, inLayer: 1, above: 2, aboveClippedToLayer: 3, aboveClippedToBase: 4 }
+
+// The tiles a tile shown while a layer moves reads first, as the program of createTileMover names them
+const MOVER_TILES = ['uUnder', 'uMask', 'uStays', 'uDrawn', 'uMoved0', 'uMoved1', 'uMoved2', 'uMoved3']
+
+// Tiles shown on the screen while a layer or folder moves (see projection.ts and moveProgram in composer.ts): its
+// paint where it is now goes onto the picture of what is under it, with its opacity, its blend mode and the base it
+// is clipped to, followed by the steps above it, as they will be once it is let go. Its paint is what stays at the
+// tile, with the pictures that move on top, at the same place in every tile for the same move ("uShift"): each pixel
+// is in one of the four pictures of the tiles around its place before the move (only one when the move is a whole
+// number of tiles). The graphics card works it all out on every frame, so a new place costs nothing more
+export function createTileMover(renderer: WebGLRenderer) {
+  const program = (count: number) =>
+    tileProgram(
+      `tile-move-${count}`,
+      stepsFragment(
+        count,
+        `${MOVER_TILES.map(name => `uniform sampler2D ${name};`).join('\n')}
+uniform vec2 uShift;
+uniform vec3 uItem;`,
+        `  vec2 before = vUV * ${TILE_SIZE}.0 - uShift;
+  vec2 corner = step(0.0, before);
+  vec2 movedUV = before / ${TILE_SIZE}.0 + 1.0 - corner;
+  vec4 moved0 = texture(uMoved0, movedUV);
+  vec4 moved1 = texture(uMoved1, movedUV);
+  vec4 moved2 = texture(uMoved2, movedUV);
+  vec4 moved3 = texture(uMoved3, movedUV);
+  vec4 moved = corner.y < 0.5 ? (corner.x < 0.5 ? moved0 : moved1) : (corner.x < 0.5 ? moved2 : moved3);
+  vec4 own = texture(uStays, vUV);
+  own = moved + own * (1.0 - moved.a);
+  vec4 drawn = texture(uDrawn, vUV);
+  int drawnAs = int(uItem.z + 0.5);
+  if (drawnAs == 1) own = drawn + own * (1.0 - drawn.a);
+  float clip = texture(uMask, vUV).a;
+  vec4 picture = blendOnto(texture(uUnder, vUV), own * uItem.y * clip, int(uItem.x + 0.5));
+  if (drawnAs >= 2) picture = blendOnto(picture, drawn * (drawnAs == 3 ? own.a : drawnAs == 4 ? clip : 1.0), 0);`,
+      ),
+      count,
+      MOVER_TILES,
+    )
+  const programs = { none: program(0), some: program(MOVER_STEPS) }
+  // "uItem": the blend mode and the opacity of what moves, and how what a transform draws goes in (see DRAWN)
+  const move = new UniformGroup({
+    uShift: { value: new Float32Array(2), type: 'vec2<f32>' },
+    uItem: { value: new Float32Array(3), type: 'vec3<f32>' },
+  })
+  const set = createTileSet(move, [programs.none, programs.some])
+
+  // A tile showing the move with what it needs (see MovePicture in composer.ts), at this column and row, "width" and
+  // "height" of it on the paper, out of sight, its paint still to be given (see setPaint). Null when the steps are
+  // more than the program can do
+  function show(
+    picture: { under: Texture; mask: Texture | null; steps: LiveStep[] },
+    column: number,
+    row: number,
+    width: number,
+    height: number,
+  ) {
+    const count = picture.steps.length > 0 ? MOVER_STEPS : 0
+    const forSteps = stepsUniforms(picture.steps, count)
+    if (!forSteps) return null
+    const textures = { uUnder: picture.under.source, uMask: (picture.mask ?? NO_MASK).source, ...forSteps.tiles }
+    const values = tileValues(width, height, picture.steps, forSteps)
+    return set.add(count > 0 ? programs.some : programs.none, column, row, textures, values)
+  }
+
+  // The paint of what moves at a tile: what stays there, the pictures that move from the four tiles around (above
+  // left, above right, below left, below right of where "uShift" puts them), and what a transform draws there. Null:
+  // nothing
+  function setPaint(tile: ShownTile, stays: Texture | null, moved: (Texture | null)[], drawn: Texture | null) {
+    const paint = [stays, drawn, ...moved]
+    for (const [i, texture] of paint.entries()) tile.textures[2 + i] = (texture ?? NO_PAINT).source
+  }
+
+  // Where the pictures that move start in each tile, in pixels from its corner (from 0 to a tile's size)
+  function setShift(x: number, y: number) {
+    const shift = move.uniforms.uShift as Float32Array
+    shift[0] = x
+    shift[1] = y
+  }
+
+  // The blend mode and the opacity of what moves, and how what a transform draws goes in (see DRAWN)
+  function setItem(mode: BlendMode, opacity: number, drawnAs: number) {
+    const item = move.uniforms.uItem as Float32Array
+    item[0] = MODE_NUMBERS[mode]
+    item[1] = opacity
+    item[2] = drawnAs
+  }
+
+  compileSet(renderer, set, [
+    show({ under: NO_PAINT, mask: null, steps: [] }, 0, 0, 1, 1)!,
+    show({ under: NO_PAINT, mask: null, steps: [{ kind: 'keep' }] }, 0, 0, 1, 1)!,
+  ])
+  return { container: set.container, show, setPaint, setShift, setItem, remove: set.remove, destroy: set.destroy }
+}
+
+export type TileMover = ReturnType<typeof createTileMover>
 
 // Draw this once, into a tiny tile, so that the graphics card's driver turns its program into its own code now, while
 // the drawing opens, and not the first time it is needed, which would freeze the screen for a moment (a tenth of a
@@ -472,5 +747,3 @@ function compileNow(renderer: WebGLRenderer, container: Container) {
   renderer.render({ container, target: tiny, clear: true })
   tiny.destroy(true)
 }
-
-export type TileMixer = ReturnType<typeof createTileMixer>

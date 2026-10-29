@@ -103,6 +103,7 @@ export type EngineSnapshot = {
   isModified: boolean // changed since it was opened or last saved
   isUpdating: boolean // putting the picture together again after a layer change (see composeLayerTiles)
   task: string | null // what is being worked out over several frames ("Filling…"), if anything (see runTask)
+  progress: number | null // how far the task is, from 0 to 1, when it can tell (see setProgress)
   hasSelection: boolean
   transform: { smooth: boolean } | null // the transform being made, if any (see smartObject.ts)
   canMergeDown: boolean // the active layer can be merged into the one under it (see mergeDown)
@@ -360,6 +361,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       isModified,
       isUpdating: projection.isUpdating(),
       task,
+      progress: task ? taskProgress : null,
       hasSelection: selection !== null,
       transform: transform ? { smooth: transform.smooth } : null,
       canMergeDown: canMergeDown(),
@@ -425,6 +427,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   async function runTask(label: string, work: () => Promise<boolean>) {
     if (isBusy()) return
     task = label
+    taskProgress = null
     changed(false)
     let didChange = false
     try {
@@ -436,6 +439,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
   }
 
+  // How far the task is, from 0 to 1 (null: it can't tell), shown as a bar next to its name. The screen is told only
+  // when it moves by a hundredth, not on every frame
+  let taskProgress: number | null = null
+  function setProgress(value: number | null) {
+    const rounded = value === null ? null : Math.min(1, Math.floor(value * 100) / 100)
+    if (rounded === taskProgress) return
+    taskProgress = rounded
+    changed(false)
+  }
+
   // Change tiles of a layer in RAM, a few every frame, as one undo step: "change" gives a tile's new pixels (null = no
   // paint, and the tile is whole: see tiles.ts), or undefined to leave it as it is. The new tiles are sent to the graphics card where it has a copy of
   // them, so nothing has to be read back from it. "withSelection": the selection changes too, right afterwards, as part
@@ -445,6 +458,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     keys: Iterable<string>,
     change: (key: string, tile: StoredTile | undefined) => StoredTile | null | undefined,
     keep: { selection?: boolean; smart?: boolean } = {}, // what the undo step keeps too (see history.ts)
+    onTile?: () => void, // called for each tile, to show how far the work is
   ) {
     while (gpu.hasUnsaved()) await nextFrame() // every tile in RAM (nothing could paint since runTask waited)
     const pace = createPacer()
@@ -452,6 +466,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     history.begin(layer, keep)
     for (const key of keys) {
       await pace()
+      onTile?.()
       const tile = change(key, layer.tiles.get(key))
       if (tile === undefined) continue
       history.backUpTile(key)
@@ -1153,11 +1168,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // paint. With "withPictures", also pictures of the part it loses there, to move along; a smart object being
   // transformed draws itself instead. What the layer keeps off the paper shows faded meanwhile (see the ghost in
   // projection.ts). Tiles shown live would show through all that. For a folder, the pictures are of all its layers put
-  // together
-  async function prepareLift(layer: Layer, cut: Selection | null, lifted: string[], withPictures: boolean) {
+  // together, or of each of its layers that moves ("movers") when they can't move as one picture (see planMove in
+  // projection.ts)
+  async function prepareLift(
+    layer: Layer,
+    cut: Selection | null,
+    lifted: string[],
+    withPictures: boolean,
+    movers: Layer[] = [layer],
+  ) {
     projection.finishLive()
     outsideHidden = layer
     outside.update(layer)
+    const { asOne } = projection.planMove()
+    const pictured = asOne ? [layer] : movers
     const isLifted = new Set(lifted)
     const painted = new Set(isFolder(layer) ? layersIn(layer).flatMap(inside => [...gpu.tilesWithPaint(inside)]) : [])
     const offPaper = [...(isFolder(layer) ? painted : gpu.tilesWithPaint(layer))].filter(key => {
@@ -1166,32 +1190,40 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     })
     const pace = createPacer()
     for (const key of new Set([...lifted, ...(lifted.length > 0 ? offPaper : []), ...projection.paintedAbove()])) {
-      await pace()
-      const { column, row } = parseTileKey(key)
-      const shows = isShown(layer) && (!isFolder(layer) || painted.has(key))
-      const texture = !shows
-        ? null
-        : isFolder(layer)
-          ? folderTexture(layer, column, row)
-          : gpu.getTexture(layer, column, row, false)
-      const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
-      // All of the tile moves when it is selected whole, and, with a selection (which is only on the paper), all of it
-      // is on the paper
-      const { width, height } = tileSize(grid, column, row)
-      const movesWhole = selected === 'full' && (!cut || (width === TILE_SIZE && height === TILE_SIZE))
-      let moving: RenderTexture | null = null
-      let left: RenderTexture | null = null
-      if (texture && selected && withPictures) {
-        moving = projection.moveTexture()
-        gpu.copyInto(texture, moving)
-        if (cut) selectionView.cut(moving, key)
+      for (const each of pictured) {
+        await pace()
+        const { column, row } = parseTileKey(key)
+        const shows = isShown(each) && (!isFolder(each) || painted.has(key))
+        const texture = !shows
+          ? null
+          : isFolder(each)
+            ? folderTexture(each, column, row)
+            : gpu.getTexture(each, column, row, false)
+        const selected = !isLifted.has(key) ? undefined : cut ? cut.get(key) : 'full'
+        // All of the tile moves when it is selected whole, and, with a selection (which is only on the paper), all of
+        // it is on the paper
+        const { width, height } = tileSize(grid, column, row)
+        const movesWhole = selected === 'full' && (!cut || (width === TILE_SIZE && height === TILE_SIZE))
+        let moving: RenderTexture | null = null
+        let left: RenderTexture | null = null
+        if (texture && selected && withPictures) {
+          // Without a selection, a layer's tile moves whole: its texture itself is taken, which costs the graphics card
+          // nothing, where a copy of each tile would make it lag behind for a few frames with a big layer. A selected
+          // part, or a folder's layers put together, is a copy
+          if (!cut && !isFolder(each)) moving = gpu.detach(each, column, row)
+          if (!moving) {
+            moving = projection.moveTexture()
+            gpu.copyInto(texture, moving)
+            if (cut) selectionView.cut(moving, key)
+          }
+        }
+        if (texture && !movesWhole) {
+          left = projection.moveTexture()
+          gpu.copyInto(texture, left)
+          if (selected && cut) selectionView.cutAway(left, key)
+        }
+        projection.prepareMoveTile(key, moving, left, texture !== null && selected !== undefined, each)
       }
-      if (texture && !movesWhole) {
-        left = projection.moveTexture()
-        gpu.copyInto(texture, left)
-        if (selected && cut) selectionView.cutAway(left, key)
-      }
-      projection.prepareMoveTile(key, moving, left)
     }
   }
 
@@ -1216,7 +1248,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const lifted = [...new Set(movers.flatMap(liftedOf))]
     if (lifted.length === 0) return released.then(() => false) // nothing to move
     try {
-      await prepareLift(item, cut, lifted, true)
+      await prepareLift(item, cut, lifted, true, movers)
       const follow = (dx: number, dy: number) => {
         projection.setMoveOffset(dx, dy)
         selectionView.setOffset(dx, dy)
@@ -1226,16 +1258,23 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       drag.follow = follow
 
       const keep = await released
+      projection.holdMove() // the layers change now: the screen keeps showing the move until they are put together
       const { dx, dy } = drag
       if (!keep || (dx === 0 && dy === 0)) return false
       let didChange = false
       history.startGroup()
+      // The bar shows the tiles worked out in RAM as the first half of the work, and the tiles put together again as
+      // the second (see endLift)
+      const keysOf = movers.map(layer => movedKeys(grid, liftedOf(layer), dx, dy))
+      const total = keysOf.reduce((sum, keys) => sum + keys.size, 0)
+      let done = 0
+      const counted = () => setProgress(++done / total / 2)
       for (const [i, layer] of movers.entries()) {
         const before = new Map(layer.tiles) // the tiles change one by one, and each new one needs the old ones
-        const keys = movedKeys(grid, liftedOf(layer), dx, dy)
         const move = (key: string) => movedTile(grid, before, cut, key, dx, dy, memory)
         // The selection is kept once, with the first layer; a smart object keeps its corners from before
-        const moved = await changeTiles(layer, keys, move, { selection: i === 0, smart: layer.smart !== undefined })
+        const keep = { selection: i === 0, smart: layer.smart !== undefined }
+        const moved = await changeTiles(layer, keysOf[i], move, keep, counted)
         // Moved by whole pixels, a smart object's tiles are its source drawn at its corners moved as much
         if (moved && layer.smart) {
           const corners = layer.smart.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) as Quad
@@ -1255,9 +1294,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Keep showing a move or a transform until the tiles it changed are put together, then stop, in the same frame (see
   // backgroundWork)
+  // The bar goes on from where the task's own work left it, as the tiles are put together
   async function endLift() {
     isMoveEnding = true
-    while (isMoveEnding) await nextFrame()
+    const from = taskProgress ?? 0
+    const waiting = projection.waitingCount()
+    while (isMoveEnding) {
+      if (waiting > 0) setProgress(from + (1 - from) * (1 - projection.waitingCount() / waiting))
+      await nextFrame()
+    }
     outsideHidden = null
   }
 
@@ -1381,7 +1426,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       view.addBlock(key)
     }
     await prepareLift(started.layer, started.cut, lifted, false)
-    projection.setMoveContent(view.container, view.faded)
+    // A selected part, or an image, goes into a new layer above (see applyTransform)
+    const isNewLayer = started.kind === 'part' || started.kind === 'image'
+    projection.setMoveContent(view.container, view.faded, view, isNewLayer)
     projection.showMove(0, 0)
     transform = { ...started, corners: object.corners, smooth: object.smooth, view }
   }
@@ -1391,6 +1438,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     if (!transform || !isValidQuad(corners)) return
     transform.corners = corners
     transform.view.setCorners(corners)
+    projection.moveChanged()
   }
 
   function setTransformSmooth(smooth: boolean) {
@@ -1398,6 +1446,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     transform.smooth = smooth
     smoothTransforms = smooth
     transform.view.setSmooth(smooth)
+    projection.moveChanged()
     changed(false)
   }
 
@@ -1419,6 +1468,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const done = transform
     if (!done) return
     transform = null // the handles go, and the work can start
+    projection.holdMove()
     const { layer, kind, view, cut } = done
     const object: SmartObject = { ...done.object, corners: done.corners, smooth: done.smooth }
     return runTask('Transforming…', async () => {

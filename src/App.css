@@ -308,6 +308,14 @@ fieldset.new-project-row {
   color: var(--muted);
 }
 
+/* How far the task is, when it can tell (see setProgress in engine.ts) */
+.busy progress {
+  width: 120px;
+  margin-left: 8px;
+  vertical-align: middle;
+  accent-color: var(--accent);
+}
+
 /* The view's zoom and rotation, with its buttons */
 .view-controls {
   display: inline-flex;

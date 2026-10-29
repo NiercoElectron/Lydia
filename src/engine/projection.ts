@@ -1,30 +1,22 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
-import type {
-  BLEND_MODES,
-  Geometry,
-  GlRenderTarget,
-  GlRenderTargetAdaptor,
-  Mesh,
-  Shader,
-  Texture,
-  WebGLRenderer,
-} from 'pixi.js'
-import { createTileMixer, type LayerBlender } from './blendModes'
-import { createComposer, type LivePicture, type PaintOf } from './composer'
+import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
+import { createTileMixer, createTileMover, DRAWN, type LayerBlender, type ShownTile } from './blendModes'
+import { createComposer, type LivePicture, type MovePicture, type PaintOf } from './composer'
 import type { GpuTiles } from './gpuTiles'
 import {
   activeIndex,
   blockStart,
+  clipBaseIndex,
+  isClipped,
   isFolder,
   isInside,
   isShown,
   LOCKED_ALPHA,
   splitIndex,
-  type BlendMode,
   type Layer,
   type LayerStack,
 } from './layers'
-import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
+import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tilesTouching, tileSize, type Grid } from './tiles'
 
 // The projection is the only thing drawn on the screen: one grid of tiles covering the whole paper, with the paper's
 // color and all the visible layers already put together, like Krita does. To put a tile together quickly while
@@ -55,6 +47,13 @@ export type ShownStroke = {
 export const strokeBlend = (shown: ShownStroke) =>
   (shown.erase ? 'erase' : shown.alphaLocked ? LOCKED_ALPHA : 'normal') as BLEND_MODES
 
+// What a transform draws, for the exact way of showing a move (see createSmartView in smartObject.ts): into one tile
+// of the paper, and the tiles it covers
+export type MoveContent = {
+  drawTile: (column: number, row: number, target: RenderTexture) => void
+  coveredKeys: () => Set<string>
+}
+
 export function createProjection(
   renderer: WebGLRenderer,
   grid: Grid,
@@ -80,6 +79,10 @@ export function createProjection(
   // thousands of textures at once takes time. When nothing is being updated, they are freed a few every frame
   const spareTextures: RenderTexture[] = []
   const FREE_PER_FRAME = 32
+  // While a move is let go but still shows (see holdMove), the tiles it changed are put together with at most this many
+  // passes of the graphics card a frame (see passes in composer.ts): more would make the screen skip frames, and the move
+  // shows the right picture meanwhile, so a few more frames to finish show nothing different
+  const HELD_PASSES = 80
   // The order to work through the waiting tiles in (see cachedFirst); null = to be worked out again
   let waitingOrder: string[] | null = null
 
@@ -210,6 +213,7 @@ export function createProjection(
   // moves), then prepare the new versions of the waiting tiles. Each group is shown all at once when it is complete
   function composeWaiting(budget: number) {
     updateLive()
+    updateMove()
     if (waiting.size === 0 && startingLive.size === 0 && prepared.size === 0) {
       for (const texture of spareTextures.splice(-FREE_PER_FRAME)) texture.destroy(true)
       return
@@ -225,9 +229,11 @@ export function createProjection(
     startingOrder = null
     showStartedLive()
     waitingOrder ??= cachedFirst(waiting)
+    const passesBefore = composer.passes()
     for (const key of waitingOrder) {
       if (!waiting.has(key)) continue
       if (performance.now() >= deadline) return
+      if (isMoveHeld && composer.passes() - passesBefore >= HELD_PASSES) return
       const { column, row } = parseTileKey(key)
       const texture = takeTexture(tileSize(grid, column, row))
       composeTileInto(column, row, texture)
@@ -336,7 +342,7 @@ export function createProjection(
   // freeze the screen: they start a few every frame instead (see composeWaiting), out of sight, and are shown all at
   // once when they are all ready
   // "shown" is the tile put together for the current opacity, when the steps are too many for the screen
-  type LiveTile = { mesh: Mesh<Geometry, Shader>; picture: LivePicture; shown: RenderTexture | null }
+  type LiveTile = { screen: ShownTile; picture: LivePicture; shown: RenderTexture | null }
   const live = new Map<string, LiveTile>() // "column,row" -> the tile shown live
   const startingLive = new Set<string>() // tiles waiting to be shown live
   const startedLive: string[] = [] // live tiles ready but not shown yet
@@ -346,11 +352,7 @@ export function createProjection(
   let isLiveStale = false // the tiles with steps left must be put together again for a new opacity
   const mixer = createTileMixer(renderer)
   const liveContainer = new Container() // on top of the projection's sprites
-
-  // Whether a layer has paint at this tile, in RAM or still only on the graphics card
-  function hasPaint(layer: Layer, key: string) {
-    return layer.tiles.has(key) || gpu.getCached(layer, key)?.dirty === true
-  }
+  liveContainer.addChild(mixer.container)
 
   // The tiles where a layer has paint, or the layers in a folder
   function tilesOf(layer: Layer) {
@@ -388,60 +390,37 @@ export function createProjection(
     isLiveStale = true
   }
 
-  // What is under the active layer, or under the active folder's block, at a tile: its "below" tile, with the layers
-  // between that and the active one put together on it when the active one is in a folder ("made", a texture of the
-  // caller's from then on)
-  function underActive(column: number, row: number, key: string) {
-    if (staleBelow.delete(key)) composeBelowTile(column, row)
-    const start = blockStart(stack, activeIndex(stack))
-    const split = splitIndex(stack)
-    if (start === split) return { texture: below.get(key)!, made: null }
-    const made = takeTexture(tileSize(grid, column, row))
-    belowSprite.texture = below.get(key)!
-    composeLayers(belowSprite, split, start, column, row, made)
-    return { texture: made, made }
-  }
-
-  // The layers above the active one at a tile, put together on their own into a texture of the caller's, or null when
-  // none of them has paint there
-  function aboveActive(column: number, row: number, key: string) {
-    const first = activeIndex(stack) + 1
-    if (!stack.layers.slice(first).some(other => isShown(other) && hasPaint(other, key))) return null
-    const above = takeTexture(tileSize(grid, column, row))
-    composeLayers(emptyBase, first, stack.layers.length, column, row, above)
-    return above
-  }
-  const emptyBase = new Container() // the layers above are put together over nothing (transparent)
-
   // Get a live tile ready, out of sight until the others are ready too (see showStartedLive)
   function startLive(key: string) {
     const { column, row } = parseTileKey(key)
     if (staleBelow.delete(key)) composeBelowTile(column, row)
-    belowSprite.texture = below.get(key)!
-    const picture = composer.live(activeIndex(stack), column, row, belowSprite, splitIndex(stack), paintOf)
+    const belowTile = below.get(key)!
+    belowSprite.texture = belowTile
+    // The "below" tiles stay as they are while tiles show live (see markAllBelowStale): a whole one can be used as it
+    // is (see live in composer.ts)
+    const { width, height } = tileSize(grid, column, row)
+    const whole = width === TILE_SIZE && height === TILE_SIZE ? belowTile : undefined
+    const picture = composer.live(activeIndex(stack), column, row, belowSprite, splitIndex(stack), paintOf, whole)
     gpu.trim()
     if (!picture) return // the layer changes nothing here
     // The graphics card does the steps on the screen, unless they are too many: then the tile is put together for each
     // new opacity (see updateLive)
-    const { width, height } = tileSize(grid, column, row)
     let shown: RenderTexture | null = null
-    let mesh = mixer.show(picture.zero, picture.one, picture.steps, width, height)
-    if (!mesh) {
+    let screen = mixer.show(picture.zero, picture.one, picture.steps, column, row, width, height)
+    if (!screen) {
       shown = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
       composer.showLive(picture, liveAmount, shown)
-      mesh = mixer.show(shown, shown, [], width, height)!
+      screen = mixer.show(shown, shown, [], column, row, width, height)!
     }
-    mesh.position.set(column * TILE_SIZE, row * TILE_SIZE)
-    mesh.visible = false
-    liveContainer.addChild(mesh)
-    const tile = { mesh, picture, shown }
+    const tile = { screen, picture, shown }
     for (const texture of texturesShown(tile)) applyScaleMode(texture)
     live.set(key, tile)
     startedLive.push(key)
   }
 
   // The textures a live tile shows
-  const texturesShown = (tile: LiveTile) => (tile.shown ? [tile.shown] : composer.texturesOf(tile.picture))
+  const texturesShown = (tile: LiveTile) =>
+    tile.shown ? [tile.shown] : [tile.picture.zero, ...composer.texturesOf(tile.picture)]
 
   // Put the tiles with steps left together again for the current opacity
   function updateLive() {
@@ -456,7 +435,7 @@ export function createProjection(
     for (const key of startedLive) {
       const tile = live.get(key)
       if (!tile) continue // put together again in the meantime
-      tile.mesh.visible = true
+      tile.screen.visible = true
       tileSprites.get(key)!.visible = false
     }
     startedLive.length = 0
@@ -466,7 +445,7 @@ export function createProjection(
   function stopLive(key: string) {
     const tile = live.get(key)
     if (!tile) return
-    mixer.remove(tile.mesh)
+    mixer.remove(tile.screen)
     // Freed later, a few every frame (see composeWaiting)
     spareTextures.push(...composer.texturesOf(tile.picture))
     if (tile.shown) spareTextures.push(tile.shown)
@@ -504,18 +483,30 @@ export function createProjection(
 
   // ----- Showing a move -----
 
-  // While the move tool drags a part of the active layer (see move.ts), the moved part is shown on its own, over what
-  // is left of the layer and under the layers above, so each new position costs nothing to show. Tiles where the layer
-  // loses paint, or where layers above have paint, are shown with three pictures instead of their projection tile: the
-  // "below" tile with what is left of the active layer on it, the moved part, and the layers above put together.
-  // Elsewhere the projection tile already has everything under the moved part, and nothing goes over it.
-  // The pictures are copies, so the layer's tiles can change under them once the move is let go. Like the live
-  // opacity, the layers above are put together on their own, so a blend mode other than normal among them looks a
-  // little different until the move is done, and so does the moved part over what is left of a layer at less than full
-  // opacity. The active layer's own blend mode is shown with the graphics card's closest blending (see closestBlend),
-  // and clipped layers (see isClipped in layers.ts) aren't clipped until the move is let go.
-  // The pictures of the active layer are its whole tiles, and it can have paint off the paper: they are cut at the
-  // paper's edge, and the "ghost", under the paper (see engine.ts), shows them faded where they are off it
+  // While the move tool drags a part of the active layer or folder (see move.ts), or a transform changes it (see
+  // smartObject.ts), the screen shows it where the pointer has it, in one of two ways (see planMove):
+  // - "plain", when the layer is Normal at full opacity, isn't clipped and has nothing clipped to it, is in folders that
+  //   change nothing, and the layers above are all Normal. The moved part is then shown on its own, over what is left of
+  //   the layer and under the layers above, so each new position costs nothing to show. Tiles where the layer loses
+  //   paint, or where layers above have paint, are shown with three pictures instead of their projection tile: the
+  //   "below" tile with what is left of the active layer on it, the moved part, and the layers above put together.
+  //   Elsewhere the projection tile already has everything under the moved part, and nothing goes over it
+  // - "exact", otherwise: a blend mode, an opacity, clipping or a folder with a mode of its own would make that picture
+  //   wrong. Each tile the move changes shows as it will be once let go: the layer's paint where it is now, onto a
+  //   picture of what is under it, and the steps above it, made once for each tile (see moveProgram in composer.ts).
+  //   The graphics card works that out on the screen on every frame, from the pictures of the layer's tiles at their
+  //   new place (see createTileMover in blendModes.ts), so a new position costs almost nothing, as a new opacity does
+  //   (see "Showing the active layer's opacity live" above). Only the tiles on the screen are shown (see updateMove).
+  //   The layer's paint is the layer's, or a folder's layers put together, which then move as one picture. In a folder
+  //   letting what is in it pass through, with blend modes in it, each of its layers is drawn where it is now instead,
+  //   and put together as they are in the folder: those tiles, and the ones with more steps above them than the
+  //   graphics card can do on the screen, are put together again for each new position, a few passes on the graphics
+  //   card each (see showExactTile). When layers are clipped to a folder the layer is in, that folder is the one whose
+  //   tiles are worked out (see clippedAround in composer.ts).
+  // The pictures belong to the move (copies, or the layer's tiles themselves, taken off the graphics card's copies: see
+  // prepareLift in engine.ts), so the layer's tiles can change once the move is let go, while it still shows. The
+  // pictures of the active layer are its whole tiles, and it can have paint off the paper: they are cut at the paper's
+  // edge, and the "ghost", under the paper (see engine.ts), shows them faded where they are off it
   type MoveTile = { sprites: Sprite[]; textures: RenderTexture[] }
   const moveTiles = new Map<string, MoveTile>() // "column,row" -> the tile's pictures
   const moveUnder = new Container() // "below" and what is left of the active layer
@@ -536,11 +527,118 @@ export function createProjection(
   let ghostContent: Container | null = null
   for (const part of moveParts) part.visible = false
 
-  // The graphics card's own blending closest to a layer's blend mode, to show a move: Screen and Add give the same
-  // picture, and Multiply too over paint that covers fully (like the paper's). The others show as Normal until the
-  // move is let go
-  const closestBlend = (mode: BlendMode): BLEND_MODES =>
-    mode === 'multiply' || mode === 'screen' || mode === 'add' ? mode : 'normal'
+  // How the move shows: "root" is the position of the layer or folder whose tiles are worked out, and "asOne" whether
+  // its paint moves as one picture (else each layer in it is drawn where it is now)
+  type MovePlan = { isExact: boolean; root: number; asOne: boolean }
+  let plan: MovePlan = { isExact: false, root: -1, asOne: true }
+
+  // The exact way's tiles: shown in place of the projection tiles, cut at the paper's edge like them. "state" is the
+  // moveState they were put together for
+  type ExactTile = { sprite: Sprite; texture: RenderTexture; state: number }
+  const exactTiles = new Map<string, ExactTile>()
+  const exactContainer = new Container()
+  // The exact way's tiles worked out on the screen (see showMovingTile): "drawn" is what a transform draws there,
+  // "copy" a copy of what stays of the layer there, and "shift" where the pictures that move start, as "column,row" of
+  // tiles, for the pictures it reads
+  type MovingTile = {
+    screen: ShownTile
+    drawn: RenderTexture | null
+    copy: RenderTexture | null
+    shift: string
+    state: number
+  }
+  const movingTiles = new Map<string, MovingTile>()
+  const onlyExact = new Set<string>() // tiles with more steps than the graphics card can do on the screen
+  const shownMoveTiles = new Set<string>() // the tiles shown in place of their projection tiles, either way
+  const mover = createTileMover(renderer)
+  exactContainer.addChild(mover.container)
+  const programs = new Map<string, MovePicture | null>() // "column,row" -> what the tile needs (see moveProgram)
+  // For each layer drawn where it is now, its pictures at its tiles: what moves ("lifted") and what stays ("left"), and
+  // whether the tile loses paint ("isLifted": all of it may move, with no picture when a transform draws it)
+  type TilePictures = { lifted: RenderTexture | null; left: RenderTexture | null; isLifted: boolean }
+  const movePictures = new Map<Layer, Map<string, TilePictures>>()
+  const folderPictures = new Map<string, RenderTexture>() // a folder's layers put together where nothing of it moves
+  const moveScratch: RenderTexture[] = [] // whole tiles for drawing the layers where they are now, reused
+  let moveState = 0 // goes up whenever what the move shows changes
+  let lastShown = '' // the move's state and the tiles on the screen when they were last put together (see updateMove)
+  let lastTiles = '' // the tiles on the screen, and the tiles the pictures that move are on, at the same time
+  let isMoveShown = false
+  let isMoveHeld = false // let go: the layers change now, and the tiles stay as they are until the move ends
+  const moveOffset = { x: 0, y: 0 }
+  // What a transform draws (see createSmartView in smartObject.ts), and whether it goes into a new layer above
+  // (a selected part, or an image placed) instead of the layer itself
+  let drawnContent: MoveContent | null = null
+  let isContentAbove = false
+
+  // Whether a layer or folder shows in the plain way: Normal, or a folder that lets what is in it pass through
+  const isPlain = (layer: Layer) =>
+    !isShown(layer) || layer.blendMode === 'normal' || layer.blendMode === 'pass-through'
+
+  // Whether a folder's layers, put together, can move as one picture: always for a folder with a mode of its own (they
+  // are put together on their own, from nothing); for one letting what is in it pass through, when they are all Normal
+  function movesAsOne(folder: Layer) {
+    if (folder.blendMode !== 'pass-through') return true
+    const index = stack.layers.indexOf(folder)
+    return stack.layers.slice(blockStart(stack, index), index).every(isPlain)
+  }
+
+  // Choose how the move of the active layer or folder shows (see above), before its tiles are prepared
+  function planMove() {
+    const index = activeIndex(stack)
+    const item = stack.active
+    const around = composer.clippedAround(index)
+    if (around !== null) plan = { isExact: true, root: around, asOne: false }
+    else if (isFolder(item) && !movesAsOne(item)) plan = { isExact: true, root: index, asOne: false }
+    else {
+      let inPlainFolders = true
+      for (let folder = item.parent; folder; folder = folder.parent) {
+        const at = stack.layers.indexOf(folder)
+        if (folder.blendMode !== 'pass-through' || folder.opacity < 1 || isClipped(stack, at)) inPlainFolders = false
+      }
+      const hasClipped = stack.layers.some(
+        (other, at) => at > index && isShown(other) && isClipped(stack, at) && clipBaseIndex(stack, at) === index,
+      )
+      const plain =
+        item.opacity === 1 &&
+        isPlain(item) &&
+        !isClipped(stack, index) &&
+        !hasClipped &&
+        inPlainFolders &&
+        stack.layers.slice(index + 1).every(isPlain)
+      plan = { isExact: !plain, root: index, asOne: true }
+    }
+    return { isExact: plan.isExact, asOne: plan.asOne }
+  }
+
+  // Whether a layer has paint at this tile, in RAM or still only on the graphics card
+  function hasPaint(layer: Layer, key: string) {
+    return layer.tiles.has(key) || gpu.getCached(layer, key)?.dirty === true
+  }
+
+  // What is under the active layer, or under the active folder's block, at a tile: its "below" tile, with the layers
+  // between that and the active one put together on it when the active one is in a folder ("made", a texture of the
+  // caller's from then on)
+  function underActive(column: number, row: number, key: string) {
+    if (staleBelow.delete(key)) composeBelowTile(column, row)
+    const start = blockStart(stack, activeIndex(stack))
+    const split = splitIndex(stack)
+    if (start === split) return { texture: below.get(key)!, made: null }
+    const made = takeTexture(tileSize(grid, column, row))
+    belowSprite.texture = below.get(key)!
+    composeLayers(belowSprite, split, start, column, row, made)
+    return { texture: made, made }
+  }
+
+  // The layers above the active one at a tile, put together on their own into a texture of the caller's, or null when
+  // none of them has paint there
+  function aboveActive(column: number, row: number, key: string) {
+    const first = activeIndex(stack) + 1
+    if (!stack.layers.slice(first).some(other => isShown(other) && hasPaint(other, key))) return null
+    const above = takeTexture(tileSize(grid, column, row))
+    composeLayers(emptyBase, first, stack.layers.length, column, row, above)
+    return above
+  }
+  const emptyBase = new Container() // the layers above are put together over nothing (transparent)
 
   // The tiles on the paper where a layer that shows, above the active one, has paint
   function paintedAbove() {
@@ -551,66 +649,405 @@ export function createProjection(
     return keys
   }
 
-  // Get a tile ready for showing a move, out of sight until showMove: "lifted" is the part of the active layer's tile
-  // that moves (null: none), and "left" what is left of the tile (null: nothing). Both are copies made in textures from
-  // moveTexture, and belong to the move from now on. Off the paper, the tile only has what moves, which can be dragged
-  // onto it, and both show in the ghost
-  function prepareMoveTile(key: string, lifted: RenderTexture | null, left: RenderTexture | null) {
+  // Get a tile ready for showing a move, out of sight until showMove: "lifted" is the part of the layer's tile that
+  // moves (null: none), and "left" what is left of the tile (null: nothing). Both belong to the move from now on:
+  // copies made in textures from moveTexture, or the layer's own (see prepareLift in engine.ts). "isLifted": the tile
+  // loses paint. "layer" is the active layer or folder, or a layer in it when its layers are drawn one by one (see
+  // planMove). Off the paper, the tile only has what moves, which can be dragged onto it, and both show in the ghost
+  function prepareMoveTile(
+    key: string,
+    lifted: RenderTexture | null,
+    left: RenderTexture | null,
+    isLifted: boolean,
+    layer: Layer = stack.active,
+  ) {
     const { column, row } = parseTileKey(key)
-    const layer = stack.active
-    const tile: MoveTile = { sprites: [], textures: [] }
-    const add = (part: Container, texture: Texture, isActiveLayer: boolean) => {
+    const tile = moveTiles.get(key) ?? { sprites: [], textures: [] }
+    moveTiles.set(key, tile)
+    const add = (part: Container, texture: Texture) => {
       const sprite = new Sprite(texture)
       sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
-      if (isActiveLayer) {
-        sprite.alpha = layer.opacity
-        sprite.blendMode = closestBlend(layer.blendMode)
-      }
       part.addChild(sprite)
       tile.sprites.push(sprite)
     }
-    let above: RenderTexture | null = null
-    if (isOnPaper(grid, column, row)) {
-      const under = underActive(column, row, key)
-      add(moveUnder, under.texture, false)
-      if (under.made) tile.textures.push(under.made)
-      if (left) add(moveUnder, left, true)
-      above = aboveActive(column, row, key)
-      if (above) add(moveAbove, above, false)
+    if (left) add(ghostLeft, left)
+    if (lifted) add(ghostMoved, lifted)
+    for (const texture of [left, lifted]) if (texture) tile.textures.push(texture)
+    if (plan.isExact) {
+      let pictures = movePictures.get(layer)
+      if (!pictures) movePictures.set(layer, (pictures = new Map()))
+      pictures.set(key, { lifted, left, isLifted })
+      movedPlaces = null
+      // Made now, a few tiles every frame, rather than all at once when the move starts showing
+      if (isOnPaper(grid, column, row)) {
+        const program = programFor(key)
+        if (program) movingTileFor(key, program)
+      }
+      return
     }
-    if (lifted) add(moved, lifted, true)
-    if (left) add(ghostLeft, left, false)
-    if (lifted) add(ghostMoved, lifted, false)
-    for (const texture of [left, lifted, above]) if (texture) tile.textures.push(texture)
-    moveTiles.set(key, tile)
+    if (!isOnPaper(grid, column, row)) {
+      if (lifted) add(moved, lifted)
+      return
+    }
+    const under = underActive(column, row, key)
+    add(moveUnder, under.texture)
+    if (under.made) tile.textures.push(under.made)
+    if (left) add(moveUnder, left)
+    const above = aboveActive(column, row, key)
+    if (above) {
+      add(moveAbove, above)
+      tile.textures.push(above)
+    }
+    if (lifted) add(moved, lifted)
   }
 
   // Show the prepared tiles instead of their projection tiles, with the moved part this far from where it was
   function showMove(x: number, y: number) {
     setMoveOffset(x, y)
+    ghost.visible = true
+    isMoveShown = true
+    if (plan.isExact) {
+      updateMove()
+      return
+    }
     for (const key of moveTiles.keys()) {
       const sprite = tileSprites.get(key)
       if (sprite) sprite.visible = false
     }
     for (const part of moveParts) part.visible = true
-    ghost.visible = true
     applyMoveScaleMode()
   }
 
   function setMoveOffset(x: number, y: number) {
     moved.position.set(x, y)
     ghostMoved.position.set(x, y)
+    moveOffset.x = x
+    moveOffset.y = y
+    moveState++
+  }
+
+  // What a transform shows changed (its corners, or how smooth it is)
+  function moveChanged() {
+    moveState++
+  }
+
+  // The move was let go: its tiles stay as they are, while the layers change under them (see endLift in engine.ts)
+  function holdMove() {
+    isMoveHeld = true
   }
 
   // Show this in place of pictures of the moved part (a smart object being transformed draws itself: see
-  // smartObject.ts), and "faded" in the ghost, or nothing
-  function setMoveContent(content: Container | null, faded: Container | null = null) {
+  // smartObject.ts), and "faded" in the ghost, or nothing. In the exact way, "drawn" draws it into a tile, and "above"
+  // says it goes into a new layer above the active one
+  function setMoveContent(
+    content: Container | null,
+    faded: Container | null = null,
+    drawn: MoveContent | null = null,
+    above = false,
+  ) {
     if (movedContent) moved.removeChild(movedContent)
     if (ghostContent) ghost.removeChild(ghostContent)
     movedContent = content
     ghostContent = faded
+    drawnContent = drawn
+    isContentAbove = above
     if (content) moved.addChild(content)
     if (faded) ghost.addChild(faded)
+    moveState++
+  }
+
+  // What the exact way needs for a tile (see moveProgram in composer.ts), made the first time
+  function programFor(key: string) {
+    if (programs.has(key)) return programs.get(key)!
+    const { column, row } = parseTileKey(key)
+    if (staleBelow.delete(key)) composeBelowTile(column, row)
+    const belowTile = below.get(key)!
+    belowSprite.texture = belowTile
+    // The "below" tiles stay as they are until the move ends: a whole one can be used as it is (see moveProgram)
+    const { width, height } = tileSize(grid, column, row)
+    const whole = width === TILE_SIZE && height === TILE_SIZE ? belowTile : undefined
+    const program = composer.moveProgram(plan.root, column, row, belowSprite, splitIndex(stack), paintOf, whole)
+    gpu.trim()
+    programs.set(key, program)
+    return program
+  }
+
+  // The tiles on the paper the move changes now: where a layer loses paint, where its moved part is, and what a
+  // transform covers
+  // Among the tiles on the paper between these columns and rows (the screen's), those the move changes now: where a
+  // layer loses paint, where its moved part is, and what a transform covers
+  function changedTiles(firstColumn: number, lastColumn: number, firstRow: number, lastRow: number) {
+    const keys = new Set<string>()
+    const add = (column: number, row: number) => {
+      if (column < Math.max(firstColumn, 0) || column > Math.min(lastColumn, grid.columns - 1)) return
+      if (row < Math.max(firstRow, 0) || row > Math.min(lastRow, grid.rows - 1)) return
+      keys.add(tileKey(column, row))
+    }
+    movedPlaces ??= placesOfMove()
+    for (const { column, row } of movedPlaces.lost) add(column, row)
+    // A moved picture covers one or two columns, and one or two rows, of the tiles
+    const columns = [Math.floor(moveOffset.x / TILE_SIZE)]
+    if (moveOffset.x % TILE_SIZE !== 0) columns.push(columns[0] + 1)
+    const rows = [Math.floor(moveOffset.y / TILE_SIZE)]
+    if (moveOffset.y % TILE_SIZE !== 0) rows.push(rows[0] + 1)
+    for (const { column, row } of movedPlaces.lifted) {
+      for (const shiftColumn of columns) for (const shiftRow of rows) add(column + shiftColumn, row + shiftRow)
+    }
+    if (drawnContent) {
+      for (const key of drawnContent.coveredKeys()) {
+        const { column, row } = parseTileKey(key)
+        add(column, row)
+      }
+    }
+    return keys
+  }
+
+  // Where the layers that move lose paint, and where their moved pictures start from: the same for the whole move,
+  // so worked out once (null: to be worked out again, after more tiles are prepared)
+  let movedPlaces: { lost: { column: number; row: number }[]; lifted: { column: number; row: number }[] } | null = null
+  function placesOfMove() {
+    const lost: { column: number; row: number }[] = []
+    const lifted: { column: number; row: number }[] = []
+    for (const pictures of movePictures.values()) {
+      for (const [key, picture] of pictures) {
+        if (picture.isLifted) lost.push(parseTileKey(key))
+        if (picture.lifted) lifted.push(parseTileKey(key))
+      }
+    }
+    return { lost, lifted }
+  }
+
+  // The columns and rows of the tiles on the screen now
+  function tilesOnScreen() {
+    const { width, height } = renderer.screen
+    const corners = [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: 0, y: height },
+      { x: width, y: height },
+    ].map(point => container.toLocal(point))
+    const xs = corners.map(p => p.x)
+    const ys = corners.map(p => p.y)
+    return tilesTouching(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys))
+  }
+
+  // Put together, for where the move is now, the tiles it changes that are on the screen (in the exact way), each once
+  // for each new position. The others show their projection tiles, being out of sight or unchanged. Every frame
+  function updateMove() {
+    if (!isMoveShown || !plan.isExact || isMoveHeld) return
+    const { firstColumn, lastColumn, firstRow, lastRow } = tilesOnScreen()
+    // Nothing to do while neither the move nor the screen changes
+    const shownNow = `${moveState} ${firstColumn} ${lastColumn} ${firstRow} ${lastRow}`
+    if (shownNow === lastShown) return
+    lastShown = shownNow
+    // The pictures that move start one or two tiles from where they were (see createTileMover)
+    const shift = { column: Math.floor(moveOffset.x / TILE_SIZE), row: Math.floor(moveOffset.y / TILE_SIZE) }
+    mover.setShift(moveOffset.x - shift.column * TILE_SIZE, moveOffset.y - shift.row * TILE_SIZE)
+    const item = stack.layers[plan.root]
+    mover.setItem(item.blendMode, item.opacity, drawnAs())
+    // While the pictures that move stay on the same tiles, the same tiles show, reading the same pictures: when the
+    // graphics card works them all out on the screen, there is nothing more to do
+    const onTiles = [shift.column, shift.row, moveOffset.x % TILE_SIZE === 0, moveOffset.y % TILE_SIZE === 0]
+    const tilesNow = `${onTiles.join(' ')} ${firstColumn} ${lastColumn} ${firstRow} ${lastRow}`
+    const isOnScreenOnly = plan.asOne && !drawnContent && onlyExact.size === 0
+    if (isOnScreenOnly && tilesNow === lastTiles) return
+    lastTiles = tilesNow
+    const wanted = changedTiles(firstColumn, lastColumn, firstRow, lastRow)
+    for (const key of shownMoveTiles) if (!wanted.has(key)) hideMoveTile(key)
+    for (const key of wanted) {
+      const program = programFor(key)
+      if (!program) continue // nothing of the layer shows here: the projection tile is right
+      if (!showMovingTile(key, program, shift)) showExactTile(key, program)
+    }
+  }
+
+  // How what a transform draws goes in (see DRAWN in blendModes.ts)
+  function drawnAs() {
+    if (!drawnContent) return DRAWN.none
+    if (!isContentAbove) return DRAWN.inLayer
+    const clip = composer.clipAbove(plan.root)
+    return clip === 'layer' ? DRAWN.aboveClippedToLayer : clip === 'base' ? DRAWN.aboveClippedToBase : DRAWN.above
+  }
+
+  // Show the projection tile again in place of the move's
+  function hideMoveTile(key: string) {
+    const exact = exactTiles.get(key)
+    if (exact) exact.sprite.visible = false
+    const moving = movingTiles.get(key)
+    if (moving) moving.screen.visible = false
+    tileSprites.get(key)!.visible = true
+    shownMoveTiles.delete(key)
+  }
+
+  // The tile worked out on the screen for a tile of the paper (see showMovingTile), made the first time, out of sight.
+  // Null when it can't be: the layers of a folder are drawn one by one, or the steps are too many
+  function movingTileFor(key: string, program: MovePicture) {
+    const known = movingTiles.get(key)
+    if (known || !plan.asOne || onlyExact.has(key)) return known ?? null
+    const { column, row } = parseTileKey(key)
+    const { width, height } = tileSize(grid, column, row)
+    const screen = mover.show(program, column, row, width, height)
+    if (!screen) {
+      onlyExact.add(key)
+      return null
+    }
+    // What the layer has at a tile with no pictures (one the move only reaches) is copied too: its tiles change once
+    // the move is let go, while the move still shows (see holdMove)
+    const root = stack.layers[plan.root]
+    const stays = movePictures.get(root)?.has(key) || isFolder(root) ? null : gpu.getTexture(root, column, row, false)
+    let copy: RenderTexture | null = null
+    if (stays) {
+      copy = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
+      gpu.copyInto(stays, copy)
+    }
+    const tile: MovingTile = { screen, drawn: null, copy, shift: '', state: -1 }
+    movingTiles.set(key, tile)
+    for (const texture of [program.under, ...composer.texturesOfMove(program), copy]) {
+      if (texture) applyScaleMode(texture)
+    }
+    return tile
+  }
+
+  // Show a tile the move changes worked out by the graphics card on the screen, on every frame, from the pictures of
+  // the layer's tiles at their new place (see createTileMover in blendModes.ts). False when it can't be (see
+  // movingTileFor)
+  function showMovingTile(key: string, program: MovePicture, shift: { column: number; row: number }) {
+    const tile = movingTileFor(key, program)
+    if (!tile) return false
+    const { column, row } = parseTileKey(key)
+    if (drawnContent && !tile.drawn) {
+      tile.drawn = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
+      applyScaleMode(tile.drawn)
+      tile.shift = '' // the program reads it from now on
+    }
+    const shiftKey = `${shift.column},${shift.row}`
+    if (tile.shift !== shiftKey) {
+      tile.shift = shiftKey
+      const root = stack.layers[plan.root]
+      const pictures = movePictures.get(root)
+      const here = pictures?.get(key)
+      // What stays of the layer: the picture made of it here, if any (see prepareMoveTile)
+      const stays = here ? here.left : isFolder(root) ? staysAt(root, column, row) : tile.copy
+      const moved = [0, 1, 2, 3].map(i => {
+        const from = tileKey(column - shift.column - 1 + (i % 2), row - shift.row - 1 + Math.floor(i / 2))
+        return pictures?.get(from)?.lifted ?? null
+      })
+      mover.setPaint(tile.screen, stays, moved, tile.drawn)
+      for (const texture of [stays, ...moved]) if (texture) applyScaleMode(texture)
+    }
+    if (tile.drawn && tile.state !== moveState) drawnContent?.drawTile(column, row, tile.drawn)
+    tile.state = moveState
+    tile.screen.visible = true
+    tileSprites.get(key)!.visible = false
+    shownMoveTiles.add(key)
+    return true
+  }
+
+  // Put a tile the move changes together again for where it is now
+  function showExactTile(key: string, program: MovePicture) {
+    const { column, row } = parseTileKey(key)
+    let tile = exactTiles.get(key)
+    if (tile?.sprite.visible && tile.state === moveState) return
+    if (!tile) {
+      const texture = takeTexture(tileSize(grid, column, row))
+      const sprite = new Sprite(texture)
+      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
+      exactContainer.addChild(sprite)
+      tile = { sprite, texture, state: -1 }
+      exactTiles.set(key, tile)
+      applyScaleMode(texture)
+    }
+    const used: RenderTexture[] = []
+    const drawnAt = new Map<Layer, RenderTexture>()
+    const paintNow: PaintOf = (layer, c, r) => {
+      if (!movePictures.has(layer)) return gpu.getTexture(layer, c, r, false)
+      let paint = drawnAt.get(layer)
+      if (!paint) {
+        paint = layerWhereItIs(layer, c, r, used)
+        drawnAt.set(layer, paint)
+      }
+      return paint
+    }
+    const root = stack.layers[plan.root]
+    if (!plan.asOne) composer.showMoved(program, plan.root, column, row, paintNow, tile.texture)
+    else {
+      const paint = layerWhereItIs(root, column, row, used)
+      const content = isContentAbove && drawnContent ? scratchTile(used) : undefined
+      if (content) drawnContent!.drawTile(column, row, content)
+      composer.showMoved(program, plan.root, column, row, paintNow, tile.texture, paint, content)
+    }
+    moveScratch.push(...used)
+    tile.state = moveState
+    tile.sprite.visible = true
+    tileSprites.get(key)!.visible = false
+    shownMoveTiles.add(key)
+  }
+
+  const drawRoot = new Container() // a layer drawn where it is now, at one tile
+  const drawSprites: Sprite[] = []
+
+  function scratchTile(used: RenderTexture[]) {
+    const tile = moveScratch.pop() ?? RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    used.push(tile)
+    return tile
+  }
+
+  // A layer's paint at a tile with its moved part where it is now, in a whole tile from "used": what stays there (the
+  // part left, or all of its paint there when none of it moves), the moved pictures that reach it, and what a
+  // transform draws there. For a folder moving as one picture, its layers put together
+  function layerWhereItIs(layer: Layer, column: number, row: number, used: RenderTexture[]) {
+    const key = tileKey(column, row)
+    const pictures = movePictures.get(layer) ?? new Map<string, TilePictures>()
+    const textures: { texture: Texture; x: number; y: number }[] = []
+    const here = pictures.get(key)
+    const stays = here?.isLifted ? here.left : staysAt(layer, column, row)
+    if (stays) textures.push({ texture: stays, x: 0, y: 0 })
+    const { firstColumn, lastColumn, firstRow, lastRow } = tilesTouching(
+      column * TILE_SIZE - moveOffset.x,
+      row * TILE_SIZE - moveOffset.y,
+      (column + 1) * TILE_SIZE - moveOffset.x,
+      (row + 1) * TILE_SIZE - moveOffset.y,
+    )
+    for (let c = firstColumn; c <= lastColumn; c++) {
+      for (let r = firstRow; r <= lastRow; r++) {
+        const lifted = pictures.get(tileKey(c, r))?.lifted
+        if (lifted) {
+          textures.push({
+            texture: lifted,
+            x: (c - column) * TILE_SIZE + moveOffset.x,
+            y: (r - row) * TILE_SIZE + moveOffset.y,
+          })
+        }
+      }
+    }
+    if (drawnContent && !isContentAbove && layer === stack.active) {
+      const drawn = scratchTile(used)
+      drawnContent.drawTile(column, row, drawn)
+      textures.push({ texture: drawn, x: 0, y: 0 })
+    }
+    drawRoot.removeChildren()
+    for (const [i, { texture, x, y }] of textures.entries()) {
+      drawSprites[i] ??= new Sprite()
+      drawSprites[i].texture = texture
+      drawSprites[i].position.set(x, y)
+      drawRoot.addChild(drawSprites[i])
+    }
+    const target = scratchTile(used)
+    renderer.render({ container: drawRoot, target, clear: true, clearColor: [0, 0, 0, 0] })
+    return target
+  }
+
+  // A layer's paint at a tile where none of it moves: its own, or for a folder, its layers put together (made once)
+  function staysAt(layer: Layer, column: number, row: number) {
+    if (!isFolder(layer)) return gpu.getTexture(layer, column, row, false)
+    const key = tileKey(column, row)
+    let tile = folderPictures.get(key)
+    if (!tile) {
+      tile = RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+      composer.composeFolder(layer, column, row, tile)
+      folderPictures.set(key, tile)
+    }
+    return tile
   }
 
   // Show the projection tiles again. The pictures' textures are freed later, a few every frame
@@ -622,16 +1059,49 @@ export function createProjection(
       spareTextures.push(...tile.textures)
     }
     moveTiles.clear()
+    for (const key of shownMoveTiles) tileSprites.get(key)!.visible = true
+    shownMoveTiles.clear()
+    for (const { sprite, texture } of exactTiles.values()) {
+      sprite.destroy()
+      spareTextures.push(texture)
+    }
+    exactTiles.clear()
+    for (const { screen, drawn, copy } of movingTiles.values()) {
+      mover.remove(screen)
+      for (const texture of [drawn, copy]) if (texture) spareTextures.push(texture)
+    }
+    movingTiles.clear()
+    onlyExact.clear()
+    for (const program of programs.values()) if (program) spareTextures.push(...composer.texturesOfMove(program))
+    programs.clear()
+    movePictures.clear()
+    spareTextures.push(...folderPictures.values(), ...moveScratch)
+    folderPictures.clear()
+    moveScratch.length = 0
     setMoveContent(null)
     for (const part of moveParts) part.visible = false
     ghost.visible = false
     setMoveOffset(0, 0)
+    isMoveShown = false
+    isMoveHeld = false
+    plan = { isExact: false, root: -1, asOne: true }
+    movedPlaces = null
+    lastShown = ''
+    lastTiles = ''
   }
 
   function applyMoveScaleMode() {
     for (const part of [...moveParts, ghostLeft, ghostMoved]) {
       for (const child of part.children) if (child instanceof Sprite) applyScaleMode(child.texture)
     }
+    for (const { texture } of exactTiles.values()) applyScaleMode(texture)
+    // What the tiles worked out on the screen read (the pictures that move are in the ghost too)
+    for (const program of programs.values()) {
+      if (program) for (const texture of [program.under, ...composer.texturesOfMove(program)]) applyScaleMode(texture)
+    }
+    for (const { drawn, copy } of movingTiles.values())
+      for (const texture of [drawn, copy]) if (texture) applyScaleMode(texture)
+    for (const texture of folderPictures.values()) applyScaleMode(texture)
   }
 
   // ----- Reading colors -----
@@ -704,7 +1174,7 @@ export function createProjection(
     container.addChild(sprite)
     tileSprites.set(key, sprite)
   })
-  container.addChild(liveContainer, moveRoot)
+  container.addChild(liveContainer, exactContainer, moveRoot)
   composeAll()
 
   function destroy() {
@@ -716,12 +1186,15 @@ export function createProjection(
     for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
     container.destroy({ children: true })
     mixer.destroy()
+    mover.destroy()
     ghost.destroy({ children: true })
     composer.destroy()
     withStrokeRoot.destroy({ children: true })
     withStrokeTexture?.destroy(true)
     paperTile.destroy()
     emptyBase.destroy()
+    drawRoot.destroy()
+    for (const sprite of drawSprites) sprite.destroy()
   }
 
   return {
@@ -736,6 +1209,10 @@ export function createProjection(
     composeWaiting,
     finishWaiting,
     isUpdating: () => waiting.size > 0 || startingLive.size > 0 || prepared.size > 0,
+    // How many tiles wait to be put together again (see composeLayerTiles)
+    waitingCount: () => waiting.size,
+    // How many tiles show live now (see showOpacityLive), for the tests of the app
+    liveShown: () => [...live.values()].filter(tile => tile.screen.visible).length,
     markAllBelowStale,
     markBelowStale,
     prepareTile,
@@ -747,10 +1224,13 @@ export function createProjection(
     ghost,
     // A texture for a picture of a layer's whole tile, during a move (it belongs to the move from then on)
     moveTexture: () => takeTexture({ width: TILE_SIZE, height: TILE_SIZE }),
+    planMove,
     prepareMoveTile,
     showMove,
     setMoveOffset,
     setMoveContent,
+    moveChanged,
+    holdMove,
     endMove,
     colorAt,
     setZoom,

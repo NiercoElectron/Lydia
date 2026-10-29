@@ -393,7 +393,12 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           </button>
           <button onClick={handleBack}>Back</button>
           {(busy || snapshot.task || snapshot.isUpdating) && (
-            <span className="busy">{busy ?? snapshot.task ?? 'Updating…'}</span>
+            <span className="busy">
+              {busy ?? snapshot.task ?? 'Updating…'}
+              {!busy && snapshot.task && snapshot.progress !== null && (
+                <progress value={snapshot.progress} aria-label={snapshot.task} />
+              )}
+            </span>
           )}
         </div>
       </header>
