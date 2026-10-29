@@ -7,6 +7,13 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Changed
+
+- The **opacity shows live** while its slider moves whatever the blend modes of the layer, of the layers above it and
+  of the folders it is in, clipped or not, and for a folder too
+  ([decision 60](docs/decisions.md#60-the-live-opacity-with-any-blend-mode)). It used to be put together again a few
+  tiles at a time, showing late on big drawings.
+
 ## [0.11.0] - 2026-10-28
 
 ### Added

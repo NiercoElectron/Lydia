@@ -839,7 +839,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
     layer.opacity = opacity
     // A hidden layer changes nothing on the screen: it is put together with its new opacity when it is shown again
-    if (isShown(layer) && !projection.showOpacityLive(layer, gpu.tilesWithPaint(layer))) {
+    if (isShown(layer) && !projection.showOpacityLive(layer)) {
       projection.composeLayerTiles(layer)
     }
     changed()

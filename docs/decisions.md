@@ -273,7 +273,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   put together once. Each step then only changes the opacity of the middle sprite, and the graphics card puts the three
   together on every frame. When the slider is let go, the tiles are put together for good. If a layer above uses a
   blend mode other than normal, its look depends on what is under it, so it can't be put together on its own: then the
-  tiles are put together at every step, as before.
+  tiles are put together at every step, as before. (Since 0.11.1 it is shown another way, which works whatever the
+  blend modes: decision 60.)
 - **Measured (headless, full 10000×10000 layer with layers above and below):** the first step takes ~340 ms (it puts
   the "above" tiles together), each next step ~2 ms, letting go ~35 ms. At full size the live tiles are exactly the
   final tiles; zoomed out, the screen can differ by 2/255 because each sprite is smoothed on its own.
@@ -1527,12 +1528,12 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - The projection (decision 10) still puts the normal layers together in one pass. At a layer with another mode, what
     is together so far is drawn into a whole tile, the layer is blended with it into a second one, and the layers above
     go on top of that. Only the tiles where such a layer has paint take the extra passes.
-  - The live opacity (decision 23) needs the layer itself to be Normal too: otherwise its tiles are put together at
-    each step, as with a layer above with another mode.
+  - The live opacity (decision 23) needed the layer itself to be Normal too: otherwise its tiles were put together at
+    each step, as with a layer above with another mode. Since 0.11.1 it works with any mode (decision 60).
   - While a part is moved (decision 41), the active layer's mode shows with the graphics card's closest blending
     (Multiply, Screen and Add); the others show as Normal until it is let go.
   - The fill bucket's **All layers** (decision 39) still finds its region in the layers put together as Normal.
-  - I don't accept these three differences: they go in 0.11.1, the version after this stage's.
+  - I don't accept these differences: they go in 0.11.1, the version after this stage's (the first one is done).
 - **Checked:** the 16 modes against the formulas written again in the test on its own, over red, a blue gray, gray and
   the white paper; nothing changed where the layer has no paint; the list in the panel; Multiply at 50% while the
   slider moves and after; undo and redo of a mode; painting on the layer under a Multiply layer, multiplied while
@@ -1563,7 +1564,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - Painting on the base shows more of the layers clipped to it while painting, and painting on a clipped layer is
     clipped while painting, since both are put together like any stroke.
   - While the opacity slider moves (decision 23), the clipped part of the layer is made once for each tile, and the
-    new opacity applies to it like to any layer.
+    new opacity applies to it like to any layer. Since 0.11.1 the layers clipped to it show live too (decision 60).
   - When a layer is deleted, moved, merged, clipped or unclipped, the tiles of every clipped layer are put together
     again: their base may be another one.
   - Two things don't follow clipping yet, and go in 0.11.1 with those of decision 56: while a part is moved (decision
@@ -1614,7 +1615,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - The "below" tiles (decision 10) now stop under the outermost folder holding the active layer, which is put
     together whole while painting.
   - The live opacity (decision 23) works for a layer in folders that change nothing (at full opacity, not clipped);
-    otherwise the tiles are put together at each step.
+    otherwise the tiles are put together at each step. Since 0.11.1 it works in any folder, and for a folder's own
+    opacity too (decision 60).
   - While a folder is moved, its layers are shown put together as one picture.
   - An undo step of the order of layers keeps the folder each layer was in.
   - In the file, a folder has "folder", and what is in a folder has the position of its folder ("parent"); Lydia
@@ -1649,6 +1651,47 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Known:** a test that measures time (`move-tool`) can fail now and then on a busy computer. puppeteer-core 24 brings
   a package that `npm audit` warns about (basic-ftp, for downloading browsers), which the tests never use and which
   isn't part of Lydia; version 25 changes how it is used, for later.
+
+## 60. The live opacity with any blend mode
+
+- **Date:** 2026-10-28
+- **Status:** adopted
+- **Problem:** since blend modes, clipping and folders (decisions 56 to 58), the live opacity (decision 23) only worked
+  when the layer and all the layers above it were Normal, in folders that change nothing. Otherwise its tiles were put
+  together again at each step, a few every frame, so on a big drawing the new opacity showed late. I didn't accept
+  that (decision 56).
+- **Decision:** while the slider moves, the opacity shows right away whatever the blend modes of the layer, of the
+  layers above it and of the folders it is in, clipped or not. A folder's own opacity shows live too.
+- **How:**
+  - A tile's picture changes in a straight line with the layer's opacity, as long as what goes over the layer only adds
+    and multiplies (Normal, Multiply, Screen, and folders that let what is in them pass through): at 30% it is the
+    picture without the layer, mixed with 30% of the picture with the layer at full opacity, whatever the layer's own
+    mode. So both pictures are made once for each tile, and a small program on the graphics card (`createTileMixer`
+    in `blendModes.ts`) mixes them on the screen on every frame: a new opacity is only a new number.
+  - A layer above with a mode that does more (Overlay, Color Dodge…), or a folder with a mode of its own around the
+    layer, breaks the straight line. The two pictures are then made up to there, and the rest becomes a list of steps,
+    each with a picture of the other layers it needs, made once (`live` in `composer.ts`). The same program does up
+    to 7 steps on the screen; with more (a pile of such layers), the tile is put together again for each new opacity
+    from those pictures, one pass per step, instead of from all the layers.
+  - Only one case still puts the tiles together at each step, as before: layers clipped to a folder that the layer is
+    in, since that folder's paint, which clips them, changes with the opacity too.
+  - The pictures are copies, so the layer's own tiles no longer have to stay on the graphics card while the slider is
+    held.
+  - The first time a graphics card's driver meets a program, it turns it into its own code. On Windows, where Chrome
+    goes through Direct3D, that took 3 seconds for a first version of the program with the formulas written out for
+    each step, and froze the screen at the first move of the slider. With the steps in a loop it takes a tenth of a
+    second, and the programs are made ready when the drawing opens.
+- **Measured (headless, RTX 4060 Ti, 10000×10000 with two layers filled whole):** while the slider moves, 2.4 ms per
+  frame under a Normal layer (2.3 ms in 0.11.0) and 5.5 ms under an Overlay one (5.7 ms in 0.11.0, which didn't show
+  the new opacity until it was all put together again); the first move of the slider, 14 ms, as in 0.11.0. In the
+  development server, React takes ~9 ms to draw the panels again at each step of the slider (0.7 ms in the built app),
+  so dragging it shows fewer frames there only.
+- **Checked:** the screen while the slider is held against the picture once it is let go, in 23 cases: Normal, Multiply
+  and Difference layers; under Screen, Overlay and Color Dodge layers; Normal and Hard Light layers clipped to it, and
+  the layer clipped itself; in a folder with Multiply, Luminosity and Color Burn; the folder itself, with its own mode and passing
+  through; a layer under 8 Overlay and Soft Light layers (more steps than the screen does); a layer clipped to the
+  folder (put together again instead); on a transparent paper. Color Dodge at 99% and 100% also showed how its formula
+  jumps: a channel exactly at 0 under it can't be brightened (Photoshop and Krita do the same).
 
 ## Open questions
 

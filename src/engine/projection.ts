@@ -1,12 +1,20 @@
 import { Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
-import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGLRenderer } from 'pixi.js'
-import type { LayerBlender } from './blendModes'
-import { createComposer, type PaintOf } from './composer'
+import type {
+  BLEND_MODES,
+  Geometry,
+  GlRenderTarget,
+  GlRenderTargetAdaptor,
+  Mesh,
+  Shader,
+  Texture,
+  WebGLRenderer,
+} from 'pixi.js'
+import { createTileMixer, type LayerBlender } from './blendModes'
+import { createComposer, type LivePicture, type PaintOf } from './composer'
 import type { GpuTiles } from './gpuTiles'
 import {
   activeIndex,
   blockStart,
-  isClipped,
   isFolder,
   isInside,
   isShown,
@@ -174,6 +182,8 @@ export function createProjection(
   // A folder changes the tiles where the layers in it have paint: "list" is where to find them (the list from before,
   // for a folder just deleted)
   function composeLayerTiles(layer: Layer, list: Layer[] = stack.layers) {
+    // Tiles of this layer still shown live (just after the opacity slider was let go) follow it right away
+    if (layer === liveLayer) followLiveLayer()
     if (isFolder(layer)) {
       for (const inside of list) if (!isFolder(inside) && isInside(inside, layer)) composeLayerTiles(inside)
       return
@@ -184,13 +194,6 @@ export function createProjection(
       if (isBelowActive) markBelowStale(key)
       dropPrepared(key) // a version prepared before this change is out of date
       addWaiting(key)
-    }
-    // Tiles of this layer still shown live (just after the opacity slider was let go) follow it right away
-    if (layer === liveLayer) {
-      for (const tile of live.values()) {
-        tile.layerSprite.alpha = layer.opacity
-        tile.layerSprite.visible = layer.visible
-      }
     }
   }
 
@@ -206,6 +209,7 @@ export function createProjection(
   // Do the waiting work for at most "budget" milliseconds: first start the tiles to show live (while the opacity slider
   // moves), then prepare the new versions of the waiting tiles. Each group is shown all at once when it is complete
   function composeWaiting(budget: number) {
+    updateLive()
     if (waiting.size === 0 && startingLive.size === 0 && prepared.size === 0) {
       for (const texture of spareTextures.splice(-FREE_PER_FRAME)) texture.destroy(true)
       return
@@ -216,7 +220,7 @@ export function createProjection(
       if (!startingLive.has(key)) continue
       if (performance.now() >= deadline) return // the rest in the next frame
       startingLive.delete(key)
-      startLive(liveLayer!, key)
+      startLive(key)
     }
     startingOrder = null
     showStartedLive()
@@ -317,61 +321,71 @@ export function createProjection(
 
   // ----- Showing the active layer's opacity live -----
 
-  // Putting every tile of a big layer together again for each step of the opacity slider would be too slow. So while
-  // the slider moves, each tile of the active layer is shown with three sprites instead of its projection tile: its
-  // "below" tile, the layer's own tile with the new opacity, and the layers above it, put together once. A new opacity
-  // then only changes one sprite per tile, and the graphics card puts the three together on every frame. A tile goes
-  // back to its projection tile as soon as that is put together again (see composeTile).
+  // Putting every tile of a big layer together again for each step of the opacity slider would be too slow. But a
+  // tile's picture changes in a straight line with the layer's opacity: at 30 %, it is the picture without the layer
+  // mixed with 30 % of the picture with the layer at full opacity, whatever the layer's blend mode, as long as what
+  // goes over it only adds and multiplies (see live in composer.ts). So while the slider moves, each tile of the active
+  // layer or folder is shown as a mix of those two pictures, made once (see createTileMixer in blendModes.ts), and a
+  // new opacity only changes how much of each the graphics card shows. When a layer above it, or a folder it is in,
+  // has a blend mode that does more, the mix is made up to there, and the rest are steps the graphics card also does on
+  // every frame, from pictures of the other layers made once. With more steps than it can do at once (a pile of many
+  // such layers and folders), the tile is put together for each new opacity instead (see showLive in composer.ts):
+  // one more pass on the graphics card per step, instead of all the layers. A tile goes back to its projection tile as
+  // soon as that is put together again (see composeTile).
   // Starting a tile needs every layer at its place, so with many big layers, starting all of them at once would
   // freeze the screen: they start a few every frame instead (see composeWaiting), out of sight, and are shown all at
   // once when they are all ready
-  // "clipped" is the layer's tile as it shows when it is clipped (see isClipped in layers.ts), and "under" what is under
-  // it when it is in a folder (see underActive): both made for the live tile
-  type LiveTile = {
-    sprites: Container
-    layerSprite: Sprite
-    above: RenderTexture | null
-    clipped: RenderTexture | null
-    under: RenderTexture | null
-  }
+  // "shown" is the tile put together for the current opacity, when the steps are too many for the screen
+  type LiveTile = { mesh: Mesh<Geometry, Shader>; picture: LivePicture; shown: RenderTexture | null }
   const live = new Map<string, LiveTile>() // "column,row" -> the tile shown live
   const startingLive = new Set<string>() // tiles waiting to be shown live
   const startedLive: string[] = [] // live tiles ready but not shown yet
   let startingOrder: string[] | null = null // the order to start them in (see cachedFirst)
-  let liveLayer: Layer | null = null // the layer the live tiles show
+  let liveLayer: Layer | null = null // the layer or folder the live tiles show
+  let liveAmount = 0 // how much of it they show: its opacity, or 0 while it is hidden
+  let isLiveStale = false // the tiles with steps left must be put together again for a new opacity
+  const mixer = createTileMixer(renderer)
   const liveContainer = new Container() // on top of the projection's sprites
-  const emptyBase = new Container() // the layers above are put together over nothing (transparent)
 
   // Whether a layer has paint at this tile, in RAM or still only on the graphics card
   function hasPaint(layer: Layer, key: string) {
     return layer.tiles.has(key) || gpu.getCached(layer, key)?.dirty === true
   }
 
-  // Show the active layer's tiles at "keys" with its current opacity. Returns false when that can't be done this way,
-  // and the tiles must be put together again instead
-  function showOpacityLive(layer: Layer, keys: Iterable<string>) {
-    if (layer !== stack.active || isFolder(layer)) return false // "below" only has the layers under the active one
-    // The layers above are put together on their own, without what is under them, and the layer goes onto what is under
-    // it as the graphics card blends. That only gives the same picture when the layer and the ones above it use the
-    // normal blend mode, or are folders that let what is in them pass through: the other modes (like multiply) depend on
-    // what is under them. And the folders the layer is in must change nothing, at full opacity and not clipped
-    const plain = (other: Layer) => !other.visible || other.blendMode === 'normal' || other.blendMode === 'pass-through'
-    if (!stack.layers.slice(activeIndex(stack)).every(plain)) return false
-    for (let folder = layer.parent; folder; folder = folder.parent) {
-      if (folder.opacity < 1 || isClipped(stack, stack.layers.indexOf(folder))) return false
+  // The tiles where a layer has paint, or the layers in a folder
+  function tilesOf(layer: Layer) {
+    if (!isFolder(layer)) return gpu.tilesWithPaint(layer)
+    const keys = new Set<string>()
+    for (const inside of stack.layers) {
+      if (!isFolder(inside) && isInside(inside, layer)) for (const key of gpu.tilesWithPaint(inside)) keys.add(key)
     }
+    return keys
+  }
+
+  // Show the active layer or folder with its current opacity, on the tiles it changes. Returns false when that can't be
+  // done this way, and the tiles must be put together again instead
+  function showOpacityLive(layer: Layer) {
+    // The tiles start from "below", which only has what is under the active layer, and layers clipped to a folder it
+    // is in change with its opacity in a way the mix can't show (see canShowLive in composer.ts)
+    if (layer !== stack.active || !composer.canShowLive(activeIndex(stack))) return false
     if (liveLayer !== layer) {
       finishLive()
-      gpu.keep(layer) // the sprites show the layer's own textures, so they must stay on the graphics card
       liveLayer = layer
     }
-    for (const tile of live.values()) tile.layerSprite.alpha = layer.opacity
-    for (const key of onPaper(keys)) {
+    followLiveLayer()
+    for (const key of onPaper(tilesOf(layer))) {
       if (live.has(key) || startingLive.has(key)) continue
       startingLive.add(key)
       startingOrder = null
     }
     return true
+  }
+
+  // The live tiles show the layer's current opacity, or none of it while it is hidden
+  function followLiveLayer() {
+    liveAmount = liveLayer!.visible ? liveLayer!.opacity : 0
+    mixer.setAmount(liveAmount)
+    isLiveStale = true
   }
 
   // What is under the active layer, or under the active folder's block, at a tile: its "below" tile, with the layers
@@ -397,37 +411,43 @@ export function createProjection(
     composeLayers(emptyBase, first, stack.layers.length, column, row, above)
     return above
   }
+  const emptyBase = new Container() // the layers above are put together over nothing (transparent)
 
   // Get a live tile ready, out of sight until the others are ready too (see showStartedLive)
-  function startLive(layer: Layer, key: string) {
+  function startLive(key: string) {
     const { column, row } = parseTileKey(key)
-    let texture: Texture | null = gpu.getTexture(layer, column, row, false)
-    if (!texture) return // no paint here
-    const index = activeIndex(stack)
-    let clipped: RenderTexture | null = null
-    if (isClipped(stack, index)) {
-      // Only the part of the layer its base covers, once: the opacity then applies to it as to any layer
-      clipped = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
-      if (!composer.composeAlone(index, column, row, clipped, paintOf)) {
-        spareTextures.push(clipped)
-        return // nothing of the layer shows here
-      }
-      texture = clipped
+    if (staleBelow.delete(key)) composeBelowTile(column, row)
+    belowSprite.texture = below.get(key)!
+    const picture = composer.live(activeIndex(stack), column, row, belowSprite, splitIndex(stack), paintOf)
+    gpu.trim()
+    if (!picture) return // the layer changes nothing here
+    // The graphics card does the steps on the screen, unless they are too many: then the tile is put together for each
+    // new opacity (see updateLive)
+    const { width, height } = tileSize(grid, column, row)
+    let shown: RenderTexture | null = null
+    let mesh = mixer.show(picture.zero, picture.one, picture.steps, width, height)
+    if (!mesh) {
+      shown = takeTexture({ width: TILE_SIZE, height: TILE_SIZE })
+      composer.showLive(picture, liveAmount, shown)
+      mesh = mixer.show(shown, shown, [], width, height)!
     }
-    const under = underActive(column, row, key)
-    const above = aboveActive(column, row, key)
-
-    const sprites = new Container()
-    sprites.position.set(column * TILE_SIZE, row * TILE_SIZE)
-    const layerSprite = new Sprite(texture)
-    sprites.addChild(new Sprite(under.texture), layerSprite)
-    if (above) sprites.addChild(new Sprite(above))
-    for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
-    layerSprite.alpha = layer.opacity
-    sprites.visible = false
-    liveContainer.addChild(sprites)
-    live.set(key, { sprites, layerSprite, above, clipped, under: under.made })
+    mesh.position.set(column * TILE_SIZE, row * TILE_SIZE)
+    mesh.visible = false
+    liveContainer.addChild(mesh)
+    const tile = { mesh, picture, shown }
+    for (const texture of texturesShown(tile)) applyScaleMode(texture)
+    live.set(key, tile)
     startedLive.push(key)
+  }
+
+  // The textures a live tile shows
+  const texturesShown = (tile: LiveTile) => (tile.shown ? [tile.shown] : composer.texturesOf(tile.picture))
+
+  // Put the tiles with steps left together again for the current opacity
+  function updateLive() {
+    if (!isLiveStale) return
+    isLiveStale = false
+    for (const tile of live.values()) if (tile.shown) composer.showLive(tile.picture, liveAmount, tile.shown)
   }
 
   // Once every live tile is ready, show them all at once instead of their projection tiles
@@ -436,7 +456,7 @@ export function createProjection(
     for (const key of startedLive) {
       const tile = live.get(key)
       if (!tile) continue // put together again in the meantime
-      tile.sprites.visible = true
+      tile.mesh.visible = true
       tileSprites.get(key)!.visible = false
     }
     startedLive.length = 0
@@ -446,19 +466,18 @@ export function createProjection(
   function stopLive(key: string) {
     const tile = live.get(key)
     if (!tile) return
-    tile.sprites.destroy({ children: true }) // only the sprites: their textures belong to the layer and to "below"
+    mixer.remove(tile.mesh)
     // Freed later, a few every frame (see composeWaiting)
-    for (const texture of [tile.above, tile.clipped, tile.under]) if (texture) spareTextures.push(texture)
+    spareTextures.push(...composer.texturesOf(tile.picture))
+    if (tile.shown) spareTextures.push(tile.shown)
     tileSprites.get(key)!.visible = true
     live.delete(key)
     releaseLiveLayerIfDone()
   }
 
-  // Once no tile is shown live or waiting to be, the layer's tiles can leave the graphics card again
+  // Once no tile is shown live or waiting to be, they stop following the layer
   function releaseLiveLayerIfDone() {
-    if (!liveLayer || live.size > 0 || startingLive.size > 0) return
-    gpu.keep(null)
-    liveLayer = null
+    if (live.size === 0 && startingLive.size === 0) liveLayer = null
   }
 
   // Put the tiles shown live together for good, now (before the "below" tiles change, or before exporting). The ones
@@ -654,9 +673,7 @@ export function createProjection(
     if (mode === scaleMode) return
     scaleMode = mode
     for (const texture of projection.values()) applyScaleMode(texture)
-    for (const { sprites } of live.values()) {
-      for (const sprite of sprites.children as Sprite[]) applyScaleMode(sprite.texture)
-    }
+    for (const tile of live.values()) for (const texture of texturesShown(tile)) applyScaleMode(texture)
     applyMoveScaleMode()
   }
 
@@ -693,11 +710,12 @@ export function createProjection(
   function destroy() {
     endMove()
     for (const tile of live.values()) {
-      for (const texture of [tile.above, tile.clipped, tile.under]) texture?.destroy(true)
+      for (const texture of [...composer.texturesOf(tile.picture), tile.shown]) texture?.destroy(true)
     }
     for (const texture of [...prepared.values(), ...spareTextures]) texture.destroy(true)
     for (const texture of [...projection.values(), ...below.values()]) texture.destroy(true)
     container.destroy({ children: true })
+    mixer.destroy()
     ghost.destroy({ children: true })
     composer.destroy()
     withStrokeRoot.destroy({ children: true })

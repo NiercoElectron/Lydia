@@ -10,7 +10,8 @@ import {
   Texture,
   UniformGroup,
 } from 'pixi.js'
-import type { WebGLRenderer } from 'pixi.js'
+import type { TextureSource, WebGLRenderer } from 'pixi.js'
+import type { LiveStep } from './composer'
 import type { BlendMode } from './layers'
 import { TILE_SIZE } from './tiles'
 
@@ -77,20 +78,10 @@ void main(void) {
 }
 `
 
-// The graphics card keeps colors multiplied by their alpha: the formulas need them as they are, so that is undone
-// first, and done again in the result
-const fragment = `#version 300 es
-precision highp float;
-
-in vec2 vUV;
-out vec4 finalColor;
-
-uniform sampler2D uBackdrop;
-uniform sampler2D uPaint;
-uniform sampler2D uMask;
-uniform float uOpacity;
-uniform float uMode;
-
+// The formulas, shared by the program that blends tiles and the one that shows tiles live (see createTileMixer). The
+// graphics card keeps colors multiplied by their alpha: the formulas need them as they are, so that is undone first,
+// and done again in the result
+const FORMULAS = `
 vec3 screen(vec3 under, vec3 over) {
   return under + over - under * over;
 }
@@ -147,8 +138,7 @@ vec3 withSaturation(vec3 color, float amount) {
 }
 
 // The mode's mix of the color under and the layer's color
-vec3 blended(vec3 under, vec3 over) {
-  int mode = int(uMode + 0.5);
+vec3 blended(vec3 under, vec3 over, int mode) {
   if (mode == 1) return under * over;
   if (mode == 2) return screen(under, over);
   if (mode == 3) return hardLight(over, under); // Overlay is Hard Light with the two swapped
@@ -167,20 +157,38 @@ vec3 blended(vec3 under, vec3 over) {
   return over;
 }
 
-void main(void) {
-  if (int(uMode + 0.5) == 16) {
-    // Mixing two pictures: as much of the second as the opacity, where the mask covers
-    finalColor = mix(texture(uBackdrop, vUV), texture(uPaint, vUV), uOpacity * texture(uMask, vUV).a);
-    return;
-  }
-  vec4 under = texture(uBackdrop, vUV);
-  vec4 over = texture(uPaint, vUV) * (uOpacity * texture(uMask, vUV).a);
+// "over" (already at its opacity) onto "under" with this mode: each one alone where the other has no paint, and the
+// mix as much as both cover
+vec4 blendOnto(vec4 under, vec4 over, int mode) {
   vec3 underColor = under.a > 0.0 ? min(under.rgb / under.a, 1.0) : vec3(0.0);
   vec3 overColor = over.a > 0.0 ? min(over.rgb / over.a, 1.0) : vec3(0.0);
-  vec3 mixed = clamp(blended(underColor, overColor), 0.0, 1.0);
-  // Each one alone where the other has no paint, and the mix as much as both cover
+  vec3 mixed = clamp(blended(underColor, overColor, mode), 0.0, 1.0);
   vec3 color = over.rgb * (1.0 - under.a) + under.rgb * (1.0 - over.a) + mixed * over.a * under.a;
-  finalColor = vec4(color, over.a + under.a * (1.0 - over.a));
+  return vec4(color, over.a + under.a * (1.0 - over.a));
+}
+`
+
+const fragment = `#version 300 es
+precision highp float;
+
+in vec2 vUV;
+out vec4 finalColor;
+
+uniform sampler2D uBackdrop;
+uniform sampler2D uPaint;
+uniform sampler2D uMask;
+uniform float uOpacity;
+uniform float uMode;
+${FORMULAS}
+void main(void) {
+  float amount = uOpacity * texture(uMask, vUV).a;
+  int mode = int(uMode + 0.5);
+  if (mode == 16) {
+    // Mixing two pictures: as much of the second as the opacity, where the mask covers
+    finalColor = mix(texture(uBackdrop, vUV), texture(uPaint, vUV), amount);
+    return;
+  }
+  finalColor = blendOnto(texture(uBackdrop, vUV), texture(uPaint, vUV) * amount, mode);
 }
 `
 
@@ -269,12 +277,200 @@ export function createLayerBlender(renderer: WebGLRenderer) {
     scratch?.destroy(true)
   }
 
-  // Only the part of "paint" that "mask" covers, into "target" (a clipped layer's tile, shown on its own)
-  function clip(paint: Texture, mask: Texture, target: RenderTexture) {
+  // Only the part of "paint" that "mask" covers, into "target", or all of it without a mask (a copy)
+  function clip(paint: Texture, target: RenderTexture, mask?: Texture) {
     blend(NO_PAINT, paint, 1, 'normal', target, mask)
   }
 
+  compileNow(renderer, root)
   return { blend, blendOnto, mix, clip, destroy }
 }
 
 export type LayerBlender = ReturnType<typeof createLayerBlender>
+
+// How many steps a tile shown live can do on the screen (see createTileMixer): each one reads up to two tiles, and with
+// the two pictures mixed first that is 16, the fewest a graphics card with WebGL 2 can read at once
+const MIXER_STEPS = 7
+// How the mixer's program tells the steps apart (see LiveStep in composer.ts): none, onto, into, mixed with a picture,
+// keep, mixed with the picture kept
+const STEP_KINDS = { none: 0, onto: 1, into: 2, mix: 3, keep: 4, mixKept: 5 }
+const STEP_NUMBERS = Array.from({ length: MIXER_STEPS }, (_, i) => i)
+
+// For each step in "uSteps": "x" its kind, "y" its mode, "z" its opacity, "w" 1 when it has a mask (its second tile).
+// The tiles are read first, each by its own name (a program can't choose a tile by a number it works out), and the
+// steps then go in a loop, so the formulas are in the program once: the graphics card's driver turns the program
+// into its own code the first time it is used, and with the formulas written out for every step, that took seconds.
+// Only the tiles of the steps there are ("uCount") are read, and the masks there are.
+// Two pictures can be kept at once, which is enough for a folder letting what is in it pass through inside another one
+const mixerFragment = `#version 300 es
+precision highp float;
+
+in vec2 vUV;
+out vec4 finalColor;
+
+uniform sampler2D uZero;
+uniform sampler2D uOne;
+uniform float uAmount;
+uniform vec4 uSteps[${MIXER_STEPS}];
+uniform float uCount;
+${STEP_NUMBERS.map(i => `uniform sampler2D uFirst${i};\nuniform sampler2D uSecond${i};`).join('\n')}
+${FORMULAS}
+void main(void) {
+  int count = int(uCount + 0.5);
+${STEP_NUMBERS.map(
+  i => `  vec4 first${i} = vec4(0.0);
+  float mask${i} = 1.0;
+  if (count > ${i}) {
+    first${i} = texture(uFirst${i}, vUV);
+    if (uSteps[${i}].w > 0.5) mask${i} = texture(uSecond${i}, vUV).a;
+  }`,
+).join('\n')}
+  vec4 picture = mix(texture(uZero, vUV), texture(uOne, vUV), uAmount);
+  vec4 kept = vec4(0.0);
+  vec4 keptBefore = vec4(0.0);
+  for (int i = 0; i < ${MIXER_STEPS}; i++) {
+    if (i >= count) break;
+    vec4 first = ${STEP_NUMBERS.slice(0, -1)
+      .map(i => `i == ${i} ? first${i} : `)
+      .join('')}first${MIXER_STEPS - 1};
+    float mask = ${STEP_NUMBERS.slice(0, -1)
+      .map(i => `i == ${i} ? mask${i} : `)
+      .join('')}mask${MIXER_STEPS - 1};
+    int kind = int(uSteps[i].x + 0.5);
+    float amount = uSteps[i].z * mask;
+    if (kind == 4) {
+      keptBefore = kept;
+      kept = picture;
+    } else if (kind == 3 || kind == 5) {
+      picture = mix(kind == 3 ? first : kept, picture, amount);
+      if (kind == 5) kept = keptBefore;
+    } else {
+      // Onto the picture, or the picture onto the tile
+      vec4 under = kind == 1 ? picture : first;
+      vec4 over = (kind == 1 ? first : picture) * amount;
+      picture = blendOnto(under, over, int(uSteps[i].y + 0.5));
+    }
+  }
+  finalColor = picture;
+}
+`
+
+// What the mixer's program needs for these steps: the numbers of the steps and the tiles they read. Null when there
+// are too many, or more pictures kept at once than it can keep
+function mixerSteps(steps: LiveStep[]) {
+  if (steps.length > MIXER_STEPS) return null
+  const numbers = new Float32Array(MIXER_STEPS * 4)
+  const tiles: Record<string, TextureSource> = {}
+  let keptCount = 0
+  for (const i of STEP_NUMBERS) {
+    const step = steps[i]
+    let values = [STEP_KINDS.none, 0, 0, 0]
+    let first: Texture = NO_PAINT
+    let second: Texture | null = null
+    if (step?.kind === 'onto') {
+      values = [STEP_KINDS.onto, MODE_NUMBERS[step.mode], step.opacity, 0]
+      first = step.paint
+    } else if (step?.kind === 'into') {
+      values = [STEP_KINDS.into, MODE_NUMBERS[step.mode], step.opacity, 0]
+      first = step.under
+      second = step.mask
+    } else if (step?.kind === 'mix') {
+      values = [step.before ? STEP_KINDS.mix : STEP_KINDS.mixKept, 0, step.opacity, 0]
+      if (step.before) first = step.before
+      else keptCount--
+      second = step.mask
+    } else if (step?.kind === 'keep') {
+      values = [STEP_KINDS.keep, 0, 0, 0]
+      if (++keptCount > 2) return null
+    }
+    if (second) values[3] = 1
+    numbers.set(values, i * 4)
+    tiles[`uFirst${i}`] = first.source
+    tiles[`uSecond${i}`] = (second ?? NO_MASK).source
+  }
+  return { numbers, tiles }
+}
+
+// Tiles shown on the screen as a mix of two pictures of the same place: as much of the second as "amount", the same
+// for all of them, followed by the steps still to do (a layer's opacity changing live: see projection.ts and live in
+// composer.ts). The graphics card works it all out on every frame, so a new amount costs nothing more. The pictures
+// are whole tiles; a tile at the paper's edge only shows the part on the paper
+export function createTileMixer(renderer: WebGLRenderer) {
+  const geometry = new Geometry({
+    attributes: { aPosition: { buffer: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), format: 'float32x2' } },
+    indexBuffer: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  })
+  const glProgram = GlProgram.from({
+    vertex: `#version 300 es
+in vec2 aPosition;
+
+uniform mat3 uProjectionMatrix;
+uniform mat3 uWorldTransformMatrix;
+uniform mat3 uTransformMatrix;
+uniform vec2 uPart;
+
+out vec2 vUV;
+
+void main(void) {
+  vUV = aPosition * uPart;
+  vec3 position = vec3(vUV * ${TILE_SIZE}.0, 1.0);
+  gl_Position = vec4((uProjectionMatrix * uWorldTransformMatrix * uTransformMatrix * position).xy, 0.0, 1.0);
+}
+`,
+    fragment: mixerFragment,
+    name: 'tile-mix',
+    preferredFragmentPrecision: 'highp',
+  })
+  const amount = new UniformGroup({ uAmount: { value: 0, type: 'f32' } })
+
+  // A tile mixing these two pictures and doing these steps, "width" and "height" of it on the paper. Null when the
+  // steps are more than the program can do
+  function show(zero: Texture, one: Texture, steps: LiveStep[], width: number, height: number) {
+    const forSteps = mixerSteps(steps)
+    if (!forSteps) return null
+    const tile = new UniformGroup({
+      uPart: { value: new Float32Array([width / TILE_SIZE, height / TILE_SIZE]), type: 'vec2<f32>' },
+      uSteps: { value: forSteps.numbers, type: 'vec4<f32>', size: MIXER_STEPS },
+      uCount: { value: steps.length, type: 'f32' },
+    })
+    const shader = new Shader({
+      glProgram,
+      resources: { mixAmount: amount, mixTile: tile, uZero: zero.source, uOne: one.source, ...forSteps.tiles },
+    })
+    return new Mesh({ geometry, shader })
+  }
+
+  function setAmount(value: number) {
+    amount.uniforms.uAmount = value
+  }
+
+  // Take a tile off the screen
+  function remove(tile: Mesh<Geometry, Shader>) {
+    const shader = tile.shader!
+    tile.destroy()
+    shader.destroy()
+  }
+
+  // The program stays: PixiJS keeps one for each source code, shared by every drawing opened
+  function destroy() {
+    geometry.destroy()
+  }
+
+  const sample = new Container()
+  sample.addChild(show(NO_PAINT, NO_PAINT, [], 1, 1)!)
+  compileNow(renderer, sample)
+  remove(sample.children[0] as Mesh<Geometry, Shader>)
+  sample.destroy()
+  return { show, setAmount, remove, destroy }
+}
+
+// Draw this once, into a tiny tile, so that the graphics card's driver turns its program into its own code now, while
+// the drawing opens, and not the first time it is needed, which would freeze the screen for a moment (a tenth of a
+// second for each program on Windows, where Chrome goes through Direct3D)
+function compileNow(renderer: WebGLRenderer, container: Container) {
+  const tiny = RenderTexture.create({ width: 1, height: 1 })
+  renderer.render({ container, target: tiny, clear: true })
+  tiny.destroy(true)
+}
+
+export type TileMixer = ReturnType<typeof createTileMixer>
