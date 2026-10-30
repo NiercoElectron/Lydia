@@ -86,13 +86,12 @@ everything, brushes as files and the Brush Designer, the Pixel brush and a pixel
 stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, pixel-perfect strokes, straight lines, turning and flipping the view, the fill bucket, rectangle, lasso and
 magic wand selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export, enlarged too, the
-interface in English, Brazilian Portuguese and Spanish, and error codes.
+interface in English, Brazilian Portuguese and Spanish, error codes, and a color panel with a color triangle and a
+color tray.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Colors: a color triangle (a ring of hues around a triangle of shades) in place of the color picker
-- [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
       the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
       that bend the picture where each one is dragged), pen tilt (the brush follows how the pen leans, like a
@@ -101,6 +100,7 @@ Next, roughly in this order:
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)
 - [ ] Text and filters (hue and saturation, levels, blur)
+- [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
       from the computer
 
