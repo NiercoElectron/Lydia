@@ -1,5 +1,39 @@
 # Histórico de alterações
 
+## [0.14.0] - 2026-10-30
+
+### Added
+
+- **Textura do papel** para pincéis ([decisão 67](docs/decisions.md#67-the-paper-grain)): uma textura fixa no papel, cujos sulcos ficam brancos com pouca pressão e são preenchidos com mais pressão, como um lápis sobre papel de verdade. No Editor de pincéis, em **Textura do papel**: escolha uma das quatro opções do Lydia (Papel, Áspero, Tela, Ruído) ou importe uma imagem e ajuste a **Profundidade** e a **Escala**. A textura é salva no arquivo do pincel.
+- Um pincel **Lápis**, com a textura Papel.
+- **Altere qualquer pincel** no Editor de pincéis ([decisão 70](docs/decisions.md#70-changing-brushes-and-images-as-tips)): **Começar com**, na tela inicial, abre um pincel com sua ponta e configurações. Um pincel seu pode ser salvo por cima ou com **Salvar cópia**; os que vêm com o Lydia sempre viram cópias, preservando o original.
+- **Uma imagem como ponta:** **Usar imagem…** coloca a imagem no papel do Editor de pincéis, onde pode ser retocada, e **Inverter** inverte as partes claras e escuras do papel.
+
+### Changed
+
+- Com zoom, os pixels são **suavizados**, como no ibisPaint e no Procreate, para que linhas finas não pareçam degraus ([decisão 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)). Continuam como quadrados nítidos para pixel art enquanto um pincel de pixel está selecionado e onde a grade de pixels aparece.
+- Com caneta, o **contorno do pincel** acompanha o tamanho da pintura: usa a pressão atual durante o traço e a última pressão enquanto a caneta está no ar ([decisão 69](docs/decisions.md#69-the-brushs-outline-follows-the-pen)). Com mouse, continua mostrando o tamanho em pressão máxima.
+
+### Fixed
+
+- Uma ponta pintada por todo o papel de 1024×1024 criava um pincel cujo arquivo não podia ser aberto.
+
+## [0.13.0] - 2026-10-29
+
+### Added
+
+- Um **painel de cores**, no canto superior direito, substitui o seletor de cores do navegador ([decisão 65](docs/decisions.md#65-the-color-panel)): um anel de matizes ao redor de um triângulo de tons que gira com o matiz escolhido; a cor do pincel e a cor de fundo, trocadas com **X**; o código da cor (#rrggbb); controles de H, S e V; e as cores usadas recentemente, guardadas para a próxima visita.
+- Uma **bandeja de cores** ([decisão 66](docs/decisions.md#66-the-color-tray)), aberta pelo painel de cores: cores guardadas para escolher de novo rapidamente, que ficam até serem removidas. Uma lista para todos os desenhos, guardada pelo navegador, e outra para cada desenho, salva no arquivo dele.
+
+## [0.12.0] - 2026-10-29
+
+### Added
+
+- A **varinha mágica** (W) ([decisão 64](docs/decisions.md#64-the-magic-wand)): seleciona a área ao redor do ponto clicado cujas cores são próximas à cor desse ponto, como no preenchimento, com configurações próprias: Tolerância, Referência, Expandir (sobre a borda suave das linhas, para colorir por dentro sem deixar uma borda clara) e **Contíguo**, que, desativado, seleciona a cor no desenho inteiro. Shift adiciona e Alt remove.
+- Espanhol em toda a interface e no histórico de versões, com a opção Español e detecção automática de variantes do idioma do sistema, como es-ES, es-MX e es-AR.
+- Português brasileiro em toda a interface, incluindo o Editor de pincéis e o histórico de versões. A tela inicial oferece Sistema, Português (Brasil) e English, lembra a escolha e detecta o português pelo idioma preferido do navegador. Nomes de novas camadas e pastas usam o idioma escolhido; nomes dados pelo usuário são preservados.
+- **Códigos de erro**: toda mensagem de erro começa com um código, como LYD-201, e permanece em inglês em qualquer idioma, para consulta em [docs/errors.md](docs/errors.md) ou envio em um relato ([decisão 63](docs/decisions.md#63-lydia-in-portuguese-and-spanish)). Erros inesperados usam o código da operação em andamento, com a causa entre parênteses.
+
 ## [0.11.1] - 2026-10-29
 
 ### Changed

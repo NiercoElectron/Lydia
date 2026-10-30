@@ -1,5 +1,39 @@
 # Historial de cambios
 
+## [0.14.0] - 2026-10-30
+
+### Added
+
+- **Textura del papel** para pinceles ([decisión 67](docs/decisions.md#67-the-paper-grain)): una textura fija en el papel, cuyos surcos quedan blancos con poca presión y se rellenan con más presión, como un lápiz sobre papel real. En el Editor de pinceles, en **Textura del papel**: elige una de las cuatro opciones de Lydia (Papel, Áspero, Lienzo, Ruido) o importa una imagen y ajusta la **Profundidad** y la **Escala**. La textura se guarda en el archivo del pincel.
+- Un pincel **Lápiz**, con la textura Papel.
+- **Modifica cualquier pincel** en el Editor de pinceles ([decisión 70](docs/decisions.md#70-changing-brushes-and-images-as-tips)): **Empezar con**, en la pantalla inicial, abre un pincel con su punta y configuración. Un pincel propio se puede sobrescribir o guardar con **Guardar copia**; los incluidos en Lydia siempre se convierten en copias, conservando el original.
+- **Una imagen como punta:** **Usar imagen…** coloca la imagen en el papel del Editor de pinceles, donde se puede retocar, e **Invertir** invierte las zonas claras y oscuras del papel.
+
+### Changed
+
+- Al ampliar, los píxeles se **suavizan**, como en ibisPaint y Procreate, para que las líneas finas no parezcan escalones ([decisión 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)). Siguen siendo cuadrados nítidos para pixel art mientras hay un pincel de píxeles seleccionado y donde aparece la cuadrícula de píxeles.
+- Con lápiz, el **contorno del pincel** sigue el tamaño de la pintura: usa la presión actual durante el trazo y la última presión mientras el lápiz está en el aire ([decisión 69](docs/decisions.md#69-the-brushs-outline-follows-the-pen)). Con ratón, sigue mostrando el tamaño a presión máxima.
+
+### Fixed
+
+- Una punta pintada por todo el papel de 1024×1024 creaba un pincel cuyo archivo no se podía abrir.
+
+## [0.13.0] - 2026-10-29
+
+### Added
+
+- Un **panel de colores**, en la esquina superior derecha, sustituye al selector de colores del navegador ([decisión 65](docs/decisions.md#65-the-color-panel)): un anillo de tonos alrededor de un triángulo de matices que gira con el tono elegido; el color del pincel y el de fondo, intercambiables con **X**; el código del color (#rrggbb); controles de H, S y V; y los colores usados recientemente, guardados para la próxima visita.
+- Una **bandeja de colores** ([decisión 66](docs/decisions.md#66-the-color-tray)), que se abre desde el panel de colores: colores guardados para volver a elegirlos rápidamente, que permanecen hasta quitarlos. Una lista para todos los dibujos, guardada por el navegador, y otra para cada dibujo, guardada en su archivo.
+
+## [0.12.0] - 2026-10-29
+
+### Added
+
+- La **varita mágica** (W) ([decisión 64](docs/decisions.md#64-the-magic-wand)): selecciona el área alrededor del punto elegido cuyos colores se parecen al de ese punto, como el relleno, con ajustes propios: Tolerancia, Referencia, Expandir (sobre el borde suave de las líneas, para colorear por dentro sin dejar un borde claro) y **Contiguo**, que, desactivado, selecciona el color en todo el dibujo. Mayús añade y Alt quita.
+- Español en toda la interfaz y el historial de versiones, con la opción Español y detección automática de variantes del idioma del sistema como es-ES, es-MX y es-AR.
+- Portugués brasileño en toda la interfaz, incluidos el Editor de pinceles y el historial de versiones. La pantalla inicial ofrece Sistema, Português (Brasil) y English, recuerda la elección y detecta el portugués a partir del idioma preferido del navegador. Los nombres de las capas y carpetas nuevas usan el idioma elegido; los nombres del usuario se conservan.
+- **Códigos de error**: cada mensaje de error empieza con un código, como LYD-201, y permanece en inglés en cualquier idioma, para consultarlo en [docs/errors.md](docs/errors.md) o incluirlo en un informe ([decisión 63](docs/decisions.md#63-lydia-in-portuguese-and-spanish)). Los errores inesperados usan el código de la operación en curso, con la causa entre paréntesis.
+
 ## [0.11.1] - 2026-10-29
 
 ### Changed

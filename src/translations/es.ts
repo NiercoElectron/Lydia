@@ -374,4 +374,57 @@ export const es: Record<string, string> = {
   Changed: 'Modificado',
   Fixed: 'Corregido',
   Removed: 'Eliminado',
+  Paper: 'Papel',
+  Rough: 'Áspero',
+  Canvas: 'Lienzo',
+  'Paper grain': 'Textura del papel',
+  'The picture of the paper\u0027s grain, repeated across the paper: darker is higher, where light pressure already paints':
+    'Imagen de la textura, repetida por el papel: las zonas oscuras son más altas y ya reciben pintura con poca presión',
+  Picture: 'Imagen',
+  'Use an image of your own as the grain': 'Usa una imagen propia como textura',
+  Depth: 'Profundidad',
+  'How deep the paper\u0027s grooves are: how much of the paper a light touch leaves out (pressing harder fills them). At 0% there is no grain':
+    'Profundidad de los surcos del papel: cuánto queda sin pintar con poca presión (más presión rellena los surcos). Al 0% no hay textura',
+  'How big the grain\u0027s picture is on the paper': 'Tamaño de la imagen de la textura en el papel',
+  'Ring of hues, and a triangle of the shades of the hue chosen':
+    'Anillo de tonos y triángulo de matices del tono elegido',
+  'Brush color': 'Color del pincel',
+  'Swap with the background color (X)': 'Intercambiar con el color de fondo (X)',
+  'Color code': 'Código del color',
+  'The color as a code: #rrggbb, or #rgb': 'Color en código: #rrggbb o #rgb',
+  'Color tray: colors kept to pick again quickly':
+    'Bandeja de colores: colores guardados para volver a elegirlos rápidamente',
+  'Color tray': 'Bandeja de colores',
+  'Value: how far from black': 'Valor: distancia del negro',
+  'Colors painted with lately': 'Colores usados recientemente',
+  'All drawings': 'Todos los dibujos',
+  'Kept by this browser, the same in every drawing': 'Guardados en este navegador, iguales en todos los dibujos',
+  'This drawing': 'Este dibujo',
+  'Kept in the drawing, saved with it': 'Guardados en el dibujo y en su archivo',
+  'Take {color} out': 'Quitar {color}',
+  'Take it out': 'Quitar',
+  'Keep the brush color here': 'Guardar el color del pincel aquí',
+  'The brush color is already here': 'El color del pincel ya está aquí',
+  'How far a color can be from the one clicked and still be selected, from 0 to 255':
+    'Cuánto puede diferir un color del elegido y aun así seleccionarse, de 0 a 255',
+  'What the magic wand looks at to find where to stop':
+    'Qué tiene en cuenta la varita mágica para encontrar los límites',
+  'At most how many pixels the selection goes past its edge, into the soft edge of the lines around it, up to where they are darkest':
+    'Máximo de píxeles que la selección avanza sobre el borde suave de las líneas que la rodean, hasta la parte más oscura',
+  'Only the pixels connected to the one clicked; off, every pixel of a close color in the drawing':
+    'Solo los píxeles conectados al elegido; desactivado, todos los píxeles de color parecido del dibujo',
+  Contiguous: 'Contiguo',
+  'Magic wand': 'Varita mágica',
+  'Selecting…': 'Seleccionando…',
+  'Put an image on the paper: dark places paint, light ones don’t':
+    'Coloca una imagen en el papel: las zonas oscuras pintan y las claras no pintan',
+  'Use image…': 'Usar imagen…',
+  'What paints stops painting, and the other way round': 'Lo que pinta deja de pintar y viceversa',
+  'Save changes': 'Guardar cambios',
+  'Keep it as a new brush': 'Guardar como un pincel nuevo',
+  'Save copy': 'Guardar copia',
+  'A new brush, or one of the brushes, to change it or make another from it':
+    'Un pincel nuevo o uno existente, para modificarlo o crear otro a partir de él',
+  'Start from': 'Empezar con',
+  'A new brush': 'Un pincel nuevo',
 }
