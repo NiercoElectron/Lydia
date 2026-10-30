@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-30
+
 ### Added
 
 - **Paper grain** for brushes ([decision 67](docs/decisions.md#67-the-paper-grain)): a texture of the paper, fixed to
@@ -479,7 +481,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/NiercoElectron/Lydia/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/NiercoElectron/Lydia/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/NiercoElectron/Lydia/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/NiercoElectron/Lydia/compare/v0.11.0...v0.11.1

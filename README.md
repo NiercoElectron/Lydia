@@ -89,14 +89,12 @@ everything, brushes as files and the Brush Designer, the Pixel brush and a pixel
 stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer, tapered stroke ends, pixel brushes drawn in the Brush Designer, pixel-perfect strokes, straight lines, turning and flipping the view, the fill bucket, rectangle, lasso and
 magic wand selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export, enlarged too, the
-interface in English, Brazilian Portuguese and Spanish, error codes, and a color panel with a color triangle and a
-color tray.
+interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
+color tray, a paper grain for brushes, and changing any brush in the Brush Designer, from images too.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Brushes: grain (a paper texture, for pencils), and in the Brush Designer, edit existing brushes and use an
-      image as the tip
 - [ ] Distort: smudge and blur tools, a liquify tool (push, bloat and pucker the picture with the pen, and brush it
       back to how it was) and a mesh mode for transforming (a grid of points that bend the picture where each one is
       dragged)

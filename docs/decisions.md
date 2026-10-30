@@ -238,8 +238,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   (decisions 54 to 58), and 0.11.1 showed the live opacity, moving and the fill bucket right with them (decisions 60
   to 62). 0.12.0 brought the Selections stage: the magic wand (decision 64), with the interface in Portuguese and
   Spanish and codes for the errors (decision 63). 0.13.0 brought the Colors stage: the color panel, with its triangle,
-  and the color tray (decisions 65 and 66). 1.0.0 will be the desktop app, packaged with Electron. The full list is
-  in [CHANGELOG.md](../CHANGELOG.md).
+  and the color tray (decisions 65 and 66). 0.14.0 brought the Brushes stage: the paper grain and changing brushes in
+  the Brush Designer, from images too (decisions 67 and 70), with smooth pixels when zoomed in and an outline that
+  follows the pen (decisions 68 and 69). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
+  [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
   worth trying, and its changelog tells what the stage brought.
