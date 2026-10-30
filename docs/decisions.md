@@ -1825,11 +1825,17 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     by Lydia, stay as they were, and so does the drawing file.
   - The history of versions is translated in `src/translations/changelog.pt-BR.md` and `changelog.es.md`. A version
     not translated yet shows in English.
-- **Known:** each new text in the interface needs its translation in both dictionaries (the test below finds the ones
-  missing), and each new version its lines in both translated histories. A new error needs a code of its own, in
-  `src/errors.ts` and in `errors.md`. A code is never given to another error.
+- **Known:** each new text in the interface needs its translation in both dictionaries, and each new version its lines
+  in both translated histories. A new error needs a code of its own, in `src/errors.ts` and in `errors.md`. A code is
+  never given to another error.
+- **Translating apart from the code** (my choice, from 0.12.0): Claude writes the new texts in English, and I
+  translate them later, several at once; until then they show in English. `npm run translations`
+  (`scripts/translations.mjs`) lists what is left in each language: the texts the code gives to `t()`, the names of
+  the tasks and of the tools, and the versions missing from the translated histories. It is kept out of the tests,
+  which first failed on every text not translated yet, so that they stay a sign of something broken.
 - **Checked:** `tests/app/language.mjs`: the choice, the system's language, the places for values, the two meanings
-  of Screen, and that every text the code translates is in both dictionaries with the same places;
+  of Screen, both dictionaries with the same texts and the same places, and each translated version with the
+  original's dates and links;
   `tests/app/language-ui.mjs`: switching the language in the app, in each language, and an error in English with its
   code; `tests/app/errors.mjs`: every code in its form, in `errors.md` with the same message, used in the code and in
   no dictionary, and how a message is made, an unexpected one too. The other tests start Chrome in

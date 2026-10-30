@@ -75,7 +75,14 @@ try {
     assert.equal(await page.$eval('html', el => el.lang), 'en')
     await page.select('.theme-choice select', words.locale)
     assert.equal(await page.$eval('.whats-new h2', el => el.textContent), words.news)
-    assert.ok(await page.$eval('.whats-new li', (el, expected) => el.textContent.includes(expected), words.newsText))
+    // A translated version (the newest may not be translated yet, and shows in English)
+    assert.ok(
+      await page.$$eval(
+        '.whats-new li',
+        (items, expected) => items.some(el => el.textContent.includes(expected)),
+        words.newsText,
+      ),
+    )
     await page.screenshot({ path: OUT + `/language-home-${words.locale}.png`, fullPage: true })
     await page.click('.home-actions button')
     await page.waitForSelector('dialog[open]')

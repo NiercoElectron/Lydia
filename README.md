@@ -68,8 +68,9 @@ Names you give to layers and brushes stay as you wrote them; default names for n
 Interface translations are in `src/translations/pt-BR.ts` and `src/translations/es.ts`, with English source text as keys. Values such as
 `{name}` are substituted without translating user data. Context keys (for example, `blend.Screen`) distinguish
 labels that need different translations. The translated release histories are in `src/translations/changelog.pt-BR.md` and
-`src/translations/changelog.es.md`; new releases fall back to English until a translation is added. `npm run test:app -- language language-ui` checks
-language preferences, translation coverage, release history and switching languages in the interface.
+`src/translations/changelog.es.md`; new releases fall back to English until a translation is added. `npm run translations`
+lists what is left to translate in each language. `npm run test:app -- language language-ui` checks language
+preferences, the dictionaries, the translated release history and switching languages in the interface.
 
 Error messages are not translated: they stay in English, each starting with a code such as `LYD-201`, listed with
 what each means in [docs/errors.md](docs/errors.md).

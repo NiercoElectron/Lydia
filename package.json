@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test:app": "node tests/app/run.mjs"
+    "test:app": "node tests/app/run.mjs",
+    "translations": "node scripts/translations.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.54.0",
