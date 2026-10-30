@@ -2015,6 +2015,39 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   painting at 30%, the outline is about 30% of the full size, and the same with the pen in the air afterwards; with the
   mouse, the full size again.
 
+## 70. Changing brushes, and images as tips
+
+- **Date:** 2026-10-30
+- **Status:** adopted
+- **Problem:** the Brush Designer only made new brushes, from a tip drawn by hand. To change a detail of a brush it had
+  to be made again from nothing, and a texture or a photo couldn't become a tip.
+- **Decision:** my choices:
+  - **Opening a brush:** on the start screen, **Start from** offers a new brush or any brush of the list. There, no
+    drawing is open that could be lost. The Pixel brush isn't offered: its tip is worked out for each size, so it has
+    no picture to change.
+  - **Saving:** a brush that comes with Lydia never changes: it opens as a copy, named "… copy", and saving adds it to
+    the list. The user's own brush is saved over (**Save changes**), and **Save copy** keeps it as a new one, leaving
+    the first as it was; from then on, saving changes the new one. With nothing changed, there is nothing to save.
+  - **An image as a tip:** **Use image…** puts it on the paper, where it can be retouched with the brush and the eraser
+    and undone, like anything painted: dark places paint, light ones don't. **Invert** turns the paper around, for
+    images where the light is what should paint.
+- **How:**
+  - `setPaper` in `engine.ts` puts a picture as big as the paper on the layer in place of what is there, as a step of
+    undo for an image or Invert. The tip of a brush opened goes there without one, so undoing never empties the paper.
+    The pictures are made in `brushTip.ts`.
+  - The paper is the smallest the Designer offers that the tip fits on, and the tip is made from it as ever. A tip
+    keeps its paint exactly on the way there and back.
+  - A brush's grain opens as **Custom** among the grain's pictures, also the name of an imported image.
+  - An image bigger than the paper is made smaller; a smaller one keeps its size. On a pixel brush's paper, each pixel
+    paints fully or not at all.
+  - A tip across the whole of the 1024×1024 paper had no room for its 2 pixels of margin, and made a brush too big for
+    its own file (LYD-204). Now it has as much margin as fits.
+- **Checked:** `tests/app/edit-brushes.mjs`: the list; a brush of Lydia's opening as a copy, with its tip, settings and
+  grain, not a step of undo, with nothing to save; saved as a new brush; the user's own saved over and as a copy, and
+  saving the copy afterwards; an image on the paper at its size, undone, inverted, retouched; a file that isn't an
+  image; a tip across the whole of the biggest paper; an image on a pixel brush's paper; and a soft tip keeping its
+  paint exactly.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

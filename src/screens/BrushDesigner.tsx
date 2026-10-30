@@ -1,7 +1,7 @@
 import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
-import { useEffect, useMemo, useState } from 'react'
-import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { builtInBrush, saveBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushShapeControls, type GrainChoice } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
@@ -24,8 +24,14 @@ import {
   StabilizerControls,
   TaperControls,
 } from '../components/Toolbar'
-import { brushFileName, DEFAULT_SHAPE, serializeBrushFile, type BrushShape } from '../engine/brushFile'
-import { decodeTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
+import {
+  brushFileName,
+  DEFAULT_SHAPE,
+  serializeBrushFile,
+  type BrushPreset,
+  type BrushShape,
+} from '../engine/brushFile'
+import { decodeTip, invertedPaper, paperOfImage, paperOfTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
 import type { Engine } from '../engine/engine'
 import { newProject } from '../engine/projectFile'
 import type { PaintTool } from '../engine/tools'
@@ -47,6 +53,20 @@ const PIXEL_SHAPE: BrushShape = { ...DEFAULT_SHAPE, spacing: 0.01, pressureSize:
 // The tip is drawn with the brush and the eraser only
 const DESIGNER_TOOLS: readonly PaintTool[] = ['brush', 'eraser']
 
+// The settings of a brush as it is in its file
+function shapeOf(preset: BrushPreset): BrushShape {
+  const shape: Partial<BrushPreset> = { ...preset }
+  delete shape.name
+  delete shape.tip
+  delete shape.grain
+  return shape as BrushShape
+}
+
+// The text of a brush's file. The grain's picture goes in only when it has some depth
+function brushFile(name: string, tip: Uint8Array, shape: BrushShape, grain: GrainChoice | null) {
+  return serializeBrushFile({ name, tip, ...shape, grain: shape.grainDepth > 0 ? grain?.png : undefined })
+}
+
 // The color that paints this much (in percent): black paints fully, white not at all
 function grayFor(strength: number) {
   const level = Math.round(255 * (1 - strength / 100))
@@ -58,14 +78,16 @@ function grayFor(strength: number) {
 type Props = {
   tipSize: number // the paper's width and height, in pixels
   pixel: boolean // the brush is a pixel brush, its tip drawn pixel by pixel (see brushFile.ts)
+  brush?: LibraryBrush // the brush it starts from, with its tip on the paper and its settings; none for a new brush
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   onBack: () => void
 }
 
-// The Brush Designer: draw the tip of a new brush on a small paper, choose how the tip is placed along a stroke, try
-// it, and keep it in the brushes or as a file (decision 30). A pixel brush's tip paints fully or not at all: it is
-// drawn in black only, and its edges, strength and the settings that turn the tip are left out
-export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
+// The Brush Designer: draw the tip of a new brush on a small paper, or change a brush, choose how the tip is placed
+// along a stroke, try it, and keep it in the brushes or as a file (decisions 30 and 70). A pixel brush's tip paints
+// fully or not at all: it is drawn in black only, and its edges, strength and the settings that turn the tip are left
+// out
+export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Props) {
   const { t } = useLanguage()
   const [paper] = useState(() => newProject(tipSize, tipSize))
   const [engine, setEngine] = useState<Engine | null>(null)
@@ -74,14 +96,26 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   const [edge, setEdge] = useState<Edge>('hard')
   const [strength, setStrength] = useState(100)
   const [size, setSize] = useState(pixel ? 1 : Math.round(tipSize / 8))
-  const [name, setName] = useState(() => t(DEFAULT_NAME))
-  const [shape, setShape] = useState<BrushShape>(pixel ? PIXEL_SHAPE : DEFAULT_SHAPE)
+  // The brush as it starts. One that comes with Lydia is never changed, so it starts as a copy of it
+  const [start] = useState(() => {
+    const preset = brush?.preset
+    if (!preset) return { name: t(DEFAULT_NAME), shape: pixel ? PIXEL_SHAPE : DEFAULT_SHAPE, grain: null }
+    const name = brush.isBuiltIn ? t('{name} copy', { name: t(preset.name, {}, 'brush') }) : preset.name
+    const grain: GrainChoice | null = preset.grain ? { id: 'custom', png: preset.grain } : null
+    return { name, shape: shapeOf(preset), grain }
+  })
+  const [name, setName] = useState(start.name)
+  const [shape, setShape] = useState<BrushShape>(start.shape)
+  const [startTip, setStartTip] = useState<Uint8Array | null>(null) // the tip made from the paper as it started
   const [tipPng, setTipPng] = useState<Uint8Array | null>(null) // the tip as it goes in the file
   const [tip, setTip] = useState<BrushTip | null>(null) // the same tip, ready to paint with
-  const [grain, setGrain] = useState<GrainChoice | null>(null) // the picture of the paper's grain, if one was chosen
-  // The id the brush got when it was saved, so saving again changes it, and the file saved then
-  const [savedId, setSavedId] = useState<string>()
+  // The picture of the paper's grain, if one was chosen
+  const [grain, setGrain] = useState<GrainChoice | null>(start.grain)
+  // The id of the brush that saving changes: the one it got when it was saved, or the one opened if it is the user's.
+  // And the file saved then
+  const [savedId, setSavedId] = useState(brush && !brush.isBuiltIn ? brush.id : undefined)
   const [savedFile, setSavedFile] = useState<string | null>(null)
+  const imageInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     engine?.setBrush({ tool, size, color: grayFor(strength) })
@@ -99,6 +133,18 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
     }
   }, [engine, edge, pixel])
 
+  // The paper starts with the tip of the brush opened
+  useEffect(() => {
+    if (!engine || !brush) return
+    let cancelled = false
+    tipOf(brush).then(openedTip => {
+      if (!cancelled) engine.setPaper(paperOfTip(openedTip, tipSize), false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [engine, brush, tipSize])
+
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
@@ -115,6 +161,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
       const png = await tipFromPicture(await engine.exportImage('png'), pixel)
       const decoded = png ? await decodeTip(png, grain?.png) : null
       if (cancelled) return
+      setStartTip(first => first ?? png)
       setTipPng(png)
       setTip(decoded)
     }
@@ -126,15 +173,19 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
     }
   }, [engine, snapshot, pixel, grain])
 
-  // The brush's file as it is now, or null while nothing is painted. The grain's picture goes in only when it has some
-  // depth
-  const file = useMemo(() => {
-    if (!tipPng) return null
-    const grainPng = shape.grainDepth > 0 ? grain?.png : undefined
-    return serializeBrushFile({ name: name.trim() || t(DEFAULT_NAME), tip: tipPng, ...shape, grain: grainPng })
-  }, [name, tipPng, shape, grain, t])
+  // The brush's file as it is now, or null while nothing is painted
+  const fileName = name.trim() || t(DEFAULT_NAME)
+  const file = useMemo(
+    () => (tipPng ? brushFile(fileName, tipPng, shape, grain) : null),
+    [fileName, tipPng, shape, grain],
+  )
+  // The file of the brush opened, as it was, so that a brush nobody changed has nothing to save
+  const openedFile = useMemo(
+    () => (brush && startTip ? brushFile(start.name, startTip, start.shape, start.grain) : null),
+    [brush, startTip, start],
+  )
   const isSaved = file !== null && file === savedFile
-  const isUnsaved = file !== null && file !== savedFile
+  const isUnsaved = file !== null && file !== (savedFile ?? openedFile)
 
   // Ask before closing the tab with a brush that isn't saved
   useEffect(() => {
@@ -154,6 +205,43 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
       saveBrushId(id)
     } catch (error) {
       alert(errorMessage(error, 'LYD-212'))
+    }
+  }
+
+  // Keep the brush as a new one, leaving the one it came from as it was. From then on, saving changes the new one
+  async function handleSaveCopy() {
+    if (!tipPng) return
+    try {
+      const copyName = t('{name} copy', { name: fileName })
+      const copy = brushFile(copyName, tipPng, shape, grain)
+      const id = await saveBrush(copy)
+      setName(copyName)
+      setSavedId(id)
+      setSavedFile(copy)
+      saveBrushId(id)
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-212'))
+    }
+  }
+
+  // Put an image on the paper, as a step of undo
+  async function handleImageChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const image = e.target.files?.[0]
+    e.target.value = '' // so the same file can be chosen again
+    if (!image || !engine) return
+    try {
+      engine.setPaper(await paperOfImage(image, tipSize, pixel), true)
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-301'))
+    }
+  }
+
+  async function handleInvert() {
+    if (!engine) return
+    try {
+      engine.setPaper(await invertedPaper(await engine.exportImage('png'), tipSize), true)
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-305'))
     }
   }
 
@@ -260,13 +348,35 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
                 ? t('Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.')
                 : t('Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.')}
           </p>
+          <div className="designer-actions">
+            <button
+              onClick={() => imageInput.current?.click()}
+              disabled={!engine}
+              title={t('Put an image on the paper: dark places paint, light ones don’t')}
+            >
+              {t('Use image…')}
+            </button>
+            <button
+              onClick={() => void handleInvert()}
+              disabled={!tip}
+              title={t('What paints stops painting, and the other way round')}
+            >
+              {t('Invert')}
+            </button>
+            <input ref={imageInput} type="file" accept="image/*" hidden onChange={handleImageChosen} />
+          </div>
           <BrushShapeControls shape={shape} onChange={setShape} grain={grain} onGrainChange={setGrain} />
           <h2>{t('Try it')}</h2>
           <BrushTestArea tip={tip} shape={shape} />
           <div className="designer-actions">
-            <button onClick={handleSave} disabled={!file || isSaved}>
-              {t('Save to my brushes')}
+            <button onClick={handleSave} disabled={!isUnsaved}>
+              {brush && !brush.isBuiltIn ? t('Save changes') : t('Save to my brushes')}
             </button>
+            {savedId && brush && (
+              <button onClick={handleSaveCopy} disabled={!file} title={t('Keep it as a new brush')}>
+                {t('Save copy')}
+              </button>
+            )}
             <button onClick={handleExport} disabled={!file}>
               {t('Export file')}
             </button>

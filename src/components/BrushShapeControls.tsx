@@ -13,9 +13,9 @@ const NOISE_MODES: [NoiseMode, string, string][] = [
   ['worn', 'Worn', 'The tip worn away from its edge in: full in the middle, with growing holes toward the edge'],
 ]
 
-// The picture of a brush's paper grain (see grain.ts): one of the grains that come with Lydia, or an image imported,
-// as a PNG
-export type GrainChoice = { id: GrainId | 'imported'; png: Uint8Array }
+// The picture of a brush's paper grain (see grain.ts), as a PNG: one of the grains that come with Lydia, or another
+// one, an image imported or the grain of the brush opened
+export type GrainChoice = { id: GrainId | 'custom'; png: Uint8Array }
 
 // A grain chosen with no depth yet gets this much, so that it shows
 const FIRST_GRAIN_DEPTH = 0.5
@@ -47,7 +47,7 @@ export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Pr
   function handleGrainFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = '' // so the same file can be chosen again
-    if (file) void chooseGrain('imported', grainFromImage(file))
+    if (file) void chooseGrain('custom', grainFromImage(file))
   }
 
   const hasNoise = shape.noiseAmount > 0
@@ -223,7 +223,7 @@ export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Pr
                   {grainNames[id]}
                 </button>
               ))}
-              {grain?.id === 'imported' && <button aria-pressed={true}>{t('Imported')}</button>}
+              {grain?.id === 'custom' && <button aria-pressed={true}>{t('Custom')}</button>}
               <button onClick={() => grainInput.current?.click()} title={t('Use an image of your own as the grain')}>
                 {t('Import…')}
               </button>

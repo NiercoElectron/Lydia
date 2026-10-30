@@ -1,5 +1,5 @@
 import { LydiaError, type ErrorCode } from '../errors'
-import { MAX_GRAIN_SIZE } from './brushFile'
+import { MAX_GRAIN_SIZE, MAX_TIP_SIZE } from './brushFile'
 
 // A brush tip ready to paint with: a white picture with the amount of paint in its alpha, so the brush can tint it
 // with any color
@@ -79,6 +79,71 @@ async function decodeGrain(png: Uint8Array) {
   return image
 }
 
+// ----- Pictures for the Brush Designer's paper -----
+//
+// A picture to put on the paper with setPaper (see engine.ts): as big as the paper, black, with the amount of paint in
+// its alpha, as if it was painted there
+
+function newPaper(side: number) {
+  const paper = document.createElement('canvas')
+  paper.width = side
+  paper.height = side
+  return { paper, ctx: paper.getContext('2d', { willReadFrequently: true })! }
+}
+
+// Turn the picture on this canvas (on white) into paint, each pixel's as "paintAt" says from what it paints as it is
+function toPaint(ctx: CanvasRenderingContext2D, side: number, paintAt: (paint: number) => number) {
+  const pixels = ctx.getImageData(0, 0, side, side)
+  const data = pixels.data
+  for (let i = 0; i < data.length; i += 4) {
+    data[i + 3] = paintAt(paintOf(data, i))
+    data[i] = data[i + 1] = data[i + 2] = 0
+  }
+  ctx.putImageData(pixels, 0, 0)
+}
+
+// The tip of a brush, in the middle of a paper it fits on
+export function paperOfTip(tip: BrushTip, side: number) {
+  const { paper, ctx } = newPaper(side)
+  ctx.drawImage(tip.image, Math.floor((side - tip.image.width) / 2), Math.floor((side - tip.image.height) / 2))
+  ctx.globalCompositeOperation = 'source-in' // the tip's picture is white: only its alpha is kept
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, side, side)
+  return paper
+}
+
+// Any image in the middle of the paper, made smaller if it doesn't fit: dark places paint, light or transparent ones
+// don't. On a pixel brush's paper ("pixel"), each pixel paints fully or not at all
+export async function paperOfImage(file: Blob, side: number, pixel: boolean) {
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new LydiaError('LYD-301')
+  }
+  const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height))
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+  const { paper, ctx } = newPaper(side)
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, side, side)
+  ctx.drawImage(bitmap, Math.floor((side - width) / 2), Math.floor((side - height) / 2), width, height)
+  bitmap.close()
+  toPaint(ctx, side, paint => (pixel ? (paint >= PIXEL_PAINTS ? 255 : 0) : paint))
+  return paper
+}
+
+// The paper turned around, from a picture of it (white where nothing is painted): what painted doesn't, and the other
+// way round
+export async function invertedPaper(picture: Blob, side: number) {
+  const bitmap = await createImageBitmap(picture)
+  const { paper, ctx } = newPaper(side)
+  ctx.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  toPaint(ctx, side, paint => 255 - paint)
+  return paper
+}
+
 // Any image as the picture of a paper grain: in grays, as a PNG of up to MAX_GRAIN_SIZE on each side (a bigger one is
 // made smaller), transparent places white
 export async function grainFromImage(file: Blob): Promise<Uint8Array> {
@@ -146,7 +211,9 @@ export async function tipFromPicture(picture: Blob, pixel = false): Promise<Uint
   }
   if (right === -1) return null
 
-  const margin = pixel ? 0 : TIP_MARGIN
+  // A tip painted across the whole of the biggest paper has no room for a margin: it would be too big for its file
+  const paintedSide = Math.max(right - left, bottom - top) + 1
+  const margin = pixel ? 0 : Math.min(TIP_MARGIN, Math.floor((MAX_TIP_SIZE - paintedSide) / 2))
   const tip = document.createElement('canvas')
   tip.width = right - left + 1 + 2 * margin
   tip.height = bottom - top + 1 + 2 * margin

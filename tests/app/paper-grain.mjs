@@ -225,7 +225,7 @@ await page.evaluate(() => {
 })
 await click('Back')
 await sleep(300)
-await page.select('.designer-start select', '256')
+await page.select('.designer-start .tip-paper', '256')
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && document.querySelector('.designer-panel'), { timeout: 90000 })
 await sleep(800)
@@ -277,7 +277,7 @@ const fileInput = await page.$('.grain-pictures input[type=file]')
 await fileInput.uploadFile(ROOT + '/src/grains/canvas.png')
 await page.waitForFunction(() =>
   [...document.querySelectorAll('.grain-pictures button')].some(
-    b => b.textContent === 'Imported' && b.ariaPressed === 'true',
+    b => b.textContent === 'Custom' && b.ariaPressed === 'true',
   ),
 )
 check('an imported image becomes the grain', true)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { LibraryBrush } from './brushLibrary'
 import type { ProjectData } from './engine/projectFile'
 import { BrushDesigner } from './screens/BrushDesigner'
 import { Editor } from './screens/Editor'
@@ -8,9 +9,11 @@ import type { TrayImage } from './tray'
 import './App.css'
 
 // The screen being shown: the start screen, a drawing, or the Brush Designer with the size of its paper, for a smooth
-// brush or a pixel brush
+// brush or a pixel brush, and the brush it starts from, if any
 type Screen =
-  { name: 'home' } | { name: 'editor'; project: ProjectData } | { name: 'designer'; tipSize: number; pixel: boolean }
+  | { name: 'home' }
+  | { name: 'editor'; project: ProjectData }
+  | { name: 'designer'; tipSize: number; pixel: boolean; brush?: LibraryBrush }
 
 function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' })
@@ -30,7 +33,8 @@ function App() {
     return <Editor project={screen.project} gpuMemory={gpuMemory} tray={tray} onTrayChange={setTray} onBack={goHome} />
   }
   if (screen.name === 'designer') {
-    return <BrushDesigner tipSize={screen.tipSize} pixel={screen.pixel} gpuMemory={gpuMemory} onBack={goHome} />
+    const { tipSize, pixel, brush } = screen
+    return <BrushDesigner tipSize={tipSize} pixel={pixel} brush={brush} gpuMemory={gpuMemory} onBack={goHome} />
   }
   return (
     <Home
@@ -38,7 +42,7 @@ function App() {
       onGpuMemoryChange={handleGpuMemoryChange}
       onNewProject={openProject}
       onOpenProject={openProject}
-      onOpenDesigner={(tipSize, pixel) => setScreen({ name: 'designer', tipSize, pixel })}
+      onOpenDesigner={(tipSize, pixel, brush) => setScreen({ name: 'designer', tipSize, pixel, brush })}
     />
   )
 }

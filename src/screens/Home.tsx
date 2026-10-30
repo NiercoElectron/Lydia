@@ -1,11 +1,13 @@
 import { errorMessage } from '../errors'
 import { useLanguage, type LanguageChoice } from '../i18n'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
+import { loadBrushes, tipOf, type LibraryBrush } from '../brushLibrary'
 import { NewProjectDialog } from '../components/NewProjectDialog'
 import { WhatsNew } from '../components/WhatsNew'
-import { DEFAULT_PIXEL_TIP_SIZE, DEFAULT_TIP_SIZE, PIXEL_TIP_SIZES, TIP_SIZES } from '../engine/brushFile'
+import { DEFAULT_PIXEL_TIP_SIZE, DEFAULT_TIP_SIZE, MAX_TIP_SIZE, PIXEL_TIP_SIZES, TIP_SIZES } from '../engine/brushFile'
+import type { BrushTip } from '../engine/brushTip'
 import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { tilesInGigabytes } from '../engine/tiles'
 import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES, type ThemeChoice } from '../settings'
@@ -23,7 +25,16 @@ type Props = {
   onGpuMemoryChange: (gigabytes: number) => void
   onNewProject: (project: ProjectData) => void
   onOpenProject: (project: ProjectData) => void
-  onOpenDesigner: (tipSize: number, pixel: boolean) => void
+  onOpenDesigner: (tipSize: number, pixel: boolean, brush?: LibraryBrush) => void
+}
+
+// Whether a brush's tip can be edited: the Pixel brush's is worked out for each size, so it has no picture to edit
+const hasTipPicture = (brush: LibraryBrush) => brush.preset.pixel !== 'round'
+
+// The smallest paper the Brush Designer offers that a tip fits on
+function paperFor(tip: BrushTip, pixel: boolean) {
+  const side = Math.max(tip.image.width, tip.image.height)
+  return [...(pixel ? PIXEL_TIP_SIZES : []), ...TIP_SIZES].find(paper => paper >= side) ?? MAX_TIP_SIZE
 }
 
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
@@ -32,8 +43,38 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   const [isOpening, setIsOpening] = useState(false)
   const [isPixelTip, setIsPixelTip] = useState(false) // the Brush Designer makes a pixel brush
   const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
+  const [brushes, setBrushes] = useState<LibraryBrush[]>([]) // the ones that can be opened in the Brush Designer
+  const [startBrushId, setStartBrushId] = useState('') // the one it starts from; '': a new brush
   const fileInputRef = useRef<HTMLInputElement>(null)
   const theme = useTheme()
+
+  useEffect(() => {
+    let cancelled = false
+    loadBrushes().then(
+      loaded => {
+        if (!cancelled) setBrushes(loaded.filter(hasTipPicture))
+      },
+      error => console.warn('Could not read the brushes:', error),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Open the Brush Designer on a new brush, or on the one to start from, on a paper it fits on
+  async function handleOpenDesigner() {
+    const brush = brushes.find(each => each.id === startBrushId)
+    if (!brush) {
+      onOpenDesigner(tipSize, isPixelTip)
+      return
+    }
+    try {
+      const pixel = brush.preset.pixel === 'drawn'
+      onOpenDesigner(paperFor(await tipOf(brush), pixel), pixel, brush)
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-210'))
+    }
+  }
 
   async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -88,43 +129,60 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
         <section className="designer-start">
           <h2>{t('Brush Designer')}</h2>
           <p className="hint">{t('Draw the tip of a new brush, try it, and save it to your brushes or as a file.')}</p>
-          <label>
-            {t('Brush')}
-            <span className="button-group">
-              <button
-                aria-pressed={!isPixelTip}
-                onClick={() => {
-                  setIsPixelTip(false)
-                  setTipSize(DEFAULT_TIP_SIZE)
-                }}
-                title={t('A brush for painting: its tip is resized to any size, smoothly')}
-              >
-                {t('Smooth')}
-              </button>
-              <button
-                aria-pressed={isPixelTip}
-                onClick={() => {
-                  setIsPixelTip(true)
-                  setTipSize(DEFAULT_PIXEL_TIP_SIZE)
-                }}
-                title={t('A brush for pixel art: its tip is drawn pixel by pixel, and paints at 1×, 2×, 3×… its size')}
-              >
-                {t('Pixel')}
-              </button>
-            </span>
-          </label>
-          <label>
-            {t('Tip paper')}
-            <select value={tipSize} onChange={e => setTipSize(Number(e.target.value))}>
-              {(isPixelTip ? PIXEL_TIP_SIZES : TIP_SIZES).map(tip => (
-                <option key={tip} value={tip}>
-                  {tip}×{tip}
-                  {tip === (isPixelTip ? DEFAULT_PIXEL_TIP_SIZE : DEFAULT_TIP_SIZE) ? t(' (default)') : ''}
+          <label title={t('A new brush, or one of the brushes, to change it or make another from it')}>
+            {t('Start from')}
+            <select className="start-brush" value={startBrushId} onChange={e => setStartBrushId(e.target.value)}>
+              <option value="">{t('A new brush')}</option>
+              {brushes.map(brush => (
+                <option key={brush.id} value={brush.id}>
+                  {brush.isBuiltIn ? t(brush.preset.name, {}, 'brush') : brush.preset.name}
                 </option>
               ))}
             </select>
           </label>
-          <button onClick={() => onOpenDesigner(tipSize, isPixelTip)}>{t('Open Brush Designer')}</button>
+          {!startBrushId && (
+            <>
+              <label>
+                {t('Brush')}
+                <span className="button-group">
+                  <button
+                    aria-pressed={!isPixelTip}
+                    onClick={() => {
+                      setIsPixelTip(false)
+                      setTipSize(DEFAULT_TIP_SIZE)
+                    }}
+                    title={t('A brush for painting: its tip is resized to any size, smoothly')}
+                  >
+                    {t('Smooth')}
+                  </button>
+                  <button
+                    aria-pressed={isPixelTip}
+                    onClick={() => {
+                      setIsPixelTip(true)
+                      setTipSize(DEFAULT_PIXEL_TIP_SIZE)
+                    }}
+                    title={t(
+                      'A brush for pixel art: its tip is drawn pixel by pixel, and paints at 1×, 2×, 3×… its size',
+                    )}
+                  >
+                    {t('Pixel')}
+                  </button>
+                </span>
+              </label>
+              <label>
+                {t('Tip paper')}
+                <select className="tip-paper" value={tipSize} onChange={e => setTipSize(Number(e.target.value))}>
+                  {(isPixelTip ? PIXEL_TIP_SIZES : TIP_SIZES).map(tip => (
+                    <option key={tip} value={tip}>
+                      {tip}×{tip}
+                      {tip === (isPixelTip ? DEFAULT_PIXEL_TIP_SIZE : DEFAULT_TIP_SIZE) ? t(' (default)') : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <button onClick={() => void handleOpenDesigner()}>{t('Open Brush Designer')}</button>
         </section>
 
         <section className="gpu-memory">

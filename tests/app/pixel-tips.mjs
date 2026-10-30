@@ -117,7 +117,7 @@ const labels = () =>
 
 // ----- The Brush Designer, for a pixel brush -----
 await click('Pixel')
-const options = await page.$$eval('.designer-start select option', os => os.map(o => o.textContent))
+const options = await page.$$eval('.designer-start .tip-paper option', os => os.map(o => o.textContent))
 check(
   'Pixel: tip papers of 16, 32 and 64, 32 by default',
   options.join() === '16×16,32×32 (default),64×64',
@@ -126,7 +126,7 @@ check(
 await click('Smooth')
 check(
   'Smooth: the papers as before',
-  (await page.$$eval('.designer-start select option', os => os.map(o => o.textContent))).join() ===
+  (await page.$$eval('.designer-start .tip-paper option', os => os.map(o => o.textContent))).join() ===
     '256×256,512×512 (default),1024×1024',
 )
 await click('Pixel')

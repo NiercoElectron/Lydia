@@ -43,8 +43,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Pixel-perfect strokes: pixel brushes can leave out the doubled corners of lines drawn by hand
 - Straight lines with Shift + click, kept to the angles of pixel art (or every 15°) with Ctrl
 - A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
-- Brush Designer (on the start screen): draw the tip of a new brush, choose its settings, try it, and save it to the
-  brush list or as a file
+- Brush Designer (on the start screen): draw the tip of a new brush or change any brush, from a drawing or an image,
+  choose its settings, try it, and save it to the brush list or as a file
 - Pixel brushes drawn in the Brush Designer, pixel by pixel, that paint their tip at 1×, 2×, 3×… its size
 - Layers: add, delete, duplicate, merge down, choose, move (drag them in the list), rename (double-click), hide and
   show, change the opacity and the blend mode (Multiply, Screen, Overlay… 16 in all), lock their transparency, clip

@@ -99,9 +99,9 @@ await page.reload({ waitUntil: 'networkidle0' })
 // ----- Opening it -----
 check(
   'the start screen offers the Brush Designer, with a 512×512 paper by default',
-  (await page.$eval('.designer-start select', s => s.value)) === '512',
+  (await page.$eval('.designer-start .tip-paper', s => s.value)) === '512',
 )
-await page.select('.designer-start select', '256')
+await page.select('.designer-start .tip-paper', '256')
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && window.lydia.app.renderer, { timeout: 60000 })
 await sleep(500)
@@ -152,6 +152,7 @@ check('turning with the stroke changes the sample', turned !== spaced, `${spaced
 
 // ----- Scribbling in the test area, and the scribbles follow the changes -----
 const area = await page.$eval('.test-canvas', c => {
+  c.scrollIntoView() // the panel scrolls, on a short window
   const b = c.getBoundingClientRect()
   return { x: b.left, y: b.top, w: b.width, h: b.height }
 })

@@ -318,10 +318,14 @@ says 4 times as many pixels in an inch, so it too prints at that size, only shar
 
 ## The Brush Designer
 
-Opened from the start screen, it draws the tip of a new brush.
+Opened from the start screen, it draws the tip of a new brush, or changes a brush: **Start from** chooses one, which
+opens with its tip on the paper and its settings (the Pixel brush isn't there: its tip is worked out for each size).
 
 - Paint the tip on the paper: black paints fully, gray paints lightly, white doesn't paint. **Brush** and **Eraser**,
   with **Edge** (Soft or Hard), **Strength** and **Size** in the bar; **Clear paper** starts again.
+- **Use image…** puts an image on the paper, made smaller if it doesn't fit: dark places paint, light or transparent
+  ones don't. It can be retouched and undone like anything painted. **Invert** turns the paper around: what painted
+  doesn't, and the other way round.
 - Give it a **Name**, and choose how it paints: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow,
   Wash (the stroke doesn't pile up over itself) and the pen's pressure. **Noise** gives every copy of the tip a
   texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
@@ -330,7 +334,9 @@ Opened from the start screen, it draws the tip of a new brush.
   higher, where light pressure already paints), its **Depth** (how much of the paper a light touch leaves out; 0% is
   no grain) and its **Scale** (how big the picture is on the paper). The picture goes in the brush's file.
 - **Try it** paints with the brush as it is now, at any size; **Clear** wipes the test area.
-- **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file.
+- **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file. A brush that
+  comes with Lydia never changes: it opens as a copy. Your own is saved with **Save changes**, or kept as a new brush,
+  leaving it as it was, with **Save copy**.
 
 **A pixel brush** (Pixel on the start screen) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
 Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.

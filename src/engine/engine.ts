@@ -78,10 +78,12 @@ import {
 import type { StabilizerSettings } from './stabilizer'
 import {
   createGrid,
+  forEachTile,
   isOnPaper,
   paperPart,
   parseTileKey,
   TILE_SIZE,
+  tileKey,
   tilesInGigabytes,
   tileSize,
   wholeTileMask,
@@ -936,6 +938,31 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     if (history.end()) changed()
   }
 
+  // Put this picture, as big as the paper, on the active layer in place of what is on it. For the Brush Designer's
+  // paper (see brushTip.ts). "canUndo": as a step of undo; if not, it is where the paper starts from
+  function setPaper(picture: HTMLCanvasElement, canUndo: boolean) {
+    if (isBusy()) return
+    const layer = stack.active
+    const texture = new Texture({ source: new CanvasSource({ resource: picture, resolution: 1 }) })
+    const sprite = new Sprite(texture)
+    const root = new Container()
+    root.addChild(sprite)
+    if (canUndo) history.begin(layer)
+    forEachTile(grid, (column, row) => {
+      if (canUndo) history.backUpTile(tileKey(column, row)) // before the tile changes
+      const target = gpu.getTexture(layer, column, row, true)!
+      gpu.clearTexture(target)
+      sprite.position.set(-column * TILE_SIZE, -row * TILE_SIZE)
+      renderer.render({ container: root, target, clear: false })
+      gpu.markDirty(layer, tileKey(column, row))
+      projection.composeTile(column, row)
+    })
+    root.destroy({ children: true })
+    texture.destroy(true)
+    if (canUndo) history.end()
+    changed(canUndo)
+  }
+
   // ----- Undo -----
 
   function undo() {
@@ -1745,6 +1772,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     undo,
     redo,
     clearLayer,
+    setPaper,
     addLayer,
     addFolder,
     addLayerOutside,

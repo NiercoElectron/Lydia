@@ -14,6 +14,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   Designer, under **Paper grain**: one of the four that come with Lydia (Paper, Rough, Canvas, Noise) or any image
   imported, with its **Depth** and **Scale**. The grain is saved in the brush's file.
 - A **Pencil** brush, with the Paper grain.
+- **Change any brush** in the Brush Designer ([decision 70](docs/decisions.md#70-changing-brushes-and-images-as-tips)):
+  **Start from**, on the start screen, opens a brush with its tip and settings. Your own is saved over or with **Save
+  copy**; one that comes with Lydia never changes, and becomes a copy.
+- **An image as a tip:** **Use image…** puts it on the Brush Designer's paper, where it can be retouched, and **Invert**
+  turns the paper around.
 
 ### Changed
 
@@ -23,6 +28,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - With a pen, the **brush's outline** is as big as the pen paints: at its pressure while painting, and at the last
   pressure with the pen in the air ([decision 69](docs/decisions.md#69-the-brushs-outline-follows-the-pen)). With the
   mouse, it is still as big as at full pressure.
+
+### Fixed
+
+- A tip painted across the whole of the 1024×1024 paper made a brush whose file couldn't be opened.
 
 ## [0.13.0] - 2026-10-29
 
