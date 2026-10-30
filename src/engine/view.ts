@@ -2,7 +2,7 @@ import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
-import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR } from './cursors'
+import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
@@ -31,6 +31,7 @@ const CURSORS: Record<Tool, string> = {
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
   lasso: 'crosshair',
+  wand: WAND_CURSOR,
   move: 'move',
   hand: 'grab',
   zoom: 'zoom-in',
@@ -52,6 +53,7 @@ export type ViewActions = {
   canPickColors: () => boolean // whether anyone wants those colors: if not, holding Alt doesn't pick them
   onFill: (x: number, y: number) => void // the fill bucket went down at this point of the paper
   onSelect: (points: Point[], mode: SelectionMode) => void // a polygon drawn with a selection tool (none: a click)
+  onWand: (x: number, y: number, mode: SelectionMode) => void // the magic wand went down at this point of the paper
   // The move tool went down, was dragged this many pixels of the paper from there, and came up ("keep": false when the
   // browser took the pointer away)
   onMoveStart: () => void
@@ -340,6 +342,13 @@ export function createView(
     }
   }
 
+  // The magic wand selects around the point where the pointer goes down (see selection.ts)
+  function wand(e: PointerEvent): Gesture {
+    const point = toPaper(e)
+    actions.onWand(point.x, point.y, selectionMode(e))
+    return { move() {}, up() {} }
+  }
+
   // The move tool drags the selected part of the active layer, or all of it when nothing is selected, by whole pixels
   // of the paper. Shift keeps it level or upright: the direction is chosen once the pointer is far enough from where it
   // went down to tell, and kept until Shift is let go, so a path that wanders doesn't make it jump from one to the other
@@ -430,6 +439,7 @@ export function createView(
     eyedropper: pick,
     select: selectRectangle,
     lasso,
+    wand,
     move: movePaint,
     hand: pan,
     zoom,

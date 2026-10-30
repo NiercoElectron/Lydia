@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
+import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
 import { AdvancedMenu } from './AdvancedMenu'
@@ -72,6 +73,7 @@ type Props = {
   size: number
   opacity: number // in percent
   fill: FillSettings
+  wand: WandSettings
   selection: SelectionControls
   transform: TransformControls
   stabilizer: StabilizerSettings
@@ -86,6 +88,7 @@ type Props = {
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
+  onWandChange: (change: Partial<WandSettings>) => void
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
   onTaperChange: (change: Partial<TaperSettings>) => void
   onGridToggle: () => void
@@ -94,14 +97,15 @@ type Props = {
 }
 
 // The settings of the chosen tool: the color, then the brush's size and opacity, with its stabilizer and taper under
-// Advanced and, for a pixel brush, Pixel-perfect; the fill bucket's settings, or the selection's. The move tool has
-// none. While a transform is made, its own settings instead
+// Advanced and, for a pixel brush, Pixel-perfect; the fill bucket's settings, or the selection's, with the magic
+// wand's. The move tool has none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
   color,
   size,
   opacity,
   fill,
+  wand,
   selection,
   transform,
   stabilizer,
@@ -116,6 +120,7 @@ export function Toolbar({
   onSizeChange,
   onOpacityChange,
   onFillChange,
+  onWandChange,
   onStabilizerChange,
   onTaperChange,
   onGridToggle,
@@ -123,7 +128,7 @@ export function Toolbar({
   onPixelPerfectToggle,
 }: Props) {
   const { t } = useLanguage()
-  const isSelecting = tool === 'select' || tool === 'lasso'
+  const isSelecting = tool === 'select' || tool === 'lasso' || tool === 'wand'
   const isMoving = tool === 'move'
   if (transform.transform) {
     return (
@@ -141,7 +146,8 @@ export function Toolbar({
         <ColorInput color={color} disabled={tool === 'eraser'} onChange={onColorChange} />
       </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
-      {isSelecting && <SelectionButtons selection={selection} />}
+      {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
+      {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}
       {(isSelecting || isMoving) && (
         <button
           onClick={transform.onStart}
@@ -266,19 +272,87 @@ function FillControls({
   )
 }
 
-function SelectionButtons({ selection }: { selection: SelectionControls }) {
+// The magic wand's settings (see selection.ts): like the fill bucket's, and whether it selects only the pixels
+// connected to the one clicked
+function WandControls({
+  wand,
+  onWandChange,
+}: {
+  wand: WandSettings
+  onWandChange: (change: Partial<WandSettings>) => void
+}) {
   const { t } = useLanguage()
   return (
     <>
-      <span className="button-group" title={t('Edges of new selections: soft, or whole pixels for pixel art')}>
-        {t('Edges')}
-        <button aria-pressed={!selection.hardEdges} onClick={() => selection.onHardEdgesChange(false)}>
-          {t('Soft')}
+      <label title={t('How far a color can be from the one clicked and still be selected, from 0 to 255')}>
+        {t('Tolerance')}
+        <input
+          type="range"
+          min={0}
+          max={255}
+          value={wand.tolerance}
+          onChange={e => onWandChange({ tolerance: Number(e.target.value) })}
+        />
+        <SliderValue value={wand.tolerance} min={0} max={255} onChange={tolerance => onWandChange({ tolerance })} />
+      </label>
+      <span className="button-group" title={t('What the magic wand looks at to find where to stop')}>
+        {t('Look at')}
+        <button aria-pressed={wand.reference === 'all'} onClick={() => onWandChange({ reference: 'all' })}>
+          {t('All layers')}
         </button>
-        <button aria-pressed={selection.hardEdges} onClick={() => selection.onHardEdgesChange(true)}>
-          {t('Hard')}
+        <button aria-pressed={wand.reference === 'layer'} onClick={() => onWandChange({ reference: 'layer' })}>
+          {t('This layer')}
         </button>
       </span>
+      <label
+        title={t(
+          'At most how many pixels the selection goes past its edge, into the soft edge of the lines around it, up to where they are darkest',
+        )}
+      >
+        {t('Expand')}
+        <input
+          type="range"
+          min={0}
+          max={MAX_FILL_EXPAND}
+          value={wand.expand}
+          onChange={e => onWandChange({ expand: Number(e.target.value) })}
+        />
+        <SliderValue
+          value={wand.expand}
+          min={0}
+          max={MAX_FILL_EXPAND}
+          unit=" px"
+          onChange={expand => onWandChange({ expand })}
+        />
+      </label>
+      <button
+        aria-pressed={wand.contiguous}
+        onClick={() => onWandChange({ contiguous: !wand.contiguous })}
+        title={t('Only the pixels connected to the one clicked; off, every pixel of a close color in the drawing')}
+      >
+        {t('Contiguous')}
+      </button>
+    </>
+  )
+}
+
+// The selection's commands, with the edges of new selections for the tools that draw a shape (the magic wand's
+// follow the pixels)
+function SelectionButtons({ selection, hasEdges }: { selection: SelectionControls; hasEdges: boolean }) {
+  const { t } = useLanguage()
+  return (
+    <>
+      {hasEdges && (
+        <span className="button-group" title={t('Edges of new selections: soft, or whole pixels for pixel art')}>
+          {t('Edges')}
+          <button aria-pressed={!selection.hardEdges} onClick={() => selection.onHardEdgesChange(false)}>
+            {t('Soft')}
+          </button>
+          <button aria-pressed={selection.hardEdges} onClick={() => selection.onHardEdgesChange(true)}>
+            {t('Hard')}
+          </button>
+        </span>
+      )}
       <button onClick={selection.onSelectAll} title={t('Select everything (Ctrl+A)')}>
         {t('Select all')}
       </button>

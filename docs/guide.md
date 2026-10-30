@@ -132,10 +132,19 @@ or the fill bucket does the same.
 
 ## Selections
 
-**Rectangle select (S)** drags a rectangle; **Lasso (L)** draws around any shape.
+**Rectangle select (S)** drags a rectangle; **Lasso (L)** draws around any shape; **Magic wand (W)** selects the
+area around the point clicked, like the fill bucket fills it.
 
 - Hold **Shift** to add to the selection, or **Alt** to take away from it.
-- **Edges:** **Soft** or **Hard** (whole pixels, for pixel art) for new selections.
+- **Edges:** **Soft** or **Hard** (whole pixels, for pixel art) for new selections with the rectangle and the lasso.
+- The magic wand's settings, its own, start like the fill bucket's:
+  - **Tolerance** (0 to 255, 32 at first): how far a color may be from the one clicked and still be selected.
+  - **Look at**: **All layers** (the visible layers as they show, without the paper) or **This layer**. With a folder
+    active, **This layer** looks at the layers in it.
+  - **Expand** (0 to 50 pixels, 20 at first): the selection goes on into the soft edge of the lines around it, up to
+    where they are darkest, so that coloring inside on a layer under the lines leaves no light rim.
+  - **Contiguous** (on at first): only the area connected to the point clicked. Off, every pixel of a close color in
+    the drawing, to change a color everywhere in pixel art for example.
 - **Select all** (Ctrl+A), **Deselect** (Ctrl+D) and **Invert** (Ctrl+Shift+I) in the bar.
 - **Delete** (or Backspace) takes the paint out of what is selected, in the active layer.
 - The brush, the eraser and the fill bucket only work inside a selection.
@@ -301,7 +310,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | ---------------------------------------------- | -------------------------------------------------- |
 | B / E                                          | Brush / eraser                                     |
 | F / I                                          | Fill bucket / eyedropper                           |
-| S / L                                          | Rectangle select / lasso                           |
+| S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |
 | H / Z / R                                      | Hand / zoom / rotate view                          |
 | [ / ]                                          | Smaller / bigger brush                             |
@@ -311,7 +320,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | G                                              | Pixel grid on / off                                |
 | Ctrl + Z                                       | Undo                                               |
 | Ctrl + Shift + Z, Ctrl + Y                     | Redo                                               |
-| Shift / Alt + drag, with S or L                | Add to / take away from the selection              |
+| Shift / Alt + drag or click, with S, L or W    | Add to / take away from the selection              |
 | Ctrl + A / Ctrl + D / Ctrl + Shift + I         | Select everything / nothing / invert the selection |
 | Delete, Backspace                              | Take out what is selected                          |
 | Shift + drag, with V                           | Move only across, or only up and down              |

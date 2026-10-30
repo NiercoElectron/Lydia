@@ -11,7 +11,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Tools in a column at the left, like in Photoshop and Krita: brush, eraser, fill bucket, eyedropper, rectangle select,
-  lasso, move, hand, zoom and rotate view
+  lasso, magic wand, move, hand, zoom and rotate view
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
@@ -20,9 +20,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   soft edge of the lines, so that no light rim is left between the color and the line
 - An eyedropper that picks the color the screen shows, by clicking or dragging over the drawing (or holding Alt while
   painting)
-- Selections with the rectangle and the lasso, shown with marching ants: added to (Shift) or taken away from (Alt), with
-  soft or hard edges (hard with a pixel brush); the brush, the eraser and the fill bucket only work inside, and Delete
-  takes out what is inside
+- Selections with the rectangle, the lasso and the magic wand, shown with marching ants: added to (Shift) or taken
+  away from (Alt), with soft or hard edges (hard with a pixel brush); the brush, the eraser and the fill bucket only
+  work inside, and Delete takes out what is inside
 - A move tool that drags what is selected, or the whole layer when nothing is, by whole pixels; the selection moves
   along, and paint moved off the paper is kept, to be brought back
 - Smart objects, like Photoshop's: scale, turn, skew or distort what is selected or a whole layer with handles, again

@@ -8,6 +8,7 @@ import {
   Pipette,
   RotateCw,
   SquareDashed,
+  WandSparkles,
   ZoomIn,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,6 +23,7 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
   eyedropper: { Icon: Pipette, name: 'Eyedropper', key: 'i', also: 'or hold Alt while painting' },
   select: { Icon: SquareDashed, name: 'Rectangle select', key: 's', also: 'Shift adds, Alt takes away' },
   lasso: { Icon: Lasso, name: 'Lasso', key: 'l', also: 'Shift adds, Alt takes away' },
+  wand: { Icon: WandSparkles, name: 'Magic wand', key: 'w', also: 'Shift adds, Alt takes away' },
   move: {
     Icon: Move,
     name: 'Move',

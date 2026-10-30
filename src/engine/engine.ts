@@ -51,12 +51,15 @@ import { withResolution } from './resolution'
 import {
   combine,
   cutOut,
+  DEFAULT_WAND,
   invert,
   polygonTiles,
+  regionSelection,
   selectEverything,
   type Point,
   type Selection,
   type SelectionMode,
+  type WandSettings,
 } from './selection'
 import { createSelectionView } from './selectionView'
 import {
@@ -259,6 +262,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     selectionView,
   )
   const fillSettings: FillSettings = { ...DEFAULT_FILL }
+  const wandSettings: WandSettings = { ...DEFAULT_WAND }
   let hasHardSelectionEdges = false
   let task: string | null = null // see runTask
   let isMoveEnding = false // a move waits for the tiles it changed to be put together (see endLift)
@@ -281,6 +285,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canPickColors: () => colorListeners.size > 0,
     onFill: (x, y) => void fillAt(x, y),
     onSelect: (points, mode) => selectPolygon(points, mode),
+    onWand: (x, y, mode) => void selectRegion(x, y, mode),
     onMoveStart: () => startMove(),
     onMove: (dx, dy) => dragMove(dx, dy),
     onMoveEnd: keep => releaseMove(keep),
@@ -1152,6 +1157,38 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setSelection(combine(selection, polygonTiles(grid, points, hasHardSelectionEdges), mode))
   }
 
+  function setWand(settings: Partial<WandSettings>) {
+    Object.assign(wandSettings, settings)
+  }
+
+  // Select the region around this point of the paper with the magic wand (see selection.ts), or take it away from the
+  // selection, or add it. With "This layer", a folder is looked at as the layers in it put together as Normal ones.
+  // The region is found as a task, like a fill; the selection changes once it is over
+  async function selectRegion(x: number, y: number, mode: SelectionMode) {
+    const seedX = Math.floor(x)
+    const seedY = Math.floor(y)
+    if (seedX < 0 || seedY < 0 || seedX >= grid.width || seedY >= grid.height) return
+    let found = null as Selection | null
+    await runTask('Selecting…', async () => {
+      const active = stack.active
+      const inLayer = isFolder(active)
+        ? stack.layers.filter(other => !isFolder(other) && isInside(other, active) && isShown(other))
+        : [active]
+      const reference =
+        wandSettings.reference === 'layer'
+          ? layersReference(
+              inLayer.map(other => ({ tiles: other.tiles, opacity: other === active ? 1 : other.opacity })),
+              memory,
+            )
+          : allLayersReference()
+      const { tolerance, expand, contiguous } = wandSettings
+      const region = await findFillRegion(grid, reference, seedX, seedY, tolerance, expand, contiguous)
+      found = regionSelection(region)
+      return false // the drawing doesn't change
+    })
+    if (found) setSelection(combine(selection, found, mode))
+  }
+
   // New selections get soft edges, or hard ones (whole pixels, for pixel art)
   function setSelectionEdges(hard: boolean) {
     hasHardSelectionEdges = hard
@@ -1650,6 +1687,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     onColorPick,
     setBrush,
     setFill,
+    setWand,
     setBrushTip,
     setPixelGrid,
     setBrushOutline,

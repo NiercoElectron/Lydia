@@ -9,6 +9,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ### Added
 
+- The **magic wand** (W) ([decision 64](docs/decisions.md#64-the-magic-wand)): it selects the area around the point
+  clicked whose colors are close to the color there, found like the fill bucket's, with settings of its own:
+  Tolerance, Look at, Expand (into the soft edge of the lines, so coloring inside leaves no light rim) and
+  **Contiguous**, which off selects a color everywhere in the drawing. Shift adds and Alt takes away.
+
 - Spanish throughout the interface and release history, with an Español option and automatic detection of
   Spanish system language variants such as es-ES, es-MX and es-AR.
 - Brazilian Portuguese throughout the interface, including the Brush Designer and the release history.

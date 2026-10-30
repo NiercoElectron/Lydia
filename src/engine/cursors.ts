@@ -36,6 +36,23 @@ export const FILL_CURSOR = iconCursor(
   'crosshair',
 )
 
+// The magic wand selects where its tip points
+export const WAND_CURSOR = iconCursor(
+  [
+    'm21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72',
+    'm14 7 3 3',
+    'M5 6v4',
+    'M19 14v4',
+    'M10 2v2',
+    'M7 8H3',
+    'M21 16h-4',
+    'M11 3H9',
+  ],
+  21,
+  3,
+  'crosshair',
+)
+
 // Turning the view: an arrow going round
 export const ROTATE_CURSOR = iconCursor(
   ['M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8', 'M21 3v5h-5'],

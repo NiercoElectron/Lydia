@@ -1,3 +1,4 @@
+import type { FillMask, FillReference } from './fill'
 import { toStoredTile, type StoredTile, type TileMemory } from './memory'
 import { TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
@@ -146,6 +147,33 @@ function softMask(stretches: number[][], left: number, width: number, height: nu
   const mask = new Uint8Array(width * height)
   for (let i = 0; i < mask.length; i++) mask[i] = Math.round(Math.min(1, coverage[i]) * 255)
   return mask
+}
+
+// The magic wand (decision 64) selects the region around the point clicked whose colors are close to the color there,
+// found as the fill bucket finds where to fill (findFillRegion in fill.ts), with settings of its own
+export type WandSettings = {
+  tolerance: number // how far each of red, green, blue and alpha may be from the color clicked, from 0 to 255
+  reference: FillReference // what it looks at: the active layer, or the visible layers put together
+  expand: number // at most how many pixels it goes past its edge, into the soft edge of the lines around it
+  contiguous: boolean // only the pixels connected to the one clicked, or every pixel of the paper close enough
+}
+
+export const DEFAULT_WAND: WandSettings = { tolerance: 32, reference: 'all', expand: 20, contiguous: true }
+
+// The selection of a region found by findFillRegion: each of its pixels selected whole, its edge under the lines too.
+// The fill bucket fills behind the paint there; a selection can't, so painting inside it on the lines' own layer
+// covers their soft edge, while painting on a layer under them shows the same as the fill
+export function regionSelection(region: Map<string, FillMask>): Selection {
+  const tiles: Selection = new Map()
+  for (const [key, mask] of region) {
+    if (mask === 'full') {
+      tiles.set(key, 'full')
+      continue
+    }
+    const selected = mask.map(value => (value > 0 ? 255 : 0))
+    tiles.set(key, selected.every(value => value === 255) ? 'full' : selected)
+  }
+  return tiles
 }
 
 // Each pixel of a tile, from 0 to 255 (a "full" tile is all 255)

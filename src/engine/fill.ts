@@ -139,6 +139,7 @@ type TileState = {
 
 // The region the fill covers from the pixel (x, y): the pixels connected to it, side by side or above and below,
 // whose colors are within "tolerance" of its color; and its edge, at most "expand" pixels into the lines around it.
+// Not "contiguous" (for the magic wand: see selection.ts), every pixel of the paper close enough, connected or not.
 // Returns "column,row" -> the mask of each tile it touches
 export async function findFillRegion(
   grid: Grid,
@@ -147,6 +148,7 @@ export async function findFillRegion(
   y: number,
   tolerance: number,
   expand: number,
+  contiguous = true,
 ) {
   const pace = createPacer()
 
@@ -196,7 +198,19 @@ export async function findFillRegion(
 
   // Pixels to go on from, as pairs of numbers (x, y). Each one fills the stretch of its row it is in, and adds the
   // stretches above and below it (a "scanline" fill)
-  const stack = [x, y]
+  const stack = contiguous ? [x, y] : []
+
+  // Not contiguous: every tile of the paper, each pixel close enough filled where it is
+  if (!contiguous) {
+    for (let row = 0; row < grid.rows; row++) {
+      for (let column = 0; column < grid.columns; column++) {
+        await pace()
+        const tile = tileAt(column, row)
+        if (isOneColor(tile)) tile.full = tile.isClose
+        else for (let i = 0; i < tile.pixels!.length; i++) if (tile.pixels![i] === OPEN) tile.pixels![i] = FILLED
+      }
+    }
+  }
 
   // In row y, from "left" to "right": add the first pixel of each stretch the fill can still reach, and the tiles of a
   // single color close enough

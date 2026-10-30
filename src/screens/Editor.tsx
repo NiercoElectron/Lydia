@@ -27,7 +27,7 @@ import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
-import type { Point } from '../engine/selection'
+import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import type { Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
 import { loadBrushId, saveBrushId } from '../settings'
@@ -50,6 +50,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   const [size, setSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
   const [fill, setFill] = useState<FillSettings>(DEFAULT_FILL)
+  const [wand, setWand] = useState<WandSettings>(DEFAULT_WAND)
   const [hardSelectionEdges, setHardSelectionEdges] = useState(false)
   const [busy, setBusy] = useState<string | null>(null) // what is being done right now ("Saving…"), if anything
   const [brushes, setBrushes] = useState<LibraryBrush[]>([])
@@ -80,6 +81,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useEffect(() => {
     engine?.setFill(fill)
   }, [engine, fill])
+
+  useEffect(() => {
+    engine?.setWand(wand)
+  }, [engine, wand])
 
   useEffect(() => {
     engine?.setSelectionEdges(hardSelectionEdges)
@@ -336,6 +341,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           size={size}
           opacity={opacity}
           fill={fill}
+          wand={wand}
           selection={{
             hasSelection: snapshot.hasSelection,
             hardEdges: hardSelectionEdges,
@@ -365,6 +371,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
+          onWandChange={change => setWand(current => ({ ...current, ...change }))}
           onStabilizerChange={changeStabilizer}
           onTaperChange={changeTaper}
           onGridToggle={toggleGrid}

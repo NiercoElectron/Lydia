@@ -1835,6 +1835,38 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   English (`LAUNCH` in `tests/app/setup.mjs`), since they find buttons by their English names: on my computer, in
   Portuguese, 34 of them failed once Lydia followed its language.
 
+## 64. The magic wand
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Decision:**
+  - The **Magic wand** (W, as in Photoshop) selects the area around the point clicked whose colors are close to the
+    color there, the way the fill bucket finds what to fill (decision 39). Shift + click adds to the selection and
+    Alt + click takes away from it, as with the other selection tools (decision 40).
+  - Its settings are its own (my choice, as in Photoshop and Krita), and start like the fill bucket's: **Tolerance**
+    32, **Look at** All layers, **Expand** 20 pixels.
+  - **Expand** works as the fill bucket's (my choice): the selection goes on into the soft edge of the lines around
+    the area, up to where they are darkest. Selecting only the close colors, as Photoshop's wand does, leaves the soft
+    edge out: coloring inside on a layer under the lines then leaves a light rim, the one Expand was made for.
+  - **Contiguous** (my choice), on at first: only the area connected to the point clicked. Off, every pixel of a close
+    color in the drawing, connected or not, to change a color everywhere in pixel art for example. The fill bucket
+    still fills only what is connected (decision 39).
+  - The **Edges** buttons don't show with the wand: its edges follow the pixels of the drawing.
+- **How:**
+  - `findFillRegion` (`fill.ts`) finds the area, with the same reference as the fill bucket: with **All layers**, the
+    layers as they show, with blend modes, clipping and folders (decision 62). Not contiguous, it goes through every
+    tile of the paper instead of growing from the point clicked; a tile of a single color is taken or not as a whole.
+  - Each pixel of the area, and of its edge under the lines, is selected whole (`regionSelection` in `selection.ts`).
+    The fill bucket fills behind the paint at the edge; a selection can't tell, so painting inside it on the lines'
+    own layer covers their soft edge. On a layer under the lines, it shows the same as the fill.
+  - With a folder active, **This layer** looks at the layers in it, put together as Normal ones.
+  - The area is found as a task, like a fill: the bar says "Selecting…", and painting and changing the layers wait.
+    The selection changes once it is found, as one step of undo.
+- **Measured (headless, RTX 4060 Ti, 10000×10000, empty):** a click takes about 0.2 s, and 0.05 s with Contiguous off.
+- **Checked:** `tests/app/magic-wand.mjs`: the key, the button and the bar; the area stopping at a Soft round line;
+  Expand going into its soft edge without crossing it; Shift, Alt and Ctrl+Z; Contiguous off selecting the other side
+  of the line too; This layer on an empty layer not looking at the line.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
