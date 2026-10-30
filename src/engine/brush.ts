@@ -15,6 +15,7 @@ import {
   type TaperSettings,
 } from './dabs'
 import type { GpuTiles } from './gpuTiles'
+import { createGrainPass, grainOf, type GrainSettings } from './grain'
 import type { History } from './history'
 import type { LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
@@ -91,31 +92,58 @@ export function createBrush(
     return strokeTexture
   }
 
-  // In a tile only partly selected, the stroke is painted into a tile of its own, and the stroke's tile shown is that
-  // one cut to the selection again after every change. Cut where it is painted, the soft edge of a selection would be
-  // cut again at every movement of the pen, its paint fading away (half selected: half of it, then a quarter...)
-  const uncutTiles = new Map<string, RenderTexture>()
+  // In a tile only partly selected, or with a brush that has a paper grain, the stroke is painted into a tile of its
+  // own ("raw"), and the stroke's tile shown is that one with the grain on it and cut to the selection again after
+  // every change. Cut where it is painted, the soft edge of a selection would be cut again at every movement of the
+  // pen, its paint fading away (half selected: half of it, then a quarter...). The grain is put on the whole stroke
+  // (see grain.ts), with the most pressure of its dabs at each pixel, painted into tiles of their own
+  const rawTiles = new Map<string, RenderTexture>()
+  const pressureTiles = new Map<string, RenderTexture>()
+  const grainPass = createGrainPass(renderer)
 
-  // Where the stroke paints in this tile: its own tile, or the one uncut
-  function paintedTile(key: string, strokeTexture: RenderTexture) {
-    if (!selection.isCut(key)) return strokeTexture
-    let uncut = uncutTiles.get(key)
-    if (uncut) return uncut
+  // A tile as big as this stroke's tile, cleared, for the stroke
+  function emptyTile(strokeTexture: RenderTexture) {
     const { width, height } = strokeTexture
     const isFull = width === TILE_SIZE && height === TILE_SIZE
-    uncut = (isFull && spareStrokeTiles.pop()) || RenderTexture.create({ width, height })
-    renderer.render({ container: nothing, target: uncut, clear: true, clearColor: [0, 0, 0, 0] })
-    uncutTiles.set(key, uncut)
-    return uncut
+    const texture = (isFull && spareStrokeTiles.pop()) || RenderTexture.create({ width, height })
+    renderer.render({ container: nothing, target: texture, clear: true, clearColor: [0, 0, 0, 0] })
+    return texture
   }
 
-  // The stroke's tile shown, as the uncut one cut to the selection (if this tile has one)
-  function cutAgain(key: string) {
-    const uncut = uncutTiles.get(key)
-    if (!uncut) return
+  // Where the stroke paints in this tile: its own tile, or the raw one
+  function paintedTile(key: string, strokeTexture: RenderTexture) {
+    if (!strokeStart.grain && !selection.isCut(key)) return strokeTexture
+    let raw = rawTiles.get(key)
+    if (!raw) {
+      raw = emptyTile(strokeTexture)
+      rawTiles.set(key, raw)
+    }
+    return raw
+  }
+
+  function pressureTile(key: string, strokeTexture: RenderTexture) {
+    let pressure = pressureTiles.get(key)
+    if (!pressure) {
+      pressure = emptyTile(strokeTexture)
+      pressureTiles.set(key, pressure)
+    }
+    return pressure
+  }
+
+  // The stroke's tile shown, as the raw one with the grain on it (if the brush has one), cut to the selection (if
+  // this tile has one)
+  function finishTile(key: string) {
+    const raw = rawTiles.get(key)
+    if (!raw) return
     const strokeTexture = strokeTiles.get(key)!
-    copyPart(uncut, new Rectangle(0, 0, uncut.width, uncut.height), strokeTexture, 0, 0)
-    selection.cut(strokeTexture, key)
+    if (strokeStart.grain) {
+      const { column, row } = parseTileKey(key)
+      const pressure = pressureTiles.get(key)!
+      grainPass.apply(raw, pressure, strokeTexture, column * TILE_SIZE, row * TILE_SIZE, strokeStart.grain)
+    } else {
+      copyPart(raw, new Rectangle(0, 0, raw.width, raw.height), strokeTexture, 0, 0)
+    }
+    if (selection.isCut(key)) selection.cut(strokeTexture, key)
   }
 
   // Keep a stroke's tile for the next strokes, or let it go
@@ -145,8 +173,9 @@ export function createBrush(
       recycle(strokeTexture)
     }
     strokeTiles.clear()
-    for (const uncut of uncutTiles.values()) recycle(uncut)
-    uncutTiles.clear()
+    for (const texture of [...rawTiles.values(), ...pressureTiles.values()]) recycle(texture)
+    rawTiles.clear()
+    pressureTiles.clear()
   }
 
   // Paint with another brush from now on
@@ -187,8 +216,12 @@ export function createBrush(
     for (const [key, tileDabs] of byTile) {
       if (!selection.canPaint(key)) continue
       const { column, row } = parseTileKey(key)
-      const painted = paintedTile(key, strokeTile(key, column, row))
-      if (fresh) renderer.render({ container: nothing, target: painted, clear: true, clearColor: [0, 0, 0, 0] })
+      const strokeTexture = strokeTile(key, column, row)
+      const painted = paintedTile(key, strokeTexture)
+      const pressure = strokeStart.grain ? pressureTile(key, strokeTexture) : null
+      for (const texture of fresh ? [painted, pressure] : []) {
+        if (texture) renderer.render({ container: nothing, target: texture, clear: true, clearColor: [0, 0, 0, 0] })
+      }
       const left = column * TILE_SIZE
       const top = row * TILE_SIZE
       if (backUpBefore && tileDabs.at(-1) === backUpBefore) {
@@ -198,7 +231,8 @@ export function createBrush(
       } else {
         painter.paint(painted, tileDabs, left, top)
       }
-      cutAgain(key)
+      if (pressure) painter.paintPressure(pressure, tileDabs, left, top)
+      finishTile(key)
       projection.composeTile(column, row)
     }
   }
@@ -225,7 +259,8 @@ export function createBrush(
   }
 
   // Keep what the stroke has under this dab in this tile (whose corner is at "left", "top" on the paper), where it is
-  // painted (see paintedTile)
+  // painted (see paintedTile). Only pixel brushes leave out corners, and they have no grain, so their pressure needn't be
+  // kept
   function backUp(key: string, painted: RenderTexture, dab: Dab, left: number, top: number) {
     const half = dab.size / 2 // a pixel tip fits in a square of its size (see dabsByTile)
     const x = Math.max(0, Math.floor(dab.x - half) - left)
@@ -243,9 +278,9 @@ export function createBrush(
   // them again
   function restoreBackups() {
     for (const [key, { texture, frame }] of backups) {
-      const painted = uncutTiles.get(key) ?? strokeTiles.get(key)!
+      const painted = rawTiles.get(key) ?? strokeTiles.get(key)!
       copyPart(texture, new Rectangle(0, 0, frame.width, frame.height), painted, frame.x, frame.y)
-      cutAgain(key)
+      finishTile(key)
     }
     return [...backups.keys()]
   }
@@ -292,8 +327,14 @@ export function createBrush(
   // Where the dabs of the stroke being painted go, or null when not painting
   let path: DabPath | null = null
   // The stroke being painted as it was started, its points and the dabs painted so far, to work it out again at its
-  // end (see taperEnd)
-  let strokeStart = { size: 0, seed: 0, taper: NO_TAPER, pixelPerfect: false }
+  // end (see taperEnd). "grain": the paper's grain, when the brush has one (see grain.ts)
+  let strokeStart: {
+    size: number
+    seed: number
+    taper: TaperSettings
+    pixelPerfect: boolean
+    grain: GrainSettings | null
+  } = { size: 0, seed: 0, taper: NO_TAPER, pixelPerfect: false, grain: null }
   let strokePoints: StrokePoint[] = []
   let strokeDabs: Dab[] = []
 
@@ -309,6 +350,7 @@ export function createBrush(
       seed: Math.floor(Math.random() * 2 ** 32),
       taper: settings.taper,
       pixelPerfect: settings.pixelPerfect && shape.pixel !== 'none',
+      grain: grainOf(tip, shape),
     }
     strokePoints = [{ x, y, pressure }]
     strokeDabs = []
@@ -324,7 +366,13 @@ export function createBrush(
   }
 
   const isSameDab = (a: Dab, b: Dab) =>
-    a.x === b.x && a.y === b.y && a.size === b.size && a.angle === b.angle && a.alpha === b.alpha && a.seed === b.seed
+    a.x === b.x &&
+    a.y === b.y &&
+    a.size === b.size &&
+    a.angle === b.angle &&
+    a.alpha === b.alpha &&
+    a.seed === b.seed &&
+    a.pressure === b.pressure
 
   // The end of a stroke can only taper once the stroke has ended and its length is known, and a short stroke's start
   // tapers less than was painted (see dabs.ts). So the stroke is worked out again from its points, with the same random
@@ -395,10 +443,17 @@ export function createBrush(
 
   function destroy() {
     painter.destroy()
+    grainPass.destroy()
     mergeRoot.destroy({ children: true })
     copyRoot.destroy({ children: true })
     forgetBackups()
-    const textures = [...strokeTiles.values(), ...uncutTiles.values(), ...spareStrokeTiles, ...spareBackups]
+    const textures = [
+      ...strokeTiles.values(),
+      ...rawTiles.values(),
+      ...pressureTiles.values(),
+      ...spareStrokeTiles,
+      ...spareBackups,
+    ]
     for (const texture of textures) texture.destroy(true)
   }
 

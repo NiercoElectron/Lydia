@@ -1,8 +1,9 @@
-import { LydiaError } from '../errors'
+import { LydiaError, type ErrorCode } from '../errors'
 
 export const BRUSH_EXTENSION = '.lydbrush'
 export const MAX_TIP_SIZE = 1024 // the biggest tip picture, in pixels on each side
-export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip of 1024×1024 full of detail is well under this
+export const MAX_GRAIN_SIZE = 1024 // the biggest paper grain picture, in pixels on each side
+export const MAX_BRUSH_FILE_BYTES = 8 * 1024 ** 2 // a tip and a grain of 1024×1024 full of detail are well under this
 export const TIP_SIZES = [256, 512, 1024] // the papers the Brush Designer offers for drawing a tip
 export const DEFAULT_TIP_SIZE = 512
 export const PIXEL_TIP_SIZES = [16, 32, 64] // the papers for drawing a pixel brush's tip, pixel by pixel
@@ -31,6 +32,10 @@ export type BrushShape = {
   noiseContrast: number
   noisePerStroke: boolean // the noise changes with each stroke, not each dab, so its streaks run along the stroke
   pixel: PixelTip // whether the brush paints whole pixels of the paper
+  // The paper's grain (see grain.ts), with a grain picture: how deep its grooves are, from 0 (no grain) to 1, and how
+  // big its picture is on the paper (1 = a pixel of the picture on each pixel of the paper)
+  grainDepth: number
+  grainScale: number
 }
 
 // "none": a smooth brush, its tip's picture resized to any size. "round": a pixel brush with a round tip, worked out
@@ -42,8 +47,9 @@ export type PixelTip = (typeof PIXEL_TIPS)[number]
 const NOISE_MODES = ['mix', 'drops', 'worn'] as const
 export type NoiseMode = (typeof NOISE_MODES)[number]
 
-// A brush, as it is in its file: a name, the picture of its tip (a PNG image) and its shape
-export type BrushPreset = BrushShape & { name: string; tip: Uint8Array }
+// A brush, as it is in its file: a name, the picture of its tip (a PNG image), its shape, and the picture of its
+// paper grain (a PNG image), if it has one
+export type BrushPreset = BrushShape & { name: string; tip: Uint8Array; grain?: Uint8Array }
 
 export const DEFAULT_SHAPE: BrushShape = {
   spacing: 0.1,
@@ -63,6 +69,8 @@ export const DEFAULT_SHAPE: BrushShape = {
   noiseContrast: 1,
   noisePerStroke: false,
   pixel: 'none',
+  grainDepth: 0,
+  grainScale: 1,
 }
 
 // The smallest and biggest values of each number, so a file can't make Lydia place millions of dabs
@@ -76,6 +84,8 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
   noiseLayers: [1, 4],
   noiseStretch: [1, 16],
   noiseContrast: [0.1, 10],
+  grainDepth: [0, 1],
+  grainScale: [0.1, 10],
 }
 
 // ----- The .lydbrush file (version 1) -----
@@ -95,9 +105,15 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
 // gray paints lightly. "pixel" is "round" for a pixel brush, which works out its tip for each size: its picture is then
 // only for versions of Lydia without pixel brushes, which paint with it as a smooth brush. It is "drawn" for a pixel
 // brush that paints its picture as it is, where it is darker than middle gray, at a whole multiple of its size;
-// versions of Lydia before 0.9.0, which brought them, paint it as a smooth brush. A missing field takes its
-// usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left alone, so a file from a newer version of the
-// same format still opens. A brush file is only data: nothing in it is ever run, so brushes downloaded from anywhere
+// versions of Lydia before 0.9.0, which brought them, paint it as a smooth brush.
+//
+// "grain", if there is one, is the picture of the paper's grain, a PNG image of up to 1024×1024 that repeats across
+// the paper: darker is higher, where light pressure already paints, and lighter is the grooves, which only more
+// pressure fills ("grainDepth" says how deep they are). Versions of Lydia before 0.14.0, which brought it, paint
+// without it.
+//
+// A missing field takes its usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left alone, so a file from
+// a newer version of the same format still opens. A brush file is only data: nothing in it is ever run, so brushes downloaded from anywhere
 // are safe to add
 
 const FORMAT = 'lydia-brush'
@@ -121,10 +137,20 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   if (typeof data.tip !== 'string' || !data.tip.startsWith(PNG_DATA_URL)) {
     throw new LydiaError('LYD-203')
   }
-  const tip = fromBase64(data.tip.slice(PNG_DATA_URL.length))
-  const { width, height } = pngSize(tip)
+  const tip = fromBase64(data.tip.slice(PNG_DATA_URL.length), 'LYD-203')
+  const { width, height } = pngSize(tip, 'LYD-203')
   if (width > MAX_TIP_SIZE || height > MAX_TIP_SIZE) {
     throw new LydiaError('LYD-204', { width, height, max: MAX_TIP_SIZE })
+  }
+
+  let grain: Uint8Array | undefined
+  if (data.grain !== undefined) {
+    if (typeof data.grain !== 'string' || !data.grain.startsWith(PNG_DATA_URL)) throw new LydiaError('LYD-215')
+    grain = fromBase64(data.grain.slice(PNG_DATA_URL.length), 'LYD-215')
+    const size = pngSize(grain, 'LYD-215')
+    if (size.width > MAX_GRAIN_SIZE || size.height > MAX_GRAIN_SIZE) {
+      throw new LydiaError('LYD-216', { ...size, max: MAX_GRAIN_SIZE })
+    }
   }
 
   const shape = { ...DEFAULT_SHAPE }
@@ -143,12 +169,19 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   shape.pixel = PIXEL_TIPS.find(pixelTip => pixelTip === data.pixel) ?? DEFAULT_SHAPE.pixel
 
   const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : fallbackName
-  return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip }
+  return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip, ...(grain && { grain }) }
 }
 
 // The text of a .lydbrush file for this brush
-export function serializeBrushFile({ name, tip, ...shape }: BrushPreset) {
-  const file = { format: FORMAT, version: VERSION, name, ...shape, tip: PNG_DATA_URL + toBase64(tip) }
+export function serializeBrushFile({ name, tip, grain, ...shape }: BrushPreset) {
+  const file = {
+    format: FORMAT,
+    version: VERSION,
+    name,
+    ...shape,
+    tip: PNG_DATA_URL + toBase64(tip),
+    ...(grain && { grain: PNG_DATA_URL + toBase64(grain) }),
+  }
   return JSON.stringify(file, null, 2) + '\n'
 }
 
@@ -164,8 +197,9 @@ export function brushFileName(name: string) {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
-// The size of a PNG image, from its first bytes: the signature, then the "IHDR" part with the width and the height
-function pngSize(png: Uint8Array) {
+// The size of a PNG image, from its first bytes: the signature, then the "IHDR" part with the width and the height.
+// "code": the error when it isn't one
+function pngSize(png: Uint8Array, code: ErrorCode) {
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength)
   const isPng =
     png.length >= 24 &&
@@ -173,16 +207,16 @@ function pngSize(png: Uint8Array) {
     String.fromCharCode(...png.subarray(12, 16)) === 'IHDR'
   const width = isPng ? view.getUint32(16) : 0
   const height = isPng ? view.getUint32(20) : 0
-  if (width === 0 || height === 0) throw new LydiaError('LYD-203')
+  if (width === 0 || height === 0) throw new LydiaError(code)
   return { width, height }
 }
 
-function fromBase64(text: string) {
+function fromBase64(text: string, code: ErrorCode) {
   let binary: string
   try {
     binary = atob(text)
   } catch {
-    throw new LydiaError('LYD-203')
+    throw new LydiaError(code)
   }
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)

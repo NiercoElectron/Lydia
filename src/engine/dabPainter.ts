@@ -61,6 +61,11 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
   const stamp = new Container()
   stampRoot.addChild(stamp)
   const dabSprites: Sprite[] = [] // reused instead of creating new sprites every time
+  // The pressure of the dabs, for the paper's grain (see paintPressure)
+  const pressureRoot = new Container()
+  const pressureStamp = new Container()
+  pressureRoot.addChild(pressureStamp)
+  const pressureSprites: Sprite[] = []
   const pixelTips = new Map<number, Texture>() // by size, the most recently used last
   let pixelTipsArea = 0 // their pixels, added up
 
@@ -109,7 +114,7 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
     const oldTexture = texture
     tip = newTip
     texture = createTipTexture(tip)
-    for (const sprite of dabSprites) sprite.texture = texture
+    for (const sprite of [...dabSprites, ...pressureSprites]) sprite.texture = texture
     noiseDabs.setTip(texture, tip)
     oldTexture.destroy(true)
   }
@@ -149,15 +154,40 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
     if (isPixel) trimPixelTips()
   }
 
+  // Paint the pressure of these dabs into "target", for the paper's grain (see grain.ts): in red, green and blue, at
+  // each pixel the most pressure of any dab there, times how much paint its tip has there. Only a smooth brush has a
+  // grain, so each dab is its tip, without noise
+  function paintPressure(target: Texture, dabs: Dab[], left: number, top: number) {
+    const tipSide = Math.max(tip.image.width, tip.image.height)
+    pressureStamp.removeChildren()
+    dabs.forEach((dab, i) => {
+      let sprite = pressureSprites[i]
+      if (!sprite) {
+        sprite = new Sprite(texture)
+        sprite.anchor.set(0.5)
+        sprite.blendMode = 'max'
+        pressureSprites[i] = sprite
+      }
+      sprite.position.set(dab.x, dab.y)
+      sprite.rotation = dab.angle
+      sprite.scale.set(dab.size / tipSide)
+      sprite.tint = Math.round(dab.pressure * 255) * 0x010101
+      pressureStamp.addChild(sprite)
+    })
+    pressureStamp.position.set(-left, -top)
+    renderer.render({ container: pressureRoot, target, clear: false })
+  }
+
   function destroy() {
     stampRoot.destroy({ children: true })
-    for (const sprite of dabSprites) sprite.destroy()
+    pressureRoot.destroy({ children: true })
+    for (const sprite of [...dabSprites, ...pressureSprites]) sprite.destroy()
     noiseDabs.destroy()
     texture.destroy(true)
     for (const pixelTexture of pixelTips.values()) pixelTexture.destroy(true)
   }
 
-  return { setTip, paint, destroy }
+  return { setTip, paint, paintPressure, destroy }
 }
 
 export type DabPainter = ReturnType<typeof createDabPainter>

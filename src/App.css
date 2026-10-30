@@ -630,6 +630,12 @@ input.slider-value {
   font-size: 0.9rem;
 }
 
+/* The paper grain's pictures take the rest of their row, going on to a second line when they don't fit */
+.grain-pictures {
+  grid-column: 2 / 4;
+  flex-wrap: wrap;
+}
+
 .test-canvas {
   display: block;
   width: 100%;

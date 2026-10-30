@@ -10,6 +10,7 @@ export type Dab = {
   angle: number // how much the tip is turned, in radians, clockwise
   alpha: number // how much paint it puts down, from 0 to 1
   seed: number // the dab's own random numbers, for brushes with noise (see noiseDabs.ts)
+  pressure: number // the pen's pressure there, from 0 to 1, how far it fills the paper's grain (see grain.ts)
 }
 
 export type StrokePoint = { x: number; y: number; pressure: number }
@@ -128,9 +129,9 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
       const height = dabSize * down
       const left = Math.round(x - width / 2)
       const top = Math.round(y - height / 2)
-      return { x: left + width / 2, y: top + height / 2, size: dabSize, angle: 0, alpha, seed }
+      return { x: left + width / 2, y: top + height / 2, size: dabSize, angle: 0, alpha, seed, pressure }
     }
-    return { x, y, size: dabSize, angle, alpha, seed }
+    return { x, y, size: dabSize, angle, alpha, seed, pressure }
   }
 
   // Add a dab to the stroke, unless it would paint the same pixels as the one before (a pixel brush that moved less

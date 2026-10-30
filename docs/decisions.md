@@ -1933,6 +1933,47 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   the drawing; picking and taking out; the list for all drawings kept for a new drawing, whose own is empty; and a
   drawing saved and opened again with its own colors.
 
+## 67. The paper grain
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** a pencil on real paper leaves the paper's grooves white where it is pressed lightly, and Lydia's brushes
+  had no way to do that: the noise of decision 35 belongs to each dab and moves with it, so it never looks like a
+  paper under the stroke. The roadmap's Brushes stage starts with it.
+- **Decision:** a **paper grain** for each brush: a picture of how high the paper is, repeated across the paper and
+  fixed to it (not to the dabs), so strokes over the same place meet the same grooves. My choices:
+  - **Pictures:** four come with Lydia (Paper, Rough, Canvas and Noise), and any image can be imported in the Brush
+    Designer. The picture goes inside the `.lydbrush` file, so the grain goes wherever the brush goes.
+  - **Pressure fills:** light pressure only paints the higher places, more pressure reaches into the grooves, and
+    going over a place again in the same stroke doesn't fill them. Each brush has a **Depth** (how much of the paper
+    a light touch leaves out) and a **Scale** (how big the picture is on the paper).
+
+  A new brush, **Pencil**, paints with the Paper grain. Pixel brushes have no grain, like they have no noise.
+
+- **How:**
+  - The grain is put on the whole stroke, not on each dab (`src/engine/grain.ts`). Next to the stroke's own tiles,
+    the brush paints the pressure of its dabs into tiles of their own, keeping at each pixel the most pressure any dab
+    had there (times how much paint its tip has there, so the soft edge of a tip presses less). After each change, a
+    shader makes the tile shown: the stroke's paint where the grain lets it through at that pressure. The paint
+    reaches down to depth × (1 − pressure / 2) of the paper's height, fading out over a little more, so full pressure
+    still leaves out half as much, and the mouse (always at full pressure) shows the grain too. Since the most
+    pressure is kept, not added up, passing again doesn't fill the grooves; only pressing harder does.
+  - This uses the same tiles of their own that a stroke in a partly selected tile already had (cut to the selection
+    after each change), now also for a brush with a grain.
+  - The grains that come with Lydia are made by `scripts/make-brushes.mjs` as 256×256 PNG images in `src/grains`,
+    repeating without seams, with their heights spread evenly (each pixel takes its rank), so a Depth of 50% leaves
+    out half of the paper at the lightest touch whatever the grain. In a picture, darker is higher, like a tip, where
+    black paints. An imported image is turned to grays as it is (up to 1024×1024; a bigger one is made smaller).
+  - In the file, `grain` is the picture, beside `grainDepth` and `grainScale`. Older versions of Lydia don't know
+    them and paint the brush without its grain, so the format's version stays 1. A grain that isn't a PNG image is
+    error LYD-215, one too big LYD-216, and an image the Brush Designer can't use LYD-217.
+  - The brush previews and the Brush Designer's test area put the grain on as the drawing does.
+- **Checked:** `tests/app/paper-grain.mjs`: Pencil in the list with its sample; light pressure leaving much of the
+  paper out and full pressure less; four passes in one stroke leaving as much out as one; two strokes crossing on two
+  layers leaving the same places out; Hard round with no holes; the grain saved in the file and read again, a brush
+  without one saving none, a broken grain, and the limits of Depth and Scale; and in the Brush Designer, choosing a
+  grain (Depth goes to 50%), the test area painting with it, an imported image, and saving.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

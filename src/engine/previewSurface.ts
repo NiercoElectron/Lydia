@@ -3,6 +3,7 @@ import type { BrushShape } from './brushFile'
 import type { BrushTip } from './brushTip'
 import { createDabPainter, type DabPainter } from './dabPainter'
 import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
+import { createGrainPass, grainOf, type GrainSettings } from './grain'
 
 // The brush previews (the sample strokes of the brush list, the Brush Designer's test area) are painted by the
 // graphics card with the same code as the drawing (dabPainter.ts), each stroke in a texture of its own as on the
@@ -27,6 +28,10 @@ export async function createPreviewSurface() {
   let height = 1
   let painted = RenderTexture.create({ width, height }) // the finished strokes
   let stroke = RenderTexture.create({ width, height }) // the stroke being painted
+  // With a paper grain (see grain.ts): the most pressure of the stroke's dabs at each pixel, and the stroke with the
+  // grain on it
+  let pressure = RenderTexture.create({ width, height })
+  let grained = RenderTexture.create({ width, height })
   let shown = RenderTexture.create({ width, height }) // both together, to be copied
   const nothing = new Container()
   const strokeRoot = new Container() // the stroke alone, to be put with the finished strokes
@@ -37,6 +42,8 @@ export async function createPreviewSurface() {
   const shownStrokeSprite = new Sprite(stroke)
   shownRoot.addChild(paintedSprite, shownStrokeSprite)
   let painter: DabPainter | null = null
+  const grainPass = createGrainPass(renderer)
+  let grain: GrainSettings | null = null // the stroke's
   let path: DabPath | null = null
   let unit = 1 // pixels for each unit of the strokes
 
@@ -46,15 +53,16 @@ export async function createPreviewSurface() {
   // Make it this many pixels, and empty
   function setSize(newWidth: number, newHeight: number) {
     if (newWidth !== width || newHeight !== height) {
-      const old = [painted, stroke, shown]
+      const old = [painted, stroke, pressure, grained, shown]
       width = newWidth
       height = newHeight
       painted = RenderTexture.create({ width, height })
       stroke = RenderTexture.create({ width, height })
+      pressure = RenderTexture.create({ width, height })
+      grained = RenderTexture.create({ width, height })
       shown = RenderTexture.create({ width, height })
       paintedSprite.texture = painted
-      strokeSprite.texture = stroke
-      shownStrokeSprite.texture = stroke
+      showStroke()
       for (const texture of old) texture.destroy(true)
     }
     clear()
@@ -63,6 +71,13 @@ export async function createPreviewSurface() {
   function clear() {
     clearTexture(painted)
     clearTexture(stroke)
+    clearTexture(grained)
+  }
+
+  // The stroke as it is shown and put with the finished strokes: with the grain on it, if the brush has one
+  function showStroke() {
+    strokeSprite.texture = grain ? grained : stroke
+    shownStrokeSprite.texture = strokeSprite.texture
   }
 
   // The dabs, from units of the strokes to pixels
@@ -70,7 +85,12 @@ export async function createPreviewSurface() {
     unit === 1 ? dabs : dabs.map(dab => ({ ...dab, x: dab.x * unit, y: dab.y * unit, size: dab.size * unit }))
 
   function paintDabs(dabs: Dab[]) {
-    if (dabs.length > 0) painter!.paint(stroke, inPixels(dabs), 0, 0)
+    if (dabs.length === 0) return
+    const inUnits = inPixels(dabs)
+    painter!.paint(stroke, inUnits, 0, 0)
+    if (!grain) return
+    painter!.paintPressure(pressure, inUnits, 0, 0)
+    grainPass.apply(stroke, pressure, grained, 0, 0, grain)
   }
 
   // Start a stroke with this brush at this point. "size" and the points are in units of "pixels" pixels each (pixel
@@ -79,7 +99,13 @@ export async function createPreviewSurface() {
     if (painter) painter.setTip(tip, shape)
     else painter = createDabPainter(renderer, tip, shape)
     unit = pixels
+    // The grain is as big as on a drawing whose pixels are the units of the strokes
+    const brushGrain = grainOf(tip, shape)
+    grain = brushGrain && { ...brushGrain, scale: brushGrain.scale * unit }
+    showStroke()
     clearTexture(stroke)
+    clearTexture(pressure)
+    clearTexture(grained)
     path = createDabPath(shape, size, { tip: tip.image })
     paintDabs(path.start(point))
   }
@@ -94,6 +120,7 @@ export async function createPreviewSurface() {
     path = null
     renderer.render({ container: strokeRoot, target: painted, clear: false })
     clearTexture(stroke)
+    clearTexture(grained)
   }
 
   // A whole stroke at once
@@ -115,9 +142,10 @@ export async function createPreviewSurface() {
 
   function destroy() {
     painter?.destroy()
+    grainPass.destroy()
     strokeRoot.destroy({ children: true })
     shownRoot.destroy({ children: true })
-    for (const texture of [painted, stroke, shown]) texture.destroy(true)
+    for (const texture of [painted, stroke, pressure, grained, shown]) texture.destroy(true)
   }
 
   return { setSize, clear, startStroke, continueStroke, endStroke, paintStroke, copyTo, destroy }

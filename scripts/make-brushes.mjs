@@ -1,11 +1,13 @@
 // Makes the brushes that come with Lydia: draws each tip with a little math and writes it, with its settings, as a
-// .lydbrush file in src/brushes (the format is explained in src/engine/brushFile.ts). Run it from the project folder
+// .lydbrush file in src/brushes (the format is explained in src/engine/brushFile.ts), and the paper grains that come
+// with Lydia as PNG images in src/grains. Run it from the project folder
 // with "node scripts/make-brushes.mjs" after changing a brush here. The random parts use a fixed seed, so running it
 // again writes the same files
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 
 const OUT = 'src/brushes'
+const GRAINS_OUT = 'src/grains'
 
 // ----- A small PNG writer: grayscale, 8 bits per pixel -----
 
@@ -142,6 +144,94 @@ const dashes = drawTip(128, (x, y) => {
 // Lydia without pixel brushes, which paint with it as a hard round brush
 const pixelTip = drawTip(64, (x, y) => (Math.hypot(x, y) <= 32 ? 1 : 0))
 
+// A pencil's lead: round, its edge softened over a few pixels
+const pencil = drawTip(64, (x, y) => (30 - Math.hypot(x, y)) / 4)
+
+// ----- Paper grains -----
+
+// The paper grains that come with Lydia, offered in the Brush Designer (src/grains) and used by the brushes below.
+// A grain repeats across the paper, so each one joins up with itself at its edges. In the picture, darker is higher:
+// the paint reaches the dark places first, and the light ones (the grooves) only with more pressure
+const GRAIN_SIZE = 256
+
+// Smooth random bumps that repeat every GRAIN_SIZE pixels: "cells" cells across, each corner of the grid wrapping
+// around to the other side
+function wrappingNoise(cells, next) {
+  const values = Array.from({ length: cells * cells }, next)
+  const smooth = t => t * t * (3 - 2 * t)
+  const cell = GRAIN_SIZE / cells
+  return (x, y) => {
+    const gx = x / cell
+    const gy = y / cell
+    const x0 = Math.floor(gx)
+    const y0 = Math.floor(gy)
+    const tx = smooth(gx - x0)
+    const ty = smooth(gy - y0)
+    const at = (cx, cy) => values[(cy % cells) * cells + (cx % cells)]
+    const top = at(x0, y0) * (1 - tx) + at(x0 + 1, y0) * tx
+    const bottom = at(x0, y0 + 1) * (1 - tx) + at(x0 + 1, y0 + 1) * tx
+    return top * (1 - ty) + bottom * ty
+  }
+}
+
+// Bumps of several sizes added up: [cells across, weight] for each
+function layeredNoise(layers, next) {
+  const noises = layers.map(([cells, weight]) => [wrappingNoise(cells, next), weight])
+  return (x, y) => noises.reduce((sum, [noise, weight]) => sum + noise(x, y) * weight, 0)
+}
+
+// A grain from how high the paper is at each point. The heights are spread evenly from the lowest to the highest
+// (each pixel takes its rank among all of them), so that each grain's depth means the same: at 50%, half of the paper
+// is out of reach of light pressure
+function drawGrain(heightAt) {
+  const count = GRAIN_SIZE * GRAIN_SIZE
+  const heights = new Float64Array(count)
+  for (let y = 0; y < GRAIN_SIZE; y++) {
+    for (let x = 0; x < GRAIN_SIZE; x++) heights[y * GRAIN_SIZE + x] = heightAt(x, y)
+  }
+  const order = Array.from({ length: count }, (_, i) => i).sort((a, b) => heights[a] - heights[b])
+  const gray = Buffer.alloc(count)
+  order.forEach((pixel, rank) => (gray[pixel] = Math.round(255 * (1 - rank / (count - 1)))))
+  return encodePng(GRAIN_SIZE, gray)
+}
+
+const paperRandom = random(21)
+const paperNoise = layeredNoise(
+  [
+    [32, 0.1],
+    [64, 0.3],
+    [128, 0.6],
+  ],
+  paperRandom,
+)
+const paperGrain = drawGrain((x, y) => paperNoise(x, y) + 0.15 * paperRandom())
+
+const roughNoise = layeredNoise(
+  [
+    [8, 0.35],
+    [16, 0.3],
+    [32, 0.2],
+    [64, 0.15],
+  ],
+  random(22),
+)
+const roughGrain = drawGrain(roughNoise)
+
+// Woven threads 8 pixels wide, over and under each other: each square of 8×8 is the top of a thread across or of a
+// thread down, by turns, rounded across the thread, with a little unevenness
+const THREAD = 8
+const canvasNoise = wrappingNoise(64, random(23))
+const canvasGrain = drawGrain((x, y) => {
+  const across = (Math.floor(x / THREAD) + Math.floor(y / THREAD)) % 2 === 0
+  const sideways = across ? y % THREAD : x % THREAD
+  return Math.sin((Math.PI * (sideways + 0.5)) / THREAD) + 0.3 * canvasNoise(x, y)
+})
+
+const noiseRandom = random(24)
+const noiseGrain = drawGrain(() => noiseRandom())
+
+const grains = { paper: paperGrain, rough: roughGrain, canvas: canvasGrain, noise: noiseGrain }
+
 // ----- The brushes -----
 
 const usual = {
@@ -160,6 +250,19 @@ const brushes = {
   'hard-round': { name: 'Hard round', spacing: 0.08, tip: hardRound },
   pixel: { name: 'Pixel', spacing: 0.01, pixel: 'round', tip: pixelTip },
   airbrush: { name: 'Airbrush', spacing: 0.05, flow: 0.1, pressureSize: false, pressureFlow: true, tip: airbrush },
+  // The paper's grain: pressed lightly, only its tops take the lead; pressed harder, its grooves fill too. Washed, so
+  // going over the same place again doesn't fill them
+  pencil: {
+    name: 'Pencil',
+    spacing: 0.05,
+    flow: 0.85,
+    wash: true,
+    pressureFlow: true,
+    grainDepth: 0.75,
+    grainScale: 1,
+    tip: pencil,
+    grain: paperGrain,
+  },
   chalk: { name: 'Chalk', spacing: 0.15, angleJitter: 1, scatter: 0.05, flow: 0.9, pressureFlow: true, tip: chalk },
   calligraphy: { name: 'Calligraphy', spacing: 0.02, angle: 315, tip: calligraphy },
   dashes: { name: 'Dashes', spacing: 1.6, followStroke: true, pressureSize: false, tip: dashes },
@@ -195,9 +298,16 @@ const brushes = {
 }
 
 mkdirSync(OUT, { recursive: true })
-for (const [file, { name, tip, ...settings }] of Object.entries(brushes)) {
+for (const [file, { name, tip, grain, ...settings }] of Object.entries(brushes)) {
   const brush = { format: 'lydia-brush', version: 1, name, ...usual, ...settings }
   brush.tip = 'data:image/png;base64,' + tip.toString('base64')
+  if (grain) brush.grain = 'data:image/png;base64,' + grain.toString('base64')
   writeFileSync(`${OUT}/${file}.lydbrush`, JSON.stringify(brush, null, 2) + '\n')
   console.log(`${file}.lydbrush: ${Math.round(tip.length / 1024)} KB of tip`)
+}
+
+mkdirSync(GRAINS_OUT, { recursive: true })
+for (const [file, grain] of Object.entries(grains)) {
+  writeFileSync(`${GRAINS_OUT}/${file}.png`, grain)
+  console.log(`${file}.png: ${Math.round(grain.length / 1024)} KB`)
 }

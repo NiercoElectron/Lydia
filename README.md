@@ -35,7 +35,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
 - Brushes with filtered noise: every dab different, with the brush's own character, mixed with the tip, as whole
   drops of paint or wearing the tip away (Bristles, Sponge)
-- Brushes are `.lydbrush` files: nine come with Lydia, and more can be added (Import…, or drop the files on the
+- A paper grain for brushes: a texture of the paper whose grooves light pressure leaves white and more pressure fills,
+  like a pencil on real paper (Pencil), from the four that come with Lydia or any image
+- Brushes are `.lydbrush` files: ten come with Lydia, and more can be added (Import…, or drop the files on the
   window), exported to share them, and deleted
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
 - Pixel-perfect strokes: pixel brushes can leave out the doubled corners of lines drawn by hand
@@ -92,14 +94,16 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Brushes: grain (a paper texture, for pencils), smudge and blur tools, a liquify tool (push, bloat and pucker
-      the picture with the pen, and brush it back to how it was) and a mesh mode for transforming (a grid of points
-      that bend the picture where each one is dragged), pen tilt (the brush follows how the pen leans, like a
-      pencil); in the Brush Designer, edit existing brushes and use an image as the tip
+- [ ] Brushes: grain (a paper texture, for pencils), and in the Brush Designer, edit existing brushes and use an
+      image as the tip
+- [ ] Distort: smudge and blur tools, a liquify tool (push, bloat and pucker the picture with the pen, and brush it
+      back to how it was) and a mesh mode for transforming (a grid of points that bend the picture where each one is
+      dragged)
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)
 - [ ] Text and filters (hue and saturation, levels, blur)
+- [ ] Pen tilt: the brush follows how the pen leans, like a pencil
 - [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
       from the computer

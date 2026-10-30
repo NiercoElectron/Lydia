@@ -27,22 +27,25 @@ longer used. The list in the code is in `src/errors.ts`.
 
 ## 2: brushes
 
-| Code    | Message                                                                                 | What it means                                                                                         |
-| ------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| LYD-201 | This is not a Lydia brush.                                                              | The file isn't a `.lydbrush` file made by Lydia.                                                      |
-| LYD-202 | This brush was made by a newer version of Lydia. Update Lydia to use it.                | The brush has things this version doesn't know.                                                       |
-| LYD-203 | The tip of this brush is not a PNG image.                                               | The brush file is damaged: its tip can't be read.                                                     |
-| LYD-204 | The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}. | A tip can be at most 1024×1024 pixels.                                                                |
-| LYD-205 | The tip of this brush has no paint.                                                     | The tip is all transparent, so it would paint nothing.                                                |
-| LYD-206 | Only Lydia brushes ({extension} files) can be added.                                    | Only `.lydbrush` files go in the list of brushes.                                                     |
-| LYD-207 | This file is too big to be a brush.                                                     | A brush file is at most 8 MB.                                                                         |
-| LYD-208 | This brush is already in the list.                                                      | The same brush was added before.                                                                      |
-| LYD-209 | Could not add this brush.                                                               | Something else went wrong while adding it: the cause is in parentheses.                               |
-| LYD-210 | Could not use this brush.                                                               | The chosen brush couldn't be made ready to paint with: the cause is in parentheses.                   |
-| LYD-211 | Could not delete the brush.                                                             | The browser didn't let Lydia take it out of its storage: the cause is in parentheses.                 |
-| LYD-212 | Could not save the brush in this browser.                                               | The browser didn't let Lydia keep it, for example in a private window: the cause is in parentheses.   |
-| LYD-213 | Could not make a picture of the tip.                                                    | The browser couldn't make the tip's image.                                                            |
-| LYD-214 | Lydia has no brush called "{name}".                                                     | One of the brushes that come with Lydia is missing. It should never happen: it is a mistake in Lydia. |
+| Code    | Message                                                                                         | What it means                                                                                                               |
+| ------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| LYD-201 | This is not a Lydia brush.                                                                      | The file isn't a `.lydbrush` file made by Lydia.                                                                            |
+| LYD-202 | This brush was made by a newer version of Lydia. Update Lydia to use it.                        | The brush has things this version doesn't know.                                                                             |
+| LYD-203 | The tip of this brush is not a PNG image.                                                       | The brush file is damaged: its tip can't be read.                                                                           |
+| LYD-204 | The tip of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}.         | A tip can be at most 1024×1024 pixels.                                                                                      |
+| LYD-205 | The tip of this brush has no paint.                                                             | The tip is all transparent, so it would paint nothing.                                                                      |
+| LYD-206 | Only Lydia brushes ({extension} files) can be added.                                            | Only `.lydbrush` files go in the list of brushes.                                                                           |
+| LYD-207 | This file is too big to be a brush.                                                             | A brush file is at most 8 MB.                                                                                               |
+| LYD-208 | This brush is already in the list.                                                              | The same brush was added before.                                                                                            |
+| LYD-209 | Could not add this brush.                                                                       | Something else went wrong while adding it: the cause is in parentheses.                                                     |
+| LYD-210 | Could not use this brush.                                                                       | The chosen brush couldn't be made ready to paint with: the cause is in parentheses.                                         |
+| LYD-211 | Could not delete the brush.                                                                     | The browser didn't let Lydia take it out of its storage: the cause is in parentheses.                                       |
+| LYD-212 | Could not save the brush in this browser.                                                       | The browser didn't let Lydia keep it, for example in a private window: the cause is in parentheses.                         |
+| LYD-213 | Could not make a picture of the tip.                                                            | The browser couldn't make the tip's image.                                                                                  |
+| LYD-214 | Lydia has no brush called "{name}".                                                             | One of the brushes that come with Lydia is missing. It should never happen: it is a mistake in Lydia.                       |
+| LYD-215 | The paper grain of this brush is not a PNG image.                                               | The brush file is damaged: the picture of its paper grain can't be read.                                                    |
+| LYD-216 | The paper grain of this brush is too big ({width}×{height} pixels). The biggest is {max}×{max}. | A paper grain's picture can be at most 1024×1024 pixels.                                                                    |
+| LYD-217 | Could not use this image as the paper grain.                                                    | In the Brush Designer, the image chosen as the grain couldn't be read, or a grain that comes with Lydia couldn't be loaded. |
 
 ## 3: images and the tray
 

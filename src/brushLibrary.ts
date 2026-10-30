@@ -21,6 +21,7 @@ const BUILT_IN_ORDER = [
   'hard-round',
   'pixel',
   'airbrush',
+  'pencil',
   'chalk',
   'calligraphy',
   'dashes',
@@ -59,7 +60,7 @@ const tips = new Map<string, Promise<BrushTip>>()
 export function tipOf(brush: LibraryBrush) {
   let tip = tips.get(brush.id)
   if (!tip) {
-    tip = decodeTip(brush.preset.tip)
+    tip = decodeTip(brush.preset.tip, brush.preset.grain)
     tips.set(brush.id, tip)
   }
   return tip
@@ -135,7 +136,7 @@ export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
         throw new LydiaError('LYD-208')
       }
       const preset = parseBrushFile(text, file.name.slice(0, -BRUSH_EXTENSION.length))
-      await decodeTip(preset.tip) // a tip that can't be painted with is found now, not at the first stroke
+      await decodeTip(preset.tip, preset.grain) // a tip that can't be painted with is found now, not at the first stroke
       const id = await withStore('readwrite', store => store.add({ file: text }))
       added.push({ id: `added/${id}`, isBuiltIn: false, preset, file: text })
     } catch (error) {

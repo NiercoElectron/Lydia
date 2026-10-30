@@ -2,7 +2,7 @@ import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf } from '../brushLibrary'
-import { BrushShapeControls } from '../components/BrushShapeControls'
+import { BrushShapeControls, type GrainChoice } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
 import { SliderValue } from '../components/SliderValue'
@@ -78,6 +78,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   const [shape, setShape] = useState<BrushShape>(pixel ? PIXEL_SHAPE : DEFAULT_SHAPE)
   const [tipPng, setTipPng] = useState<Uint8Array | null>(null) // the tip as it goes in the file
   const [tip, setTip] = useState<BrushTip | null>(null) // the same tip, ready to paint with
+  const [grain, setGrain] = useState<GrainChoice | null>(null) // the picture of the paper's grain, if one was chosen
   // The id the brush got when it was saved, so saving again changes it, and the file saved then
   const [savedId, setSavedId] = useState<string>()
   const [savedFile, setSavedFile] = useState<string | null>(null)
@@ -105,13 +106,14 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
   useBackdrop(engine)
 
-  // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it
+  // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it, and when another
+  // grain is chosen
   useEffect(() => {
     if (!engine) return
     let cancelled = false
     async function makeTip(engine: Engine) {
       const png = await tipFromPicture(await engine.exportImage('png'), pixel)
-      const decoded = png ? await decodeTip(png) : null
+      const decoded = png ? await decodeTip(png, grain?.png) : null
       if (cancelled) return
       setTipPng(png)
       setTip(decoded)
@@ -122,13 +124,15 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
     return () => {
       cancelled = true
     }
-  }, [engine, snapshot, pixel])
+  }, [engine, snapshot, pixel, grain])
 
-  // The brush's file as it is now, or null while nothing is painted
-  const file = useMemo(
-    () => (tipPng ? serializeBrushFile({ name: name.trim() || t(DEFAULT_NAME), tip: tipPng, ...shape }) : null),
-    [name, tipPng, shape, t],
-  )
+  // The brush's file as it is now, or null while nothing is painted. The grain's picture goes in only when it has some
+  // depth
+  const file = useMemo(() => {
+    if (!tipPng) return null
+    const grainPng = shape.grainDepth > 0 ? grain?.png : undefined
+    return serializeBrushFile({ name: name.trim() || t(DEFAULT_NAME), tip: tipPng, ...shape, grain: grainPng })
+  }, [name, tipPng, shape, grain, t])
   const isSaved = file !== null && file === savedFile
   const isUnsaved = file !== null && file !== savedFile
 
@@ -256,7 +260,7 @@ export function BrushDesigner({ tipSize, pixel, gpuMemory, onBack }: Props) {
                 ? t('Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.')
                 : t('Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.')}
           </p>
-          <BrushShapeControls shape={shape} onChange={setShape} />
+          <BrushShapeControls shape={shape} onChange={setShape} grain={grain} onGrainChange={setGrain} />
           <h2>{t('Try it')}</h2>
           <BrushTestArea tip={tip} shape={shape} />
           <div className="designer-actions">

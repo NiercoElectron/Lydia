@@ -122,8 +122,12 @@ until taken out. The button with a palette, next to the color's code, opens and 
 
   A stroke shorter than both tapers has them shortened alike until they meet, and a click paints a whole dot.
 
-- **The brushes:** nine come with Lydia (Soft round, Hard round, Pixel, Airbrush, Chalk, Calligraphy, Dashes, Bristles,
-  Sponge). Click one to paint with it.
+- **The brushes:** ten come with Lydia (Soft round, Hard round, Pixel, Airbrush, Pencil, Chalk, Calligraphy, Dashes,
+  Bristles, Sponge). Click one to paint with it.
+- **The paper grain:** some brushes, like Pencil, have the texture of a paper, fixed to the drawing. Pressed lightly,
+  they only paint its higher places, leaving the grooves white; pressed harder, they fill more of them. Going over the
+  same place again in one stroke doesn't fill them. With the mouse, a brush paints as at full pressure, which still
+  leaves some grooves white.
   - **Import…** adds brushes from `.lydbrush` files; dropping the files on the window does the same.
   - **Export** saves the chosen brush as a file, to share it.
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
@@ -317,13 +321,17 @@ Opened from the start screen, it draws the tip of a new brush.
 - Give it a **Name**, and choose how it paints: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow,
   Wash (the stroke doesn't pile up over itself) and the pen's pressure. **Noise** gives every copy of the tip a
   texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
+- **Paper grain** gives the brush the texture of a paper (see [Brush and eraser](#brush-and-eraser)): choose its
+  **Picture**, one of the four that come with Lydia (Paper, Rough, Canvas, Noise) or **Import…** any image (darker is
+  higher, where light pressure already paints), its **Depth** (how much of the paper a light touch leaves out; 0% is
+  no grain) and its **Scale** (how big the picture is on the paper). The picture goes in the brush's file.
 - **Try it** paints with the brush as it is now, at any size; **Clear** wipes the test area.
 - **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file.
 
 **A pixel brush** (Pixel on the start screen) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
 Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
-The tip is cut to its painted pixels. The settings that turn the tip or give it noise are left out; the new brush
-starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
+The tip is cut to its painted pixels. The settings that turn the tip or give it noise or a paper grain are left
+out; the new brush starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
 
 ## When something goes wrong
 

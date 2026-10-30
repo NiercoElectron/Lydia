@@ -1,5 +1,9 @@
+import { useRef } from 'react'
+import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
 import type { BrushShape, NoiseMode } from '../engine/brushFile'
+import { grainFromImage } from '../engine/brushTip'
+import { GRAINS, grainPicture, type GrainId } from '../grains'
 import { SliderValue } from './SliderValue'
 
 // How the noise can form each copy of the tip (see noiseDabs.ts)
@@ -9,16 +13,43 @@ const NOISE_MODES: [NoiseMode, string, string][] = [
   ['worn', 'Worn', 'The tip worn away from its edge in: full in the middle, with growing holes toward the edge'],
 ]
 
+// The picture of a brush's paper grain (see grain.ts): one of the grains that come with Lydia, or an image imported,
+// as a PNG
+export type GrainChoice = { id: GrainId | 'imported'; png: Uint8Array }
+
+// A grain chosen with no depth yet gets this much, so that it shows
+const FIRST_GRAIN_DEPTH = 0.5
+
 type Props = {
   shape: BrushShape
   onChange: (shape: BrushShape) => void
+  grain: GrainChoice | null
+  onGrainChange: (grain: GrainChoice) => void
 }
 
 // The settings of a brush, in the Brush Designer. Fractions in the file are shown as percents. A pixel brush's tip is
-// never turned and has no noise, so those settings are left out for it
-export function BrushShapeControls({ shape, onChange }: Props) {
+// never turned and has no noise nor paper grain, so those settings are left out for it
+export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Props) {
   const { t } = useLanguage()
   const change = (changes: Partial<BrushShape>) => onChange({ ...shape, ...changes })
+  const grainInput = useRef<HTMLInputElement>(null)
+  const grainNames = { paper: t('Paper'), rough: t('Rough'), canvas: t('Canvas'), noise: t('Noise') }
+
+  async function chooseGrain(id: GrainChoice['id'], picture: Promise<Uint8Array>) {
+    try {
+      onGrainChange({ id, png: await picture })
+      if (shape.grainDepth === 0) change({ grainDepth: FIRST_GRAIN_DEPTH })
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-217'))
+    }
+  }
+
+  function handleGrainFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // so the same file can be chosen again
+    if (file) void chooseGrain('imported', grainFromImage(file))
+  }
+
   const hasNoise = shape.noiseAmount > 0
   const isPixel = shape.pixel !== 'none'
   return (
@@ -177,6 +208,50 @@ export function BrushShapeControls({ shape, onChange }: Props) {
             checked={shape.noisePerStroke}
             disabled={!hasNoise}
             onChange={checked => change({ noisePerStroke: checked })}
+          />
+          <h3>{t('Paper grain')}</h3>
+          <div
+            className="slider-row"
+            title={t(
+              "The picture of the paper's grain, repeated across the paper: darker is higher, where light pressure already paints",
+            )}
+          >
+            <span>{t('Picture')}</span>
+            <span className="button-group grain-pictures">
+              {GRAINS.map(id => (
+                <button key={id} aria-pressed={grain?.id === id} onClick={() => void chooseGrain(id, grainPicture(id))}>
+                  {grainNames[id]}
+                </button>
+              ))}
+              {grain?.id === 'imported' && <button aria-pressed={true}>{t('Imported')}</button>}
+              <button onClick={() => grainInput.current?.click()} title={t('Use an image of your own as the grain')}>
+                {t('Import…')}
+              </button>
+              <input ref={grainInput} type="file" accept="image/*" hidden onChange={handleGrainFile} />
+            </span>
+          </div>
+          <Slider
+            label={t('Depth')}
+            hint={t(
+              "How deep the paper's grooves are: how much of the paper a light touch leaves out (pressing harder fills them). At 0% there is no grain",
+            )}
+            min={0}
+            max={100}
+            value={percent(shape.grainDepth)}
+            unit="%"
+            disabled={!grain}
+            onChange={value => change({ grainDepth: value / 100 })}
+          />
+          <Slider
+            label={t('Scale')}
+            hint={t("How big the grain's picture is on the paper")}
+            min={10}
+            max={1000}
+            step={10}
+            value={percent(shape.grainScale)}
+            unit="%"
+            disabled={!grain}
+            onChange={value => change({ grainScale: value / 100 })}
           />
         </>
       )}

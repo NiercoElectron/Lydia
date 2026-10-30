@@ -1,4 +1,5 @@
-import { LydiaError } from '../errors'
+import { LydiaError, type ErrorCode } from '../errors'
+import { MAX_GRAIN_SIZE } from './brushFile'
 
 // A brush tip ready to paint with: a white picture with the amount of paint in its alpha, so the brush can tint it
 // with any color
@@ -7,24 +8,41 @@ export type BrushTip = {
   // How far from the center the paint goes, as a fraction of half of the picture's longer side: 1 for a round tip,
   // up to √2 for a square one (its corners). Tells which tiles a dab can touch, however it is turned
   reach: number
+  // The brush's paper grain (see grain.ts), if it has one: how high the paper is at each pixel, in red, green and
+  // blue alike, from 0 (the bottom of a groove) to 255 (the top)
+  grain: HTMLCanvasElement | null
 }
 
-// Turn the PNG picture of a tip (black paints, white or transparent doesn't) into a tip ready to paint with
-export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
+// A PNG picture on a canvas of its size, as it is, its colors not changed to the screen's. "code": the error when it
+// can't be read
+async function pngCanvas(png: Uint8Array, code: ErrorCode) {
   let bitmap: ImageBitmap
   try {
     const blob = new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' })
     bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })
   } catch {
-    throw new LydiaError('LYD-203')
+    throw new LydiaError(code)
   }
-  const { width, height } = bitmap
   const image = document.createElement('canvas')
-  image.width = width
-  image.height = height
+  image.width = bitmap.width
+  image.height = bitmap.height
   const ctx = image.getContext('2d', { willReadFrequently: true })!
   ctx.drawImage(bitmap, 0, 0)
   bitmap.close()
+  return { image, ctx }
+}
+
+// How much a pixel of a picture paints, from 0 to 255: black fully, white or transparent not at all
+function paintOf(data: Uint8ClampedArray, i: number) {
+  const lightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+  return Math.round(((255 - lightness) * data[i + 3]) / 255)
+}
+
+// Turn the PNG picture of a tip (black paints, white or transparent doesn't), and of its paper grain if it has one
+// (darker is higher), into a tip ready to paint with
+export async function decodeTip(png: Uint8Array, grainPng?: Uint8Array): Promise<BrushTip> {
+  const { image, ctx } = await pngCanvas(png, 'LYD-203')
+  const { width, height } = image
 
   const pixels = ctx.getImageData(0, 0, width, height)
   const data = pixels.data
@@ -33,8 +51,7 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4
-      const lightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-      const paint = Math.round(((255 - lightness) * data[i + 3]) / 255)
+      const paint = paintOf(data, i)
       data[i] = data[i + 1] = data[i + 2] = 255
       data[i + 3] = paint
       if (paint === 0) continue
@@ -46,7 +63,47 @@ export async function decodeTip(png: Uint8Array): Promise<BrushTip> {
   }
   if (farthest === 0) throw new LydiaError('LYD-205')
   ctx.putImageData(pixels, 0, 0)
-  return { image, reach: farthest / halfSide }
+  return { image, reach: farthest / halfSide, grain: grainPng ? await decodeGrain(grainPng) : null }
+}
+
+// Turn the PNG picture of a paper grain into the heights of the paper (see BrushTip)
+async function decodeGrain(png: Uint8Array) {
+  const { image, ctx } = await pngCanvas(png, 'LYD-215')
+  const pixels = ctx.getImageData(0, 0, image.width, image.height)
+  const data = pixels.data
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = data[i + 1] = data[i + 2] = paintOf(data, i)
+    data[i + 3] = 255
+  }
+  ctx.putImageData(pixels, 0, 0)
+  return image
+}
+
+// Any image as the picture of a paper grain: in grays, as a PNG of up to MAX_GRAIN_SIZE on each side (a bigger one is
+// made smaller), transparent places white
+export async function grainFromImage(file: Blob): Promise<Uint8Array> {
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new LydiaError('LYD-217')
+  }
+  const scale = Math.min(1, MAX_GRAIN_SIZE / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = pixels.data
+  for (let i = 0; i < data.length; i += 4) data[i] = data[i + 1] = data[i + 2] = 255 - paintOf(data, i)
+  ctx.putImageData(pixels, 0, 0)
+  const png = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+  if (!png) throw new LydiaError('LYD-217')
+  return new Uint8Array(await png.arrayBuffer())
 }
 
 const TIP_MARGIN = 2 // white pixels kept around the paint, so the edge of a turned dab fades out instead of being cut

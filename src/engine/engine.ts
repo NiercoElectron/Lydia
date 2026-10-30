@@ -260,7 +260,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     gpu,
     projection,
     history,
-    await decodeTip(startBrush.tip),
+    await decodeTip(startBrush.tip, startBrush.grain),
     startBrush,
     selectionView,
   )

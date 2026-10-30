@@ -168,7 +168,8 @@ await sleep(300)
 const noisy = await testPaint()
 check(
   'the noise controls are off until there is noise, then on',
-  disabledBefore === 5 && disabledAfter === 0,
+  // The paper grain's Depth and Scale stay off as well, with no grain picture chosen
+  disabledBefore === 5 + 2 && disabledAfter === 2,
   `${disabledBefore} → ${disabledAfter} off`,
 )
 await (await page.$('.designer-panel')).screenshot({ path: OUT + '/designer-noise-2.png' })

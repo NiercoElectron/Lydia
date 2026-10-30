@@ -7,6 +7,14 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Paper grain** for brushes ([decision 67](docs/decisions.md#67-the-paper-grain)): a texture of the paper, fixed to
+  it, whose grooves light pressure leaves white and more pressure fills, like a pencil on real paper. In the Brush
+  Designer, under **Paper grain**: one of the four that come with Lydia (Paper, Rough, Canvas, Noise) or any image
+  imported, with its **Depth** and **Scale**. The grain is saved in the brush's file.
+- A **Pencil** brush, with the Paper grain.
+
 ## [0.13.0] - 2026-10-29
 
 ### Added
