@@ -7,13 +7,14 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-29
+
 ### Added
 
 - The **magic wand** (W) ([decision 64](docs/decisions.md#64-the-magic-wand)): it selects the area around the point
   clicked whose colors are close to the color there, found like the fill bucket's, with settings of its own:
   Tolerance, Look at, Expand (into the soft edge of the lines, so coloring inside leaves no light rim) and
   **Contiguous**, which off selects a color everywhere in the drawing. Shift adds and Alt takes away.
-
 - Spanish throughout the interface and release history, with an Español option and automatic detection of
   Spanish system language variants such as es-ES, es-MX and es-AR.
 - Brazilian Portuguese throughout the interface, including the Brush Designer and the release history.
@@ -440,7 +441,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/NiercoElectron/Lydia/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/NiercoElectron/Lydia/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/NiercoElectron/Lydia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/NiercoElectron/Lydia/compare/v0.9.0...v0.10.0
