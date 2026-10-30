@@ -1,9 +1,10 @@
 // What is left to translate (decision 63), for each language: the interface's texts missing from its dictionary in
 // src/translations, and the released versions missing from its translated history of versions. Run it from the
 // project folder with "npm run translations". It looks at the texts the code gives to t() or translate() as they are
-// written, the names of the tasks (runTask) and of the tools (src/components/toolList.ts); a text the code puts
-// together some other way isn't seen. A text or a version not translated yet shows in English, so this is kept apart
-// from the tests: it ends with an error while something is left, for whoever translates
+// written, the names of the tasks (runTask), of the tools (src/components/toolList.ts) and of the brushes that come
+// with Lydia (src/brushes); a text the code puts together some other way isn't seen. A text or a version not
+// translated yet shows in English, so this is kept apart from the tests: it ends with an error while something is
+// left, for whoever translates
 import { readdirSync, readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -51,6 +52,11 @@ function scan(directory) {
   }
 }
 scan('src')
+
+// The names of the brushes that come with Lydia, translated where they are shown, as "brush.<name>"
+for (const file of readdirSync(new URL('../src/brushes/', import.meta.url))) {
+  found(`brush.${JSON.parse(read(`src/brushes/${file}`)).name}`, file)
+}
 
 // ----- The versions released -----
 
