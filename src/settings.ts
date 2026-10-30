@@ -1,5 +1,5 @@
 import { MAX_TAPER, NO_TAPER, TAPER_THINS, type TaperSettings } from './engine/dabs'
-import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MIN_SIZE } from './engine/projectFile'
+import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MAX_TRAY_COLORS, MIN_SIZE } from './engine/projectFile'
 import { DEFAULT_STABILIZER, MAX_STABILIZER, STABILIZER_MODES, type StabilizerSettings } from './engine/stabilizer'
 
 // Choices remembered by this browser between visits
@@ -212,6 +212,47 @@ export function loadBrushId() {
 export function saveBrushId(id: string) {
   try {
     localStorage.setItem(BRUSH_KEY, id)
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+// The colors painted with lately, the newest first (see ColorPanel.tsx)
+export const MAX_RECENT_COLORS = 10
+const RECENT_COLORS_KEY = 'lydia.recentColors'
+
+export function loadRecentColors(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(RECENT_COLORS_KEY) ?? '[]')
+    return Array.isArray(saved) ? saved.filter(isColor).slice(0, MAX_RECENT_COLORS) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveRecentColors(colors: string[]) {
+  try {
+    localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(colors))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+// The color tray's colors for all drawings (see ColorTray.tsx); each drawing keeps its own too, in its file
+const TRAY_COLORS_KEY = 'lydia.trayColors'
+
+export function loadTrayColors(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(TRAY_COLORS_KEY) ?? '[]')
+    return Array.isArray(saved) ? saved.filter(isColor).slice(0, MAX_TRAY_COLORS) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveTrayColors(colors: string[]) {
+  try {
+    localStorage.setItem(TRAY_COLORS_KEY, JSON.stringify(colors))
   } catch {
     // not remembered next time, but used now
   }

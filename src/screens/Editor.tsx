@@ -17,6 +17,8 @@ import {
   useSelectionShortcuts,
   useTransformShortcuts,
 } from '../components/engineHooks'
+import { ColorPanel } from '../components/ColorPanel'
+import { ColorTray } from '../components/ColorTray'
 import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
@@ -30,7 +32,16 @@ import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import type { Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
-import { loadBrushId, saveBrushId } from '../settings'
+import { isTyping } from '../engine/view'
+import {
+  loadBrushId,
+  loadRecentColors,
+  loadTrayColors,
+  MAX_RECENT_COLORS,
+  saveBrushId,
+  saveRecentColors,
+  saveTrayColors,
+} from '../settings'
 import { freeTrayImage, isImageFile, makeTrayImages, TRAY_DRAG_TYPE, type TrayImage } from '../tray'
 
 type Props = {
@@ -47,6 +58,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState('#000000')
+  const [background, setBackground] = useState('#ffffff') // the color kept behind the brush's, swapped by X
+  const [recentColors, setRecentColors] = useState(loadRecentColors)
+  const [trayColors, setTrayColors] = useState(loadTrayColors) // the color tray's, for all drawings
+  const [isColorTrayOpen, setIsColorTrayOpen] = useState(false)
   const [size, setSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
   const [fill, setFill] = useState<FillSettings>(DEFAULT_FILL)
@@ -81,6 +96,31 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useEffect(() => {
     engine?.setFill(fill)
   }, [engine, fill])
+
+  // The colors painted with lately: each stroke of the brush and each fill puts its color first
+  useEffect(
+    () =>
+      engine?.onPaint(used =>
+        setRecentColors(colors => [used, ...colors.filter(each => each !== used)].slice(0, MAX_RECENT_COLORS)),
+      ),
+    [engine],
+  )
+  useEffect(() => saveRecentColors(recentColors), [recentColors])
+  useEffect(() => saveTrayColors(trayColors), [trayColors])
+
+  // The brush's color and the background color change places (X, as in Photoshop and Krita)
+  const swapColors = useCallback(() => {
+    setColor(background)
+    setBackground(color)
+  }, [color, background])
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key.toLowerCase() === 'x') swapColors()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [swapColors])
 
   useEffect(() => {
     engine?.setWand(wand)
@@ -337,7 +377,6 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
       <header className="editor-bar">
         <Toolbar
           tool={tool}
-          color={color}
           size={size}
           opacity={opacity}
           fill={fill}
@@ -367,7 +406,6 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           isFolder={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isFolder ?? false}
           isPixelBrush={isPixelBrush}
           isPixelPerfectOn={isPixelPerfectOn}
-          onColorChange={setColor}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
@@ -441,30 +479,51 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         <div className="draw-area">
           <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine} />
           {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
+          {isColorTrayOpen && (
+            <ColorTray
+              color={color}
+              general={trayColors}
+              drawing={snapshot.trayColors}
+              onPick={setColor}
+              onGeneralChange={setTrayColors}
+              onDrawingChange={colors => engine?.setTrayColors(colors)}
+            />
+          )}
         </div>
-        <LayersPanel
-          layers={snapshot.layers}
-          activeLayerId={snapshot.activeLayerId}
-          canDelete={snapshot.canDelete}
-          canMergeDown={snapshot.canMergeDown}
-          onAdd={() => engine?.addLayer()}
-          onAddFolder={() => engine?.addFolder()}
-          onAddOutside={() => engine?.addLayerOutside()}
-          onDelete={() => engine?.deleteLayer()}
-          onDuplicate={() => engine?.duplicateLayer()}
-          onMergeDown={() => engine?.mergeDown()}
-          onSelect={id => engine?.selectLayer(id)}
-          onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
-          onRename={(id, name) => engine?.renameLayer(id, name)}
-          onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
-          onOpenChange={(id, open) => engine?.setFolderOpen(id, open)}
-          onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
-          onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
-          onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}
-          onBlendModeChange={(id, mode) => engine?.setLayerBlendMode(id, mode)}
-          onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
-          onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
-        />
+        <div className="side-panels">
+          <ColorPanel
+            color={color}
+            background={background}
+            recent={recentColors}
+            isTrayOpen={isColorTrayOpen}
+            onColorChange={setColor}
+            onSwap={swapColors}
+            onTrayToggle={() => setIsColorTrayOpen(open => !open)}
+          />
+          <LayersPanel
+            layers={snapshot.layers}
+            activeLayerId={snapshot.activeLayerId}
+            canDelete={snapshot.canDelete}
+            canMergeDown={snapshot.canMergeDown}
+            onAdd={() => engine?.addLayer()}
+            onAddFolder={() => engine?.addFolder()}
+            onAddOutside={() => engine?.addLayerOutside()}
+            onDelete={() => engine?.deleteLayer()}
+            onDuplicate={() => engine?.duplicateLayer()}
+            onMergeDown={() => engine?.mergeDown()}
+            onSelect={id => engine?.selectLayer(id)}
+            onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
+            onRename={(id, name) => engine?.renameLayer(id, name)}
+            onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
+            onOpenChange={(id, open) => engine?.setFolderOpen(id, open)}
+            onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
+            onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
+            onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}
+            onBlendModeChange={(id, mode) => engine?.setLayerBlendMode(id, mode)}
+            onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
+            onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
+          />
+        </div>
       </div>
       {isDroppingFiles && (
         <div className="drop-hint">

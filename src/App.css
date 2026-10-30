@@ -785,3 +785,189 @@ button.layer-name {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The right column: the color panel on top (see ColorPanel.tsx), the layers under it */
+.side-panels {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+}
+
+.side-panels .layers-panel {
+  flex: 1;
+  width: auto;
+  min-height: 0;
+  border-left: none;
+}
+
+.color-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.color-picker {
+  align-self: center;
+  cursor: crosshair;
+  touch-action: none; /* the pen and the fingers drag the colors instead of scrolling */
+}
+
+.color-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* The brush's color in front, the background color behind it, as in Photoshop and Krita */
+.color-swatches {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 30px;
+}
+
+.color-swatch {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 0 1px var(--panel);
+}
+
+.color-swatch.foreground {
+  top: 0;
+  left: 0;
+}
+
+.color-swatch.background {
+  right: 0;
+  bottom: 0;
+}
+
+.color-swap {
+  display: flex;
+  flex-shrink: 0;
+  padding: 3px 4px;
+}
+
+.color-hex {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+}
+
+.color-slider {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-slider input[type='range'] {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+}
+
+.recent-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.recent-color {
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+}
+
+.color-tray-button {
+  display: flex;
+  flex-shrink: 0;
+  padding: 3px 4px;
+}
+
+/* The color tray (see ColorTray.tsx), floating over the drawing next to the color panel */
+.color-tray {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+  max-height: calc(100% - 16px);
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 16px var(--shadow);
+  box-sizing: border-box;
+}
+
+.color-tray h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.color-list h3 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: normal;
+  color: var(--muted);
+}
+
+.color-list ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.color-list li {
+  position: relative;
+}
+
+.tray-color,
+.tray-color-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+}
+
+.tray-color[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Shown over the color while the pointer is on it */
+.tray-color-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.color-list li:hover .tray-color-remove,
+.tray-color-remove:focus-visible {
+  display: flex;
+}

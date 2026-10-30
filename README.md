@@ -12,6 +12,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
 - Tools in a column at the left, like in Photoshop and Krita: brush, eraser, fill bucket, eyedropper, rectangle select,
   lasso, magic wand, move, hand, zoom and rotate view
+- A color panel: a ring of hues around a triangle of shades that turns with it, a background color swapped with X, the
+  color's code, H/S/V sliders and the colors painted with lately; and a color tray of colors kept on purpose, for all
+  drawings or saved with one
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)

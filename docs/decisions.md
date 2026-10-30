@@ -1874,6 +1874,64 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Expand going into its soft edge without crossing it; Shift, Alt and Ctrl+Z; Contiguous off selecting the other side
   of the line too; This layer on an empty layer not looking at the line.
 
+## 65. The color panel
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** the brush's color was the browser's own color picker, in the bar: a window that opens, closes, and
+  looks different in every browser. Painters change color all the time, and I wanted a triangle like Krita's.
+- **Decision:** a color panel in place of it, with the same idea as Krita's triangle, drawn the way Lydia draws:
+  - at the top of the right column, above the layers, always showing (my choice: a color is one click away, without
+    opening anything). The new interface (Interface, in the roadmap) may move it;
+  - a ring of hues around a triangle of the shades of the hue chosen: the pure color in one corner, white and black
+    in the others. The triangle turns with the hue, its pure corner pointing at the hue on the ring (my choice, as in
+    Krita), which ties the two together;
+  - with it (my choices, all four offered): the brush's color and a **background color** behind it, swapped with
+    **X** as in Photoshop and Krita; the color's code (#rrggbb, or #rgb); **H**, **S** and **V** sliders; and the
+    **colors painted with lately**, the last 10, kept between visits.
+- **How:**
+  - `src/colors.ts` turns colors between "#rrggbb" and hue, saturation and value (HSV), and places them in the
+    triangle: a color is made of the pure color's corner as much as s × v, of white's as much as the rest of v, and
+    of black's as much as 1 − v. A gray keeps the hue it had, and black the saturation too, so picking black or
+    white doesn't send the panel back to red.
+  - `src/components/ColorPanel.tsx` draws the ring with a conic gradient and the triangle pixel by pixel, its edges
+    smoothed. A point outside the triangle counts as the nearest point of its edge, so dragging past it keeps going
+    along it, and its corners are easy to reach.
+  - As the color picker did since 0.11.0, dragging shows each step in the panel at once but hands the color on at
+    most once a frame: each new color draws the whole editor again.
+  - The engine tells the editor the color of each stroke of the brush (not the eraser) and each fill once done
+    (`onPaint`); the editor keeps the 10 latest in the browser (`settings.ts`).
+- **Checked:** `tests/app/color-panel.mjs`: the panel above the layers and no color in the bar; the triangle's three
+  corners; a click and a drag on the ring; the triangle turned to the new hue; a typed code, at once or on Enter, and
+  something else dropped; the sliders, and black keeping the hue; X and the button, and X while typing; the recent
+  colors from strokes, one used again moving first, the eraser not counting, a click on one, and kept for the next
+  drawing. The tests that set the color now type it in the panel's code.
+
+## 66. The color tray
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** the colors painted with lately (decision 65) change by themselves: trying other colors pushes the good
+  ones out. I wanted a place to keep colors on purpose and pick them quickly, without the risk of losing them.
+- **Decision:** a **color tray** (my idea), opened and closed by a small button in the color panel, floating over the
+  drawing next to it (my choice, like the tray of images: it doesn't push the layers down). Two lists, both my
+  choice:
+  - **All drawings**: the same in every drawing, kept by the browser;
+  - **This drawing**: the drawing's own, saved in its file, so they go with it to another computer.
+
+  **+** keeps the brush's color at the end of a list (not twice), a click picks a color, and **×** takes one out. At
+  most 60 in each list. The colors stay until taken out.
+
+- **How:**
+  - `src/components/ColorTray.tsx`. The list for all drawings is kept in the browser (`settings.ts`), like the
+    recent colors.
+  - The drawing's list is kept by the engine (`setTrayColors`) and saved in the `.lyd` file as `colors`. Changing it
+    is a change of the drawing, to save, but not a step of undo, like the export scale. Older versions of Lydia don't
+    know `colors`, and open the file without them, so the file's version stays the same.
+- **Checked:** `tests/app/color-tray.mjs`: the button; + in each list, not twice, and only This drawing's changing
+  the drawing; picking and taking out; the list for all drawings kept for a new drawing, whose own is empty; and a
+  drawing saved and opened again with its own colors.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

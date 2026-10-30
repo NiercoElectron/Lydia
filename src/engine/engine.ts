@@ -43,6 +43,7 @@ import {
   EXPORT_SCALES,
   fitsExport,
   MAX_SIZE,
+  MAX_TRAY_COLORS,
   serializeProject,
   type LayerToSave,
   type ProjectData,
@@ -122,6 +123,7 @@ export type EngineSnapshot = {
   canMergeDown: boolean // the active layer can be merged into the one under it (see mergeDown)
   exportScale: number // how many times bigger images are exported
   exportScales: number[] // the ones this drawing's images fit at
+  trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -215,6 +217,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let layersCreated = layers.filter(layer => !isFolder(layer)).length // for naming new layers
   let foldersCreated = layers.length - layersCreated // and folders
   let exportScale = project.exportScale ?? 1
+  let trayColors = project.colors ?? []
   let selection: Selection | null = null // see selection.ts
 
   const memory = createTileMemory(RAW_BUDGET)
@@ -277,8 +280,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Whoever wants the colors picked with the eyedropper (the editor's color). The Brush Designer paints in grays of
   // its own and doesn't listen, so there holding Alt doesn't pick colors
   const colorListeners = new Set<(color: string) => void>()
+  const paintListeners = new Set<(color: string) => void>()
+  const painted = (color: string) => {
+    for (const listener of paintListeners) listener(color)
+  }
   const view = createView(app, world, grid, brush, projection, gpu, {
-    onStrokeEnd: () => changed(),
+    onStrokeEnd: () => {
+      changed()
+      if (brush.settings.tool === 'brush') painted(brush.settings.color)
+    },
     onColorPick: color => {
       for (const listener of colorListeners) listener(color)
     },
@@ -382,6 +392,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       canMergeDown: canMergeDown(),
       exportScale,
       exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
+      trayColors,
     }
   }
 
@@ -941,6 +952,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     changed()
   }
 
+  // The drawing's own colors in the color tray, kept with it like the export scale: not a step of undo
+  function setTrayColors(colors: string[]) {
+    if (colors.length === trayColors.length && colors.every((color, i) => color === trayColors[i])) return
+    trayColors = colors.slice(0, MAX_TRAY_COLORS)
+    changed()
+  }
+
   // The drawing as an image at its full size, or enlarged (see setExportScale): each pixel a square of whole pixels,
   // with nothing blended between them, so pixel art stays sharp. The projection already has the paper and all the
   // visible layers put together, so only its tiles need to be copied
@@ -1044,7 +1062,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const paper = { ...project, exportScale }
+    const paper = { ...project, exportScale, colors: trayColors }
     const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
     isModified = false
     changed(false)
@@ -1057,6 +1075,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function setTool(tool: Tool) {
     view.setTool(tool)
     if (isPaintTool(tool)) brush.settings.tool = tool
+  }
+
+  // Tell "listener" the color of every stroke of the brush (not the eraser) and every fill, once done, for the colors
+  // used lately (see ColorPanel.tsx). Returns a function that stops it
+  function onPaint(listener: (color: string) => void) {
+    paintListeners.add(listener)
+    return () => {
+      paintListeners.delete(listener)
+    }
   }
 
   // Tell "listener" every color picked with the eyedropper. Returns a function that stops it
@@ -1090,13 +1117,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const { tolerance, expand } = fillSettings
       const region = await findFillRegion(grid, reference, seedX, seedY, tolerance, expand)
       const { color, opacity } = brush.settings
-      return changeTiles(layer, region.keys(), (key, tile) => {
+      const didChange = await changeTiles(layer, region.keys(), (key, tile) => {
         const selected = selection ? selection.get(key) : 'full'
         if (!selected) return undefined // not selected at all
         if (layer.alphaLocked && !tile) return undefined // no paint to take the color
         const amounts = selected === 'full' ? undefined : selected
         return fillTile(grid, key, tile, region.get(key)!, color, opacity, memory, amounts, layer.alphaLocked)
       })
+      if (didChange) painted(color)
+      return didChange
     })
   }
 
@@ -1685,6 +1714,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     },
     setTool,
     onColorPick,
+    onPaint,
     setBrush,
     setFill,
     setWand,
@@ -1739,6 +1769,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     straightenView: view.straighten,
     flipView: view.flip,
     setExportScale,
+    setTrayColors,
     exportImage,
     saveProject,
     destroy,

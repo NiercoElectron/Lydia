@@ -62,7 +62,11 @@ export type ProjectData = {
   activeLayer: number // the position of the layer the brush paints on
   view?: ViewData // none for a new drawing, which shows the whole paper
   exportScale?: number // how many times bigger images are exported (see EXPORT_SCALES); 1 when missing
+  colors?: string[] // the drawing's own colors in the color tray (see ColorTray.tsx), "#rrggbb"; none when missing
 }
+
+// At most this many colors in each list of the color tray
+export const MAX_TRAY_COLORS = 60
 
 export type Paper = Pick<ProjectData, 'width' | 'height' | 'background' | 'dpi'>
 
@@ -138,13 +142,14 @@ type FileHeader = {
   activeLayer: number
   view?: ViewData
   exportScale?: number
+  colors?: string[] // older versions of Lydia don't know it, and open the file without them
   layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
 // Turn a drawing into the contents of a .lyd file. "wholeTiles": its tiles are whole, some of them off the paper
 // (version 4); otherwise they are on the paper, cut at its edge
 export function serializeProject(
-  { width, height, background, dpi, exportScale = 1 }: Paper & Pick<ProjectData, 'exportScale'>,
+  { width, height, background, dpi, exportScale = 1, colors = [] }: Paper & Pick<ProjectData, 'exportScale' | 'colors'>,
   activeLayer: number,
   view: ViewData,
   layers: LayerToSave[],
@@ -176,6 +181,7 @@ export function serializeProject(
     activeLayer,
     view,
     exportScale,
+    colors: colors.length > 0 ? colors : undefined,
     layers: layers.map(({ tiles, smart, ...layer }) => ({
       ...layer,
       tiles: entries(tiles),
@@ -241,7 +247,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new LydiaError('LYD-103')
   }
 
-  const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, layers } = header
+  const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, colors, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -338,6 +344,10 @@ export function parseProject(file: ArrayBuffer): ProjectData {
   }
   if (isView(view)) project.view = view
   if (EXPORT_SCALES.includes(exportScale as number)) project.exportScale = exportScale as number
+  if (Array.isArray(colors)) {
+    const kept = colors.filter(isColor).map(color => color.toLowerCase())
+    if (kept.length > 0) project.colors = kept.slice(0, MAX_TRAY_COLORS)
+  }
   return project
 }
 

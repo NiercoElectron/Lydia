@@ -367,7 +367,7 @@ await page.keyboard.up('Alt')
 await sleep(100)
 check(
   'Alt + click picks the color instead of filling',
-  (await page.$eval('.toolbar input[type=color]', i => i.value)) === '#000000' && !(await snapshot()).task,
+  (await page.$eval('input.color-hex', i => i.value)) === '#000000' && !(await snapshot()).task,
 )
 
 // ----- Opacity, on a transparent paper -----

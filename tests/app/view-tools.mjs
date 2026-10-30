@@ -313,7 +313,7 @@ await page.mouse.click(S.x, S.y)
 await sleep(50)
 check(
   'the eyedropper picks under the pointer, turned and flipped',
-  (await page.$eval('.toolbar input[type=color]', i => i.value)) === '#000000',
+  (await page.$eval('input.color-hex', i => i.value)) === '#000000',
 )
 await page.keyboard.press('b')
 

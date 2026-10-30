@@ -7,6 +7,16 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **A color panel**, at the top right, in place of the browser's color picker
+  ([decision 65](docs/decisions.md#65-the-color-panel)): a ring of hues around a triangle of the hue's shades, which
+  turns with it; the brush's color and a background color, swapped with **X**; the color's code (#rrggbb); H, S and V
+  sliders; and the colors painted with lately, kept for the next time.
+- **A color tray** ([decision 66](docs/decisions.md#66-the-color-tray)), opened from the color panel: colors kept on
+  purpose to pick again quickly, which stay until taken out. One list for all drawings, kept by the browser, and one
+  for each drawing, saved in its file.
+
 ## [0.12.0] - 2026-10-29
 
 ### Added

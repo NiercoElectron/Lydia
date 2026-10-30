@@ -68,7 +68,7 @@ const screenOf = (x, y) =>
     x,
     y,
   )
-const colorInput = () => page.$eval('.toolbar input[type=color]', input => input.value)
+const colorInput = () => page.$eval('input.color-hex', input => input.value)
 const pressed = () =>
   page.$$eval('.tool-column button[aria-pressed=true]', buttons => buttons.map(b => b.getAttribute('aria-label')))
 const cursor = () => page.evaluate(() => window.lydia.app.canvas.style.cursor)

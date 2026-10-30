@@ -35,6 +35,7 @@ const startingSnapshot: EngineSnapshot = {
   transform: null,
   canMergeDown: false,
   exportScale: 1,
+  trayColors: [],
   exportScales: [1],
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }

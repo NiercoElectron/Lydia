@@ -115,7 +115,7 @@ const redo = async () => {
 }
 const color = async hex => {
   await page.$eval(
-    'input[type=color]',
+    'input.color-hex',
     (el, v) => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v)
       el.dispatchEvent(new Event('input', { bubbles: true }))

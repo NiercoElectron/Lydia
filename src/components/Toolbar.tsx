@@ -1,5 +1,4 @@
 import { useLanguage } from '../i18n'
-import { useEffect, useRef, useState } from 'react'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
@@ -11,39 +10,6 @@ import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
-
-type ColorInputProps = {
-  color: string
-  disabled: boolean
-  onChange: (color: string) => void
-}
-
-// The brush's color. While a color is dragged in the browser's picker, it tells every step, often several in one
-// frame, and the whole screen would be drawn again for each: the picker itself then stutters. So the new color shows
-// here at once, but is handed on at most once a frame
-function ColorInput({ color, disabled, onChange }: ColorInputProps) {
-  const [shown, setShown] = useState(color)
-  const [given, setGiven] = useState(color) // the color from outside (the eyedropper changes it too)
-  if (color !== given) {
-    setGiven(color)
-    setShown(color)
-  }
-  const latest = useRef(color)
-  const frame = useRef(0)
-  useEffect(() => () => cancelAnimationFrame(frame.current), [])
-
-  function handleChange(value: string) {
-    setShown(value)
-    latest.current = value
-    if (frame.current) return // already handed on in this frame
-    frame.current = requestAnimationFrame(() => {
-      frame.current = 0
-      onChange(latest.current)
-    })
-  }
-
-  return <input type="color" value={shown} disabled={disabled} onChange={e => handleChange(e.target.value)} />
-}
 
 // The selection's settings and commands, shown with the selection tools
 export type SelectionControls = {
@@ -69,7 +35,6 @@ export type TransformControls = {
 
 type Props = {
   tool: Tool
-  color: string
   size: number
   opacity: number // in percent
   fill: FillSettings
@@ -84,7 +49,6 @@ type Props = {
   isFolder: boolean // the active one is a folder, which can't be painted on (see isFolder in layers.ts)
   isPixelBrush: boolean
   isPixelPerfectOn: boolean
-  onColorChange: (color: string) => void
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
@@ -96,12 +60,11 @@ type Props = {
   onPixelPerfectToggle: () => void
 }
 
-// The settings of the chosen tool: the color, then the brush's size and opacity, with its stabilizer and taper under
+// The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity, with its stabilizer and taper under
 // Advanced and, for a pixel brush, Pixel-perfect; the fill bucket's settings, or the selection's, with the magic
 // wand's. The move tool has none. While a transform is made, its own settings instead
 export function Toolbar({
   tool,
-  color,
   size,
   opacity,
   fill,
@@ -116,7 +79,6 @@ export function Toolbar({
   isFolder,
   isPixelBrush,
   isPixelPerfectOn,
-  onColorChange,
   onSizeChange,
   onOpacityChange,
   onFillChange,
@@ -141,10 +103,6 @@ export function Toolbar({
   const isBlocked = transform.isSmartLayer && (tool === 'brush' || tool === 'eraser' || tool === 'fill')
   return (
     <div className="toolbar">
-      <label>
-        {t('Color')}
-        <ColorInput color={color} disabled={tool === 'eraser'} onChange={onColorChange} />
-      </label>
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
       {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}

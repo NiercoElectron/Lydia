@@ -124,7 +124,7 @@ const stroke = (x0, y0, x1, y1) =>
   )
 const setColor = color =>
   page.evaluate(color => {
-    const input = document.querySelector('input[type=color]')
+    const input = document.querySelector('input.color-hex')
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, color)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   }, color)

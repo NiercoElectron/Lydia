@@ -5,6 +5,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 - [The start screen](#the-start-screen)
 - [The editor](#the-editor)
+- [Colors](#colors)
 - [Brush and eraser](#brush-and-eraser)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
@@ -52,18 +53,44 @@ On a Mac, Cmd works wherever Ctrl is written.
   Flip, Fit), Export PNG, Export JPEG, Save and Back. What Lydia is busy with ("Saving…", "Filling…") shows at the
   end.
 - **At the left:** the tools, with the **Tray** button at their foot, then the brushes.
-- **At the right:** the layers.
+- **At the right:** the colors, and the layers under them.
 
 Back goes to the start screen, and asks first when there are changes that weren't saved. So does closing the tab.
 
 Every slider has its number next to it: click the number to type a value. Enter, or clicking elsewhere, keeps it
 (within the slider's range), and Esc leaves it as it was. The zoom and the angle in the bar work the same way.
 
+## Colors
+
+The color panel, at the top right, holds the brush's color, also used by the fill bucket.
+
+- **The ring** chooses the hue: click it or drag round it.
+- **The triangle** inside it holds that hue's shades: its pure color in the corner that points at the hue on the
+  ring, white and black in the others. It turns with the hue. Click or drag in it; dragging past its edge goes along
+  the edge.
+- **The two squares:** the brush's color in front, the **background color** behind. **X**, or the arrows next to them,
+  swap the two.
+- **The code** of the color (#rrggbb): type one to use it; #rgb counts on Enter.
+- **H**, **S** and **V**: the hue (0 to 360°), the saturation (how far from gray) and the value (how far from black),
+  as sliders, for small changes.
+- **The colors painted with lately**, under them, the newest first: each stroke of the brush and each fill adds its
+  color. Click one to use it again. They are kept for the next time.
+
+The eyedropper (I, or Alt while painting) changes the brush's color too.
+
+**The color tray** keeps colors on purpose, to pick them again quickly: unlike the colors painted with lately, they stay
+until taken out. The button with a palette, next to the color's code, opens and closes it, floating over the drawing.
+
+- **All drawings**: the same colors in every drawing, kept by this browser.
+- **This drawing**: the drawing's own colors, saved in its file, so they come back when it is opened, on any
+  computer.
+- **+** keeps the brush's color at the end of a list; click a color to use it; **×**, over a color, takes it out.
+
 ## Brush and eraser
 
 **Brush (B)** paints with the chosen brush and color; **Eraser (E)** takes paint away with the same brush.
 
-- **Color**, **Size** (1 to 500 pixels; **[** and **]** make it smaller and bigger) and **Opacity** in the bar.
+- **Size** (1 to 500 pixels; **[** and **]** make it smaller and bigger) and **Opacity** in the bar.
   Opacity is how much a stroke covers, however many times it passes over the same place.
 - With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
 - Hold **Alt** to pick a color from the drawing while painting.
@@ -314,6 +341,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | V                                              | Move                                               |
 | H / Z / R                                      | Hand / zoom / rotate view                          |
 | [ / ]                                          | Smaller / bigger brush                             |
+| X                                              | Swap the brush's color and the background color    |
 | Alt (hold), with the brush, eraser or bucket   | Pick a color                                       |
 | Shift + click, with the brush or eraser        | Straight line from the end of the last stroke      |
 | Shift + Ctrl + click, with the brush or eraser | The same, keeping to a few angles                  |

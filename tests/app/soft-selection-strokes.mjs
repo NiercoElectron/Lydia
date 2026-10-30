@@ -121,6 +121,9 @@ const edge = await page.evaluate(() => {
   }
   return null
 })
+// Black over white, painted as much as that column is selected: about half, how much exactly depends on the zoom the
+// drawing opens at, and so on the size of the window
+const half = '#' + (255 - edge.amount).toString(16).padStart(2, '0').repeat(3)
 await page.keyboard.press('b')
 await sleep(100)
 // The same stroke along the edge, at two heights: given at once, then a point at a time (200 points, a pixel apart)
@@ -147,7 +150,7 @@ await frames()
 const colors = await page.evaluate(x => [60, 70, 130, 140].map(y => window.lydia.projection.colorAt(x, y)), edge.x)
 check(
   'half selected edge: at once, half the paint',
-  colors[0] === '#808080' && colors[1] === '#808080',
+  colors[0] === half && colors[1] === half,
   colors.slice(0, 2).join(),
 )
 check('…and the same a point at a time', colors[2] === colors[0] && colors[3] === colors[0], colors.slice(2).join())
@@ -252,7 +255,7 @@ const ppA = await region(110),
   ppB = await region(50)
 check(
   'pixel-perfect over the edge: a point at a time and all at once, the same',
-  ppA === ppB && ppA.includes('#808080'),
+  ppA === ppB && ppA.includes(half),
   `${new Set(ppA.split(',')).size} colors`,
 )
 
