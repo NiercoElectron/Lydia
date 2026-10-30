@@ -240,6 +240,44 @@ check('…remembered', remembered === 'off', remembered)
 await click('Outline')
 o = await outline()
 check('on again', o.visible && o.cursor === 'none')
+const full = o.width
+
+// With a pen (decision 69): as big as the pen paints, at its pressure while painting and at the last pressure it
+// painted with while it is in the air. With the mouse, as big as at full pressure again
+const cdp = await page.createCDPSession()
+const pen = async (type, x, y, force, buttons) => {
+  const p = await pageOf(x, y)
+  await cdp.send('Input.dispatchMouseEvent', {
+    type,
+    x: p.x,
+    y: p.y,
+    button: type === 'mouseMoved' ? 'none' : 'left',
+    buttons,
+    clickCount: type === 'mouseMoved' ? 0 : 1,
+    pointerType: 'pen',
+    force,
+  })
+}
+await pen('mouseMoved', 300, 600, 0, 0)
+await pen('mousePressed', 300, 600, 0.3, 1)
+for (let x = 310; x <= 400; x += 10) await pen('mouseMoved', x, 600, 0.3, 1)
+o = await outline()
+check(
+  'painting with a pen at 30%: the outline is the size it paints',
+  o.visible && o.width > 0.2 * full && o.width < 0.4 * full,
+  `${o.width.toFixed(1)} of ${full.toFixed(1)}`,
+)
+await pen('mouseReleased', 400, 600, 0, 0)
+await pen('mouseMoved', 450, 500, 0, 0)
+o = await outline()
+check(
+  '…and the same in the air, at the last pressure',
+  o.visible && o.width > 0.2 * full && o.width < 0.4 * full,
+  `${o.width.toFixed(1)} of ${full.toFixed(1)}`,
+)
+await moveTo(500, 400)
+o = await outline()
+check('with the mouse, full size again', near(o.width, full, 2), `${o.width.toFixed(1)} of ${full.toFixed(1)}`)
 
 check('no errors', problems.length === 0, problems.join(' | '))
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED')

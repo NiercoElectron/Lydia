@@ -15,6 +15,15 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   imported, with its **Depth** and **Scale**. The grain is saved in the brush's file.
 - A **Pencil** brush, with the Paper grain.
 
+### Changed
+
+- Zoomed in, the pixels are **smoothed**, like ibisPaint and Procreate show them, so thin lines don't look like steps
+  ([decision 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)). They are still sharp squares, for pixel art,
+  while a pixel brush is chosen and where the pixel grid shows.
+- With a pen, the **brush's outline** is as big as the pen paints: at its pressure while painting, and at the last
+  pressure with the pen in the air ([decision 69](docs/decisions.md#69-the-brushs-outline-follows-the-pen)). With the
+  mouse, it is still as big as at full pressure.
+
 ## [0.13.0] - 2026-10-29
 
 ### Added

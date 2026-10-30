@@ -52,7 +52,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   and show their paint off the paper
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
-- Zoom, move, turn and flip the view (the drawing itself doesn't change), with the zoom and the angle shown in the bar
+- Zoom, move, turn and flip the view (the drawing itself doesn't change), with the zoom and the angle shown in the
+  bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)

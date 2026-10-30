@@ -1974,6 +1974,47 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   without one saving none, a broken grain, and the limits of Depth and Scale; and in the Brush Designer, choosing a
   grain (Depth goes to 50%), the test area painting with it, an imported image, and saving.
 
+## 68. Smooth pixels when zoomed in
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** zoomed in, Lydia showed every pixel as a sharp square, like Photoshop, which suits pixel art. My artist
+  friend, who draws in ibisPaint, found her lines "checkered": a thin line, a pixel or two wide, turns into steps at
+  600%. ibisPaint and Procreate smooth the pixels when zooming in.
+- **Decision:** zoomed in, the pixels are **smoothed by default** (my choice), and shown as sharp squares only for
+  pixel art: while a pixel brush is chosen, or where the pixel grid shows (from 800%, when it is on). Only the screen
+  changes: the drawing, and what is exported, stay as they are.
+- **How:**
+  - `setZoom` and `setPixelArt` in `projection.ts` choose how the tiles' pictures are read: smoothed
+    ("linear") or sharp ("nearest"). The engine tells it when the brush or the pixel grid changes.
+  - Each tile smoothed on its own can't blend its edge with the next tile's pixels, so a line crossing from one tile to
+    the next showed a step at the edge. So zoomed in and smoothed, in each frame the paper's tiles on the screen are
+    first drawn into one picture, a pixel of it for each pixel of the paper, where the tiles meet exactly, and the
+    screen shows that picture, smoothed, in their place (`smoothZoom.ts`). Zoomed in, the screen shows few pixels of
+    the paper, so the picture is small, and at 100%, not turned, there is nothing to smooth and no picture is made.
+    Once the frame is drawn, everything is as before, for whatever else draws the drawing. The paint off the paper and the squares of a transparent background are drawn as they were.
+- **Checked:** `tests/app/smooth-zoom.mjs`: smoothed at 644%, as one picture in a frame and as before after it;
+  blended zoomed out; sharp where the pixel grid shows, smoothed again with the grid off; sharp with a pixel brush, and
+  smoothed again with another brush; screenshots of a line across the edge between tiles.
+
+## 69. The brush's outline follows the pen
+
+- **Date:** 2026-10-29
+- **Status:** adopted
+- **Problem:** the brush's outline (decision 45) showed the size the brush paints at full pressure. My artist friend
+  draws with a pen and a big Size, so that the pressure has room: at Size 100 her lines are 5 to 15 pixels, and the
+  outline, a circle of 100, was far bigger than anything she painted.
+- **Decision:** with a pen and a brush whose size follows the pressure, the outline is **as big as the pen paints**
+  (my choice): while painting, at the pen's pressure; with the pen in the air, at the last pressure it painted with,
+  the likeliest size of the next stroke. Before the pen first touches the drawing, and with the mouse, it is as big
+  as at full pressure, as before.
+- **How:** `view.ts` keeps the pen's latest pressure from the pointer's events while it touches the drawing (a pen in
+  the air reports no pressure), and forgets it when the mouse moves. The outline's size is the brush's Size times
+  that pressure.
+- **Checked:** `tests/app/brush-outline.mjs`, with a pen from Chrome's own input (its pointer type and pressure):
+  painting at 30%, the outline is about 30% of the full size, and the same with the pen in the air afterwards; with the
+  mouse, the full size again.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

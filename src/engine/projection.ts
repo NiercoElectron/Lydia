@@ -3,6 +3,7 @@ import type { BLEND_MODES, GlRenderTarget, GlRenderTargetAdaptor, Texture, WebGL
 import { createTileMixer, createTileMover, DRAWN, type LayerBlender, type ShownTile } from './blendModes'
 import { createComposer, type LivePicture, type MovePicture, type PaintOf } from './composer'
 import type { GpuTiles } from './gpuTiles'
+import { PIXEL_GRID_ZOOM } from './pixelGrid'
 import {
   activeIndex,
   blockStart,
@@ -1157,10 +1158,29 @@ export function createProjection(
 
   // ----- Zoom -----
 
-  // Zoomed in, show each pixel as a sharp square (like Photoshop and Krita); zoomed out, blend pixels smoothly
+  // Zoomed out, pixels are blended smoothly. Zoomed in, they are smoothed too, like ibisPaint and Procreate do, so a
+  // line doesn't turn into steps (decision 68), except for pixel art: with a pixel brush, or where the pixel grid shows
+  // (from 800%, when it is on), each pixel is a sharp square, like Photoshop shows it
   let scaleMode: 'nearest' | 'linear' = 'linear'
-  function setZoom(zoom: number) {
-    const mode = zoom >= 1 ? 'nearest' : 'linear'
+  let zoom = 1
+  let isPixelBrush = false
+  let isGridOn = true // as the pixel grid starts (see pixelGrid.ts)
+
+  function setZoom(newZoom: number) {
+    zoom = newZoom
+    applyZoomMode()
+  }
+
+  // Whether the brush chosen is a pixel brush, and whether the pixel grid is on
+  function setPixelArt(pixelBrush: boolean, gridOn: boolean) {
+    isPixelBrush = pixelBrush
+    isGridOn = gridOn
+    applyZoomMode()
+  }
+
+  function applyZoomMode() {
+    const isSharp = zoom >= 1 && (isPixelBrush || (isGridOn && zoom >= PIXEL_GRID_ZOOM))
+    const mode = isSharp ? 'nearest' : 'linear'
     if (mode === scaleMode) return
     scaleMode = mode
     for (const texture of projection.values()) applyScaleMode(texture)
@@ -1257,6 +1277,9 @@ export function createProjection(
     colorAt,
     readLayers,
     setZoom,
+    setPixelArt,
+    // Whether the pixels are shown zoomed in and smoothed now (see smoothZoom.ts)
+    isSmoothZoom: () => zoom >= 1 && scaleMode === 'linear',
     destroy,
   }
 }

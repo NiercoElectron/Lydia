@@ -490,9 +490,13 @@ export function createView(
   // ----- The brush's outline -----
 
   // With the brush or the eraser, the outline of the brush's tip follows the pointer, over everything, as big as the
-  // brush paints at full pressure and turned as its tip is, so the size and the shape of the brush show before
-  // painting. It takes the cursor's place, unless it would be too small to see. White with a black line inside, like a
-  // selection's outline, and drawn again only when what it shows changes
+  // brush paints and turned as its tip is, so the size and the shape of the brush show before painting. It takes the
+  // cursor's place, unless it would be too small to see. White with a black line inside, like a selection's outline,
+  // and drawn again only when what it shows changes.
+  //
+  // With the mouse, it is as big as the brush paints at full pressure. With a pen and a brush whose size follows the
+  // pressure, it is as big as the pen paints now: while painting, at the pen's pressure, and while the pen is in the
+  // air, at the last pressure it painted with, so the outline is the size the next stroke will likely be (decision 69)
   const brushOutline = new Graphics()
   app.stage.addChild(brushOutline)
   let isOutlineOn = true
@@ -500,11 +504,20 @@ export function createView(
   let pointer: Point | null = null // where the pointer is on the canvas, or null when it isn't over it
   let outlineKey = '' // what the outline was last drawn for: where, how big, how turned, and the view
   let outlineTip: BrushTip | null = null
+  // The pen's latest pressure while it touched the drawing, kept while it is in the air; null with the mouse, or a pen
+  // that hasn't touched the drawing yet
+  let penPressure: number | null = null
+
+  function notePressure(e: PointerEvent) {
+    if (e.pointerType !== 'pen') penPressure = null
+    else if (e.buttons & 1 && e.pressure > 0) penPressure = e.pressure
+  }
 
   function showBrushOutline() {
     const at = pointer
     const used = gesture?.tool ?? currentTool()
-    const { size } = brush.settings
+    const pressure = penPressure !== null && brush.getShape().pressureSize ? penPressure : 1
+    const size = brush.settings.size * pressure
     const isShown =
       isOutlineOn &&
       at !== null &&
@@ -649,6 +662,7 @@ export function createView(
   function handlePointerDown(e: PointerEvent) {
     if (gesture) return // already busy with another pointer
     pointer = onScreen(e) // a pen can touch the drawing without hovering over it first
+    notePressure(e)
     if (e.button !== 0 && e.button !== 1) return
     e.preventDefault() // the middle button would otherwise start the browser's auto-scroll
     // That also keeps the keyboard where it was, so take it away from a text field (like the brush name) as any other
@@ -675,6 +689,7 @@ export function createView(
 
   function handlePointerMove(e: PointerEvent) {
     pointer = onScreen(e)
+    notePressure(e)
     if (gesture) {
       if (e.pointerId === gesture.pointerId) gesture.move(e)
       return

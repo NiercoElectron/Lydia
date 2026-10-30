@@ -38,6 +38,7 @@ import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createPixelGrid } from './pixelGrid'
+import { createSmoothZoom } from './smoothZoom'
 import { createProjection } from './projection'
 import {
   EXPORT_SCALES,
@@ -249,6 +250,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   app.stage.addChild(scene)
   app.ticker.add(followZoom)
   const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
+  // Zoomed in, the paper's tiles are shown smoothed as one picture (see smoothZoom.ts)
+  const smoothZoom = createSmoothZoom(
+    renderer,
+    app.ticker,
+    scene,
+    world,
+    projection.container,
+    checkers ? [outside.container, projection.ghost, checkers] : [outside.container, projection.ghost],
+    app.screen,
+    projection.isSmoothZoom,
+  )
   const selectionView = createSelectionView(renderer, app.ticker, app.stage, world, grid, app.screen, () => selection)
 
   // The brush starts as the Soft round brush, until the screen chooses one
@@ -1161,9 +1173,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     }
   }
 
-  // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes
+  // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes. A pixel brush
+  // shows the pixels zoomed in as sharp squares (see setZoom in projection.ts)
   function setBrushTip(tip: BrushTip, shape: BrushShape) {
     brush.setTip(tip, shape)
+    projection.setPixelArt(shape.pixel !== 'none', isGridOn)
   }
 
   // ----- Selection -----
@@ -1668,9 +1682,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // ----- Pixel grid -----
 
-  // Turn the pixel grid on or off. When on, it shows from 800% zoom (see pixelGrid.ts)
+  // Turn the pixel grid on or off. When on, it shows from 800% zoom (see pixelGrid.ts), with the pixels as sharp
+  // squares (see setZoom in projection.ts)
+  let isGridOn = true
   function setPixelGrid(on: boolean) {
+    isGridOn = on
     pixelGrid.setOn(on)
+    projection.setPixelArt(brush.getShape().pixel !== 'none', on)
   }
 
   // ----- The brush's outline -----
@@ -1692,6 +1710,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     app.ticker.remove(backgroundWork)
     app.ticker.remove(followZoom)
     pixelGrid.destroy()
+    smoothZoom.destroy()
     outside.destroy()
     transform?.view.destroy()
     selectionView.destroy()

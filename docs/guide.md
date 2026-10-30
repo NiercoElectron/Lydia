@@ -99,7 +99,8 @@ until taken out. The button with a palette, next to the color's code, opens and 
   clean angles of pixel art (1 pixel across for 1, 2 or 3 down, or the other way round, across and down), in equal
   steps; with the others, every 15°.
 - **The outline:** over the drawing, the brush shows the outline of its tip instead of the cursor, as big as it paints
-  at full pressure and turned as it paints (brushes like Dashes turn it with the stroke). The Pixel brush's outline
+  and turned as it paints (brushes like Dashes turn it with the stroke). With the mouse, that is its size at full
+  pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with. The Pixel brush's outline
   goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.
 - **Advanced**, in the bar, opens a panel over the drawing with the settings changed less often: the stabilizer and
@@ -139,7 +140,8 @@ until taken out. The button with a palette, next to the color's code, opens and 
 - **Pixel brushes drawn in the Brush Designer** paint their tip as it was drawn, pixel by pixel, at 1×, 2×, 3×… its
   size: the **Size** goes to the nearest of them (a tip of 5 pixels paints 5 at sizes up to 7, 10 at sizes 8 to 12…).
   Choosing one sets the Size to 1×.
-- **The pixel grid** shows the pixels from 800% zoom: the **Grid** button, or **G**, turns it on and off.
+- **The pixel grid** shows the pixels from 800% zoom, as sharp squares: the **Grid** button, or **G**, turns it on
+  and off.
 - With a selection, the brush and the eraser only work inside it. A smart object can't be painted on (see
   [Transforming](#transforming-and-smart-objects)).
 
@@ -290,6 +292,8 @@ Changing the view never changes the drawing.
 - **Flip** like in a mirror, to check a drawing with fresh eyes: **M**, or the Flip button.
 - **Fit**, or **Ctrl+0**, shows the whole drawing.
 - The bar shows the zoom and the angle: click either one to type it (a zoom from 1% to 3200%, any angle).
+- Zoomed in, the pixels are smoothed. While a pixel brush is chosen, and where the pixel grid shows, they are sharp
+  squares instead, for pixel art.
 
 ## Undo and redo
 
