@@ -3,12 +3,12 @@
 // remembered after a reload, a display at 150%, the Brush Designer, and what it costs per frame
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
   cacheDir: CACHE_DIR,
-  server: { port: 5198, strictPort: true },
+  server: { port: PORT, strictPort: true },
   logLevel: 'silent',
 })
 await server.listen()
@@ -130,7 +130,7 @@ function expectedLines(origin, zoom, resolution, from, count, paperSize) {
   return Array.from({ length: count }, (_, i) => lines.has(from + i))
 }
 
-await page.goto('http://localhost:5198/', { waitUntil: 'networkidle0' })
+await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle0' })
 await page.evaluate(() => {
   localStorage.clear()
   indexedDB.deleteDatabase('lydia')

@@ -2,12 +2,12 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
   cacheDir: CACHE_DIR,
-  server: { port: 5198, strictPort: true },
+  server: { port: PORT, strictPort: true },
   logLevel: 'silent',
 })
 await server.listen()
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`)
 }
 await page.setViewport({ width: 1600, height: 900 })
-await page.goto('http://localhost:5198/', { waitUntil: 'networkidle0' })
+await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle0' })
 
 const versions = (fs.readFileSync(ROOT + '/CHANGELOG.md', 'utf8').match(/^## \[\d+\.\d+\.\d+\]/gm) || []).length
 const shown = await page.$$eval('.whats-new details', ds =>

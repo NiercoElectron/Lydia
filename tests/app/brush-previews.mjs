@@ -2,12 +2,12 @@
 // release PixiJS's global resources, which broke the next preview (the Designer's test area fell on its first stroke)
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
   cacheDir: CACHE_DIR,
-  server: { port: 5198, strictPort: true },
+  server: { port: PORT, strictPort: true },
   logLevel: 'silent',
 })
 await server.listen()
@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 }
 await page.setViewport({ width: 1400, height: 900 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
-await page.goto('http://localhost:5198/', { waitUntil: 'networkidle0' })
+await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle0' })
 const tryPreview = label =>
   page.evaluate(async label => {
     const { createPreviewSurface, sampleWave } = await import('/src/engine/previewSurface.ts')

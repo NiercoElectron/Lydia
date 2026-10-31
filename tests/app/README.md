@@ -11,14 +11,16 @@ You need Google Chrome (Lydia needs WebGL 2, which Chrome has even with no windo
 set `CHROME_PATH` to it.
 
 ```bash
-npm run test:app                          # all of them, one after the other (a few minutes)
+npm run test:app                          # all of them, four at a time (a few minutes)
 npm run test:app -- folders blend-modes   # only these
 node tests/app/folders.mjs                # one, with a line for each thing it checks
 ```
 
 Each test prints `ok` or `FAIL` for each thing it checks, and `ALL PASSED` at the end when nothing failed;
-`npm run test:app` prints the failed lines, and a line for each test. The tests use port 5198, so they don't disturb
-the development server, and they write what they make (screenshots to look at, drawings they save and open again)
+`npm run test:app` prints the failed lines, and a line for each test. The ones that measure time run alone at the end, as
+`ALONE` in `run.mjs` says, since the others would slow them down, and fail only when three tries in a row do; `miss` is
+a try that didn't pass. A test uses port 5198, and side by side the ones up to
+5201, so they don't disturb the development server, and they write what they make (screenshots to look at, drawings they save and open again)
 into `tests/app/output`, which isn't kept in git. `tests/app/files` has drawings saved by older versions of Lydia,
 which it must still open; a test never needs what another one made, so they can run in any order.
 

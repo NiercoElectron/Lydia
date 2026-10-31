@@ -2,13 +2,13 @@ import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, CHROME, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, CHROME, OUT, PORT, ROOT } from './setup.mjs'
 
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
   cacheDir: CACHE_DIR,
-  server: { port: 5198, strictPort: true },
+  server: { port: PORT, strictPort: true },
   logLevel: 'silent',
 })
 let browser
@@ -64,7 +64,7 @@ try {
     await page.evaluateOnNewDocument(systemLanguage => {
       Object.defineProperty(navigator, 'languages', { get: () => [systemLanguage] })
     }, words.systemLanguage)
-    await page.goto('http://localhost:5198')
+    await page.goto(`http://localhost:${PORT}`)
     await page.waitForSelector('.home-actions button')
     assert.equal(await page.$eval('html', el => el.lang), words.locale)
     assert.equal(await page.$eval('.home-actions button', el => el.textContent), words.newAction)
@@ -113,7 +113,7 @@ try {
     // Existing screens update when the preference changes in another tab.
     const other = await session.newPage()
     await other.setViewport({ width: 1600, height: 1000 })
-    await other.goto('http://localhost:5198')
+    await other.goto(`http://localhost:${PORT}`)
     await other.waitForSelector('.theme-choice select')
     await other.select('.theme-choice select', 'en')
     await page.waitForFunction(() => document.querySelector('.layers-panel h2')?.textContent === 'Layers')

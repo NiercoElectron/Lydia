@@ -12,8 +12,13 @@ export const OUT = resolve(here, 'output').replaceAll('\\', '/')
 mkdirSync(OUT, { recursive: true })
 // Drawings saved by older versions of Lydia, which it must still open
 export const FILES = resolve(here, 'files').replaceAll('\\', '/')
-// Apart from the cache of the development server, so that the tests never disturb it
-export const CACHE_DIR = resolve(ROOT, 'node_modules/.vite-app-tests').replaceAll('\\', '/')
+// The port of the tests' own server, and Vite's cache, apart from the development server's so that the tests never disturb
+// it. Tests side by side have one of each (see run.mjs)
+export const PORT = Number(process.env.LYDIA_TEST_PORT ?? 5198)
+export const CACHE_DIR = resolve(ROOT, `node_modules/.vite-app-tests${process.env.LYDIA_TEST_CACHE ?? ''}`).replaceAll(
+  '\\',
+  '/',
+)
 
 // Google Chrome, or the browser in CHROME_PATH. Lydia needs WebGL 2, which Chrome has even with no window
 const CHROME_PLACES = {

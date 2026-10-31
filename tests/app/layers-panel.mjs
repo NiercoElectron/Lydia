@@ -2,13 +2,13 @@
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import fs from 'fs'
-import { CACHE_DIR, LAUNCH, OUT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
 
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
   cacheDir: CACHE_DIR,
-  server: { port: 5198, strictPort: true },
+  server: { port: PORT, strictPort: true },
   logLevel: 'silent',
 })
 await server.listen()
@@ -139,7 +139,7 @@ const RED = [230, 57, 70],
   WHITE = [255, 255, 255]
 
 // ----- Three layers: black across, red down, blue on a diagonal -----
-await page.goto('http://localhost:5198/', { waitUntil: 'networkidle0' })
+await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle0' })
 for (const el of await (async () => {
   await page.evaluate(() =>
     [...document.querySelectorAll('button')].find(b => b.textContent === 'New project…').click(),
