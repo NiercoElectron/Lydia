@@ -4,7 +4,15 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
-import { isMixTool, isPaintTool, usesTip, type Tool, type TransformMode } from '../engine/tools'
+import {
+  hasStrength,
+  isPaintTool,
+  LIQUIFY_MODES,
+  usesTip,
+  type LiquifyMode,
+  type Tool,
+  type TransformMode,
+} from '../engine/tools'
 import { WARP_SIDES } from '../engine/warp'
 import { AdvancedMenu } from './AdvancedMenu'
 import { SliderValue } from './SliderValue'
@@ -40,7 +48,8 @@ type Props = {
   tool: Tool
   size: number
   opacity: number // in percent
-  strength: number // of smudge or blur, in percent
+  strength: number // of smudge, blur or liquify, in percent
+  liquifyMode: LiquifyMode
   fill: FillSettings
   wand: WandSettings
   selection: SelectionControls
@@ -57,6 +66,7 @@ type Props = {
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onStrengthChange: (strength: number) => void
+  onLiquifyModeChange: (mode: LiquifyMode) => void
   onFillChange: (change: Partial<FillSettings>) => void
   onWandChange: (change: Partial<WandSettings>) => void
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
@@ -68,14 +78,15 @@ type Props = {
 }
 
 // The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity, with its stabilizer and taper under
-// Advanced and, for a pixel brush, Pixel-perfect; the size and strength of smudge or blur, with the stabilizer; the
-// fill bucket's settings, or the selection's, with the magic wand's. The move tool has none. While a transform is made,
+// Advanced and, for a pixel brush, Pixel-perfect; the size and strength of smudge, blur or liquify, with the stabilizer
+// and liquify's modes; the fill bucket's settings, or the selection's, with the magic wand's. The move tool has none. While a transform is made,
 // its own settings instead
 export function Toolbar({
   tool,
   size,
   opacity,
   strength,
+  liquifyMode,
   fill,
   wand,
   selection,
@@ -92,6 +103,7 @@ export function Toolbar({
   onSizeChange,
   onOpacityChange,
   onStrengthChange,
+  onLiquifyModeChange,
   onFillChange,
   onWandChange,
   onStabilizerChange,
@@ -141,6 +153,7 @@ export function Toolbar({
       {tool === 'eraser' && isAlphaLocked && !isBlocked && (
         <span className="notice">{t("This layer's transparency is locked: the eraser can't take paint away.")}</span>
       )}
+      {tool === 'liquify' && <LiquifyModes mode={liquifyMode} onChange={onLiquifyModeChange} />}
       {tool !== 'fill' && !isSelecting && !isMoving && (
         <label title={t('Brush size ([ and ])')}>
           {t('Size')}
@@ -154,7 +167,7 @@ export function Toolbar({
           <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={onSizeChange} />
         </label>
       )}
-      {isMixTool(tool) && (
+      {hasStrength(tool) && (
         <label title={t('How much it moves or softens the paint. With a pen, the pressure changes it too')}>
           {t('Strength')}
           <input
@@ -167,7 +180,7 @@ export function Toolbar({
           <SliderValue value={strength} min={1} max={100} unit="%" onChange={onStrengthChange} />
         </label>
       )}
-      {!isSelecting && !isMoving && !isMixTool(tool) && (
+      {!isSelecting && !isMoving && !hasStrength(tool) && (
         <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
           {t('Opacity')}
           <input
@@ -199,6 +212,27 @@ export function Toolbar({
       <SharpButton isOn={isSharpOn} onToggle={onSharpToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
     </div>
+  )
+}
+
+// What liquify does to the picture (see liquify.ts)
+function LiquifyModes({ mode, onChange }: { mode: LiquifyMode; onChange: (mode: LiquifyMode) => void }) {
+  const { t } = useLanguage()
+  const buttons: Record<LiquifyMode, { label: string; title: string }> = {
+    push: { label: t('Push'), title: t('Pushes the picture along the stroke') },
+    bloat: { label: t('Bloat'), title: t('Makes the middle of the brush bigger, more the longer it stays') },
+    pucker: { label: t('Pucker'), title: t('Makes the middle of the brush smaller, pulling in what is around it') },
+    twirl: { label: t('Twirl'), title: t('Turns the picture around the middle of the brush') },
+    reconstruct: { label: t('Reconstruct'), title: t('Brushes the picture back to how it was') },
+  }
+  return (
+    <span className="button-group">
+      {LIQUIFY_MODES.map(each => (
+        <button key={each} aria-pressed={mode === each} onClick={() => onChange(each)} title={buttons[each].title}>
+          {buttons[each].label}
+        </button>
+      ))}
+    </span>
   )
 }
 

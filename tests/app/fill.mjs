@@ -151,7 +151,7 @@ await newDrawing(1500, 1000, false)
 const labels = await page.$$eval('.tool-column button', bs => bs.map(b => b.getAttribute('aria-label')).join())
 check(
   'the column has the fill bucket after the eraser, smudge and blur',
-  labels.startsWith('Brush,Eraser,Smudge,Blur,Fill,'),
+  labels.startsWith('Brush,Eraser,Smudge,Blur,Liquify,Fill,'),
   labels,
 )
 await page.keyboard.press('f')

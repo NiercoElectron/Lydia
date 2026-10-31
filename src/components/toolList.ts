@@ -11,6 +11,7 @@ import {
   RotateCw,
   SquareDashed,
   WandSparkles,
+  Waves,
   ZoomIn,
   type LucideIcon,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
   eraser: { Icon: Eraser, name: 'Eraser', key: 'e' },
   smudge: { Icon: FingerprintPattern, name: 'Smudge', key: 'u', also: 'drags the paint on the layer' },
   blur: { Icon: Droplets, name: 'Blur', key: 'j', also: 'softens the paint on the layer' },
+  liquify: { Icon: Waves, name: 'Liquify', key: 'q', also: 'moves and bends the picture on the layer' },
   fill: { Icon: PaintBucket, name: 'Fill', key: 'f', also: 'Alt picks a color' },
   eyedropper: { Icon: Pipette, name: 'Eyedropper', key: 'i', also: 'or hold Alt while painting' },
   select: { Icon: SquareDashed, name: 'Rectangle select', key: 's', also: 'Shift adds, Alt takes away' },

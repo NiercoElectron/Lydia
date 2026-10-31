@@ -10,7 +10,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   choose from
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
-- Tools in a column at the left, like in Photoshop and Krita: brush, eraser, smudge, blur, fill bucket, eyedropper,
+- Tools in a column at the left, like in Photoshop and Krita: brush, eraser, smudge, blur, liquify, fill bucket, eyedropper,
   rectangle select, lasso, magic wand, move, hand, zoom and rotate view
 - A color panel: a ring of hues around a triangle of shades that turns with it, a background color swapped with X, the
   color's code, H/S/V sliders and the colors painted with lately; and a color tray of colors kept on purpose, for all
@@ -19,6 +19,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
+- Liquify: push, bloat, pucker and twirl the picture with the pen, and brush it back to the very pixels it had, with
+  no loss of sharpness however many strokes
 - Smudge and blur: drag or soften the paint on the active layer through the brush's tip, more or less as the pen
   presses
 - A fill bucket, with a tolerance, looking at all the visible layers or only the active one, and expanding under the
@@ -97,8 +99,8 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Distort: smudge and blur tools and a mesh mode for transforming (both done), and a liquify tool (push, bloat
-      and pucker the picture with the pen, and brush it back to how it was)
+- [x] Distort: smudge and blur tools, a mesh mode for transforming, and a liquify tool (push, bloat, pucker and twirl
+      the picture with the pen, and brush it back to how it was)
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)

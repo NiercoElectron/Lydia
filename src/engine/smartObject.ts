@@ -256,7 +256,7 @@ export async function imageTiles(image: ImageBitmap, pace: () => Promise<void>) 
 // small cells instead, each corner carrying its place in the source, and the graphics card finds each pixel's place
 // between them. The corners of the cells are at multiples of one step, the same in every block, so the blocks' edges
 // meet
-const PAD = 2
+export const PAD = 2
 // The cells of a bent object: at least this many pixels of the source, and at most this many cells across it
 const MIN_CELL = 16
 const MAX_CELLS = 128
@@ -329,6 +329,9 @@ void main(void) {
 }
 `
 
+// The program that draws them, for GlProgram. Liquify draws through the same one, as a bent object (see liquify.ts)
+export const SMART_PROGRAM = { vertex, fragment, name: 'smart-object', preferredFragmentPrecision: 'highp' } as const
+
 // A block of the source, ready to draw: its texture with a border, the part of the source it draws, and three meshes
 // sharing one shape: one for the screen (cut at the paper's edge, see projection.ts), one for its faded part off the
 // paper, and one for drawing into the layer's tiles
@@ -350,7 +353,7 @@ const BLOCK_SIZE = BLOCK_TILES * TILE_SIZE
 
 // Draws smart objects: on the screen while they are transformed, and into their layer's tiles
 export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: SmartObject) {
-  const glProgram = GlProgram.from({ vertex, fragment, name: 'smart-object', preferredFragmentPrecision: 'highp' })
+  const glProgram = GlProgram.from(SMART_PROGRAM)
   const shared = new UniformGroup({
     uInverse: { value: new Float32Array(9), type: 'mat3x3<f32>' },
     uBent: { value: object.warp ? 1 : 0, type: 'f32' },

@@ -22,6 +22,8 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 //   selection.ts)
 // - "group": several steps that are undone and redone together (a transform that makes a new layer from a selection)
 type TileBackup = StoredTile | null | PendingPixels
+// What else a "tiles" step takes back and forward with the pixels: "swap" does it, and "bytes" is the RAM it keeps
+export type StepSide = { swap: () => void; bytes: number }
 export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'blendMode' | 'clipped' | 'name' | 'smart'>
 // "selection" and "smart" are undefined when the step doesn't keep them; "smart" is null when the layer wasn't a smart
 // object
@@ -31,6 +33,7 @@ type TilesStep = {
   tiles: Map<string, TileBackup>
   selection?: Selection | null
   smart?: SmartObject | null
+  side?: StepSide
 }
 // "parents": the folder each one of "layers" is in (see isFolder in layers.ts)
 type OrderStep = { kind: 'order'; layers: Layer[]; parents: (Layer | null)[]; active: Layer; layer: Layer }
@@ -90,10 +93,11 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
 
   // Finish recording. A change that touched no tiles (a click outside the paper) is not kept: an empty step would make
   // undo seem to do nothing. Returns whether a step was added
-  function end() {
+  function end(side?: StepSide) {
     const step = current
     current = null
     if (!step || step.tiles.size === 0) return false
+    step.side = side
     add(step)
     return true
   }
@@ -196,6 +200,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
         else if (tile === undefined) bytes += TILE_SIZE * TILE_SIZE * 4 // an IOU not filled in yet counts as a whole tile
       }
     }
+    if (step.kind === 'tiles') bytes += step.side?.bytes ?? 0
     if (step.kind === 'selection' || step.kind === 'tiles') bytes += selectionBytes(step.selection ?? null)
     for (const layer of layersKeptBy(step)) {
       for (const tile of layer.tiles.values()) bytes += bytesOf(tile)
@@ -241,6 +246,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
       step.layer.smart = step.smart ?? undefined
       step.smart = now
     }
+    step.side?.swap()
   }
 
   // Put the kept list of layers and active layer back, and keep the current ones in the step instead
@@ -303,8 +309,8 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
   function redo() {
     const step = redoStack.pop()
     if (!step) return
+    undoStack.push(step) // first, so that what the step does sees it as the last one
     swap(step)
-    undoStack.push(step)
   }
 
   // Every tile the history keeps, for the memory budget, with the sources of the smart objects it keeps
@@ -335,6 +341,7 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
     undo,
     redo,
     storedTiles,
+    lastStep: () => undoStack.at(-1) ?? null,
     canUndo: () => undoStack.length > 0,
     canRedo: () => redoStack.length > 0,
   }

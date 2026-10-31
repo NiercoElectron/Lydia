@@ -8,6 +8,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Colors](#colors)
 - [Brush and eraser](#brush-and-eraser)
 - [Smudge and blur](#smudge-and-blur)
+- [Liquify](#liquify)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -159,6 +160,29 @@ passes.
 - With a selection, they only change what is inside it. With the layer's transparency locked, they only color the paint
   already there.
 - **The stabilizer**, under Advanced, works here too.
+
+## Liquify
+
+**Liquify (Q)** moves the picture on the active layer instead of painting on it. Choose what it does in the bar:
+
+- **Push** moves the picture along the stroke. At 100% it follows the pen.
+- **Bloat** makes the middle of the brush bigger, and **Pucker** smaller, pulling in what is around it.
+- **Twirl** turns the picture around the middle of the brush.
+- **Reconstruct** brushes the picture back to how it was, to the very pixels.
+
+More about it:
+
+- Each stroke is on the layer at once, and Ctrl+Z undoes it. There is nothing to apply, and you can paint on the layer
+  right after.
+- Bloat, Pucker, Twirl and Reconstruct go on working while the pen holds still: hold it longer for more.
+- **Size** and **Strength** are in the bar, kept apart from the brush's. With a pen, pressing harder makes it stronger; the
+  size stays. The brush is always round and soft, whichever is chosen.
+- Many strokes don't make the picture softer, because each pixel is worked out from the original.
+- **How far back Reconstruct goes:** to the layer as it was before the strokes in a row. Painting, or anything else that
+  changes the drawing, or choosing another layer, starts again from the layer as it is then. Ctrl+Z still goes back as
+  far as ever.
+- It only changes the active layer. With a selection, only what is inside it; with the layer's transparency locked, only
+  the colors. A smart object can't be changed until it is converted to pixels.
 
 ## Eyedropper
 
@@ -379,6 +403,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | ---------------------------------------------- | -------------------------------------------------- |
 | B / E                                          | Brush / eraser                                     |
 | U / J                                          | Smudge / blur                                      |
+| Q                                              | Liquify                                            |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |

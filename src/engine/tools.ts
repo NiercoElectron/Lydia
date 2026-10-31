@@ -4,6 +4,7 @@ export type Tool =
   | 'eraser'
   | 'smudge'
   | 'blur'
+  | 'liquify'
   | 'fill'
   | 'eyedropper'
   | 'select'
@@ -27,5 +28,16 @@ export type MixTool = 'smudge' | 'blur'
 
 export const isMixTool = (tool: Tool): tool is MixTool => tool === 'smudge' || tool === 'blur'
 
-// The tools with the brush's tip under the pointer
-export const usesTip = (tool: Tool) => isPaintTool(tool) || isMixTool(tool)
+// How liquify moves the picture (see liquify.ts): along the stroke, out from the middle of the dab or in toward it,
+// round it, or back to how it was
+export type LiquifyMode = 'push' | 'bloat' | 'pucker' | 'twirl' | 'reconstruct'
+
+export const LIQUIFY_MODES: LiquifyMode[] = ['push', 'bloat', 'pucker', 'twirl', 'reconstruct']
+
+// The tools with a strength in place of an opacity, and a size of their own
+export type StrengthTool = MixTool | 'liquify'
+
+export const hasStrength = (tool: Tool): tool is StrengthTool => isMixTool(tool) || tool === 'liquify'
+
+// The tools that work where the brush's outline is, under the pointer
+export const usesTip = (tool: Tool) => isPaintTool(tool) || hasStrength(tool)

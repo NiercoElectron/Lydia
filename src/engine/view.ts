@@ -5,6 +5,7 @@ import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
+import { MIN_LIQUIFY_SIZE, type Liquify } from './liquify'
 import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
@@ -12,7 +13,7 @@ import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
 import { tilesInRect, type Grid } from './tiles'
-import { isMixTool, isPaintTool, usesTip, type Tool } from './tools'
+import { hasStrength, isPaintTool, usesTip, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, movedWarp, transformed, type TransformTarget } from './transformHandles'
 import type { Warp } from './warp'
 
@@ -31,6 +32,7 @@ const CURSORS: Record<Tool, string> = {
   eraser: 'crosshair',
   smudge: 'crosshair',
   blur: 'crosshair',
+  liquify: 'crosshair',
   fill: FILL_CURSOR,
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
@@ -86,6 +88,7 @@ export function createView(
   grid: Grid,
   brush: Brush,
   mixTools: MixTools,
+  liquify: Liquify,
   projection: Projection,
   gpu: GpuTiles,
   actions: ViewActions,
@@ -251,23 +254,23 @@ export function createView(
     }
   }
 
-  // Smudge and blur go along the pointer like the brush, stabilizer included (see mixTools.ts)
-  function mix(e: PointerEvent): Gesture {
+  // Smudge, blur and liquify go along the pointer like the brush, stabilizer included (see mixTools.ts and liquify.ts)
+  function layerStroke(e: PointerEvent, worker: MixTools | Liquify): Gesture {
     hoverPoint = null
     const point = { ...toPaper(e), pressure: pressureOf(e) }
-    mixTools.startStroke(point.x, point.y, point.pressure)
+    worker.startStroke(point.x, point.y, point.pressure)
     if (stabilizerSettings.strength > 0) {
       stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
     }
     return {
       move(e) {
         const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
-        mixTools.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
+        worker.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
       },
       up(e) {
-        if (stabilizer && e.type === 'pointerup') mixTools.continueStroke(stabilizer.finish())
+        if (stabilizer && e.type === 'pointerup') worker.continueStroke(stabilizer.finish())
         stabilizer = null
-        if (mixTools.endStroke()) actions.onMixEnd()
+        if (worker.endStroke()) actions.onMixEnd()
       },
     }
   }
@@ -470,8 +473,9 @@ export function createView(
   const startGesture: Record<Tool, (e: PointerEvent) => Gesture> = {
     brush: paint,
     eraser: paint,
-    smudge: mix,
-    blur: mix,
+    smudge: e => layerStroke(e, mixTools),
+    blur: e => layerStroke(e, mixTools),
+    liquify: e => layerStroke(e, liquify),
     fill,
     eyedropper: pick,
     select: selectRectangle,
@@ -553,9 +557,10 @@ export function createView(
   function showBrushOutline() {
     const at = pointer
     const used = gesture?.tool ?? currentTool()
-    // Smudge and blur keep their size: the pen's pressure changes their strength
-    const pressure = penPressure !== null && brush.getShape().pressureSize && !isMixTool(used) ? penPressure : 1
-    const size = brush.settings.size * pressure
+    // Smudge, blur and liquify keep their size: the pen's pressure changes their strength
+    const pressure = penPressure !== null && brush.getShape().pressureSize && !hasStrength(used) ? penPressure : 1
+    const isCircle = used === 'liquify' // it doesn't work through the brush's tip
+    const size = isCircle ? Math.max(brush.settings.size, MIN_LIQUIFY_SIZE) : brush.settings.size * pressure
     const isShown =
       isOutlineOn &&
       at !== null &&
@@ -583,7 +588,7 @@ export function createView(
     const angle = brush.tipAngle()
     const { position, scale, rotation } = world
     const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle, line?.from.x, line?.from.y]
-      .concat([position.x, position.y, scale.x, scale.y, rotation])
+      .concat([position.x, position.y, scale.x, scale.y, rotation, isCircle])
       .join()
     if (key === outlineKey && tip === outlineTip) return
     outlineKey = key
@@ -592,6 +597,12 @@ export function createView(
     let loops: Point[][] = []
     if (!isShown) {
       // only the line
+    } else if (isCircle) {
+      const points = Math.max(32, Math.ceil(size * currentZoom()))
+      const circle = Array.from({ length: Math.min(points, 256) }, (_, i) => (i * 2 * Math.PI) / Math.min(points, 256))
+      loops = [
+        circle.map(turn => ({ x: center.x + (Math.cos(turn) * size) / 2, y: center.y + (Math.sin(turn) * size) / 2 })),
+      ]
     } else if (isPixel) {
       loops = pixelBrushOutline(tip, pixelTip === 'drawn', size, center)
     } else {
@@ -637,9 +648,15 @@ export function createView(
   let stabilizerSettings = DEFAULT_STABILIZER
   let stabilizer: Stabilizer | null = null // the stroke's, while painting with it on (see stabilizer.ts)
 
-  // While painting with the stabilizer, the brush goes on toward the pen every frame, even when the pen holds still
+  // While painting with the stabilizer, the brush goes on toward the pen every frame, even when the pen holds still, and
+  // liquify goes on working where it is
   function keepStabilizing() {
-    if (stabilizer) brush.continueStroke(stabilizer.wait(performance.now()))
+    const stroke = gesture?.tool
+    if (stabilizer) {
+      const worker = stroke === 'liquify' ? liquify : stroke === 'smudge' || stroke === 'blur' ? mixTools : brush
+      worker.continueStroke(stabilizer.wait(performance.now()))
+    }
+    if (stroke === 'liquify') liquify.hold()
   }
 
   // How strokes are smoothed from the next one on

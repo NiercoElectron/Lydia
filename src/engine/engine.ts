@@ -37,6 +37,7 @@ import {
 import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
+import { createLiquify } from './liquify'
 import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
 import { createSmoothZoom } from './smoothZoom'
@@ -90,7 +91,7 @@ import {
   wholeTileMask,
   type Grid,
 } from './tiles'
-import { isMixTool, isPaintTool, usesTip, type Tool, type TransformMode } from './tools'
+import { isMixTool, isPaintTool, usesTip, type LiquifyMode, type Tool, type TransformMode } from './tools'
 import { DEFAULT_WARP_SIDE, flatWarp, isFlatWarp, resizedWarp, type Warp } from './warp'
 import { createView } from './view'
 
@@ -302,7 +303,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     for (const listener of paintListeners) listener(color)
   }
   const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView)
-  const view = createView(app, world, grid, brush, mixTools, projection, gpu, {
+  const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView)
+  const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, {
     onStrokeEnd: () => {
       changed()
       if (brush.settings.tool === 'brush') painted(brush.settings.color)
@@ -433,6 +435,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Something changed: make a new snapshot and tell whoever is listening. "modified" = the drawing itself changed
   function changed(modified = true) {
     if (modified) isModified = true
+    liquify.forgetStale()
     outside.update(outsideHidden)
     snapshot = makeSnapshot()
     for (const listener of listeners) listener()
@@ -477,6 +480,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       if (layer.smart) yield* layer.smart.source.tiles.values()
     }
     yield* history.storedTiles()
+    yield* liquify.storedTiles()
   }
 
   // ----- Work over several frames -----
@@ -1147,9 +1151,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     if (isMixTool(tool)) mixTools.settings.tool = tool
   }
 
-  // How strongly smudge or blur work, from 0 to 1 (see mixTools.ts). Each has its own: this is the chosen tool's
+  // How strongly smudge, blur or liquify work, from 0 to 1 (see mixTools.ts and liquify.ts). Each has its own: this is
+  // the chosen tool's
   function setMixStrength(strength: number) {
     mixTools.settings.strength = strength
+    liquify.settings.strength = strength
+  }
+
+  function setLiquifyMode(mode: LiquifyMode) {
+    liquify.settings.mode = mode
   }
 
   // Tell "listener" the color of every stroke of the brush (not the eraser) and every fill, once done, for the colors
@@ -1855,6 +1865,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     view.destroy()
     brush.destroy()
     mixTools.destroy()
+    liquify.destroy()
     projection.destroy()
     blender.destroy()
     gpu.destroy()
@@ -1877,6 +1888,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setWand,
     setBrushTip,
     setMixStrength,
+    setLiquifyMode,
     setPixelGrid,
     setSharpPixels,
     setBrushOutline,
@@ -1936,7 +1948,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     saveProject,
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)
-    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, mixTools, world, pixelGrid, selectionView }),
+    inspect: () => ({
+      app,
+      stack,
+      gpu,
+      projection,
+      history,
+      memory,
+      brush,
+      mixTools,
+      liquify,
+      world,
+      pixelGrid,
+      selectionView,
+    }),
   }
 
   return engine

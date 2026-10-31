@@ -11,15 +11,16 @@ import {
   UniformGroup,
   type WebGLRenderer,
 } from 'pixi.js'
-import type { Brush, StrokeCutter } from './brush'
+import type { Brush } from './brush'
 import { DEFAULT_SHAPE } from './brushFile'
 import type { BrushTip } from './brushTip'
 import { createDabPath, type Dab, type DabPath, type StrokePoint } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
-import { LOCKED_ALPHA, type Layer, type LayerStack } from './layers'
+import type { Layer, LayerStack } from './layers'
 import type { Projection } from './projection'
-import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, type Grid } from './tiles'
+import { createTileWriter, type LayerSelection } from './tileWriter'
+import { TILE_SIZE, tileKey, tilesInRect, type Grid } from './tiles'
 import type { MixTool } from './tools'
 
 // Smudge and blur (decision 71): tools that paint with the paint already on the active layer, through the chosen
@@ -110,9 +111,11 @@ export function createMixTools(
   projection: Projection,
   history: History,
   brush: Brush,
-  selection: StrokeCutter & { cutAway: (texture: RenderTexture, key: string) => void },
+  selection: LayerSelection,
 ) {
   const settings: { tool: MixTool; strength: number } = { tool: 'smudge', strength: 0.5 }
+  const writer = createTileWriter(renderer, gpu, projection, history, selection)
+  const { clear, draw } = writer
 
   // ----- Drawing on the graphics card -----
 
@@ -153,25 +156,9 @@ export function createMixTools(
   const blurRoot = new Container()
   blurRoot.addChild(new Mesh({ geometry, shader: blurShader }))
 
-  // PixiJS ignores the blend mode of what it is asked to render, so the sprite goes inside a container
-  const copyRoot = new Container()
-  const copySprite = new Sprite()
-  copyRoot.addChild(copySprite)
-  const nothing = new Container()
   // The tiles under a dab, put together
   const readRoot = new Container()
   const readSprites: Sprite[] = []
-
-  const clear = (target: RenderTexture) =>
-    renderer.render({ container: nothing, target, clear: true, clearColor: [0, 0, 0, 0] })
-
-  // Draw "from" into "target" at (x, y). "none": in place of what is there
-  function draw(from: Texture, target: RenderTexture, x = 0, y = 0, blendMode: string = 'none') {
-    copySprite.texture = from
-    copySprite.position.set(x, y)
-    copySprite.blendMode = blendMode as Sprite['blendMode']
-    renderer.render({ container: copyRoot, target, clear: false })
-  }
 
   // ----- The stroke -----
 
@@ -194,7 +181,6 @@ export function createMixTools(
   const beforeTiles = new Map<string, RenderTexture>()
   const spareTiles: RenderTexture[] = []
   const spareTile = () => spareTiles.pop() ?? RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
-  let kept: RenderTexture | null = null // a tile for working out what goes on the layer
 
   function setBoxes(newSide: number) {
     if (boxes && newSide === side) return
@@ -330,43 +316,11 @@ export function createMixTools(
     writeBox(left, top, touched)
   }
 
-  // What the work tile gives the layer's tile: only the paint of the layer's tile when its transparency is locked,
-  // and only what is selected
-  function publish(key: string) {
-    if (!selection.canPaint(key)) return
-    const { column, row } = parseTileKey(key)
-    history.backUpTile(key) // before the tile changes: the graphics card works in order
-    const target = gpu.getTexture(layer!, column, row, true)!
-    const work = workTiles.get(key)!
-    const before = beforeTiles.get(key)
-    if (!before) {
-      draw(work, target)
-    } else {
-      kept ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
-      if (layer!.alphaLocked) {
-        draw(before, kept)
-        draw(work, kept, 0, 0, LOCKED_ALPHA)
-      } else {
-        draw(work, kept)
-      }
-      if (selection.isCut(key)) {
-        selection.cut(kept, key)
-        draw(before, target)
-        selection.cutAway(target, key)
-        draw(kept, target, 0, 0, 'add')
-      } else {
-        draw(kept, target)
-      }
-    }
-    gpu.markDirty(layer!, key)
-    projection.composeTile(column, row)
-  }
-
   function workDabs(dabs: Dab[]) {
     const touched = new Set<string>()
     const workDab = tool === 'smudge' ? smudgeDab : blurDab
     for (const dab of dabs) workDab(dab, Math.floor(dab.x - side / 2), Math.floor(dab.y - side / 2), touched)
-    for (const key of touched) publish(key)
+    for (const key of touched) writer.publish(layer!, key, workTiles.get(key)!, beforeTiles.get(key))
   }
 
   // Start a stroke at this point of the paper, with the brush's tip, at the size of the brush. The pen's pressure goes
@@ -407,12 +361,12 @@ export function createMixTools(
     forgetBoxes()
     mixShader.resources.uTip = Texture.EMPTY.source
     tipTexture?.destroy(true)
-    for (const root of [mixRoot, blurRoot, copyRoot, readRoot]) root.destroy({ children: true })
+    for (const root of [mixRoot, blurRoot, readRoot]) root.destroy({ children: true })
     for (const sprite of readSprites) if (!sprite.destroyed) sprite.destroy()
     mixShader.destroy()
     blurShader.destroy()
     geometry.destroy()
-    kept?.destroy(true)
+    writer.destroy()
     for (const texture of [...workTiles.values(), ...beforeTiles.values(), ...spareTiles]) texture.destroy(true)
   }
 

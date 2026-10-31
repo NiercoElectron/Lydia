@@ -17,6 +17,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   curve. It works together with Free, and stays in the smart object and in the drawing's file, so it can be changed
   again.
 - **Undo inside a transform:** while it is made, Ctrl+Z and Ctrl+Shift+Z go through each drag of a handle or a point.
+- **Liquify (Q)** ([decision 73](docs/decisions.md#73-liquify)), after Blur in the tool column: a pen that moves the
+  picture on the active layer instead of painting on it. **Push** follows the stroke, **Bloat** and **Pucker** make the
+  middle of the brush bigger or smaller, **Twirl** turns it, and **Reconstruct** brushes it back to the very pixels it
+  had. Each stroke is on the layer at once, with no Apply, and many strokes don't make the picture softer.
 - A **Sharp** button, next to Grid, shows the pixels as sharp squares at every zoom from 100%, with any brush
   ([decision 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
 

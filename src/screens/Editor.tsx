@@ -31,7 +31,7 @@ import type { Engine, ImageType } from '../engine/engine'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
-import { isMixTool, type MixTool, type Tool } from '../engine/tools'
+import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
 import { isTyping } from '../engine/view'
 import {
@@ -65,12 +65,14 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   const [isColorTrayOpen, setIsColorTrayOpen] = useState(false)
   const [brushSize, setBrushSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
-  // Smudge's and blur's own size and strength (in percent)
-  const [mixSettings, setMixSettings] = useState<Record<MixTool, { size: number; strength: number }>>({
+  // Smudge's, blur's and liquify's own size and strength (in percent)
+  const [mixSettings, setMixSettings] = useState<Record<StrengthTool, { size: number; strength: number }>>({
     smudge: { size: 40, strength: 50 },
     blur: { size: 40, strength: 50 },
+    liquify: { size: 100, strength: 50 },
   })
-  const mixTool = isMixTool(tool) ? tool : null
+  const [liquifyMode, setLiquifyMode] = useState<LiquifyMode>('push')
+  const mixTool = hasStrength(tool) ? tool : null
   const size = mixTool ? mixSettings[mixTool].size : brushSize
   const setSize = useCallback(
     (change: number | ((size: number) => number)) => {
@@ -119,6 +121,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useEffect(() => {
     if (mixTool) engine?.setMixStrength(strength / 100)
   }, [engine, mixTool, strength])
+
+  useEffect(() => {
+    engine?.setLiquifyMode(liquifyMode)
+  }, [engine, liquifyMode])
 
   useEffect(() => {
     engine?.setFill(fill)
@@ -408,6 +414,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           size={size}
           opacity={opacity}
           strength={strength}
+          liquifyMode={liquifyMode}
           fill={fill}
           wand={wand}
           selection={{
@@ -444,6 +451,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
             mixTool &&
             setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
           }
+          onLiquifyModeChange={setLiquifyMode}
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
           onWandChange={change => setWand(current => ({ ...current, ...change }))}
           onStabilizerChange={changeStabilizer}

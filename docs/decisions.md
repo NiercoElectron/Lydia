@@ -2124,6 +2124,57 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   drawing opened again with the same mesh and picture; a broken mesh; an unbent one not kept. The first version of the
   test dragged next to the points, and showed it by the picture not changing.
 
+## 73. Liquify
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** my artist friend needs ibisPaint's "Dissolver": a pen that moves the picture instead of painting on it,
+  pushing it along the stroke, making the middle bigger or smaller, and brushing it back to normal. Photoshop and Krita
+  call it Liquify.
+- **Decision:** my choices:
+  - **Direct, like a brush:** each stroke is on the layer at once, with no Apply, as in ibisPaint. Photoshop opens a
+    window for it, and that is slower to use.
+  - **Normal pixels:** the layer stays a normal layer, so it can be painted on right after, with no Convert to pixels.
+    The strokes can be undone, but not opened again later.
+  - **Five modes**, in the bar: **Push**, **Bloat**, **Pucker** and **Reconstruct**, from her video, and **Twirl**, which
+    Photoshop and Krita have too.
+  - **The pen's pressure changes the strength**, like smudge and blur. The size stays.
+- **How:**
+  - A direct stroke, done simply, works out the picture from the picture before, so each stroke would make it softer,
+    and Reconstruct would have nothing to go back to. So what the strokes do is kept apart, in a "session" nobody sees
+    (`src/engine/liquify.ts`): the layer's tiles as they were (the source), and a map saying, for points 4 pixels apart,
+    how far from there the source's pixel to show is. A stroke only changes the map, and after each batch of dabs the
+    tiles it touched are drawn again from the source. So however many strokes, each pixel is resampled only once, and
+    Reconstruct, which only shrinks the map, gets back to the very pixels.
+  - A point of the map moved means it shows what was at another place, so each dab looks the map up there, and Push,
+    Bloat, Pucker and Twirl only differ in where. It is 4 pixels apart because that is enough to look smooth, and only
+    the tiles used have one, about 33 KB each.
+  - The map is on the processor, where a dab reads and writes it in one piece. The tiles are drawn on the graphics card
+    as grids of cells, through the same shader as a bent smart object (decision 72), each corner carrying its place in
+    the source.
+  - The session lasts while the layer only changes through liquify. It is forgotten when anything else changes the
+    drawing, or another layer is chosen, and the next stroke starts from the layer as it is then, so Reconstruct goes
+    back that far. The undo history says when: if its last step isn't the session's, something else happened. Each
+    stroke's step keeps what it changed in the map, so undo and redo take the map along with the pixels.
+  - The source's tiles are kept the first time liquify needs them, not all at the start: on a big drawing, a stroke
+    shouldn't wait for the whole layer. Only the tiles used take memory.
+  - Bloat, Pucker, Twirl and Reconstruct go on working while the pen holds still, as they do in Photoshop: making an eye
+    bigger is holding the pen on it, not rubbing it.
+  - It doesn't use the brush's tip: the dab is always round and fades toward its edge, because a hard or textured edge
+    tears the picture. So the pointer shows a circle. It is at least 16 pixels wide, since a smaller one would fall
+    between the map's points.
+  - It is always smooth, also with a pixel brush: pixel art is better bent with the transform's Whole pixels.
+  - Writing a worked out tile on the layer, with the selection and the locked transparency, went from `mixTools.ts` to
+    `tileWriter.ts`, for both.
+- **Checked:** `tests/app/liquify.mjs`: the button, key, modes and own settings; Push following the pen, with nothing
+  changing away from it and no seam between tiles; undo and redo to the pixel; Reconstruct getting back to the very
+  pixels, also after 24 strokes, which left the edges as sharp (28696 partly painted pixels before, 28707 after); undoing
+  Reconstruct and using it again; Bloat, Pucker and Twirl, more the longer the pen holds still; only the active layer;
+  only inside the selection; a locked transparency; painting or choosing another layer ending the session; a smart object
+  left alone; the pen's pressure. On a paper of 10000×10000 with a size of 500, a dab takes about 3 ms, and the first one
+  in a place 31 ms at most, while its tiles are kept. That is with a test's stroke, not my friend's hand: she has the last
+  word on how Strength feels.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
