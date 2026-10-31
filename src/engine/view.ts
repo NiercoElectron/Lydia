@@ -12,6 +12,7 @@ import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
 import { drawRulers, gripAt, movedRuler } from './rulerHandles'
 import { createHold, type Hold, type Ruler, type Rulers } from './rulers'
+import { shapeBox, type ShapeKind } from './shapes'
 import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
@@ -30,6 +31,8 @@ const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
 const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen shows the cursor's cross, not its outline
 const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
+const LINE_END_REACH = 12 // how close to the end of a line shape the pointer has to go, in pixels of the screen
+const LINE_END_RADIUS = 6
 
 // The cursor of each tool over the drawing
 const CURSORS: Record<Tool, string> = {
@@ -39,6 +42,7 @@ const CURSORS: Record<Tool, string> = {
   blur: 'crosshair',
   liquify: 'crosshair',
   fill: FILL_CURSOR,
+  shape: 'crosshair',
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
   lasso: 'crosshair',
@@ -88,7 +92,17 @@ export type ViewActions = {
   getChosenRuler: () => number | null
   onRulerChosen: (index: number | null) => void
   onRulerChange: (index: number, ruler: Ruler) => void
+  // The shape tool (see shapes.ts): which kind it draws, the outline of one in this box, a new one, whether it edits
+  // the active layer's shape instead, and the ends of that shape, if it is a line
+  getShapeKind: () => ShapeKind
+  shapeOutline: (box: ShapeBox) => { points: Point[]; isClosed: boolean }
+  onShape: (box: ShapeBox) => void
+  isEditingShape: () => boolean
+  getLineEnds: () => [Point, Point] | null
+  onLineEnds: (ends: [Point, Point]) => void
 }
+
+export type ShapeBox = { from: Point; to: Point }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
 export function isTyping(target: EventTarget | null) {
@@ -283,6 +297,54 @@ export function createView(
     }
   }
 
+  // The shape tool draws a shape from where the pointer goes down to where it comes up. Its outline shows meanwhile: the
+  // layer is made when it comes up. While a shape is edited, it only moves the ends of a line
+  function drawShape(e: PointerEvent): Gesture {
+    const here = onScreen(e)
+    if (actions.isEditingShape()) {
+      const ends = actions.getLineEnds()
+      const end = ends?.findIndex(each => {
+        const { x, y } = toScreen(each)
+        return Math.hypot(here.x - x, here.y - y) <= LINE_END_REACH
+      })
+      return ends && end !== undefined && end >= 0 ? moveLineEnd(ends, end) : { move() {}, up() {} }
+    }
+    const kind = actions.getShapeKind()
+    const start = toPaper(e)
+    const box = (e: PointerEvent) => shapeBox(kind, start, toPaper(e), e.shiftKey, e.altKey)
+    return {
+      move(e) {
+        const { points, isClosed } = actions.shapeOutline(box(e))
+        drawOutline(points, isClosed)
+      },
+      up(e) {
+        outline.clear()
+        const { x, y } = onScreen(e)
+        const isClick = Math.hypot(x - here.x, y - here.y) < CLICK_DISTANCE
+        if (e.type === 'pointerup' && !isClick) actions.onShape(box(e))
+      },
+    }
+  }
+
+  // Drag an end of the active line. Shift keeps it to a few angles
+  function moveLineEnd(ends: [Point, Point], end: number): Gesture {
+    const other = ends[1 - end]
+    const moved = (e: PointerEvent): [Point, Point] => {
+      const at = shapeBox('line', other, toPaper(e), e.shiftKey, false).to
+      return end === 0 ? [at, other] : [other, at]
+    }
+    return {
+      move(e) {
+        drawOutline(moved(e), false)
+      },
+      up(e) {
+        outline.clear()
+        if (e.type === 'pointerup') actions.onLineEnds(moved(e))
+      },
+      cursor: 'move',
+    }
+  }
+
   function pick(e: PointerEvent): Gesture {
     pickColor(e)
     return { move: pickColor, up() {} }
@@ -398,6 +460,25 @@ export function createView(
     shownRulers = rulers
     rulersKey = key
     drawRulers(rulerLines, { rulers: rulers.list, chosen, isEditing, ...grid, toScreen })
+  }
+
+  // The handles on the ends of the active line, with the shape tool
+  const lineEnds = new Graphics()
+  app.stage.addChild(lineEnds)
+  let lineEndsKey = ''
+
+  function showLineEnds() {
+    const ends = tool === 'shape' && !gesture ? actions.getLineEnds() : null
+    lineEnds.visible = ends !== null
+    if (!ends) return
+    const [a, b] = ends.map(toScreen)
+    const key = [a.x, a.y, b.x, b.y].join()
+    if (key === lineEndsKey) return
+    lineEndsKey = key
+    lineEnds.clear()
+    for (const { x, y } of [a, b]) {
+      lineEnds.circle(x, y, LINE_END_RADIUS).fill({ color: 0xffffff }).stroke({ width: 2, color: 0x2e9bff })
+    }
   }
 
   // While the rulers are edited, the left button chooses one and drags its handles, or all of it by its line
@@ -583,6 +664,7 @@ export function createView(
     blur: e => stroke(e, mixTools, actions.onMixEnd),
     liquify: e => stroke(e, liquify, actions.onMixEnd),
     fill,
+    shape: drawShape,
     eyedropper: pick,
     select: selectRectangle,
     lasso,
@@ -939,6 +1021,7 @@ export function createView(
   app.ticker.add(showBrushOutline)
   app.ticker.add(showSymmetry)
   app.ticker.add(showRulers)
+  app.ticker.add(showLineEnds)
   showCursor()
   fitToScreen()
 
@@ -958,11 +1041,13 @@ export function createView(
     app.ticker.remove(showBrushOutline)
     app.ticker.remove(showSymmetry)
     app.ticker.remove(showRulers)
+    app.ticker.remove(showLineEnds)
     outline.destroy()
     handles.destroy()
     brushOutline.destroy()
     symmetryLines.destroy()
     rulerLines.destroy()
+    lineEnds.destroy()
     listeners.clear()
   }
 

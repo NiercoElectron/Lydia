@@ -10,6 +10,7 @@ import {
   LockOpen,
   Paperclip,
   ScanEye,
+  Shapes,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { EngineSnapshot } from '../engine/engine'
@@ -335,6 +336,7 @@ export function LayersPanel({
                       <Folder className="smart-icon" size={14} aria-label={t('Folder')} />
                     ))}
                   {layer.isSmart && <Box className="smart-icon" size={14} aria-label={t('Smart object')} />}
+                  {layer.isShape && <Shapes className="smart-icon" size={14} aria-label={t('Shape')} />}
                   {layer.name}
                 </button>
               )}

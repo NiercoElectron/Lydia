@@ -2341,6 +2341,52 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   stabilizer; the symmetry; a pixel brush painting one row; Shift's line; the file and the autosave. A slanted stroke on a
   ruler measured 11.32 pixels from its line, and a free line of the same slant, with no ruler, measured the same.
 
+## 79. Shapes
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** an artist friend of mine asked for squares, circles and the like that stay editable after they are drawn,
+  outlined with the brush's own tip or filled, and that can be transformed. A shape that turns into pixels at once
+  can't change any more.
+- **Decision:** my choices:
+  - **One layer for each shape**, like a smart object, with its opacity, blend mode, folder and clipping. I chose that over
+    several shapes in one layer, which would need a new way to choose and order them inside it.
+  - **A rectangle, an ellipse, a line, a polygon and a star**, with 3 to 12 sides or points.
+  - **All of it can change afterwards**, with **Edit shape**: the kind, the sides, the star's depth, the fill and the outline, their colors, the
+    outline's size, and its brush, with a button that takes the one chosen now. A drawing keeps its shapes' brushes, so it
+    doesn't depend on the brushes in Lydia.
+  - **A transform keeps the outline as thick as it was.** I chose that over stretching the picture as a smart object does.
+- **How:**
+  - `src/engine/shapes.ts` keeps the two points the pointer went through, which make the box, and the transforms it went
+    through, one after the other. Its outline is worked out from those, so a star that was turned can still get more
+    points. Two transforms in a row with no mesh become one matrix, so moving a shape around doesn't make the list grow.
+  - `src/engine/shapePainter.ts` paints it from scratch each time: the fill with the selection's polygon (decision 40),
+    and the outline with the same dabs as a stroke, the grain included. Its random numbers have a fixed seed, so a noisy
+    brush gives the same outline every time, and the picture changes only where the shape did.
+  - The transform shows the picture as it is, stretched, for the speed of the handles, and only Enter paints it again with
+    the outline as thick as it was. So what shows while dragging isn't quite what comes out.
+  - The bar sets how the next shape is drawn, and only **Edit shape** makes it change the active one. At first it always
+    changed the active one, which meant leaving a shape's layer to draw another with a new look. I tested that and it
+    bothered me, so I chose the button over making only the kind apply to the next shape, as in Photoshop, which would
+    have ended a rectangle's becoming a star. While editing, dragging draws nothing, and drawing a new shape ends it.
+  - A slider paints when it is let go, not while it moves: that is one step of undo, and painting a shape at each movement
+    on a big drawing would lag.
+  - The colors are taken from the color panel by pressing the fill's or the outline's square, so there is one way to
+    choose a color, with its recent colors and tray.
+  - A line can't be filled, and a shape always has a fill or an outline: with neither there would be nothing to see, or to
+    grab with Ctrl+T.
+  - A pixel brush's outline has hard edges, and so does its shape's fill.
+  - Rulers and symmetry don't apply: they follow strokes, and a shape is placed by its box.
+  - Moving a folder moves its shapes' pixels whole pixels. A part moved off the paper comes back cut until the shape is
+    painted again, since a shape is only painted on the paper.
+  - In the file, each layer's `shape` has the position of its brush in the header's `brushes`, so shapes with the same
+    brush keep it once. Older versions of Lydia don't know them, and open them as layers of pixels.
+- **Checked:** `tests/app/shapes.mjs`: the outlines of each kind and their boxes, with Shift and Alt; a shape on a new
+  layer, with undo and redo; its fill, outline, colors and size changing afterwards; a slider as one step of undo; a
+  rectangle becoming an ellipse, a polygon and a star; another brush, with its grain, and a pixel brush with hard edges;
+  a transform and a mesh keeping the outline 20 pixels wide; the move tool; a line's ends; painting blocked, Convert to
+  pixels, and undo of it; a copy; the file, opened again and changed, with its brush out of the file; the autosave.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

@@ -6,7 +6,7 @@ import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createLayerBlender } from './blendModes'
 import { createBrush, type BrushSettings } from './brush'
-import { parseBrushFile, type BrushShape } from './brushFile'
+import { parseBrushFile, serializeBrushFile, type BrushPreset } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
 import {
   createPacer,
@@ -40,6 +40,16 @@ import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createLiquify } from './liquify'
 import { newRuler, noRulers, type Ruler, type RulerKind, type Rulers } from './rulers'
+import { createShapePainter } from './shapePainter'
+import {
+  canFill,
+  DEFAULT_SHAPE_STYLE,
+  lineEnds,
+  shapePath,
+  transformedShape,
+  type Shape,
+  type ShapeStyle,
+} from './shapes'
 import { noSymmetry, type Symmetry } from './symmetry'
 import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
@@ -109,6 +119,7 @@ export type EngineSnapshot = {
     opacity: number
     blendMode: BlendMode
     isSmart: boolean
+    isShape: boolean
     hasOffPaper: boolean
     showsOffPaper: boolean
     alphaLocked: boolean
@@ -138,6 +149,9 @@ export type EngineSnapshot = {
   rulers: Rulers
   isEditingRulers: boolean
   chosenRuler: number | null // the one being edited
+  shapeStyle: ShapeStyle // of the active layer's shape, or of the next one drawn
+  isShapeLayer: boolean
+  isEditingShape: boolean // the bar changes the active layer's shape, not the next one
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
 }
 
@@ -301,6 +315,25 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let isEditingRulers = false
   let chosenRuler: number | null = null
 
+  // How the next shape is drawn, so several can be drawn in a row. With "Edit shape" on and a shape's layer active, the
+  // bar shows and changes that shape instead. A change to it waits in "shapeEdit" while a slider moves, and is painted
+  // when it is let go, as one step of undo
+  let newShapeStyle = DEFAULT_SHAPE_STYLE
+  let wantsShapeEdit = false
+  let shapeEdit: { layer: Layer; shape: Shape } | null = null
+  const isEditingShape = () => wantsShapeEdit && stack.active.shape !== undefined
+  const shownShape = () => {
+    if (!isEditingShape()) return undefined
+    return shapeEdit?.layer === stack.active ? shapeEdit.shape : stack.active.shape
+  }
+  const styleOf = ({ kind, sides, depth, fill, outline }: ShapeStyle): ShapeStyle => ({
+    kind,
+    sides,
+    depth,
+    fill,
+    outline,
+  })
+
   // The brush starts as the Soft round brush, until the screen chooses one
   const startBrush = parseBrushFile(softRound, 'Soft round')
   const brush = createBrush(
@@ -335,6 +368,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const painted = (color: string) => {
     for (const listener of paintListeners) listener(color)
   }
+  let brushPreset: BrushPreset = startBrush
+  const shapePainter = createShapePainter(renderer, grid)
   const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, {
@@ -357,7 +392,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     // A smart object (see smartObject.ts) or a folder can't be painted on, and the eraser can't take paint out of a layer
     // whose transparency is locked
     canUse: tool =>
-      !((stack.active.smart || isFolder(stack.active)) && (usesTip(tool) || tool === 'fill')) &&
+      !((stack.active.smart || stack.active.shape || isFolder(stack.active)) && (usesTip(tool) || tool === 'fill')) &&
       !(tool === 'eraser' && stack.active.alphaLocked),
     getTransform: () =>
       transform
@@ -378,6 +413,15 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     getChosenRuler: () => chosenRuler,
     onRulerChosen: index => chooseRuler(index),
     onRulerChange: (index, ruler) => changeRuler(index, ruler),
+    getShapeKind: () => newShapeStyle.kind,
+    shapeOutline: box => shapePath({ ...newShapeStyle, ...box, placements: [] }),
+    onShape: box => void addShape(box),
+    isEditingShape,
+    getLineEnds: () => {
+      const shape = shownShape()
+      return shape ? lineEnds(shape) : null
+    },
+    onLineEnds: ([from, to]) => void redrawShape({ ...stack.active.shape!, from, to, placements: [] }),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
@@ -441,6 +485,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         opacity: layer.opacity,
         blendMode: layer.blendMode,
         isSmart: layer.smart !== undefined,
+        isShape: layer.shape !== undefined,
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
         alphaLocked: layer.alphaLocked,
@@ -475,6 +520,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       rulers,
       isEditingRulers,
       chosenRuler,
+      shapeStyle: styleOf(shownShape() ?? newShapeStyle),
+      isShapeLayer: stack.active.shape !== undefined,
+      isEditingShape: isEditingShape(),
       trayColors,
     }
   }
@@ -782,6 +830,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
       if (warp) copy.smart.warp = { side: warp.side, points: warp.points.map(p => ({ ...p })) }
     }
+    if (layer.shape) copy.shape = layer.shape // a shape never changes: each change makes a new one
     return copy
   }
 
@@ -793,7 +842,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     if (isFolder(active)) return isShown(active)
     const below = siblingBelow(stack, activeIndex(stack))
     const lower = stack.layers[below]
-    return below >= 0 && !isFolder(lower) && isShown(active) && lower.visible && !lower.smart
+    return below >= 0 && !isFolder(lower) && isShown(active) && lower.visible && !lower.smart && !lower.shape
   }
 
   // Merge the active layer into the one under it, which becomes the active layer, as one step of undo. Its paint goes
@@ -993,7 +1042,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Remove all the paint from the active layer. It can be undone like a stroke
   function clearLayer() {
-    if (isBusy() || stack.active.smart || isFolder(stack.active)) return
+    if (isBusy() || stack.active.smart || stack.active.shape || isFolder(stack.active)) return
     const layer = stack.active
     history.begin(layer)
     for (const key of gpu.tilesWithPaint(layer)) {
@@ -1145,6 +1194,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     clipped: layer.clipped,
     folder: layer.folder && { ...layer.folder },
     parent: layer.parent ? stack.layers.indexOf(layer.parent) : undefined,
+    shape: layer.shape,
   })
 
   // A small picture of the drawing, for the Recover list, from the tiles the screen shows
@@ -1459,8 +1509,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Paint with another brush: its tip (see brushTip.ts) and how the tip is placed along the strokes. A pixel brush
   // shows the pixels zoomed in as sharp squares (see setZoom in projection.ts)
-  function setBrushTip(tip: BrushTip, shape: BrushShape) {
-    brush.setTip(tip, shape)
+  function setBrushTip(tip: BrushTip, preset: BrushPreset) {
+    brush.setTip(tip, preset)
+    brushPreset = preset
     showPixelArt()
   }
 
@@ -1524,7 +1575,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Take the paint out of the selected part of the active layer (Delete)
   function deleteSelected() {
     const cut = selection
-    if (!cut || stack.active.smart) return
+    if (!cut || stack.active.smart || stack.active.shape) return
     return runTask('Deleting…', () => {
       const layer = stack.active
       const keys = [...cut.keys()].filter(key => layer.tiles.has(key))
@@ -1564,7 +1615,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const released = new Promise<boolean>(resolve => {
         drag.release = resolve
       })
-      if (stack.active.smart) void moveObject(drag, released)
+      if (stack.active.smart || stack.active.shape) void moveObject(drag, released)
       else void runTask('Moving…', () => moveLifted(drag, released))
     }
   }
@@ -1654,7 +1705,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   async function moveLifted(drag: MoveDrag, released: Promise<boolean>) {
     const item = stack.active
     const cut = selection
-    const movers = isFolder(item) ? layersIn(item).filter(layer => !cut || !layer.smart) : [item]
+    const movers = isFolder(item) ? layersIn(item).filter(layer => !cut || !(layer.smart || layer.shape)) : [item]
     const liftedOf = (layer: Layer) => [...gpu.tilesWithPaint(layer)].filter(key => !cut || cut.has(key))
     const lifted = [...new Set(movers.flatMap(liftedOf))]
     if (lifted.length === 0) return released.then(() => false) // nothing to move
@@ -1684,12 +1735,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         const before = new Map(layer.tiles) // the tiles change one by one, and each new one needs the old ones
         const move = (key: string) => movedTile(grid, before, cut, key, dx, dy, memory)
         // The selection is kept once, with the first layer; a smart object keeps its corners from before
-        const keep = { selection: i === 0, smart: layer.smart !== undefined }
+        const keep = { selection: i === 0, smart: layer.smart !== undefined, shape: layer.shape !== undefined }
         const moved = await changeTiles(layer, keysOf[i], move, keep, counted)
         // Moved by whole pixels, a smart object's tiles are its source drawn at its corners moved as much
         if (moved && layer.smart) {
           const corners = layer.smart.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) as Quad
           layer.smart = { ...layer.smart, corners }
+        }
+        if (moved && layer.shape) {
+          const square = { x: 0, y: 0, width: 1, height: 1 }
+          const corners = rectQuad({ ...square, x: dx, y: dy })
+          layer.shape = transformedShape(layer.shape, square, corners)
         }
         didChange ||= moved
       }
@@ -1762,7 +1818,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function startTransform() {
     const layer = stack.active
     if (isBusy() || !isShown(layer) || isFolder(layer)) return
-    const cut = layer.smart ? null : selection
+    const cut = layer.smart || layer.shape ? null : selection
     return runTask('Transforming…', async () => {
       const pace = createPacer()
       let object = layer.smart
@@ -1782,7 +1838,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         object = { source, bounds, corners: rectQuad(bounds), smooth: smoothTransforms }
       }
       const lifted = [...layer.tiles.keys()].filter(key => !cut || cut.has(key))
-      await showTransform({ layer, kind: layer.smart ? 'object' : cut ? 'part' : 'layer', object, cut }, lifted, pace)
+      const kind = layer.smart || layer.shape ? 'object' : cut ? 'part' : 'layer'
+      await showTransform({ layer, kind, object, cut }, lifted, pace)
       return false
     })
   }
@@ -1968,7 +2025,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           history.recordOrder(target)
           stack.layers.splice(stack.layers.indexOf(layer) + 1, 0, target)
         }
-        await drawObject(target, object, view)
+        if (layer.shape) {
+          // Its points go to where the handles took the picture, and it is painted again there, as thick as it was
+          const { bounds, corners, warp } = object
+          await drawShape(layer, transformedShape(layer.shape, bounds, corners, warp))
+        } else {
+          await drawObject(target, object, view)
+        }
         return true
       } finally {
         history.endGroup()
@@ -2012,14 +2075,130 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     offPaperStale = true
   }
 
-  // Turn the active smart object into a normal layer: its pixels stay as they are and can be painted on, but its
-  // original is gone (it can be undone)
+  // Turn the active smart object or shape into a normal layer: its pixels stay as they are and can be painted on, but
+  // its original is gone (it can be undone)
   function convertToPixels() {
     const layer = stack.active
-    if (isBusy() || !layer.smart) return
+    if (isBusy() || !(layer.smart || layer.shape)) return
     history.recordLayer(layer, propsOf(layer))
     layer.smart = undefined
+    layer.shape = undefined
     changed()
+  }
+
+  // ----- Shapes -----
+
+  // A shape always shows something: a line has only its outline, and a shape with neither keeps its fill
+  function shownStyle(style: ShapeStyle): ShapeStyle {
+    if (!canFill(style.kind)) return { ...style, outline: { ...style.outline, isOn: true } }
+    return style.fill.isOn || style.outline.isOn ? style : { ...style, fill: { ...style.fill, isOn: true } }
+  }
+
+  // The file of the brush painting now, for a shape to keep (see shapes.ts)
+  let brushPresetFile: { preset: BrushPreset; file: string } | null = null
+  function brushFileNow() {
+    if (brushPresetFile?.preset !== brushPreset) {
+      brushPresetFile = { preset: brushPreset, file: serializeBrushFile(brushPreset) }
+      shapePainter.knowBrush(brushPresetFile.file, brushPreset, brush.getTip())
+    }
+    return brushPresetFile.file
+  }
+
+  // Paint a shape into a layer's tiles, a few every frame, as an undo step that also keeps the layer's shape from before
+  // (see drawObject)
+  async function drawShape(layer: Layer, shape: Shape) {
+    const plan = await shapePainter.planShape(shape)
+    const keys = new Set([...gpu.tilesWithPaint(layer), ...plan.covered])
+    const pace = createPacer()
+    history.begin(layer, { shape: true })
+    for (const key of keys) {
+      await pace()
+      const { column, row } = parseTileKey(key)
+      history.backUpTile(key) // before the tile changes: the graphics card works in order
+      if (plan.covered.has(key)) {
+        shapePainter.paintTile(plan, column, row, gpu.getTextureToReplace(layer, column, row))
+        gpu.markDirty(layer, key)
+        continue
+      }
+      layer.tiles.delete(key)
+      const cached = gpu.getCached(layer, key)
+      if (cached) {
+        gpu.clearTexture(cached.texture)
+        gpu.markClean(cached) // empty on the graphics card and in RAM
+      }
+    }
+    layer.shape = shape
+    history.end()
+    projection.composeLater(keys)
+    offPaperStale = true
+  }
+
+  // Draw a new shape on a new layer above the active one, as one step of undo
+  function addShape({ from, to }: { from: Shape['from']; to: Shape['to'] }) {
+    const isFlat = Math.abs(to.x - from.x) < 1 || Math.abs(to.y - from.y) < 1
+    if (isFlat && newShapeStyle.kind !== 'line') return
+    const style = shownStyle(newShapeStyle)
+    const shape = { ...style, from, to, placements: [], outline: { ...style.outline, brush: brushFileNow() } }
+    wantsShapeEdit = false
+    return runTask('Drawing…', async () => {
+      history.startGroup()
+      try {
+        addItem(createLayer(nextName(layerName, false)))
+        await drawShape(stack.active, shape)
+      } finally {
+        history.endGroup()
+      }
+      return true
+    })
+  }
+
+  // Paint the active layer's shape again, changed
+  function redrawShape(shape: Shape) {
+    const layer = stack.active
+    return runTask('Drawing…', async () => {
+      await drawShape(layer, shape)
+      return true
+    })
+  }
+
+  // The bar changes the active layer's shape, or goes back to the next one
+  function setEditingShape(on: boolean) {
+    wantsShapeEdit = on
+    changed(false)
+  }
+
+  // Change how the next shape is drawn, or the shape being edited: "commitShapeStyle" paints that one
+  function setShapeStyle(change: Partial<ShapeStyle>) {
+    const shape = shownShape()
+    const style = shownStyle({ ...styleOf(shape ?? newShapeStyle), ...change })
+    if (shape) shapeEdit = { layer: stack.active, shape: { ...shape, ...style } }
+    else newShapeStyle = style
+    changed(false)
+  }
+
+  function commitShapeStyle() {
+    const edit = shapeEdit
+    if (!edit || isBusy()) return
+    void runTask('Drawing…', async () => {
+      shapeEdit = null
+      await drawShape(edit.layer, edit.shape)
+      return true
+    }).then(commitShapeStyle) // a change made meanwhile
+  }
+
+  // The fill or the outline takes the color chosen now
+  function setShapeColor(part: 'fill' | 'outline') {
+    const style = styleOf(shownShape() ?? newShapeStyle)
+    setShapeStyle({ [part]: { ...style[part], color: brush.settings.color } })
+    commitShapeStyle()
+  }
+
+  // The shape being edited takes the brush painting now
+  function takeBrushForShape() {
+    const shape = shownShape()
+    if (!shape) return
+    setShapeStyle({ outline: { ...shape.outline, brush: brushFileNow() } })
+    commitShapeStyle()
   }
 
   // ----- The color around the paper -----
@@ -2110,6 +2289,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     addRuler,
     removeRuler,
     setEditingRulers,
+    setEditingShape,
+    setShapeStyle,
+    commitShapeStyle,
+    setShapeColor,
+    takeBrushForShape,
     quietSnapshot,
     onGraphicsLost,
     packTile: memory.pack,

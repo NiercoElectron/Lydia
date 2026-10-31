@@ -1,6 +1,8 @@
 import { LydiaError } from '../errors'
 import { LAYER_BLEND_MODES, type BlendMode } from './layers'
+import { parseBrushFile } from './brushFile'
 import { isRulers, type Rulers } from './rulers'
+import { MAX_DEPTH, MAX_SIDES, MIN_DEPTH, MIN_SIDES, SHAPE_KINDS, type Shape, type ShapePlacement } from './shapes'
 import { isSymmetry, type Symmetry } from './symmetry'
 import { decompress } from './lz4'
 import type { StoredTile } from './memory'
@@ -47,6 +49,7 @@ export type LayerData = {
   parent?: number // the position of the folder it is in, if any
   tiles: Map<string, StoredTile> // "column,row" -> tile
   smart?: SmartData<Map<string, StoredTile>> // for a smart object
+  shape?: Shape // for a shape (see shapes.ts): its tiles are what it painted, so older versions show it as pixels
 }
 
 // How the drawing was shown when it was saved (see view.ts), so it opens the same way: the zoom, the angle in degrees,
@@ -127,7 +130,9 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // header's
 // "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing. "symmetry" (since 0.17) is
 // how strokes are mirrored (see symmetry.ts), left out when off, and "rulers" (since 0.17) what strokes follow (see
-// rulers.ts), left out when there are none; older versions of Lydia don't know them
+// rulers.ts), left out when there are none; older versions of Lydia don't know them. A layer's "shape" (since 0.17) is
+// what it draws (see shapes.ts), with the position of its brush in the header's "brushes", the brushes' files, so shapes
+// with the same brush keep it once. A shape that makes no sense is left out, and its layer stays as its pixels
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -139,6 +144,7 @@ const WHOLE_TILES_VERSION = 4 // the first version with whole tiles, off the pap
 const MAX_TILE_INDEX = 4096
 
 type TileEntry = { column: number; row: number; color?: number; offset?: number; length?: number }
+type FileShape = Omit<Shape, 'outline'> & { outline: Omit<Shape['outline'], 'brush'> & { brush: number } }
 
 type FileHeader = {
   format: typeof FORMAT
@@ -154,7 +160,12 @@ type FileHeader = {
   colors?: string[] // older versions of Lydia don't know it, and open the file without them
   symmetry?: Symmetry
   rulers?: Rulers
-  layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
+  brushes?: string[]
+  layers: (Omit<LayerData, 'tiles' | 'smart' | 'shape'> & {
+    tiles: TileEntry[]
+    smart?: SmartData<TileEntry[]>
+    shape?: FileShape
+  })[]
 }
 
 // Turn a drawing into the contents of a .lyd file. "wholeTiles": its tiles are whole, some of them off the paper
@@ -190,6 +201,11 @@ export function serializeProject(
       }
       return { column, row, offset: start, length: packed.length }
     })
+  const brushes: string[] = []
+  function shapeInFile(shape: Shape): FileShape {
+    if (!brushes.includes(shape.outline.brush)) brushes.push(shape.outline.brush)
+    return { ...shape, outline: { ...shape.outline, brush: brushes.indexOf(shape.outline.brush) } }
+  }
   const header: FileHeader = {
     format: FORMAT,
     version: wholeTiles ? WHOLE_TILES_VERSION : layers.some(layer => layer.smart) ? SMART_VERSION : 2,
@@ -204,12 +220,14 @@ export function serializeProject(
     colors: colors.length > 0 ? colors : undefined,
     symmetry: symmetry?.mode === 'off' ? undefined : symmetry,
     rulers: rulers?.list.length ? rulers : undefined,
-    layers: layers.map(({ tiles, smart, ...layer }) => ({
+    layers: layers.map(({ tiles, smart, shape, ...layer }) => ({
       ...layer,
       tiles: entries(tiles),
       smart: smart && { ...smart, tiles: entries(smart.tiles) },
+      shape: shape && shapeInFile(shape),
     })),
   }
+  if (brushes.length > 0) header.brushes = brushes
 
   const headerBytes = new TextEncoder().encode(JSON.stringify(header))
   const start = new Uint8Array(12)
@@ -339,6 +357,8 @@ export function parseProject(file: ArrayBuffer): ProjectData {
         if (!isInteger(layer.parent)) throw damaged()
         data.parent = layer.parent
       }
+      const shape = shapeInProject(layer.shape, header.brushes)
+      if (shape) data.shape = shape
       if (layer.smart !== undefined) {
         const smart = layer.smart
         if (
@@ -434,6 +454,56 @@ function isView(value: unknown): value is ViewData {
 }
 
 const isPoint = (point: unknown) => isObject(point) && Number.isFinite(point.x) && Number.isFinite(point.y)
+
+const isCount = (value: unknown, min: number, max: number) =>
+  Number.isInteger(value) && (value as number) >= min && (value as number) <= max
+
+function isPlacement(value: unknown) {
+  const { bounds, matrix, warp } = (value ?? {}) as Partial<ShapePlacement>
+  return (
+    isObject(bounds) &&
+    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
+    (bounds.width as number) > 0 &&
+    (bounds.height as number) > 0 &&
+    Array.isArray(matrix) &&
+    matrix.length === 9 &&
+    matrix.every(Number.isFinite) &&
+    (warp === undefined || isWarp(warp))
+  )
+}
+
+function isBrush(file: unknown) {
+  if (typeof file !== 'string') return false
+  try {
+    parseBrushFile(file, '')
+    return true
+  } catch {
+    return false
+  }
+}
+
+// A shape from a file, with its brush in place, or null when it isn't one that makes sense
+export function shapeInProject(value: unknown, brushes: unknown): Shape | null {
+  if (!isObject(value) || !Array.isArray(brushes)) return null
+  const { kind, from, to, sides, depth, fill, outline, placements } = value as Partial<FileShape>
+  const brush = brushes[outline?.brush as number]
+  const isGood =
+    SHAPE_KINDS.includes(kind as Shape['kind']) &&
+    isPoint(from) &&
+    isPoint(to) &&
+    isCount(sides, MIN_SIDES, MAX_SIDES) &&
+    isCount(depth, MIN_DEPTH, MAX_DEPTH) &&
+    typeof fill?.isOn === 'boolean' &&
+    isColor(fill.color) &&
+    typeof outline?.isOn === 'boolean' &&
+    isColor(outline.color) &&
+    Number.isFinite(outline.size) &&
+    outline.size > 0 &&
+    Array.isArray(placements) &&
+    placements.every(isPlacement) &&
+    isBrush(brush)
+  return isGood ? ({ ...value, outline: { ...outline, brush } } as Shape) : null
+}
 
 // A mesh a smart object can have (see warp.ts)
 function isWarp(value: unknown): value is Warp {

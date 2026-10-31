@@ -5,6 +5,7 @@ import type { Engine, EngineSnapshot } from '../engine/engine'
 import { errorMessage } from '../errors'
 import type { StabilizerSettings } from '../engine/stabilizer'
 import { noRulers } from '../engine/rulers'
+import { DEFAULT_SHAPE_STYLE } from '../engine/shapes'
 import { noSymmetry, type SymmetryMode } from '../engine/symmetry'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
@@ -40,6 +41,9 @@ const startingSnapshot: EngineSnapshot = {
   rulers: noRulers(),
   isEditingRulers: false,
   chosenRuler: null,
+  shapeStyle: DEFAULT_SHAPE_STYLE,
+  isShapeLayer: false,
+  isEditingShape: false,
   isUpdating: false,
   task: null,
   progress: null,

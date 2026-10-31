@@ -6,6 +6,7 @@ export type Tool =
   | 'blur'
   | 'liquify'
   | 'fill'
+  | 'shape'
   | 'eyedropper'
   | 'select'
   | 'lasso'

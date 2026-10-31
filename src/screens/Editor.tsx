@@ -453,6 +453,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
           transform={{
             transform: snapshot.transform,
             isSmartLayer: snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isSmart ?? false,
+            isShapeLayer: snapshot.isShapeLayer,
             onStart: () => engine?.startTransform(),
             onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
             onModeChange: mode => engine?.setTransformMode(mode),
@@ -467,6 +468,15 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             onChange: change => engine?.setSymmetry(change),
             onCenter: () => engine?.centerSymmetry(),
             onMovingChange: on => engine?.setMovingSymmetry(on),
+          }}
+          shape={{
+            style: snapshot.shapeStyle,
+            isEditing: snapshot.isEditingShape,
+            onEditingChange: on => engine?.setEditingShape(on),
+            onChange: change => engine?.setShapeStyle(change),
+            onCommit: () => engine?.commitShapeStyle(),
+            onColor: part => engine?.setShapeColor(part),
+            onTakeBrush: () => engine?.takeBrushForShape(),
           }}
           rulers={{
             rulers: snapshot.rulers,

@@ -3,6 +3,7 @@ import { activeIndex, type Layer, type LayerStack } from './layers'
 import { bytesOf, type StoredTile } from './memory'
 import type { Projection } from './projection'
 import { selectionBytes, type Selection } from './selection'
+import type { Shape } from './shapes'
 import type { SmartObject } from './smartObject'
 import { parseTileKey, TILE_SIZE } from './tiles'
 
@@ -13,7 +14,7 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 //   keeps the tile from before it (null = the tile had no paint). Pixels are never changed, so no copy is needed. If
 //   the tile's latest pixels were still only on the graphics card, the step keeps an IOU instead, filled in a frame or
 //   two later. A move also keeps the selection from before, since the selection moves along with the paint, and a
-//   transform keeps the layer's smart object from before (see smartObject.ts)
+//   transform keeps the layer's smart object or shape from before (see smartObject.ts and shapes.ts)
 // - "order": a layer was added, deleted or moved. The step keeps the list of layers and the active layer from before
 //   (the same layers, not copies), and which layer it was about. A deleted layer stays in the step, with its tiles,
 //   so it can come back
@@ -24,15 +25,16 @@ import { parseTileKey, TILE_SIZE } from './tiles'
 type TileBackup = StoredTile | null | PendingPixels
 // What else a "tiles" step takes back and forward with the pixels: "swap" does it, and "bytes" is the RAM it keeps
 export type StepSide = { swap: () => void; bytes: number }
-export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'blendMode' | 'clipped' | 'name' | 'smart'>
-// "selection" and "smart" are undefined when the step doesn't keep them; "smart" is null when the layer wasn't a smart
-// object
+export type LayerProps = Pick<Layer, 'visible' | 'opacity' | 'blendMode' | 'clipped' | 'name' | 'smart' | 'shape'>
+// "selection", "smart" and "shape" are undefined when the step doesn't keep them; "smart" is null when the layer wasn't a
+// smart object, and "shape" when it wasn't a shape
 type TilesStep = {
   kind: 'tiles'
   layer: Layer
   tiles: Map<string, TileBackup>
   selection?: Selection | null
   smart?: SmartObject | null
+  shape?: Shape | null
   side?: StepSide
 }
 // "parents": the folder each one of "layers" is in (see isFolder in layers.ts)
@@ -48,8 +50,8 @@ export type SelectionHolder = { get: () => Selection | null; set: (selection: Se
 
 const MAX_UNDO_BYTES = 500 * 1024 * 1024 // RAM kept for undo and redo
 
-export function propsOf({ visible, opacity, blendMode, clipped, name, smart }: Layer): LayerProps {
-  return { visible, opacity, blendMode, clipped, name, smart }
+export function propsOf({ visible, opacity, blendMode, clipped, name, smart, shape }: Layer): LayerProps {
+  return { visible, opacity, blendMode, clipped, name, smart, shape }
 }
 
 // A step and the steps inside it, if it is a group
@@ -73,11 +75,12 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
   }
 
   // Start recording a change to a layer's pixels (a stroke, clearing the layer...). The change can also change the
-  // selection (a move) or the layer's smart object (a transform): then keep them as they are now
-  function begin(layer: Layer, keep: { selection?: boolean; smart?: boolean } = {}) {
+  // selection (a move) or the layer's smart object or shape (a transform): then keep them as they are now
+  function begin(layer: Layer, keep: { selection?: boolean; smart?: boolean; shape?: boolean } = {}) {
     current = { kind: 'tiles', layer, tiles: new Map() }
     if (keep.selection) current.selection = selection.get()
     if (keep.smart) current.smart = layer.smart ?? null
+    if (keep.shape) current.shape = layer.shape ?? null
   }
 
   // Before a change touches a tile for the first time, keep what the tile had before it
@@ -245,6 +248,11 @@ export function createHistory(stack: LayerStack, gpu: GpuTiles, projection: Proj
       const now = step.layer.smart ?? null
       step.layer.smart = step.smart ?? undefined
       step.smart = now
+    }
+    if (step.shape !== undefined) {
+      const now = step.layer.shape ?? null
+      step.layer.shape = step.shape ?? undefined
+      step.shape = now
     }
     step.side?.swap()
   }

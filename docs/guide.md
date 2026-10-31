@@ -11,6 +11,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Liquify](#liquify)
 - [Symmetry](#symmetry)
 - [Rulers](#rulers)
+- [Shapes](#shapes)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -222,6 +223,31 @@ stay where they are while off.
   straight line doesn't: it goes where you click.
 - Blue lines show them. They aren't part of the drawing: they never come out in an exported image.
 - Each drawing keeps its own, in its file.
+
+## Shapes
+
+The **Shape** tool (P) draws a rectangle, an ellipse, a line, a polygon or a star on a new layer of its own. Drag on the
+drawing: **Shift** keeps it even (a square, a circle, a line at a few angles), and **Alt** draws it from its middle.
+
+The bar sets how the next shape is drawn, so you can draw several in a row, each on its own layer, with no need to change
+layers.
+
+A shape stays editable. With a shape's layer active, press **Edit shape**, and the bar changes that shape, right away.
+Press it again to draw new ones: dragging on the drawing does nothing while it is on.
+
+- **Shape**: its kind. A rectangle can become a star.
+- **Sides**: of a polygon, or the points of a star. **Depth**: how far out the inside of a star is.
+- **Fill** and **Outline** turn them on and off. Next to each is a square with its color: choose a color, then press the
+  square.
+- **Size**: how wide the outline is. The outline is painted with a brush's own tip, the one chosen when the shape was
+  drawn. **Use this brush** outlines it with the one chosen now.
+
+- **Transform** scales, turns, skews or bends it. The picture stretches while you drag, and **Enter** paints it again, with
+  the outline as thick as it was.
+- The move tool moves it, and while editing, a line's ends have handles of their own.
+- It is a layer like any other: opacity, blend modes, folders and clipping all work.
+- It can't be painted on: **Convert to pixels** makes it a normal layer, which can't be edited as a shape any more.
+- A drawing keeps its shapes' brushes in its file, so they open the same on any computer.
 
 ## Eyedropper
 
@@ -464,6 +490,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | Q                                              | Liquify                                            |
 | Y                                              | Symmetry on and off                                |
 | K                                              | Rulers on and off                                  |
+| P                                              | Shape                                              |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |

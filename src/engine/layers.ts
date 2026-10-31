@@ -1,4 +1,5 @@
 import type { StoredTile } from './memory'
+import type { Shape } from './shapes'
 import type { SmartObject } from './smartObject'
 
 // The ways a layer's paint can go onto what is under it (see blendModes.ts)
@@ -38,6 +39,7 @@ export type Layer = {
   parent: Layer | null // the folder it is in, if any (see isFolder)
   folder?: { open: boolean } // set when it is a folder: "open" when the layers panel shows what is in it
   smart?: SmartObject // set when the layer is a smart object (see smartObject.ts): its tiles are then its source drawn
+  shape?: Shape // set when the layer is a shape (see shapes.ts): its tiles are then the shape painted
 }
 
 // The layers of the open drawing, from the bottom to the top, and the one the brush paints on

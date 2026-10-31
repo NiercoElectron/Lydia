@@ -17,6 +17,9 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   starts anywhere, and goes parallel to the line, around an ellipse of the same shape, or straight through the point. With
   several on the paper, the pen's direction chooses, so two vanishing points make a perspective of two points. The brush,
   the eraser, smudge, blur and liquify all follow them. **K** turns them on and off, and each drawing keeps its own.
+- **Shapes** ([decision 79](docs/decisions.md#79-shapes)): rectangles, ellipses, lines, polygons and stars, each on a layer
+  of its own, that stay editable with **Edit shape**: the kind, the sides, the fill, the outline, its color and size, and
+  even the brush that outlines it. **Transform** keeps the outline as thick as it was. The **Shape** tool is on **P**.
 
 ## [0.16.0] - 2026-10-31
 

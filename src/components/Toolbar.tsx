@@ -5,6 +5,16 @@ import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import type { RulerKind, Rulers } from '../engine/rulers'
+import {
+  canFill,
+  MAX_DEPTH,
+  MAX_SIDES,
+  MIN_DEPTH,
+  MIN_SIDES,
+  SHAPE_KINDS,
+  type ShapeKind,
+  type ShapeStyle,
+} from '../engine/shapes'
 import { MAX_SECTORS, MIN_SECTORS, SYMMETRY_MODES, type Symmetry, type SymmetryMode } from '../engine/symmetry'
 import {
   hasStrength,
@@ -37,6 +47,7 @@ export type SelectionControls = {
 export type TransformControls = {
   transform: { smooth: boolean; mode: TransformMode; warpSide: number } | null
   isSmartLayer: boolean
+  isShapeLayer: boolean
   onStart: () => void
   onSmoothChange: (smooth: boolean) => void
   onModeChange: (mode: TransformMode) => void
@@ -66,6 +77,18 @@ export type RulerControls = {
   onRemove: () => void
 }
 
+// How the next shape is drawn (see shapes.ts), or the active layer's while it is edited. A slider says "onChange" while
+// it moves and "onCommit" when it is let go
+export type ShapeControls = {
+  style: ShapeStyle
+  isEditing: boolean
+  onEditingChange: (on: boolean) => void
+  onChange: (change: Partial<ShapeStyle>) => void
+  onCommit: () => void
+  onColor: (part: 'fill' | 'outline') => void
+  onTakeBrush: () => void
+}
+
 type Props = {
   tool: Tool
   size: number
@@ -78,6 +101,7 @@ type Props = {
   transform: TransformControls
   symmetry: SymmetryControls
   rulers: RulerControls
+  shape: ShapeControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
   isGridOn: boolean
@@ -117,6 +141,7 @@ export function Toolbar({
   transform,
   symmetry,
   rulers,
+  shape,
   stabilizer,
   taper,
   isGridOn,
@@ -151,13 +176,14 @@ export function Toolbar({
     )
   }
   const paintsLayer = usesTip(tool) || tool === 'fill'
-  const isBlocked = transform.isSmartLayer && paintsLayer
+  const isBlocked = (transform.isSmartLayer || transform.isShapeLayer) && paintsLayer
   return (
     <div className="toolbar">
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
       {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}
-      {(isSelecting || isMoving) && (
+      {tool === 'shape' && <ShapeButtons controls={shape} isShapeLayer={transform.isShapeLayer} />}
+      {(isSelecting || isMoving || (tool === 'shape' && transform.isShapeLayer)) && (
         <button
           onClick={transform.onStart}
           title={t('Scale, turn, skew or distort what is selected, or the layer (Ctrl+T)')}
@@ -167,7 +193,11 @@ export function Toolbar({
       )}
       {isBlocked && (
         <>
-          <span className="notice">{t("This layer is a smart object: it can't be painted on.")}</span>
+          <span className="notice">
+            {transform.isShapeLayer
+              ? t("This layer is a shape: it can't be painted on.")
+              : t("This layer is a smart object: it can't be painted on.")}
+          </span>
           <button onClick={transform.onConvertToPixels} title={t('It keeps its pixels, but no longer its original')}>
             {t('Convert to pixels')}
           </button>
@@ -180,7 +210,7 @@ export function Toolbar({
         <span className="notice">{t("This layer's transparency is locked: the eraser can't take paint away.")}</span>
       )}
       {tool === 'liquify' && <LiquifyModes mode={liquifyMode} onChange={onLiquifyModeChange} />}
-      {tool !== 'fill' && !isSelecting && !isMoving && (
+      {tool !== 'fill' && tool !== 'shape' && !isSelecting && !isMoving && (
         <label title={t('Brush size ([ and ])')}>
           {t('Size')}
           <input
@@ -206,7 +236,7 @@ export function Toolbar({
           <SliderValue value={strength} min={1} max={100} unit="%" onChange={onStrengthChange} />
         </label>
       )}
-      {!isSelecting && !isMoving && !hasStrength(tool) && (
+      {!isSelecting && !isMoving && !hasStrength(tool) && tool !== 'shape' && (
         <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
           {t('Opacity')}
           <input
@@ -301,6 +331,129 @@ function SymmetryButtons({ controls }: { controls: SymmetryControls }) {
             {t('Center')}
           </button>
         </>
+      )}
+    </>
+  )
+}
+
+// What the shape tool draws and how, or, while editing, how the active layer's shape is drawn, which changes at once
+function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isShapeLayer: boolean }) {
+  const { t } = useLanguage()
+  const { style, isEditing, onEditingChange, onChange, onCommit, onColor, onTakeBrush } = controls
+  const { kind, sides, depth, fill, outline } = style
+  const names: Record<ShapeKind, string> = {
+    rectangle: t('Rectangle'),
+    ellipse: t('Ellipse'),
+    line: t('Line'),
+    polygon: t('Polygon'),
+    star: t('Star'),
+  }
+  const hasFill = canFill(kind)
+  const changeNow = (change: Partial<ShapeStyle>) => {
+    onChange(change)
+    onCommit()
+  }
+  // A slider, painted again when it is let go
+  const slider = (
+    label: string,
+    title: string,
+    min: number,
+    max: number,
+    value: number,
+    change: (value: number) => void,
+  ) => (
+    <label title={title}>
+      {label}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={e => change(Number(e.target.value))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
+      />
+      <SliderValue
+        value={value}
+        min={min}
+        max={max}
+        onChange={typed => {
+          change(typed)
+          onCommit()
+        }}
+      />
+    </label>
+  )
+  return (
+    <>
+      <label title={t('Which shape it draws. Shift keeps it even, and Alt draws it from its middle')}>
+        {t('Shape')}
+        <select className="shape-kind" value={kind} onChange={e => changeNow({ kind: e.target.value as ShapeKind })}>
+          {SHAPE_KINDS.map(each => (
+            <option key={each} value={each}>
+              {names[each]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(kind === 'polygon' || kind === 'star') &&
+        slider(t('Sides'), t('How many sides a polygon has, or points a star'), MIN_SIDES, MAX_SIDES, sides, value =>
+          onChange({ sides: value }),
+        )}
+      {kind === 'star' &&
+        slider(t('Depth'), t('How far out the inside of a star is'), MIN_DEPTH, MAX_DEPTH, depth, value =>
+          onChange({ depth: value }),
+        )}
+      {hasFill && (
+        <>
+          <button
+            aria-pressed={fill.isOn}
+            disabled={fill.isOn && !outline.isOn}
+            onClick={() => changeNow({ fill: { ...fill, isOn: !fill.isOn } })}
+            title={t('Fill the shape')}
+          >
+            {t('Fill')}
+          </button>
+          <button
+            className="shape-color"
+            aria-label={t('Fill color')}
+            style={{ background: fill.color }}
+            onClick={() => onColor('fill')}
+            title={t('Use the color chosen now for the fill')}
+          />
+        </>
+      )}
+      <button
+        aria-pressed={outline.isOn}
+        disabled={outline.isOn && (!hasFill || !fill.isOn)}
+        onClick={() => changeNow({ outline: { ...outline, isOn: !outline.isOn } })}
+        title={t('Outline the shape with the tip of the brush')}
+      >
+        {t('Outline')}
+      </button>
+      <button
+        className="shape-color"
+        aria-label={t('Outline color')}
+        style={{ background: outline.color }}
+        onClick={() => onColor('outline')}
+        title={t('Use the color chosen now for the outline')}
+      />
+      {outline.isOn &&
+        slider(t('Size'), t('How wide the brush outlines it'), MIN_BRUSH_SIZE, MAX_BRUSH_SIZE, outline.size, size =>
+          onChange({ outline: { ...outline, size } }),
+        )}
+      <button
+        aria-pressed={isEditing}
+        disabled={!isShapeLayer}
+        onClick={() => onEditingChange(!isEditing)}
+        title={t('Change the shape on the active layer. Press it again to draw new ones')}
+      >
+        {t('Edit shape')}
+      </button>
+      {outline.isOn && isEditing && (
+        <button onClick={onTakeBrush} title={t('Outline this shape with the brush chosen now')}>
+          {t('Use this brush')}
+        </button>
       )}
     </>
   )

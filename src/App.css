@@ -810,6 +810,13 @@ input.slider-value {
 }
 
 /* Marks a smart object in the list of layers */
+/* The color of a shape's fill or outline: pressing it takes the color chosen now */
+button.shape-color {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
 .smart-icon {
   margin-right: 4px;
   vertical-align: -2px;
