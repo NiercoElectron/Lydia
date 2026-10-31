@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-31
+
 ### Added
 
 - **Autosave** ([decision 75](docs/decisions.md#75-autosave-and-recovering-a-drawing)): Lydia keeps a copy of the drawing
@@ -518,7 +520,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/NiercoElectron/Lydia/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/NiercoElectron/Lydia/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/NiercoElectron/Lydia/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/NiercoElectron/Lydia/compare/v0.13.0...v0.14.0

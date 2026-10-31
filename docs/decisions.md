@@ -242,7 +242,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   the Brush Designer, from images too (decisions 67 and 70), with smooth pixels when zoomed in and an outline that
   follows the pen (decisions 68 and 69). 0.15.0 brought the Distort stage: smudge and blur, a mesh for transforming and
   liquify (decisions 71 to 73), with a Sharp button for the pixels, and 0.15.1 fixed the numbers of new layers (decision
-  74). 1.0.0 will be the desktop app, packaged with
+  74). 0.16.0 brought the Safety stage: autosave with a Recover list, and surviving a lost graphics card (decisions 75
+  and 76). 1.0.0 will be the desktop app, packaged with
   Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
@@ -2253,7 +2254,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   tile, the layers and the view back, in about 0.2 s; the copy kept first, and the next taking its place; painting and
   undo working; it happening three times in a row; a stroke not yet in RAM being what goes; the Brush Designer. Then with
   a real crash of the graphics process (`Browser.crashGpuProcess`, what `chrome://gpucrash` does): the drawing, the
-  brushes' samples and the color triangle all there, a new sample painting, and painting going on.
+  brushes' samples and the color triangle all there, a new sample painting, and painting going on. I tried it by hand
+  too, with `chrome://gpucrash` on a paper of 10000×10000 with 10 layers and `chrome://crash` for the Recover list, as
+  this stage was the one not to release untested.
 
 ## Open questions
 
