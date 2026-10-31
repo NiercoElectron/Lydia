@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-31
+
 ### Added
 
 - **Symmetry** ([decision 77](docs/decisions.md#77-symmetry)): what is painted on one side shows on the others too: left
@@ -534,7 +536,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/NiercoElectron/Lydia/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/NiercoElectron/Lydia/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/NiercoElectron/Lydia/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/NiercoElectron/Lydia/compare/v0.14.0...v0.15.0

@@ -101,13 +101,12 @@ magic wand selections, the move tool, smart objects and transforming, importing 
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export, enlarged too, the
 interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
 color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
-a mesh for transforming, liquify, autosave and recovery, and surviving a lost graphics card.
+a mesh for transforming, liquify, autosave and recovery, surviving a lost graphics card, symmetry, rulers, and shapes that stay
+editable.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
-      outlined with the brush's own tip or filled, that stay editable and can be transformed)
 - [ ] Text and filters (hue and saturation, levels, blur)
 - [ ] Pen tilt: the brush follows how the pen leans, like a pencil
 - [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
