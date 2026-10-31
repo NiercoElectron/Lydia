@@ -7,6 +7,17 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Autosave** ([decision 75](docs/decisions.md#75-autosave-and-recovering-a-drawing)): Lydia keeps a copy of the drawing
+  in the browser every 2 minutes if it changed, without ever making painting wait. The start screen chooses how often:
+  1, 2 or 5 minutes, or off.
+- **Recover**, on the start screen: the five newest drawings closed without saving, after a crash too, each with a
+  picture, its size and its time.
+- **Losing the graphics card** no longer stops Lydia
+  ([decision 76](docs/decisions.md#76-losing-the-graphics-card)): it says so, and opens the drawing again by itself,
+  from memory.
+
 ## [0.15.1] - 2026-10-31
 
 ### Fixed

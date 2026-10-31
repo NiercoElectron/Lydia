@@ -1,6 +1,7 @@
+import { deleteAutosaved, listAutosaved, loadAutosaved, type AutosavedDrawing } from '../autosave'
 import { errorMessage } from '../errors'
 import { useLanguage, type LanguageChoice } from '../i18n'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
 import { loadBrushes, tipOf, type LibraryBrush } from '../brushLibrary'
@@ -10,7 +11,14 @@ import { DEFAULT_PIXEL_TIP_SIZE, DEFAULT_TIP_SIZE, MAX_TIP_SIZE, PIXEL_TIP_SIZES
 import type { BrushTip } from '../engine/brushTip'
 import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { tilesInGigabytes } from '../engine/tiles'
-import { DEFAULT_GPU_MEMORY, GPU_MEMORY_CHOICES, type ThemeChoice } from '../settings'
+import {
+  AUTOSAVE_CHOICES,
+  DEFAULT_GPU_MEMORY,
+  GPU_MEMORY_CHOICES,
+  loadAutosaveMinutes,
+  saveAutosaveMinutes,
+  type ThemeChoice,
+} from '../settings'
 import { setThemeChoice, useTheme } from '../theme'
 
 // The choices for the interface's colors (see theme.ts)
@@ -37,6 +45,41 @@ function paperFor(tip: BrushTip, pixel: boolean) {
   return [...(pixel ? PIXEL_TIP_SIZES : []), ...TIP_SIZES].find(paper => paper >= side) ?? MAX_TIP_SIZE
 }
 
+// One drawing that can be recovered, with a picture of it
+function RecoverRow({
+  drawing,
+  onOpen,
+  onDelete,
+}: {
+  drawing: AutosavedDrawing
+  onOpen: () => void
+  onDelete: () => void
+}) {
+  const { t, locale } = useLanguage()
+  const { thumbnail, width, height, time } = drawing
+  const picture = useMemo(() => (thumbnail ? URL.createObjectURL(thumbnail) : undefined), [thumbnail])
+
+  useEffect(
+    () => () => {
+      if (picture) URL.revokeObjectURL(picture)
+    },
+    [picture],
+  )
+
+  return (
+    <li>
+      {picture && <img src={picture} alt="" />}
+      <span>
+        {width}×{height}
+        <br />
+        <span className="hint">{new Date(time).toLocaleString(locale)}</span>
+      </span>
+      <button onClick={onOpen}>{t('Open')}</button>
+      <button onClick={onDelete}>{t('Delete')}</button>
+    </li>
+  )
+}
+
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
   const { t, locale, choice, setChoice } = useLanguage()
   const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
@@ -45,8 +88,44 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   const [tipSize, setTipSize] = useState(DEFAULT_TIP_SIZE)
   const [brushes, setBrushes] = useState<LibraryBrush[]>([]) // the ones that can be opened in the Brush Designer
   const [startBrushId, setStartBrushId] = useState('') // the one it starts from; '': a new brush
+  const [autosaved, setAutosaved] = useState<AutosavedDrawing[]>([]) // the drawings that can be recovered
+  const [autosaveMinutes, setAutosaveMinutes] = useState(loadAutosaveMinutes)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const theme = useTheme()
+
+  useEffect(() => {
+    let cancelled = false
+    listAutosaved().then(
+      drawings => {
+        if (!cancelled) setAutosaved(drawings)
+      },
+      error => console.warn('Could not read the autosaved drawings:', error),
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function handleRecover(id: string) {
+    setIsOpening(true)
+    try {
+      onOpenProject(await loadAutosaved(id))
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-109'))
+    } finally {
+      setIsOpening(false)
+    }
+  }
+
+  async function handleDeleteAutosaved(id: string) {
+    if (!window.confirm(t('Delete this copy of the drawing? It cannot be undone.'))) return
+    try {
+      await deleteAutosaved(id)
+      setAutosaved(drawings => drawings.filter(drawing => drawing.id !== id))
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-109'))
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +181,24 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
           </button>
         </div>
         <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+        {autosaved.length > 0 && (
+          <section className="recover">
+            <h2>{t('Recover')}</h2>
+            <p className="hint">
+              {t('Drawings closed with changes that were not saved, as they were last autosaved.')}
+            </p>
+            <ul>
+              {autosaved.map(drawing => (
+                <RecoverRow
+                  key={drawing.id}
+                  drawing={drawing}
+                  onOpen={() => void handleRecover(drawing.id)}
+                  onDelete={() => void handleDeleteAutosaved(drawing.id)}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
         <div
           className="button-group theme-choice"
           title={t(
@@ -122,6 +219,26 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
             <option value="pt-BR">Português (Brasil)</option>
             <option value="en">English</option>
             <option value="es">Español</option>
+          </select>
+        </label>
+        <label
+          className="theme-choice"
+          title={t('How often Lydia keeps a copy of the drawing in this browser, for when it closes without saving')}
+        >
+          {t('Autosave')}
+          <select
+            value={autosaveMinutes}
+            onChange={e => {
+              const minutes = Number(e.target.value)
+              setAutosaveMinutes(minutes)
+              saveAutosaveMinutes(minutes)
+            }}
+          >
+            {AUTOSAVE_CHOICES.map(minutes => (
+              <option key={minutes} value={minutes}>
+                {minutes === 0 ? t('Off') : t('Every {minutes} min', { minutes })}
+              </option>
+            ))}
           </select>
         </label>
         {isChoosingNew && <NewProjectDialog onCreate={onNewProject} onCancel={() => setIsChoosingNew(false)} />}

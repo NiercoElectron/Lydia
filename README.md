@@ -60,6 +60,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art (the Sharp button)
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
+- Autosave in the browser, with a Recover list after a crash, and the drawing reopened by itself when the browser loses
+  the graphics card
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)
 - A light or a dark interface, or as the computer is set (on the start screen)
 - English, Brazilian Portuguese or Spanish, selected on the start screen or detected from the system language; the browser
@@ -95,12 +97,11 @@ magic wand selections, the move tool, smart objects and transforming, importing 
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export, enlarged too, the
 interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
 color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
-a mesh for transforming, and liquify.
+a mesh for transforming, liquify, autosave and recovery, and surviving a lost graphics card.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)
 - [ ] Text and filters (hue and saturation, levels, blur)

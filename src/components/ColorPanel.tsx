@@ -90,7 +90,12 @@ export function ColorPanel({ color, background, recent, isTrayOpen, onColorChang
   }, [scale])
   useEffect(() => {
     const canvas = canvasRef.current
-    if (canvas) drawPicker(canvas, hsv, scale)
+    if (!canvas) return
+    const draw = () => drawPicker(canvas, hsv, scale)
+    draw()
+    // The browser gives a canvas back empty after losing the graphics card (decision 76)
+    canvas.addEventListener('contextrestored', draw)
+    return () => canvas.removeEventListener('contextrestored', draw)
   }, [hsv, scale])
 
   // ----- Dragging on them -----

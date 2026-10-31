@@ -1,3 +1,4 @@
+import type { DrawingSnapshot } from '../autosave'
 import { translate } from '../i18n'
 import { LydiaError } from '../errors'
 import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
@@ -360,7 +361,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // ----- Telling React about changes -----
 
   const listeners = new Set<() => void>()
-  let isModified = false
+  let isModified = project.fromAutosave !== undefined // a recovered drawing isn't in any file
+  let changes = 0 // how many times the drawing has changed, to know if it did since the last autosave
 
   // Whether a layer's tile has paint off the paper: off it, or in its part past the paper's right or bottom edge.
   // Tiles never change (see memory.ts), so the answer for each edge tile is kept. A tile whose latest pixels are still
@@ -448,7 +450,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Something changed: make a new snapshot and tell whoever is listening. "modified" = the drawing itself changed
   function changed(modified = true) {
-    if (modified) isModified = true
+    if (modified) {
+      isModified = true
+      changes++
+    }
     liquify.forgetStale()
     outside.update(outsideHidden)
     snapshot = makeSnapshot()
@@ -484,6 +489,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       lastBudgetCheck = now
       memory.enforceBudget(storedTiles())
     }
+    giveQuietSnapshot()
   }
   app.ticker.add(backgroundWork)
 
@@ -1095,6 +1101,108 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     return withResolution(blob, project.dpi * scale)
   }
 
+  // ----- Autosave -----
+
+  // What a layer is, apart from its tiles
+  const layerProps = (layer: Layer) => ({
+    name: layer.name,
+    visible: layer.visible,
+    opacity: layer.opacity,
+    blendMode: layer.blendMode,
+    showOffPaper: layer.showOffPaper,
+    alphaLocked: layer.alphaLocked,
+    clipped: layer.clipped,
+    folder: layer.folder && { ...layer.folder },
+    parent: layer.parent ? stack.layers.indexOf(layer.parent) : undefined,
+  })
+
+  // A small picture of the drawing, for the Recover list, from the tiles the screen shows
+  const THUMBNAIL_SIDE = 240
+  function thumbnail() {
+    const scale = Math.min(THUMBNAIL_SIDE / grid.width, THUMBNAIL_SIDE / grid.height, 1)
+    const width = Math.max(1, Math.round(grid.width * scale))
+    const height = Math.max(1, Math.round(grid.height * scale))
+    const root = new Container()
+    root.scale.set(scale)
+    for (const [key, texture] of projection.tiles) {
+      const { column, row } = parseTileKey(key)
+      const sprite = new Sprite(texture)
+      sprite.position.set(column * TILE_SIZE, row * TILE_SIZE)
+      root.addChild(sprite)
+    }
+    const target = RenderTexture.create({ width, height })
+    renderer.render({ container: root, target, clear: true, clearColor: [0, 0, 0, 0] })
+    const canvas = renderer.extract.canvas(target) as HTMLCanvasElement
+    root.destroy({ children: true })
+    target.destroy(true)
+    return new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+  }
+
+  // The drawing as it is in RAM now. The tiles themselves never change (see memory.ts), and the lists are copies, so it
+  // stays as it is while the drawing goes on. A tile painted lately may be on the graphics card only: see isQuiet
+  function drawingInRam(thumbnail: Blob | null): DrawingSnapshot {
+    const { width, height, background, dpi } = project
+    return {
+      paper: { width, height, background, dpi, exportScale, colors: trayColors },
+      activeLayer: activeIndex(stack),
+      view: view.getSaved(),
+      layers: stack.layers.map(layer => ({
+        ...layerProps(layer),
+        tiles: new Map(layer.tiles),
+        smart: layer.smart && {
+          tiles: new Map(layer.smart.source.tiles),
+          bounds: layer.smart.bounds,
+          corners: layer.smart.corners,
+          smooth: layer.smart.smooth,
+          warp: layer.smart.warp,
+        },
+      })),
+      thumbnail,
+    }
+  }
+
+  // Autosave only looks at the drawing when nothing is under way, every tile is in RAM and the screen has it all
+  let quietWaiter: ((snapshot: DrawingSnapshot | null) => void) | null = null
+  const isQuiet = () =>
+    !isBusy() && !view.isDragging() && !isMoveEnding && !gpu.hasUnsaved() && !projection.isUpdating()
+
+  function giveQuietSnapshot() {
+    if (!quietWaiter || !isQuiet()) return
+    const give = quietWaiter
+    quietWaiter = null
+    const drawing = drawingInRam(null)
+    void thumbnail().then(picture => give({ ...drawing, thumbnail: picture }))
+  }
+
+  // The drawing, at the first frame nothing is under way. It never makes painting wait: a stroke just puts it off.
+  // null if the drawing closes first
+  function quietSnapshot() {
+    return new Promise<DrawingSnapshot | null>(resolve => {
+      quietWaiter = resolve
+    })
+  }
+
+  // ----- Losing the graphics card -----
+
+  // The browser can take the graphics card away from the page at any moment (a new driver, a heavy game, the computer
+  // going to sleep, too much memory used), and everything on it goes: textures, shaders and tiles painted lately. The
+  // drawing in RAM stays, so whoever listens gets it, and opens it again in another engine (decision 76)
+  const lostListeners = new Set<(drawing: DrawingSnapshot) => void>()
+
+  function onGraphicsLost(listener: (drawing: DrawingSnapshot) => void) {
+    lostListeners.add(listener)
+    return () => {
+      lostListeners.delete(listener)
+    }
+  }
+
+  function handleContextLost() {
+    app.ticker.stop() // nothing more can be drawn
+    const drawing = drawingInRam(null)
+    for (const listener of lostListeners) listener(drawing)
+  }
+  app.canvas.addEventListener('webglcontextlost', handleContextLost)
+
   // The drawing as the contents of a .lyd file. A drawing with nothing off the paper is saved the way it was before
   // layers could go off it, its tiles at the paper's edges cut there, so versions of Lydia before 0.10 can open it
   // (see projectFile.ts)
@@ -1126,15 +1234,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     // A folder is saved with "folder", and what is in a folder with the position of the folder (see projectFile.ts)
     const layersToSave: LayerToSave[] = await Promise.all(
       stack.layers.map(async layer => ({
-        name: layer.name,
-        visible: layer.visible,
-        opacity: layer.opacity,
-        blendMode: layer.blendMode,
-        showOffPaper: layer.showOffPaper,
-        alphaLocked: layer.alphaLocked,
-        clipped: layer.clipped,
-        folder: layer.folder && { ...layer.folder },
-        parent: layer.parent ? stack.layers.indexOf(layer.parent) : undefined,
+        ...layerProps(layer),
         tiles: await pack(layer.tiles),
         smart: layer.smart && {
           tiles: await pack(layer.smart.source.tiles),
@@ -1866,6 +1966,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     resizeObserver.disconnect()
     app.ticker.remove(backgroundWork)
     app.ticker.remove(followZoom)
+    quietWaiter?.(null)
+    quietWaiter = null
+    app.canvas.removeEventListener('webglcontextlost', handleContextLost)
     pixelGrid.destroy()
     smoothZoom.destroy()
     outside.destroy()
@@ -1899,6 +2002,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setBrushTip,
     setMixStrength,
     setLiquifyMode,
+    quietSnapshot,
+    onGraphicsLost,
+    packTile: memory.pack,
+    changesCount: () => changes,
     setPixelGrid,
     setSharpPixels,
     setBrushOutline,

@@ -2192,6 +2192,69 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Checked:** `tests/app/layer-names.mjs`: counting up; the last one deleted and one in the middle; layers renamed;
   undo; folders.
 
+## 75. Autosave and recovering a drawing
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** Save only downloads a file when asked. If the browser crashes or the tab closes, all since the last Save
+  is gone, and the only warning is the browser's when a tab is closed by hand.
+- **Decision:** my choices:
+  - **Inside the browser:** nothing to choose and no prompts, and the Downloads folder doesn't fill up. Clearing the
+    site's data takes the copies too; with Electron (1.0) they will be real files.
+  - **Every 2 minutes** if the drawing changed, or 1, 5 or off, on the start screen.
+  - **A Recover list on the start screen:** the 5 newest drawings closed without saving, each with a picture, its size
+    and its time, to Open or Delete. Nothing opens by itself, so it can wait.
+- **How:**
+  - A copy can be cut short at any moment, so it is written in an order where that doesn't matter (`src/autosave.ts`):
+    first the tiles, each a record of its own, then in one transaction the list of what the drawing has, deleting the
+    tiles no longer in it. Until that transaction ends the last copy is whole, and afterwards the new one is.
+  - Stored tiles never change, so a tile is written once, and an autosave only costs what changed. A tile that leaves
+    the drawing is forgotten when its record is deleted, because undo can bring the same tile back. The first version
+    didn't, and a stroke saved, undone and saved again left a copy that couldn't be opened; a test that didn't really
+    undo anything hid it.
+  - It never makes painting wait. The engine gives the drawing at the first frame with nothing under way and every tile
+    in RAM, as lists of tiles, which takes no time. The compressing is on the workers, and the writing goes 32 tiles at
+    a time. A stroke just puts it off.
+  - A copy opens by the road of a file: it is put together as a `.lyd` and read by `parseProject`, so it is checked like
+    one (LYD-107 if not).
+  - After Save, a copy is marked as saved instead of deleted, and leaves the list: the next autosave then only writes
+    what changed. Closing a drawing with nothing to lose deletes it. **Discard** keeps it in the list, in case it was a
+    mistake: that is a click away from losing work, and the list only keeps five.
+  - It has a database of its own, `lydia-autosave`, so the brushes' isn't touched.
+- **Checked:** `tests/app/autosave.mjs`: the setting; a copy, and the Recover list after the page goes away; every tile,
+  the layers, a folder, a smart object with its source and the export scale coming back; only what changed being
+  written, with undo and redo; Save and closing; a copy left half written opening from its last whole one; a damaged
+  one saying so; Delete; five at most; a stroke under way putting it off. On a paper of 10000×10000 with 1521 tiles, the
+  first copy took 0.8 s and one after a small stroke 40 ms, with no frame over 7 ms.
+
+## 76. Losing the graphics card
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** the browser can take the graphics card from a page at any moment (a new driver, a heavy game, the computer
+  going to sleep, too much memory used). Everything on it goes, and Lydia just stopped working, with the drawing still
+  there in RAM but no way to get to it.
+- **Decision:** a message, and the drawing opens again in place, from RAM, without reloading the page (my choice, over
+  going back to the last autosave, which could lose its whole interval). The tools and settings stay as they were.
+- **How:**
+  - The engine can't be saved: its textures, shaders and tiles are gone. So it hands over the drawing in RAM, and the
+    Editor opens that with a new engine, as a drawing that isn't saved yet.
+  - What goes: tiles painted in the last moments, not yet read back into RAM; the selection; and the undo history, whose
+    steps belong to the engine. The message says so: LYD-403, in English like every error.
+  - The drawing goes into an autosave first, also with autosave off. If the browser refuses another graphics card
+    (it does, after losing it too often), starting fails with LYD-402, but the drawing is in the Recover list.
+  - The Brush Designer has no copies, so it only says what happened (LYD-404).
+  - A real loss takes more than the drawing, and my first test, which only took the drawing's context, didn't show it:
+    with `chrome://gpucrash` the drawing came back, but the brushes' samples and the color triangle were blank. The
+    browser keeps a canvas's picture on the graphics card too, and gives the canvas back empty. So they draw themselves
+    again when it says it did (`contextrestored`). The samples' own renderer was gone as well: it is forgotten then, and
+    the next sample starts another.
+- **Checked:** `tests/app/graphics-lost.mjs`: first with the browser's way of taking one context away: the message; every
+  tile, the layers and the view back, in about 0.2 s; the copy kept first, and the next taking its place; painting and
+  undo working; it happening three times in a row; a stroke not yet in RAM being what goes; the Brush Designer. Then with
+  a real crash of the graphics process (`Browser.crashGpuProcess`, what `chrome://gpucrash` does): the drawing, the
+  brushes' samples and the color triangle all there, a new sample painting, and painting going on.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

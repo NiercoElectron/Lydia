@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createAutosaver, type Autosaver } from '../autosave'
 import type { TaperSettings } from '../engine/dabs'
 import type { Engine, EngineSnapshot } from '../engine/engine'
+import { errorMessage } from '../errors'
 import type { StabilizerSettings } from '../engine/stabilizer'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
 import {
+  loadAutosaveMinutes,
   loadBrushOutline,
   loadPixelGrid,
   loadPixelPerfect,
@@ -46,6 +49,54 @@ const getStartingSnapshot = () => startingSnapshot
 const getStartingView = () => startingView
 
 // The engine's latest state; the screen updates whenever it changes
+// Keep a copy of the drawing in the browser every so many minutes if it changed, never while something is under way
+// (see autosave.ts). Gives when the last copy was made, and what went wrong with it, if anything
+export function useAutosave(engine: Engine | null, fromAutosave: string | undefined) {
+  const saver = useRef<Autosaver | null>(null)
+  const [lastTime, setLastTime] = useState<number | null>(null)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!engine) return
+    const current = createAutosaver(engine.packTile, fromAutosave)
+    saver.current = current
+    const minutes = loadAutosaveMinutes()
+    let isSaving = false
+    let lastAt = performance.now()
+    let savedChanges = engine.changesCount()
+
+    async function saveNow() {
+      if (isSaving || !engine) return
+      isSaving = true
+      try {
+        const changes = engine.changesCount()
+        const snapshot = await engine.quietSnapshot()
+        if (!snapshot) return
+        await current.save(snapshot)
+        savedChanges = changes
+        setLastTime(Date.now())
+        setFailure(null)
+      } catch (error) {
+        setFailure(errorMessage(error, 'LYD-108'))
+      } finally {
+        lastAt = performance.now()
+        isSaving = false
+      }
+    }
+
+    const timer = setInterval(() => {
+      const isDue = minutes > 0 && performance.now() - lastAt >= minutes * 60000
+      if (isDue && engine.getSnapshot().isModified && engine.changesCount() !== savedChanges) void saveNow()
+    }, 1000)
+    if (import.meta.env.DEV) {
+      Object.assign((window as unknown as { lydia: object }).lydia, { autosaveNow: saveNow })
+    }
+    return () => clearInterval(timer)
+  }, [engine, fromAutosave])
+
+  return { saver, lastTime, failure }
+}
+
 export function useEngineSnapshot(engine: Engine | null) {
   return useSyncExternalStore(engine?.subscribe ?? subscribeToNothing, engine?.getSnapshot ?? getStartingSnapshot)
 }

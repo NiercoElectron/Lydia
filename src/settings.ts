@@ -27,6 +27,28 @@ export function saveGpuMemory(gigabytes: number) {
   }
 }
 
+// How often the drawing is autosaved, in minutes (0: never, see autosave.ts)
+export const AUTOSAVE_CHOICES = [1, 2, 5, 0]
+export const DEFAULT_AUTOSAVE = 2
+const AUTOSAVE_KEY = 'lydia.autosave'
+
+export function loadAutosaveMinutes() {
+  try {
+    const saved = localStorage.getItem(AUTOSAVE_KEY)
+    return saved !== null && AUTOSAVE_CHOICES.includes(Number(saved)) ? Number(saved) : DEFAULT_AUTOSAVE
+  } catch {
+    return DEFAULT_AUTOSAVE
+  }
+}
+
+export function saveAutosaveMinutes(minutes: number) {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, String(minutes))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // The size, background and resolution chosen last for a new drawing (see NewProjectDialog)
 export type NewProjectChoice = { width: number; height: number; background: string | null; dpi: number }
 const NEW_PROJECT_KEY = 'lydia.newProject'

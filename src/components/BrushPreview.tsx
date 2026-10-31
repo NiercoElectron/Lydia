@@ -21,17 +21,23 @@ export function BrushPreview({ tip, shape }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    tip.then(
-      decoded => {
-        const canvas = canvasRef.current
-        if (cancelled || !canvas) return
-        const [width, height, size] = [WIDTH / zoom, HEIGHT / zoom, SIZE / zoom]
-        void paintSample(canvas, width, decoded, shape, size, sampleWave(width, height, size * 0.6))
-      },
-      () => {}, // a tip that can't be decoded shows no stroke; choosing the brush says why
-    )
+    const paint = () =>
+      tip.then(
+        decoded => {
+          const canvas = canvasRef.current
+          if (cancelled || !canvas) return
+          const [width, height, size] = [WIDTH / zoom, HEIGHT / zoom, SIZE / zoom]
+          void paintSample(canvas, width, decoded, shape, size, sampleWave(width, height, size * 0.6))
+        },
+        () => {}, // a tip that can't be decoded shows no stroke; choosing the brush says why
+      )
+    void paint()
+    // The browser gives a canvas back empty after losing the graphics card (decision 76)
+    const canvas = canvasRef.current
+    canvas?.addEventListener('contextrestored', paint)
     return () => {
       cancelled = true
+      canvas?.removeEventListener('contextrestored', paint)
     }
   }, [tip, shape, zoom])
 

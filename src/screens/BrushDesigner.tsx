@@ -1,4 +1,4 @@
-import { errorMessage } from '../errors'
+import { errorMessage, LydiaError } from '../errors'
 import { useLanguage } from '../i18n'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf, type LibraryBrush } from '../brushLibrary'
@@ -153,6 +153,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
   const [taper, changeTaper] = useTaper(engine)
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
+  useEffect(() => engine?.onGraphicsLost(() => alert(new LydiaError('LYD-404').message)), [engine])
   useBackdrop(engine)
 
   // After every change to the paper (a stroke, undo, redo, clearing), the tip is made again from it, and when another

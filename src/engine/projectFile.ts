@@ -64,6 +64,7 @@ export type ProjectData = {
   view?: ViewData // none for a new drawing, which shows the whole paper
   exportScale?: number // how many times bigger images are exported (see EXPORT_SCALES); 1 when missing
   colors?: string[] // the drawing's own colors in the color tray (see ColorTray.tsx), "#rrggbb"; none when missing
+  fromAutosave?: string // recovered from this copy (see autosave.ts): it isn't in any file yet
 }
 
 // At most this many colors in each list of the color tray

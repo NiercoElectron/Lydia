@@ -16,14 +16,17 @@ longer used. The list in the code is in `src/errors.ts`.
 
 ## 1: projects
 
-| Code    | Message                                                                                | What it means                                                                                     |
-| ------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| LYD-101 | This file is not a Lydia project.                                                      | The file chosen isn't a `.lyd` file saved by Lydia.                                               |
-| LYD-102 | This project was made with Lydia 0.1, and this version of Lydia can no longer open it. | The very first versions saved projects in another way.                                            |
-| LYD-103 | This project was made with a newer version of Lydia. Update Lydia to open it.          | The project has things this version doesn't know.                                                 |
-| LYD-104 | This project file is damaged.                                                          | Part of the file is missing or changed, for example a download that stopped before the end.       |
-| LYD-105 | Could not open the project.                                                            | Something else went wrong while opening it: the cause is in parentheses.                          |
-| LYD-106 | Could not save the project.                                                            | Something went wrong while saving it, for example not enough memory: the cause is in parentheses. |
+| Code    | Message                                                                                | What it means                                                                                                                    |
+| ------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| LYD-101 | This file is not a Lydia project.                                                      | The file chosen isn't a `.lyd` file saved by Lydia.                                                                              |
+| LYD-102 | This project was made with Lydia 0.1, and this version of Lydia can no longer open it. | The very first versions saved projects in another way.                                                                           |
+| LYD-103 | This project was made with a newer version of Lydia. Update Lydia to open it.          | The project has things this version doesn't know.                                                                                |
+| LYD-104 | This project file is damaged.                                                          | Part of the file is missing or changed, for example a download that stopped before the end.                                      |
+| LYD-105 | Could not open the project.                                                            | Something else went wrong while opening it: the cause is in parentheses.                                                         |
+| LYD-106 | Could not save the project.                                                            | Something went wrong while saving it, for example not enough memory: the cause is in parentheses.                                |
+| LYD-107 | This autosaved drawing is damaged.                                                     | Part of a copy kept in the browser is missing.                                                                                   |
+| LYD-108 | Could not autosave the drawing.                                                        | The copy couldn't be written, for example the disk is full: the cause is in parentheses. The drawing itself is fine, so save it. |
+| LYD-109 | Could not recover the drawing.                                                         | Something else went wrong with a copy kept in the browser: the cause is in parentheses.                                          |
 
 ## 2: brushes
 
@@ -59,7 +62,9 @@ longer used. The list in the code is in `src/errors.ts`.
 
 ## 4: the browser and the graphics card
 
-| Code    | Message                                                                    | What it means                                                                                   |
-| ------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| LYD-401 | Lydia needs WebGL 2, which this browser or graphics card does not support. | Lydia draws with the graphics card through WebGL 2. Try another browser, or update its drivers. |
-| LYD-402 | Could not start the drawing.                                               | Something else went wrong while starting it: the cause is in parentheses.                       |
+| Code    | Message                                                                                                                                    | What it means                                                                                                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LYD-401 | Lydia needs WebGL 2, which this browser or graphics card does not support.                                                                 | Lydia draws with the graphics card through WebGL 2. Try another browser, or update its drivers.                                                                                                                |
+| LYD-402 | Could not start the drawing.                                                                                                               | Something else went wrong while starting it: the cause is in parentheses.                                                                                                                                      |
+| LYD-403 | The browser lost the graphics card. The drawing is reopened from memory: the last strokes, the selection and the undo history may be gone. | The browser took the graphics card away, after a new driver, a heavy game, the computer going to sleep or too much memory used. Lydia opens the drawing again by itself, and keeps a copy in the Recover list. |
+| LYD-404 | The browser lost the graphics card. Go back and open the Brush Designer again.                                                             | The same, in the Brush Designer.                                                                                                                                                                               |

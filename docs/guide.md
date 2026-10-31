@@ -25,6 +25,8 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 ## The start screen
 
+- **Recover** shows up when there are drawings closed with changes that weren't saved (see
+  [Autosave](#autosave-and-recovering-a-drawing)).
 - **New project…** opens a window to choose the paper:
   - a size: paper sizes (A4, US Letter…) and screen sizes (Full HD…), or any width and height from 16 to 10000
     pixels;
@@ -363,6 +365,25 @@ forgotten.
 
 Exported images carry the drawing's resolution, so they print at the size of their paper (an image enlarged 4 times
 says 4 times as many pixels in an inch, so it too prints at that size, only sharper).
+
+### Autosave and recovering a drawing
+
+Lydia keeps a copy of the drawing in the browser, every 2 minutes if it changed. It never interrupts painting: a stroke
+just puts it off. **Autosave**, on the start screen, chooses 1, 2 or 5 minutes, or off. Hover over **Save** to see when
+the last copy was made.
+
+If the browser closes or crashes with changes that weren't saved, **Recover**, on the start screen, lists the drawing
+with a picture, its size and its time. **Open** goes on from there, and **Delete** throws the copy away. The five newest
+drawings are kept. After **Discard**, the last copy stays there too, in case it was a mistake.
+
+- A copy can be up to the interval old: what came after it is gone.
+- It isn't a replacement for **Save**: the copies are inside this browser, so clearing the site's data takes them too,
+  and they can't be opened in another browser.
+- If a copy can't be written, the bar says so (`LYD-108`). The drawing is fine: save it.
+
+If the browser loses the graphics card (after a new driver, a heavy game or the computer going to sleep), Lydia says so
+and opens the drawing again by itself. Only the last strokes, the selection and the undo history can be gone. If it
+can't open it again, the drawing is in **Recover**.
 
 ## The Brush Designer
 

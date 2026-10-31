@@ -11,6 +11,9 @@ export const ERRORS = {
   'LYD-104': 'This project file is damaged.',
   'LYD-105': 'Could not open the project.',
   'LYD-106': 'Could not save the project.',
+  'LYD-107': 'This autosaved drawing is damaged.',
+  'LYD-108': 'Could not autosave the drawing.',
+  'LYD-109': 'Could not recover the drawing.',
   'LYD-201': 'This is not a Lydia brush.',
   'LYD-202': 'This brush was made by a newer version of Lydia. Update Lydia to use it.',
   'LYD-203': 'The tip of this brush is not a PNG image.',
@@ -35,6 +38,9 @@ export const ERRORS = {
   'LYD-305': 'Could not export the image.',
   'LYD-401': 'Lydia needs WebGL 2, which this browser or graphics card does not support.',
   'LYD-402': 'Could not start the drawing.',
+  'LYD-403':
+    'The browser lost the graphics card. The drawing is reopened from memory: the last strokes, the selection and the undo history may be gone.',
+  'LYD-404': 'The browser lost the graphics card. Go back and open the Brush Designer again.',
 } as const
 export type ErrorCode = keyof typeof ERRORS
 

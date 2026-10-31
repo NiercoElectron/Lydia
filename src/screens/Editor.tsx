@@ -1,10 +1,12 @@
-import { errorMessage, type ErrorCode } from '../errors'
+import { projectOf } from '../autosave'
+import { errorMessage, LydiaError, type ErrorCode } from '../errors'
 import { useLanguage } from '../i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
 import {
+  useAutosave,
   useBackdrop,
   useDrawingShortcuts,
   useEngineSnapshot,
@@ -53,8 +55,10 @@ type Props = {
   onBack: () => void
 }
 
-export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props) {
-  const { t } = useLanguage()
+export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack }: Props) {
+  const { t, locale } = useLanguage()
+  // The drawing the engine starts from: the one opened, or the one in RAM when the graphics card was lost
+  const [project, setProject] = useState(opened)
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
   const [tool, setTool] = useState<Tool>('brush')
@@ -359,6 +363,24 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useSelectionShortcuts(engine)
   useLayerShortcuts(engine)
   useTransformShortcuts(engine)
+  const autosave = useAutosave(engine, project.fromAutosave)
+
+  // The graphics card is gone, with the engine. The drawing goes into a copy first, for if another one can't be had: then
+  // it is in the Recover list. Then the drawing opens again here, with a new engine, and the same tools and settings
+  useEffect(
+    () =>
+      engine?.onGraphicsLost(async drawing => {
+        const saver = autosave.saver.current
+        try {
+          await saver?.save(drawing)
+        } catch (error) {
+          console.error('Could not keep a copy of the drawing:', error)
+        }
+        alert(new LydiaError('LYD-403').message)
+        setProject({ ...projectOf(drawing), fromAutosave: saver?.id ?? '' })
+      }),
+    [engine, autosave.saver],
+  )
 
   // Ask before closing the tab with changes that aren't saved
   useEffect(() => {
@@ -391,9 +413,10 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
 
   function handleSave() {
     if (!engine) return
-    runTask('Saving…', 'LYD-106', async () =>
-      downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`),
-    )
+    runTask('Saving…', 'LYD-106', async () => {
+      downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+      await autosave.saver.current?.markSaved()
+    })
   }
 
   function handleBack() {
@@ -403,6 +426,8 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
     ) {
       return
     }
+    // After "Discard", the last copy stays in the Recover list, in case it was a mistake
+    if (!snapshot.isModified) void autosave.saver.current?.close()
     onBack()
   }
 
@@ -492,9 +517,18 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
               ))}
             </select>
           </label>
-          <button onClick={handleSave} disabled={!engine || busy !== null}>
+          <button
+            onClick={handleSave}
+            disabled={!engine || busy !== null}
+            title={
+              autosave.lastTime === null
+                ? undefined
+                : t('Autosaved at {time}', { time: new Date(autosave.lastTime).toLocaleTimeString(locale) })
+            }
+          >
             {t('Save')}
           </button>
+          {autosave.failure && <span className="notice">{autosave.failure}</span>}
           <button onClick={handleBack}>{t('Back')}</button>
           {(busy || snapshot.task || snapshot.isUpdating) && (
             <span className="busy">

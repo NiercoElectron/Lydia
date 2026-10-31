@@ -7,17 +7,22 @@ import { createGrainPass, grainOf, type GrainSettings } from './grain'
 
 // The brush previews (the sample strokes of the brush list, the Brush Designer's test area) are painted by the
 // graphics card with the same code as the drawing (dabPainter.ts), each stroke in a texture of its own as on the
-// drawing, and copied to their canvases in black. They share one small renderer, started for the first preview
+// drawing, and copied to their canvases in black. They share one small renderer, started for the first preview. The
+// browser can take the graphics card away from it too (decision 76): then the next preview starts another
 
 let sharedRenderer: Promise<WebGLRenderer> | null = null
 
 function previewRenderer() {
-  sharedRenderer ??= autoDetectRenderer({
-    preference: 'webgl',
-    width: 1,
-    height: 1,
-    backgroundAlpha: 0,
-  }) as Promise<WebGLRenderer>
+  sharedRenderer ??= (
+    autoDetectRenderer({ preference: 'webgl', width: 1, height: 1, backgroundAlpha: 0 }) as Promise<WebGLRenderer>
+  ).then(renderer => {
+    const forget = () => {
+      sharedRenderer = null
+      sampleSurface = null
+    }
+    renderer.canvas.addEventListener('webglcontextlost', forget, { once: true })
+    return renderer
+  })
   return sharedRenderer
 }
 

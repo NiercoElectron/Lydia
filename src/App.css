@@ -186,14 +186,44 @@ fieldset.new-project-row {
 }
 
 .designer-start,
-.gpu-memory {
+.gpu-memory,
+.recover {
   max-width: 640px;
   margin-top: 32px;
 }
 
 .designer-start h2,
-.gpu-memory h2 {
+.gpu-memory h2,
+.recover h2 {
   font-size: 1.1rem;
+}
+
+.recover ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recover li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.recover img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #ffffff;
+  border: 1px solid var(--muted);
+}
+
+.recover li > span {
+  flex: 1;
+  min-width: 120px;
 }
 
 .designer-start label {
