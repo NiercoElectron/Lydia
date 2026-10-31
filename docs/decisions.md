@@ -241,7 +241,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   and the color tray (decisions 65 and 66). 0.14.0 brought the Brushes stage: the paper grain and changing brushes in
   the Brush Designer, from images too (decisions 67 and 70), with smooth pixels when zoomed in and an outline that
   follows the pen (decisions 68 and 69). 0.15.0 brought the Distort stage: smudge and blur, a mesh for transforming and
-  liquify (decisions 71 to 73), with a Sharp button for the pixels. 1.0.0 will be the desktop app, packaged with
+  liquify (decisions 71 to 73), with a Sharp button for the pixels, and 0.15.1 fixed the numbers of new layers (decision
+  74). 1.0.0 will be the desktop app, packaged with
   Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
@@ -2175,6 +2176,21 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   left alone; the pen's pressure. On a paper of 10000×10000 with a size of 500, a dab takes about 3 ms, and the first one
   in a place 31 ms at most, while its tiles are kept. That is with a test's stroke, not my friend's hand: she has the last
   word on how Strength feels.
+
+## 74. The numbers of new layers
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** new layers were numbered by how many had been made, so with layers deleted the numbers went on past them:
+  with Layer 1 and Layer 2 left, the next was Layer 4.
+- **Decision:** a new layer takes one number after the biggest there is (my choice, over taking the first one free), so
+  the newest layer always has the biggest number. So a deleted layer's number only comes back when it was the biggest:
+  with Layer 1, 2 and 4, the next is Layer 5. Folders work the same, with numbers of their own.
+- **How:** there is no count anymore: the number comes from the names in the drawing when a layer is added, so a saved
+  drawing needs nothing kept. Only names made the same way count, in the language in use: a layer renamed "Sky", or a
+  "Layer 3" in a drawing opened in Portuguese, doesn't.
+- **Checked:** `tests/app/layer-names.mjs`: counting up; the last one deleted and one in the middle; layers renamed;
+  undo; folders.
 
 ## Open questions
 

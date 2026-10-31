@@ -204,6 +204,22 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // ----- The drawing -----
 
+  const layerName = (number: number | string) => translate('Layer {number}', { number })
+  const folderName = (number: number | string) => translate('Folder {number}', { number })
+
+  // The name of a new layer or folder: one number after the biggest among the layers or the folders named like it, in
+  // the language in use, so the ones renamed or from another language don't count (decision 74)
+  function nextName(name: (number: number | string) => string, ofFolders: boolean) {
+    const [before, after] = name('#').split('#')
+    let biggest = 0
+    for (const layer of stack.layers) {
+      if (isFolder(layer) !== ofFolders || !layer.name.startsWith(before) || !layer.name.endsWith(after)) continue
+      const number = layer.name.slice(before.length, layer.name.length - after.length)
+      if (/^\d+$/.test(number)) biggest = Math.max(biggest, Number(number))
+    }
+    return name(biggest + 1)
+  }
+
   const grid = createGrid(project.width, project.height)
   const layers =
     project.layers.length > 0
@@ -215,14 +231,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           }
           return layer
         })
-      : [createLayer(translate('Layer {number}', { number: 1 }))]
+      : [createLayer(layerName(1))]
   // Each layer's folder, from its position (see projectFile.ts)
   project.layers.forEach(({ parent }, index) => {
     if (parent !== undefined) layers[index].parent = layers[parent]
   })
   const stack: LayerStack = { layers, active: layers[project.activeLayer] ?? layers[layers.length - 1] }
-  let layersCreated = layers.filter(layer => !isFolder(layer)).length // for naming new layers
-  let foldersCreated = layers.length - layersCreated // and folders
   let exportScale = project.exportScale ?? 1
   let trayColors = project.colors ?? []
   let selection: Selection | null = null // see selection.ts
@@ -567,7 +581,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // A new empty layer above the active one, which becomes the active layer
   function addLayer() {
     if (isBusy()) return
-    addItem(createLayer(translate('Layer {number}', { number: ++layersCreated })))
+    addItem(createLayer(nextName(layerName, false)))
   }
 
   // Add a layer right above the folder the active layer is in, or above the active folder: out of it, in the folder
@@ -576,17 +590,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const active = stack.active
     const folder = isFolder(active) ? active : active.parent
     if (isBusy() || !folder) return
-    addItem(
-      createLayer(translate('Layer {number}', { number: ++layersCreated })),
-      stack.layers.indexOf(folder) + 1,
-      folder.parent,
-    )
+    addItem(createLayer(nextName(layerName, false)), stack.layers.indexOf(folder) + 1, folder.parent)
   }
 
   // Add an empty folder (see isFolder in layers.ts), like a new layer
   function addFolder() {
     if (isBusy()) return
-    addItem(createFolder(translate('Folder {number}', { number: ++foldersCreated })))
+    addItem(createFolder(nextName(folderName, true)))
   }
 
   // Put a new layer or folder at this position, in this folder (null: none), and make it the active one. By default,
@@ -617,7 +627,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function groupActive() {
     if (isBusy()) return
     const item = stack.active
-    const folder = createFolder(translate('Folder {number}', { number: ++foldersCreated }))
+    const folder = createFolder(nextName(folderName, true))
     folder.parent = item.parent
     folder.clipped = item.clipped
     history.recordOrder(folder)
@@ -1751,7 +1761,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         if (kind === 'part' || kind === 'image') {
           // The new layer goes above, and becomes the active layer only once the transform stops showing: until then
           // the projection keeps putting tiles together with the same layers under the active one as what it shows
-          target = createLayer(done.name ?? translate('Layer {number}', { number: ++layersCreated }))
+          target = createLayer(done.name ?? nextName(layerName, false))
           target.parent = layer.parent
           insideClipped(target, stack.layers.indexOf(layer) + 1)
           history.recordOrder(target)
