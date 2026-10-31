@@ -14,6 +14,7 @@ import type { Layer } from './layers'
 import { toStoredTile, type StoredTile, type TileMemory } from './memory'
 import type { Point, SelectionTile } from './selection'
 import { parseTileKey, TILE_SIZE, tileKey, tilesTouching } from './tiles'
+import { warpPoint, type Warp } from './warp'
 
 // Smart objects (decision 42): a layer that keeps its original pixels (its "source") and where the source's corners
 // are on the paper. Its own tiles are the source drawn at those corners, worked out again from the source after every
@@ -34,6 +35,7 @@ export type SmartObject = {
   bounds: Rect // the part of the source with paint: what the corners show
   corners: Quad // where the corners of "bounds" are on the paper
   smooth: boolean // how the pixels are worked out: smoothly (bicubic), or as whole pixels (pixel art)
+  warp?: Warp // the mesh that bends it inside its corners (see warp.ts), if it is bent
 }
 
 // ----- The maths: a homography maps a rectangle to any four corners -----
@@ -47,6 +49,13 @@ export const rectQuad = ({ x, y, width, height }: Rect): Quad => [
   { x: x + width, y: y + height },
   { x, y: y + height },
 ]
+
+// Where a point of the source goes on the paper: bent by the mesh, if any, then taken to the corners by "matrix"
+export function placed(bounds: Rect, matrix: Matrix3, warp: Warp | null | undefined, point: Point) {
+  if (!warp) return mapPoint(matrix, point)
+  const { x, y } = warpPoint(warp, (point.x - bounds.x) / bounds.width, (point.y - bounds.y) / bounds.height)
+  return mapPoint(matrix, { x: bounds.x + x * bounds.width, y: bounds.y + y * bounds.height })
+}
 
 // The matrix that maps the rectangle's corners to the quad's corners (Heckbert's square-to-quad, after the rectangle
 // is made the unit square). With a parallelogram it is an affine map; otherwise a perspective one
@@ -242,12 +251,22 @@ export async function imageTiles(image: ImageBitmap, pace: () => Promise<void>) 
 // right) and works out its color there: from the 16 pixels around it (bicubic, Catmull-Rom), or from the one pixel
 // there. Those pixels can be in the blocks next to it, so each block is copied with a border of PAD pixels from its
 // neighbors first: the blocks then join without seams
+//
+// A mesh bends the shape, so no matrix can go back from the paper to the source. A bent object is drawn as a grid of
+// small cells instead, each corner carrying its place in the source, and the graphics card finds each pixel's place
+// between them. The corners of the cells are at multiples of one step, the same in every block, so the blocks' edges
+// meet
 const PAD = 2
+// The cells of a bent object: at least this many pixels of the source, and at most this many cells across it
+const MIN_CELL = 16
+const MAX_CELLS = 128
 
 // GLSL ES 3.0 (WebGL 2), for texelFetch: reading a pixel by its place, without any filtering
 const vertex = `#version 300 es
 in vec2 aPosition;
+in vec2 aUV;
 out vec2 vPaper;
+out vec2 vSource;
 
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
@@ -257,15 +276,18 @@ void main(void) {
   vec3 screen = uWorldTransformMatrix * uTransformMatrix * vec3(aPosition, 1.0);
   gl_Position = vec4((uProjectionMatrix * screen).xy, 0.0, 1.0);
   vPaper = aPosition;
+  vSource = aUV;
 }
 `
 
 const fragment = `#version 300 es
 in vec2 vPaper;
+in vec2 vSource; // the place in the source, on a bent object
 out vec4 finalColor;
 
 uniform sampler2D uTexture; // the source's block, with its border
 uniform mat3 uInverse; // from the paper to the source
+uniform float uBent;
 uniform float uSmooth;
 uniform vec2 uOrigin; // where the texture's first pixel is in the source
 uniform vec2 uSize; // the texture's size
@@ -284,7 +306,7 @@ vec4 weights(float t) {
 
 void main(void) {
   vec3 mapped = uInverse * vec3(vPaper, 1.0);
-  vec2 at = mapped.xy / mapped.z - uOrigin; // in pixels of the texture
+  vec2 at = (uBent > 0.5 ? vSource : mapped.xy / mapped.z) - uOrigin; // in pixels of the texture
   if (uSmooth < 0.5) {
     finalColor = texel(floor(at)) * uColor.a;
     return;
@@ -313,6 +335,7 @@ void main(void) {
 type SourceBlock = {
   texture: RenderTexture
   rect: Rect
+  points: Point[] // the corners of its shape, or of its cells, in the source
   geometry: MeshGeometry
   shader: Shader
   shown: Mesh<MeshGeometry, Shader>
@@ -330,6 +353,7 @@ export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: 
   const glProgram = GlProgram.from({ vertex, fragment, name: 'smart-object', preferredFragmentPrecision: 'highp' })
   const shared = new UniformGroup({
     uInverse: { value: new Float32Array(9), type: 'mat3x3<f32>' },
+    uBent: { value: object.warp ? 1 : 0, type: 'f32' },
     uSmooth: { value: object.smooth ? 1 : 0, type: 'f32' },
   })
   const blocks: SourceBlock[] = []
@@ -340,6 +364,8 @@ export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: 
   const padSprites: Sprite[] = []
   const bounds = object.bounds // never changes for one object: only its corners and smoothness do
   let corners = object.corners
+  let warp = object.warp ?? null
+  const cell = Math.max(MIN_CELL, Math.ceil(Math.max(bounds.width, bounds.height) / MAX_CELLS))
 
   // The blocks with paint, as "column,row" of blocks
   const blockKeys = new Set<string>()
@@ -403,20 +429,60 @@ export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: 
     container.addChild(shown)
     faded.addChild(ghost)
     drawRoot.addChild(drawn)
-    const block = { texture, rect, geometry, shader, shown, ghost, drawn, area: rect }
+    const block = { texture, rect, points: [], geometry, shader, shown, ghost, drawn, area: rect }
     blocks.push(block)
+    shapeBlock(block)
     place(block, homography(bounds, corners))
   }
 
-  // Put a block's shape where the homography takes it, and remember the paper's rectangle around it
+  // The places across one side of a block where its cells' corners are: its ends, and the multiples of the step
+  function cellEdges(from: number, to: number) {
+    const edges = [from]
+    for (let at = (Math.floor(from / cell) + 1) * cell; at < to; at += cell) edges.push(at)
+    edges.push(to)
+    return edges
+  }
+
+  // Give a block the shape it is drawn with: four corners, or the grid of cells of a bent object
+  function shapeBlock(block: SourceBlock) {
+    const { x, y, width, height } = block.rect
+    const xs = warp ? cellEdges(x, x + width) : [x, x + width]
+    const ys = warp ? cellEdges(y, y + height) : [y, y + height]
+    block.points = ys.flatMap(py => xs.map(px => ({ x: px, y: py })))
+    const across = xs.length
+    const indices: number[] = []
+    for (let row = 0; row < ys.length - 1; row++) {
+      for (let column = 0; column < across - 1; column++) {
+        const a = row * across + column
+        const b = a + 1
+        const c = a + across + 1
+        const d = a + across
+        indices.push(a, b, c, a, c, d)
+      }
+    }
+    block.geometry.positions = new Float32Array(block.points.length * 2)
+    block.geometry.uvs = new Float32Array(block.points.flatMap(point => [point.x, point.y]))
+    block.geometry.indices = new Uint32Array(indices)
+  }
+
+  // Put a block's shape where the corners and the mesh take it, and remember the paper's rectangle around it
   function place(block: SourceBlock, matrix: Matrix3) {
-    const points = rectQuad(block.rect).map(point => mapPoint(matrix, point))
-    block.geometry.positions = new Float32Array(points.flatMap(({ x, y }) => [x, y]))
-    const xs = points.map(p => p.x)
-    const ys = points.map(p => p.y)
-    const x = Math.min(...xs)
-    const y = Math.min(...ys)
-    block.area = { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y }
+    const positions = new Float32Array(block.points.length * 2)
+    let left = Infinity
+    let top = Infinity
+    let right = -Infinity
+    let bottom = -Infinity
+    block.points.forEach((point, i) => {
+      const { x, y } = placed(bounds, matrix, warp, point)
+      positions[i * 2] = x
+      positions[i * 2 + 1] = y
+      left = Math.min(left, x)
+      top = Math.min(top, y)
+      right = Math.max(right, x)
+      bottom = Math.max(bottom, y)
+    })
+    block.geometry.positions = positions
+    block.area = { x: left, y: top, width: right - left, height: bottom - top }
   }
 
   // Show the object at these corners
@@ -431,6 +497,19 @@ export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: 
     }
     shared.update()
     for (const block of blocks) place(block, matrix)
+  }
+
+  // Bend the object with this mesh, or not at all
+  function setWarp(newWarp: Warp | null) {
+    const wasBent = warp !== null
+    warp = newWarp
+    shared.uniforms.uBent = warp ? 1 : 0
+    shared.update()
+    const matrix = homography(bounds, corners)
+    for (const block of blocks) {
+      if ((warp !== null) !== wasBent) shapeBlock(block)
+      place(block, matrix)
+    }
   }
 
   function setSmooth(smooth: boolean) {
@@ -487,7 +566,18 @@ export function createSmartView(renderer: WebGLRenderer, gpu: GpuTiles, object: 
 
   setCorners(corners)
 
-  return { container, faded, blocks: [...blockKeys], addBlock, setCorners, setSmooth, coveredKeys, drawTile, destroy }
+  return {
+    container,
+    faded,
+    blocks: [...blockKeys],
+    addBlock,
+    setCorners,
+    setWarp,
+    setSmooth,
+    coveredKeys,
+    drawTile,
+    destroy,
+  }
 }
 
 export type SmartView = ReturnType<typeof createSmartView>

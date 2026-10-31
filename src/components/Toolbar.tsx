@@ -4,7 +4,8 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
-import { isMixTool, isPaintTool, usesTip, type Tool } from '../engine/tools'
+import { isMixTool, isPaintTool, usesTip, type Tool, type TransformMode } from '../engine/tools'
+import { WARP_SIDES } from '../engine/warp'
 import { AdvancedMenu } from './AdvancedMenu'
 import { SliderValue } from './SliderValue'
 
@@ -24,10 +25,12 @@ export type SelectionControls = {
 // Transforms and smart objects (see smartObject.ts): the transform being made, if any, and whether the active layer is
 // a smart object
 export type TransformControls = {
-  transform: { smooth: boolean } | null
+  transform: { smooth: boolean; mode: TransformMode; warpSide: number } | null
   isSmartLayer: boolean
   onStart: () => void
   onSmoothChange: (smooth: boolean) => void
+  onModeChange: (mode: TransformMode) => void
+  onWarpSideChange: (side: number) => void
   onApply: () => void
   onCancel: () => void
   onConvertToPixels: () => void
@@ -104,7 +107,7 @@ export function Toolbar({
   if (transform.transform) {
     return (
       <div className="toolbar">
-        <TransformButtons controls={transform} smooth={transform.transform.smooth} />
+        <TransformButtons controls={transform} {...transform.transform} />
         <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       </div>
     )
@@ -351,15 +354,39 @@ function SelectionButtons({ selection, hasEdges }: { selection: SelectionControl
   )
 }
 
-function TransformButtons({ controls, smooth }: { controls: TransformControls; smooth: boolean }) {
+type TransformButtonsProps = NonNullable<TransformControls['transform']> & { controls: TransformControls }
+
+function TransformButtons({ controls, smooth, mode, warpSide }: TransformButtonsProps) {
   const { t } = useLanguage()
   return (
     <>
       <span className="notice">
-        {t(
-          'Drag the corners or the sides to scale (Shift changes the proportions, Alt from the middle), outside to turn, with Ctrl to distort or skew',
-        )}
+        {mode === 'mesh'
+          ? t('Drag the points to bend it, inside to move it, outside to turn it')
+          : t(
+              'Drag the corners or the sides to scale (Shift changes the proportions, Alt from the middle), outside to turn, with Ctrl to distort or skew',
+            )}
       </span>
+      <span className="button-group" title={t('Scale, turn and skew it, or bend it with a mesh of points')}>
+        <button aria-pressed={mode === 'free'} onClick={() => controls.onModeChange('free')}>
+          {t('Free')}
+        </button>
+        <button aria-pressed={mode === 'mesh'} onClick={() => controls.onModeChange('mesh')}>
+          {t('Mesh')}
+        </button>
+      </span>
+      {mode === 'mesh' && (
+        <label title={t('How many points the mesh has each way: fewer bend wide areas, more bend details')}>
+          {t('Points')}
+          <select value={warpSide} onChange={e => controls.onWarpSideChange(Number(e.target.value))}>
+            {WARP_SIDES.map(side => (
+              <option key={side} value={side}>
+                {side}×{side}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <span
         className="button-group"
         title={t('How the pixels are worked out: smoothly, or as whole pixels for pixel art')}

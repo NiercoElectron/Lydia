@@ -423,6 +423,8 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
             isSmartLayer: snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isSmart ?? false,
             onStart: () => engine?.startTransform(),
             onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
+            onModeChange: mode => engine?.setTransformMode(mode),
+            onWarpSideChange: side => engine?.setTransformWarpSide(side),
             onApply: () => engine?.applyTransform(),
             onCancel: () => engine?.cancelTransform(),
             onConvertToPixels: () => engine?.convertToPixels(),

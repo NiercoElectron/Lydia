@@ -212,7 +212,7 @@ selection moves along.
 
 ## Transforming and smart objects
 
-Transforming scales, turns, skews or distorts. **Ctrl+T** starts it, or **Transform** in the bar of the selection and
+Transforming scales, turns, skews, distorts or bends. **Ctrl+T** starts it, or **Transform** in the bar of the selection and
 move tools (in a browser, Ctrl+T opens a new tab instead, so use the button there).
 
 - With a selection, the selected part goes into a new layer above as a **smart object**. Without one, the whole layer
@@ -223,8 +223,17 @@ move tools (in a browser, Ctrl+T opens a new tab instead, so use the button ther
   - hold **Alt** to scale from the middle;
   - drag **inside** to move it, and **outside** to turn it (**Shift**: in steps of 15°);
   - **Ctrl** + drag a corner distorts it, and Ctrl + drag a side skews it.
+- **The mesh:** **Mesh**, in the bar, shows a grid of points in place of the corners and the sides, and **Free** goes
+  back to them, keeping the bend, so both can be used in one transform:
+  - drag a **point** to bend the picture there, in a smooth curve;
+  - **Points** chooses how many there are each way, 3×3 to 6×6: few bend wide areas, more bend details;
+  - drag **inside** to move it, and **outside** to turn it, as ever.
+
+  After Enter, the mesh stays with the smart object: transforming it again shows the points where they were.
+
 - **Pixels:** **Smooth** for painting, or **Whole** for pixel art.
-- **Enter** (or Apply) applies it; **Esc** (or Cancel) leaves everything as it was.
+- **Ctrl+Z** and **Ctrl+Shift+Z** (or Undo and Redo) go back and forward through each drag while it is made.
+- **Enter** (or Apply) applies it, as one step of undo; **Esc** (or Cancel) leaves everything as it was.
 
 A smart object keeps its original pixels, so transforming it again and again never loses anything, even scaled down
 and up again. It shows a box icon in the layers. It can't be painted on, erased or filled, and Clear layer and Delete

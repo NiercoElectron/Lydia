@@ -30,8 +30,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   work inside, and Delete takes out what is inside
 - A move tool that drags what is selected, or the whole layer when nothing is, by whole pixels; the selection moves
   along, and paint moved off the paper is kept, to be brought back
-- Smart objects, like Photoshop's: scale, turn, skew or distort what is selected or a whole layer with handles, again
-  and again without losing anything, smoothly or by whole pixels for pixel art
+- Smart objects, like Photoshop's: scale, turn, skew, distort or bend with a mesh what is selected or a whole layer,
+  again and again without losing anything, smoothly or by whole pixels for pixel art
 - Import images into a tray (the Tray button, at the foot of the tool column) and drag them onto the drawing as often
   as needed, as smart objects, at their own size; the tray stays while Lydia is open
 - An opacity for each stroke, and brushes that "wash": a stroke doesn't pile up over itself
@@ -97,9 +97,8 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Distort: smudge and blur tools (done), a liquify tool (push, bloat and pucker the picture with the pen, and
-      brush it back to how it was) and a mesh mode for transforming (a grid of points that bend the picture where each
-      one is dragged)
+- [ ] Distort: smudge and blur tools and a mesh mode for transforming (both done), and a liquify tool (push, bloat
+      and pucker the picture with the pen, and brush it back to how it was)
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)

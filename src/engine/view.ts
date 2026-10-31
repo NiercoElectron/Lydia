@@ -13,7 +13,8 @@ import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerS
 import { straightLineEnd } from './straightLine'
 import { tilesInRect, type Grid } from './tiles'
 import { isMixTool, isPaintTool, usesTip, type Tool } from './tools'
-import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
+import { cursorFor, drawHandles, handleAt, movedWarp, transformed, type TransformTarget } from './transformHandles'
+import type { Warp } from './warp'
 
 export const MIN_ZOOM = 0.01 // 1% (zoomed far out)
 export const MAX_ZOOM = 32 // 3200% (each pixel of the paper is 32 pixels of the screen)
@@ -68,6 +69,8 @@ export type ViewActions = {
   // The transform being made, if any, and its handles dragged to new corners (see transformHandles.ts)
   getTransform: () => TransformTarget | null
   onTransform: (corners: Quad) => void
+  onWarp: (warp: Warp) => void
+  onTransformStep: () => void // a handle was let go
 }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
@@ -311,10 +314,16 @@ export function createView(
     const handle = handleAt(target, onScreen(e), from, toScreen)
     return {
       move(e) {
+        if (handle.kind === 'mesh') {
+          actions.onWarp(movedWarp(target, handle.index, from, toPaper(e)))
+          return
+        }
         const keys = { shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey }
         actions.onTransform(transformed(target, handle, from, toPaper(e), keys))
       },
-      up() {},
+      up() {
+        actions.onTransformStep()
+      },
       cursor: cursorFor(handle, target, toScreen, e.ctrlKey || e.metaKey),
     }
   }
@@ -830,6 +839,7 @@ export function createView(
       }
     },
     isPainting: () => gesture !== null && usesTip(gesture.tool),
+    isDragging: () => gesture !== null,
     destroy,
   }
 }

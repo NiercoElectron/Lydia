@@ -14,6 +14,9 @@ export type Tool =
   | 'zoom'
   | 'rotate'
 
+// How a transform is made: with the corners and the sides, or with the points of a mesh (see warp.ts)
+export type TransformMode = 'free' | 'mesh'
+
 // The tools that paint with the brush's tip: the brush puts paint down, the eraser takes it away
 export type PaintTool = 'brush' | 'eraser'
 

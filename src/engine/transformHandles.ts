@@ -1,23 +1,27 @@
 import type { Graphics } from 'pixi.js'
 import { ROTATE_CURSOR } from './cursors'
 import type { Point } from './selection'
-import { homography, invert, mapPoint, rectQuad, type Quad, type Rect } from './smartObject'
+import { homography, invert, mapPoint, placed, rectQuad, type Quad, type Rect } from './smartObject'
+import type { Warp } from './warp'
 
 // The handles of a transform (decision 42), like Photoshop's: a square on each corner and on the middle of each side.
 // A corner scales both ways keeping the proportions (Shift lets them change), and a side one way, from the opposite
 // corner or side (from the middle with Alt). With Ctrl, a corner moves alone (distort) and a side moves its two corners
-// (skew). Dragging inside moves the object, and outside turns it around its middle (Shift: in steps of 15°)
+// (skew). Dragging inside moves the object, and outside turns it around its middle (Shift: in steps of 15°). In the
+// Mesh mode (see warp.ts), the mesh's points take the place of the corners and the sides
 
-// What is transformed: the part of the source with paint, and where its corners are on the paper
-export type TransformTarget = { bounds: Rect; corners: Quad }
+// What is transformed: the part of the source with paint, where its corners are on the paper, and the mesh in the Mesh
+// mode
+export type TransformTarget = { bounds: Rect; corners: Quad; warp: Warp | null }
 
-export type Handle = { kind: 'corner' | 'side'; index: number } | { kind: 'inside' } | { kind: 'outside' }
+export type Handle = { kind: 'corner' | 'side' | 'mesh'; index: number } | { kind: 'inside' } | { kind: 'outside' }
 
 export type HeldKeys = { shift: boolean; alt: boolean; ctrl: boolean }
 
 const HANDLE_SIZE = 8 // pixels of the screen
 const HANDLE_REACH = 10 // how close to a handle the pointer must be to take it, in pixels of the screen
 const ROTATE_STEP = (15 * Math.PI) / 180
+const MESH_LINE_STEPS = 8 // how many straight pieces draw each line of the mesh from one point to the next
 
 const middleOf = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
 const centerOf = (quad: Quad): Point => ({
@@ -32,9 +36,11 @@ function sourceHandles(bounds: Rect): Point[] {
 }
 
 // Where the handles are on the paper
-function handlePoints({ bounds, corners }: TransformTarget) {
+function handlePoints({ bounds, corners, warp }: TransformTarget) {
   const matrix = homography(bounds, corners)
-  return sourceHandles(bounds).map(point => mapPoint(matrix, point))
+  const onPaper = (point: Point) =>
+    mapPoint(matrix, { x: bounds.x + point.x * bounds.width, y: bounds.y + point.y * bounds.height })
+  return warp ? warp.points.map(onPaper) : sourceHandles(bounds).map(point => mapPoint(matrix, point))
 }
 
 // Whether a point is inside the four corners (which always turn the same way: see isValidQuad)
@@ -64,6 +70,7 @@ export function handleAt(target: TransformTarget, screen: Point, paper: Point, t
       distance = d
     }
   })
+  if (nearest >= 0 && target.warp) return { kind: 'mesh', index: nearest }
   if (nearest >= 0) return nearest < 4 ? { kind: 'corner', index: nearest } : { kind: 'side', index: nearest - 4 }
   return isInside(target.corners, paper) ? { kind: 'inside' } : { kind: 'outside' }
 }
@@ -72,7 +79,7 @@ export function handleAt(target: TransformTarget, screen: Point, paper: Point, t
 export function cursorFor(handle: Handle, target: TransformTarget, toScreen: (p: Point) => Point, ctrl: boolean) {
   if (handle.kind === 'inside') return 'move'
   if (handle.kind === 'outside') return ROTATE_CURSOR
-  if (ctrl) return 'crosshair'
+  if (ctrl || handle.kind === 'mesh') return 'crosshair'
   const point = toScreen(handlePoints(target)[handle.kind === 'corner' ? handle.index : handle.index + 4])
   const center = toScreen(centerOf(target.corners))
   const step = Math.round(Math.atan2(point.y - center.y, point.x - center.x) / (Math.PI / 4))
@@ -83,6 +90,7 @@ export function cursorFor(handle: Handle, target: TransformTarget, toScreen: (p:
 // started
 export function transformed(target: TransformTarget, handle: Handle, from: Point, to: Point, keys: HeldKeys): Quad {
   const { bounds, corners } = target
+  if (handle.kind === 'mesh') return corners
   // Moved by whole pixels, so a smooth object doesn't get blurred by moving alone
   if (handle.kind === 'inside') {
     const dx = Math.round(to.x - from.x)
@@ -141,13 +149,56 @@ export function transformed(target: TransformTarget, handle: Handle, from: Point
   return scaled.map(p => mapPoint(matrix, p)) as Quad
 }
 
-// The outline and the handles, as wide at any zoom: white with black lines, like the selection's outline
+// The mesh after dragging one of its points from "from" to "to" (points of the paper), from where it was when the drag
+// started. The point moves in the object's square, so the mesh follows the corners
+export function movedWarp({ bounds, corners, warp }: TransformTarget, index: number, from: Point, to: Point): Warp {
+  const back = invert(homography(bounds, corners))
+  const start = mapPoint(back, from)
+  const now = mapPoint(back, to)
+  const points = [...warp!.points]
+  points[index] = {
+    x: points[index].x + (now.x - start.x) / bounds.width,
+    y: points[index].y + (now.y - start.y) / bounds.height,
+  }
+  return { side: warp!.side, points }
+}
+
+// The lines of the mesh on the paper, along the surface: each as a row of points
+function meshLines({ bounds, corners, warp }: TransformTarget, side: number) {
+  const matrix = homography(bounds, corners)
+  const at = (u: number, v: number) =>
+    placed(bounds, matrix, warp, { x: bounds.x + u * bounds.width, y: bounds.y + v * bounds.height })
+  const lines: Point[][] = []
+  for (let line = 0; line < side; line++) {
+    const where = line / (side - 1)
+    const steps = Array.from({ length: (side - 1) * MESH_LINE_STEPS + 1 }, (_, i) => i / ((side - 1) * MESH_LINE_STEPS))
+    lines.push(
+      steps.map(along => at(along, where)),
+      steps.map(along => at(where, along)),
+    )
+  }
+  return lines
+}
+
+// The outline and the handles, as wide at any zoom: white with black lines, like the selection's outline. In the Mesh
+// mode, the lines of the mesh
 export function drawHandles(graphics: Graphics, target: TransformTarget, zoom: number) {
   const width = 1 / zoom
   const size = HANDLE_SIZE / zoom
   graphics.clear()
-  graphics.poly(target.corners, true).stroke({ width: 3 * width, color: 0xffffff })
-  graphics.poly(target.corners, true).stroke({ width, color: 0x000000 })
+  if (target.warp) {
+    const lines = meshLines(target, target.warp.side)
+    for (const [lineWidth, color] of [
+      [3 * width, 0xffffff],
+      [width, 0x000000],
+    ]) {
+      for (const line of lines) graphics.poly(line, false)
+      graphics.stroke({ width: lineWidth, color })
+    }
+  } else {
+    graphics.poly(target.corners, true).stroke({ width: 3 * width, color: 0xffffff })
+    graphics.poly(target.corners, true).stroke({ width, color: 0x000000 })
+  }
   for (const { x, y } of handlePoints(target)) {
     graphics
       .rect(x - size / 2, y - size / 2, size, size)

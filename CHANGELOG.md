@@ -12,6 +12,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **Smudge (U)** and **Blur (J)** ([decision 71](docs/decisions.md#71-smudge-and-blur)), after the eraser in the tool
   column: smudge drags the paint on the active layer, and blur softens it, through the chosen brush's tip. Each has its
   own Size and Strength, and the pen's pressure changes the strength.
+- A **mesh** for transforming ([decision 72](docs/decisions.md#72-the-mesh-of-a-transform)): **Mesh**, in the
+  transform's bar, shows a grid of 3, 4, 5 or 6 points each way that bend the picture where each is dragged, in a smooth
+  curve. It works together with Free, and stays in the smart object and in the drawing's file, so it can be changed
+  again.
+- **Undo inside a transform:** while it is made, Ctrl+Z and Ctrl+Shift+Z go through each drag of a handle or a point.
 - A **Sharp** button, next to Grid, shows the pixels as sharp squares at every zoom from 100%, with any brush
   ([decision 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
 

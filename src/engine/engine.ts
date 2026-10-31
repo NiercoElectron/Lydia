@@ -90,7 +90,8 @@ import {
   wholeTileMask,
   type Grid,
 } from './tiles'
-import { isMixTool, isPaintTool, usesTip, type Tool } from './tools'
+import { isMixTool, isPaintTool, usesTip, type Tool, type TransformMode } from './tools'
+import { DEFAULT_WARP_SIDE, flatWarp, isFlatWarp, resizedWarp, type Warp } from './warp'
 import { createView } from './view'
 
 // What the screen needs to know about the drawing. A new object every time something changes, so React can tell
@@ -123,7 +124,8 @@ export type EngineSnapshot = {
   task: string | null // what is being worked out over several frames ("Filling…"), if anything (see runTask)
   progress: number | null // how far the task is, from 0 to 1, when it can tell (see setProgress)
   hasSelection: boolean
-  transform: { smooth: boolean } | null // the transform being made, if any (see smartObject.ts)
+  // The transform being made, if any (see smartObject.ts): with its pixels' way, and its mode and mesh (see warp.ts)
+  transform: { smooth: boolean; mode: TransformMode; warpSide: number } | null
   canMergeDown: boolean // the active layer can be merged into the one under it (see mergeDown)
   exportScale: number // how many times bigger images are exported
   exportScales: number[] // the ones this drawing's images fit at
@@ -207,8 +209,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       ? project.layers.map(({ smart, ...data }) => {
           const layer: Layer = { ...createLayer(data.name, data.tiles), ...data, parent: null } // set below
           if (smart) {
-            const { tiles, bounds, corners, smooth } = smart
-            layer.smart = { source: createLayer(`${data.name} (source)`, tiles), bounds, corners, smooth }
+            const { tiles, ...rest } = smart
+            layer.smart = { source: createLayer(`${data.name} (source)`, tiles), ...rest }
           }
           return layer
         })
@@ -322,8 +324,17 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     canUse: tool =>
       !((stack.active.smart || isFolder(stack.active)) && (usesTip(tool) || tool === 'fill')) &&
       !(tool === 'eraser' && stack.active.alphaLocked),
-    getTransform: () => (transform ? { bounds: transform.object.bounds, corners: transform.corners } : null),
+    getTransform: () =>
+      transform
+        ? {
+            bounds: transform.object.bounds,
+            corners: transform.corners,
+            warp: transform.mode === 'mesh' ? transform.warp : null,
+          }
+        : null,
     onTransform: corners => setTransformCorners(corners),
+    onWarp: warp => setTransformWarp(warp),
+    onTransformStep: () => keepTransformStep(),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
@@ -398,14 +409,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       })),
       activeLayerId: stack.active.id,
       canDelete: canDelete(),
-      canUndo: history.canUndo(),
-      canRedo: history.canRedo(),
+      canUndo: transform ? transform.step > 0 : history.canUndo(),
+      canRedo: transform ? transform.step < transform.steps.length - 1 : history.canRedo(),
       isModified,
       isUpdating: projection.isUpdating(),
       task,
       progress: task ? taskProgress : null,
       hasSelection: selection !== null,
-      transform: transform ? { smooth: transform.smooth } : null,
+      transform: transform
+        ? {
+            smooth: transform.smooth,
+            mode: transform.mode,
+            warpSide: transform.warp?.side ?? DEFAULT_WARP_SIDE,
+          }
+        : null,
       canMergeDown: canMergeDown(),
       exportScale,
       exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
@@ -709,9 +726,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     copy.clipped = layer.clipped
     if (layer.folder) copy.folder = { ...layer.folder }
     if (layer.smart) {
-      const { source, bounds, corners, smooth } = layer.smart
+      const { source, bounds, corners, smooth, warp } = layer.smart
       const ownSource = createLayer(source.name, new Map(source.tiles))
       copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
+      if (warp) copy.smart.warp = { side: warp.side, points: warp.points.map(p => ({ ...p })) }
     }
     return copy
   }
@@ -969,6 +987,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // ----- Undo -----
 
   function undo() {
+    if (transform) {
+      showTransformStep(transform.step - 1)
+      return
+    }
     if (isBusy()) return
     finishLayerOpacity() // an opacity change still on its way (Ctrl+Z while dragging) becomes a step first
     if (!history.canUndo()) return
@@ -977,6 +999,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   function redo() {
+    if (transform) {
+      showTransformStep(transform.step + 1)
+      return
+    }
     if (isBusy()) return
     finishLayerOpacity()
     if (!history.canRedo()) return
@@ -1101,6 +1127,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           bounds: layer.smart.bounds,
           corners: layer.smart.corners,
           smooth: layer.smart.smooth,
+          warp: layer.smart.warp,
         },
       })),
     )
@@ -1490,12 +1517,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // The transform being made (see smartObject.ts): the layer, and what it transforms: its smart object; the whole
   // layer, which becomes one; the selected part of it, which goes into a new layer above as one; or an image being put
   // into the drawing, which goes into a new layer above as one too (see placeImage). "corners" are where the handles
-  // have it now (see view.ts)
+  // have it now (see view.ts), "warp" its mesh, and "mode" which handles show. "steps" are its own undo, while it is
+  // made: where the corners and the mesh were after each change, and "step" the one showing
+  type TransformStep = { corners: Quad; warp: Warp | null }
   type Transform = {
     layer: Layer
     kind: 'object' | 'layer' | 'part' | 'image'
     object: SmartObject // as it was when the transform started
     corners: Quad
+    warp: Warp | null
+    mode: TransformMode
+    steps: TransformStep[]
+    step: number
     smooth: boolean
     view: SmartView
     cut: Selection | null
@@ -1578,7 +1611,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Show a smart object with the handles, in place of the tiles of its layer that it takes the paint of ("lifted"), a
   // few blocks every frame ("pace": the caller's, so the frame it is in isn't given a new share of time)
   async function showTransform(
-    started: Omit<Transform, 'corners' | 'smooth' | 'view'>,
+    started: Omit<Transform, 'corners' | 'warp' | 'mode' | 'steps' | 'step' | 'smooth' | 'view'>,
     lifted: string[],
     pace: () => Promise<void>,
   ) {
@@ -1593,7 +1626,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const isNewLayer = started.kind === 'part' || started.kind === 'image'
     projection.setMoveContent(view.container, view.faded, view, isNewLayer)
     projection.showMove(0, 0)
-    transform = { ...started, corners: object.corners, smooth: object.smooth, view }
+    const warp = object.warp ?? null
+    const { corners, smooth } = object
+    const steps = [{ corners, warp }]
+    transform = { ...started, corners, warp, mode: warp ? 'mesh' : 'free', steps, step: 0, smooth, view }
   }
 
   // The handles moved (see view.ts). Corners that would fold the object over itself are left out
@@ -1602,6 +1638,60 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     transform.corners = corners
     transform.view.setCorners(corners)
     projection.moveChanged()
+  }
+
+  // A point of the mesh moved (see view.ts)
+  function setTransformWarp(warp: Warp) {
+    if (!transform) return
+    transform.warp = warp
+    transform.view.setWarp(warp)
+    projection.moveChanged()
+  }
+
+  // Show the corners and the sides, or the mesh. The object keeps its mesh in both
+  function setTransformMode(mode: TransformMode) {
+    if (!transform || mode === transform.mode) return
+    transform.mode = mode
+    if (mode === 'mesh' && !transform.warp) {
+      setTransformWarp(flatWarp(DEFAULT_WARP_SIDE))
+      transform.steps[transform.step].warp = transform.warp // the picture is the same, so it isn't a step
+    }
+    changed(false)
+  }
+
+  // A change of the handles ended: it becomes a step of the transform's undo, in place of the ones undone
+  function keepTransformStep() {
+    if (!transform) return
+    const { corners, warp, steps, step } = transform
+    if (corners === steps[step].corners && warp === steps[step].warp) return // the pointer went down and up
+    steps.length = step + 1
+    steps.push({ corners, warp })
+    transform.step = step + 1
+    changed(false)
+  }
+
+  // Go to one of the transform's steps, unless a handle is being dragged. In the Mesh mode, one from before the mesh
+  // shows an unbent mesh
+  function showTransformStep(index: number) {
+    if (!transform || view.isDragging()) return
+    const shown = transform.steps[index]
+    if (!shown) return
+    const side = transform.warp?.side ?? DEFAULT_WARP_SIDE
+    transform.step = index
+    transform.corners = shown.corners
+    transform.warp = shown.warp ?? (transform.mode === 'mesh' ? flatWarp(side) : null)
+    transform.view.setCorners(shown.corners)
+    transform.view.setWarp(transform.warp)
+    projection.moveChanged()
+    changed(false)
+  }
+
+  // Use this many points each way, bending the object as nearly as they can as it was
+  function setTransformWarpSide(side: number) {
+    if (!transform?.warp) return
+    setTransformWarp(resizedWarp(transform.warp, side))
+    keepTransformStep()
+    changed(false)
   }
 
   function setTransformSmooth(smooth: boolean) {
@@ -1634,6 +1724,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     projection.holdMove()
     const { layer, kind, view, cut } = done
     const object: SmartObject = { ...done.object, corners: done.corners, smooth: done.smooth }
+    if (done.warp && !isFlatWarp(done.warp)) object.warp = done.warp
+    else delete object.warp
     return runTask('Transforming…', async () => {
       let target = layer
       history.startGroup()
@@ -1822,6 +1914,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     deleteSelected,
     // Transforms and smart objects (see smartObject.ts)
     startTransform,
+    setTransformMode,
+    setTransformWarpSide,
     placeImage,
     applyTransform,
     cancelTransform,

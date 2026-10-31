@@ -4,6 +4,7 @@ import { decompress } from './lz4'
 import type { StoredTile } from './memory'
 import type { Point } from './selection'
 import { isValidQuad, type Quad, type Rect } from './smartObject'
+import { WARP_SIDES, type Warp } from './warp'
 import { createGrid, TILE_SIZE, tileKey, tileSize, type Grid } from './tiles'
 
 export const PROJECT_EXTENSION = '.lyd'
@@ -30,7 +31,7 @@ export const fitsExport = (width: number, height: number, scale: number) =>
 
 // A smart object as it is opened or saved (see smartObject.ts): its source's tiles, the part of the source with paint,
 // where that part's corners are on the paper, and how its pixels are worked out
-export type SmartData<Tiles> = { tiles: Tiles; bounds: Rect; corners: Quad; smooth: boolean }
+export type SmartData<Tiles> = { tiles: Tiles; bounds: Rect; corners: Quad; smooth: boolean; warp?: Warp }
 
 export type LayerData = {
   name: string
@@ -105,7 +106,8 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // A smart object's layer also has "smart": its source's tiles, listed like the layer's, the rectangle of the source
 // with paint ("bounds"), the corners where that rectangle is on the paper, and "smooth". A tile that the layer and its
 // source share is stored once. Only files with smart objects are version 3: the others stay version 2, so that
-// Lydia 0.7 can still open them.
+// Lydia 0.7 can still open them. Since 0.15, "smart" can have "warp", the mesh that bends it (see warp.ts): older
+// versions don't know it, and show the layer's tiles, bent as they were saved, until it is transformed again.
 //
 // In versions 2 and 3, tiles are on the paper, and the ones at its right and bottom edges are cut there. Since Lydia
 // 0.10, layers can have paint off the paper (decision 49): a drawing with some is version 4, where every tile is whole
@@ -323,7 +325,8 @@ export function parseProject(file: ArrayBuffer): ProjectData {
           !Array.isArray(smart.tiles) ||
           !isBounds(smart.bounds, grid, isWhole) ||
           !isCorners(smart.corners) ||
-          typeof smart.smooth !== 'boolean'
+          typeof smart.smooth !== 'boolean' ||
+          (smart.warp !== undefined && !isWarp(smart.warp))
         ) {
           throw damaged()
         }
@@ -332,6 +335,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
           bounds: smart.bounds,
           corners: smart.corners,
           smooth: smart.smooth,
+          ...(smart.warp !== undefined && { warp: smart.warp }),
         }
       }
       return data
@@ -406,9 +410,16 @@ function isView(value: unknown): value is ViewData {
   )
 }
 
+const isPoint = (point: unknown) => isObject(point) && Number.isFinite(point.x) && Number.isFinite(point.y)
+
+// A mesh a smart object can have (see warp.ts)
+function isWarp(value: unknown): value is Warp {
+  if (!isObject(value) || !WARP_SIDES.includes(value.side as number) || !Array.isArray(value.points)) return false
+  return value.points.length === (value.side as number) ** 2 && value.points.every(isPoint)
+}
+
 // Four corners a smart object can have (see isValidQuad)
 function isCorners(value: unknown): value is Quad {
   if (!Array.isArray(value) || value.length !== 4) return false
-  const isPoint = (point: unknown) => isObject(point) && Number.isFinite(point.x) && Number.isFinite(point.y)
   return value.every(isPoint) && isValidQuad(value as Quad)
 }

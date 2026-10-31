@@ -2088,6 +2088,42 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   pen, more pressure dragging further at the same size. On a 4000×4000 drawing, a movement of the pen took about 1 ms
   on average at any size up to 500, and 16 ms at worst.
 
+## 72. The mesh of a transform
+
+- **Date:** 2026-10-30
+- **Status:** adopted
+- **Problem:** the transform only moves four corners, so it can't bend anything. My artist friend needs to curve parts
+  of a drawing, like Photoshop's Warp or the mesh of Krita and ibisPaint.
+- **Decision:** my choices:
+  - **Free and Mesh** buttons in the transform's bar change the handles, so one transform can use both.
+  - **3, 4, 5 or 6 points each way**, from a list in the bar, starting at 4: few bend wide areas, more bend details.
+  - **A curved surface** through the points, so dragging one makes a curve with no corners, not cells each bent alone.
+  - **It stays editable:** the mesh is kept in the smart object and in the `.lyd` file, so the transform opens with the
+    points where they were, and nothing is lost.
+- **How:**
+  - `src/engine/warp.ts`: the points are in the object's own square, from (0, 0) to (1, 1), and a Catmull-Rom surface
+    goes through them, each way. So the mesh bends the object inside its square, and the transform's corners then put
+    that square on the paper: Free and Mesh work together, and turning a bent object turns its bend.
+  - An unbent object is still drawn as it was, each pixel found through the inverse homography. A mesh can't go back
+    from the paper to the source, so a bent object is drawn as a grid of small cells, each corner carrying its place in
+    the source (`smartObject.ts`), at most 128 across the object. Their corners are at multiples of one step, the same in
+    every block of the source, so the blocks meet.
+  - Each movement of a point works out the surface again, up to 129×129 points. Written simply it took 11 ms, too near
+    a frame, so each mesh keeps its numbers with the rows past its edge: about 2 ms.
+  - Going from 3 points to 6 keeps the shape as nearly as the new points can. A mesh that bends nothing isn't kept.
+  - While a transform is made, Ctrl+Z and Ctrl+Shift+Z go through its own steps (my request: a wrong drag meant Esc and
+    starting again): each drag of a handle, in Free and in Mesh, and each change of the number of points. They are the
+    transform's: Enter makes them all one step of the drawing's undo, and Esc leaves it as it was.
+  - In the file, `warp` is beside the smart object's corners. Older versions of Lydia don't know it, and show the
+    layer's tiles as they were saved, bent, until it is transformed again, so the file's version stays the same. A
+    broken mesh is a damaged file (LYD-104).
+- **Checked:** `tests/app/mesh-transform.mjs`: the surface through every point, unbent moving nothing, the same shape
+  with more points; Free and Mesh; Esc; a point dragged bending the right side while the left stays, along a smooth
+  curve; the mesh there when opened again, with 6×6 points, kept by Free and by Esc; moving a bent object; undo; undo
+  and redo inside a transform, a new drag replacing what was undone, in Free and with the number of points; a saved
+  drawing opened again with the same mesh and picture; a broken mesh; an unbent one not kept. The first version of the
+  test dragged next to the points, and showed it by the picture not changing.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
