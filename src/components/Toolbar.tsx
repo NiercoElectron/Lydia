@@ -4,6 +4,7 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
+import { MAX_SECTORS, MIN_SECTORS, SYMMETRY_MODES, type Symmetry, type SymmetryMode } from '../engine/symmetry'
 import {
   hasStrength,
   isPaintTool,
@@ -44,6 +45,15 @@ export type TransformControls = {
   onConvertToPixels: () => void
 }
 
+// How strokes are mirrored (see symmetry.ts)
+export type SymmetryControls = {
+  symmetry: Symmetry
+  isMoving: boolean // the left button moves the center
+  onChange: (change: Partial<Symmetry>) => void
+  onCenter: () => void
+  onMovingChange: (on: boolean) => void
+}
+
 type Props = {
   tool: Tool
   size: number
@@ -54,6 +64,7 @@ type Props = {
   wand: WandSettings
   selection: SelectionControls
   transform: TransformControls
+  symmetry: SymmetryControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
   isGridOn: boolean
@@ -91,6 +102,7 @@ export function Toolbar({
   wand,
   selection,
   transform,
+  symmetry,
   stabilizer,
   taper,
   isGridOn,
@@ -211,7 +223,71 @@ export function Toolbar({
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       <SharpButton isOn={isSharpOn} onToggle={onSharpToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
+      <SymmetryButtons controls={symmetry} />
     </div>
+  )
+}
+
+// What strokes are mirrored across, how many parts a radial symmetry has, and where its center is
+function SymmetryButtons({ controls }: { controls: SymmetryControls }) {
+  const { t } = useLanguage()
+  const { symmetry, isMoving, onChange, onCenter, onMovingChange } = controls
+  const names: Record<SymmetryMode, string> = {
+    off: t('Off'),
+    vertical: t('Left and right'),
+    horizontal: t('Up and down'),
+    both: t('Four parts'),
+    radial: t('Radial'),
+  }
+  return (
+    <>
+      <label title={t('What is painted on one side shows on the others too (Y turns it on and off)')}>
+        {t('Symmetry')}
+        <select
+          className="symmetry-mode"
+          value={symmetry.mode}
+          onChange={e => onChange({ mode: e.target.value as SymmetryMode })}
+        >
+          {SYMMETRY_MODES.map(mode => (
+            <option key={mode} value={mode}>
+              {names[mode]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {symmetry.mode === 'radial' && (
+        <label title={t('How many equal parts go around the center')}>
+          {t('Parts')}
+          <input
+            type="range"
+            min={MIN_SECTORS}
+            max={MAX_SECTORS}
+            value={symmetry.sectors}
+            onChange={e => onChange({ sectors: Number(e.target.value) })}
+          />
+          <SliderValue
+            value={symmetry.sectors}
+            min={MIN_SECTORS}
+            max={MAX_SECTORS}
+            onChange={sectors => onChange({ sectors })}
+          />
+        </label>
+      )}
+      {symmetry.mode !== 'off' && (
+        <>
+          <button
+            aria-pressed={isMoving}
+            onClick={() => onMovingChange(!isMoving)}
+            title={t('Click or drag on the drawing to move the center. Press it again to go back to the tool')}
+          >
+            {t('Move center')}
+          </button>
+          <button onClick={onCenter} title={t('Put the center back in the middle of the paper')}>
+            {t('Center')}
+          </button>
+        </>
+      )}
+    </>
   )
 }
 

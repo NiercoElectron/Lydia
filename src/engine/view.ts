@@ -12,6 +12,7 @@ import type { Point, SelectionMode } from './selection'
 import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
+import { onHalfPixels, type Symmetry } from './symmetry'
 import { tilesInRect, type Grid } from './tiles'
 import { hasStrength, isPaintTool, usesTip, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, movedWarp, transformed, type TransformTarget } from './transformHandles'
@@ -73,6 +74,10 @@ export type ViewActions = {
   onTransform: (corners: Quad) => void
   onWarp: (warp: Warp) => void
   onTransformStep: () => void // a handle was let go
+  // How strokes are mirrored (see symmetry.ts), and whether the left button moves its center now
+  getSymmetry: () => Symmetry
+  isMovingSymmetry: () => boolean
+  onSymmetryCenter: (center: Point) => void
 }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
@@ -310,6 +315,65 @@ export function createView(
   }
 
   const toScreen = (paper: Point) => world.toGlobal(paper)
+
+  // ----- The lines of the symmetry -----
+
+  // Over everything, and as thin at any zoom. Drawn again only when what they show changes
+  const symmetryLines = new Graphics()
+  app.stage.addChild(symmetryLines)
+  let symmetryKey = ''
+
+  // How far a line from the center goes, in this direction, before it leaves the paper
+  function toPaperEdge({ x, y }: Point, dx: number, dy: number) {
+    const across = dx > 0 ? (grid.width - x) / dx : dx < 0 ? -x / dx : Infinity
+    const down = dy > 0 ? (grid.height - y) / dy : dy < 0 ? -y / dy : Infinity
+    return Math.min(across, down)
+  }
+
+  function showSymmetry() {
+    const symmetry = actions.getSymmetry()
+    const { mode, sectors, center } = symmetry
+    const isShown = mode !== 'off'
+    symmetryLines.visible = isShown
+    if (!isShown) return
+    const isMoving = actions.isMovingSymmetry()
+    const { position, scale, rotation } = world
+    const key = [mode, sectors, center.x, center.y, isMoving, position.x, position.y, scale.x, scale.y, rotation].join()
+    if (key === symmetryKey) return
+    symmetryKey = key
+
+    const rays: [number, number][] = []
+    if (mode === 'vertical' || mode === 'both') rays.push([0, -1], [0, 1])
+    if (mode === 'horizontal' || mode === 'both') rays.push([-1, 0], [1, 0])
+    if (mode === 'radial') {
+      for (let sector = 0; sector < sectors; sector++) {
+        const turn = (sector * 2 * Math.PI) / sectors - Math.PI / 2
+        rays.push([Math.cos(turn), Math.sin(turn)])
+      }
+    }
+    const middle = toScreen(center)
+    symmetryLines.clear()
+    for (const [dx, dy] of rays) {
+      const reach = toPaperEdge(center, dx, dy)
+      const end = toScreen({ x: center.x + dx * reach, y: center.y + dy * reach })
+      symmetryLines.moveTo(middle.x, middle.y).lineTo(end.x, end.y)
+    }
+    symmetryLines.stroke({ width: 1, color: 0x2e9bff })
+    if (isMoving) {
+      symmetryLines.circle(middle.x, middle.y, 7).fill({ color: 0xffffff }).stroke({ width: 2, color: 0x2e9bff })
+    }
+  }
+
+  // While "Move center" is on, the left button puts the center of the symmetry where it is, inside the paper
+  function moveSymmetry(e: PointerEvent): Gesture {
+    const put = (e: PointerEvent) => {
+      const { x, y } = toPaper(e)
+      const inside = { x: Math.max(0, Math.min(grid.width, x)), y: Math.max(0, Math.min(grid.height, y)) }
+      actions.onSymmetryCenter(onHalfPixels(inside))
+    }
+    put(e)
+    return { move: put, up() {}, cursor: 'move' }
+  }
 
   // While a transform is made, the left button drags its handles
   function transform(e: PointerEvent, target: TransformTarget): Gesture {
@@ -734,6 +798,11 @@ export function createView(
       showCursor()
       return
     }
+    if (actions.isMovingSymmetry() && e.button === 0 && !isSpaceDown) {
+      gesture = { ...moveSymmetry(e), pointerId: e.pointerId, tool: 'move' }
+      showCursor()
+      return
+    }
     const used = e.button === 1 ? 'hand' : currentTool()
     // While a fill or Delete is worked out, only the tools that just look can be used
     const onlyLooks = used === 'hand' || used === 'zoom' || used === 'rotate' || used === 'eyedropper'
@@ -813,6 +882,7 @@ export function createView(
   app.ticker.add(showHandles)
   app.ticker.add(keepStabilizing)
   app.ticker.add(showBrushOutline)
+  app.ticker.add(showSymmetry)
   showCursor()
   fitToScreen()
 
@@ -830,6 +900,7 @@ export function createView(
     app.ticker.remove(showHandles)
     app.ticker.remove(keepStabilizing)
     app.ticker.remove(showBrushOutline)
+    app.ticker.remove(showSymmetry)
     outline.destroy()
     handles.destroy()
     brushOutline.destroy()

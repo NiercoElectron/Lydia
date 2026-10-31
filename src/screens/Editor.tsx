@@ -461,6 +461,13 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             onCancel: () => engine?.cancelTransform(),
             onConvertToPixels: () => engine?.convertToPixels(),
           }}
+          symmetry={{
+            symmetry: snapshot.symmetry,
+            isMoving: snapshot.isMovingSymmetry,
+            onChange: change => engine?.setSymmetry(change),
+            onCenter: () => engine?.centerSymmetry(),
+            onMovingChange: on => engine?.setMovingSymmetry(on),
+          }}
           stabilizer={stabilizer}
           taper={taper}
           isGridOn={isGridOn}

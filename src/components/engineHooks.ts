@@ -4,6 +4,7 @@ import type { TaperSettings } from '../engine/dabs'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import { errorMessage } from '../errors'
 import type { StabilizerSettings } from '../engine/stabilizer'
+import { noSymmetry, type SymmetryMode } from '../engine/symmetry'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
 import {
@@ -33,6 +34,8 @@ const startingSnapshot: EngineSnapshot = {
   canUndo: false,
   canRedo: false,
   isModified: false,
+  symmetry: noSymmetry(1, 1),
+  isMovingSymmetry: false,
   isUpdating: false,
   task: null,
   progress: null,
@@ -283,6 +286,7 @@ export function useDrawingShortcuts<T extends Tool>(
 ) {
   useEffect(() => {
     if (!engine) return
+    let lastSymmetry: SymmetryMode = 'vertical' // Y turns the symmetry off, and back on as it was
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTyping(e.target)) return
       const key = e.key.toLowerCase()
@@ -301,6 +305,11 @@ export function useDrawingShortcuts<T extends Tool>(
       else if (key === '[') setSize(s => Math.max(MIN_BRUSH_SIZE, Math.min(s - 1, Math.round(s / 1.25))))
       else if (key === ']') setSize(s => Math.min(MAX_BRUSH_SIZE, Math.max(s + 1, Math.round(s * 1.25))))
       else if (key === 'g') toggleGrid()
+      else if (key === 'y') {
+        const { mode } = engine.getSnapshot().symmetry
+        if (mode !== 'off') lastSymmetry = mode
+        engine.setSymmetry({ mode: mode === 'off' ? lastSymmetry : 'off' })
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

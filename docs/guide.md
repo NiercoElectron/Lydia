@@ -9,6 +9,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Brush and eraser](#brush-and-eraser)
 - [Smudge and blur](#smudge-and-blur)
 - [Liquify](#liquify)
+- [Symmetry](#symmetry)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -185,6 +186,22 @@ More about it:
   far as ever.
 - It only changes the active layer. With a selection, only what is inside it; with the layer's transparency locked, only
   the colors. A smart object can't be changed until it is converted to pixels.
+
+## Symmetry
+
+**Symmetry**, at the end of the bar, paints the other sides as you paint one. **Y** turns it on and off.
+
+- **Left and right**, **Up and down** and **Four parts** are mirrors. **Radial** goes around the center, in as many
+  **Parts** as you choose, from 2 to 12.
+- Blue lines show where it is. They aren't part of the drawing: they never come out in an exported image.
+- **Move center**: click or drag on the drawing to put the center anywhere on the paper, then press it again to go back to
+  the tool. **Center** puts it back in the middle.
+- The brush, the eraser, straight lines, Smudge, Blur and Liquify follow it. A stroke and its copies are one step of undo,
+  and no darker where they cross.
+- Smudge and Liquify work with the paint on the layer, so where a stroke meets its copy they move each other's paint.
+- A brush with a paper grain falls on different grooves on each side, like real paper. A pixel brush stays on the pixels,
+  and its tip doesn't turn in a radial symmetry.
+- Each drawing keeps its own, in its file.
 
 ## Eyedropper
 
@@ -425,6 +442,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | B / E                                          | Brush / eraser                                     |
 | U / J                                          | Smudge / blur                                      |
 | Q                                              | Liquify                                            |
+| Y                                              | Symmetry on and off                                |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |

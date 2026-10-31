@@ -11,6 +11,7 @@ export type Dab = {
   alpha: number // how much paint it puts down, from 0 to 1
   seed: number // the dab's own random numbers, for brushes with noise (see noiseDabs.ts)
   pressure: number // the pen's pressure there, from 0 to 1, how far it fills the paper's grain (see grain.ts)
+  flipped?: boolean // the tip is mirrored left to right, before it is turned (see symmetry.ts)
 }
 
 export type StrokePoint = { x: number; y: number; pressure: number }

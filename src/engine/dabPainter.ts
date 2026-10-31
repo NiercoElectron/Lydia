@@ -138,12 +138,13 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
       }
       sprite.position.set(dab.x, dab.y)
       sprite.rotation = dab.angle
+      const flip = dab.flipped ? -1 : 1
       if (isPixel) {
         sprite.texture = pixelTip(dab.size)
-        sprite.scale.set(1)
+        sprite.scale.set(flip, 1)
       } else {
         sprite.texture = texture
-        sprite.scale.set(dab.size / tipSide)
+        sprite.scale.set((flip * dab.size) / tipSide, dab.size / tipSide)
       }
       sprite.alpha = dab.alpha
       sprite.blendMode = blendMode
@@ -170,7 +171,7 @@ export function createDabPainter(renderer: WebGLRenderer, startTip: BrushTip, st
       }
       sprite.position.set(dab.x, dab.y)
       sprite.rotation = dab.angle
-      sprite.scale.set(dab.size / tipSide)
+      sprite.scale.set(((dab.flipped ? -1 : 1) * dab.size) / tipSide, dab.size / tipSide)
       sprite.tint = Math.round(dab.pressure * 255) * 0x010101
       pressureStamp.addChild(sprite)
     })

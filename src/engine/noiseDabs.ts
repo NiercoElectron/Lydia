@@ -63,7 +63,7 @@ flat out uint vSeed;
 void main(void) {
   // A corner of the tip's picture, with a margin around it for drops that stick out, turned with the dab
   vec2 square = aPosition * (1.0 + 2.0 * uMargin);
-  vec2 corner = square * uTipShape * aSize;
+  vec2 corner = square * uTipShape * vec2(aSize, abs(aSize)); // a negative size mirrors the tip, left to right
   float c = cos(aAngle);
   float s = sin(aAngle);
   vec2 position = aCenter + vec2(corner.x * c - corner.y * s, corner.x * s + corner.y * c);
@@ -273,7 +273,7 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
       const at = i * FLOATS_PER_DAB
       dabData[at] = dab.x
       dabData[at + 1] = dab.y
-      dabData[at + 2] = dab.size
+      dabData[at + 2] = dab.flipped ? -dab.size : dab.size
       dabData[at + 3] = dab.angle
       dabData[at + 4] = dab.alpha
       dabData[at + 5] = dab.seed

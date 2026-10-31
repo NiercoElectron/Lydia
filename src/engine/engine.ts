@@ -39,6 +39,7 @@ import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createLiquify } from './liquify'
+import { noSymmetry, type Symmetry } from './symmetry'
 import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
 import { createSmoothZoom } from './smoothZoom'
@@ -131,6 +132,8 @@ export type EngineSnapshot = {
   canMergeDown: boolean // the active layer can be merged into the one under it (see mergeDown)
   exportScale: number // how many times bigger images are exported
   exportScales: number[] // the ones this drawing's images fit at
+  symmetry: Symmetry
+  isMovingSymmetry: boolean
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
 }
 
@@ -284,6 +287,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   )
   const selectionView = createSelectionView(renderer, app.ticker, app.stage, world, grid, app.screen, () => selection)
 
+  // How strokes are mirrored (see symmetry.ts), and whether the left button moves its center for now
+  let symmetry: Symmetry = project.symmetry ?? noSymmetry(grid.width, grid.height)
+  let isMovingSymmetry = false
+  const getSymmetry = () => symmetry
+
   // The brush starts as the Soft round brush, until the screen chooses one
   const startBrush = parseBrushFile(softRound, 'Soft round')
   const brush = createBrush(
@@ -296,6 +304,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     await decodeTip(startBrush.tip, startBrush.grain),
     startBrush,
     selectionView,
+    getSymmetry,
   )
   const fillSettings: FillSettings = { ...DEFAULT_FILL }
   const wandSettings: WandSettings = { ...DEFAULT_WAND }
@@ -317,8 +326,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const painted = (color: string) => {
     for (const listener of paintListeners) listener(color)
   }
-  const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView)
-  const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView)
+  const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
+  const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, {
     onStrokeEnd: () => {
       changed()
@@ -352,6 +361,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     onTransform: corners => setTransformCorners(corners),
     onWarp: warp => setTransformWarp(warp),
     onTransformStep: () => keepTransformStep(),
+    getSymmetry,
+    isMovingSymmetry: () => isMovingSymmetry,
+    onSymmetryCenter: center => setSymmetry({ center }),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
@@ -444,6 +456,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       canMergeDown: canMergeDown(),
       exportScale,
       exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
+      symmetry,
+      isMovingSymmetry,
       trayColors,
     }
   }
@@ -1143,7 +1157,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function drawingInRam(thumbnail: Blob | null): DrawingSnapshot {
     const { width, height, background, dpi } = project
     return {
-      paper: { width, height, background, dpi, exportScale, colors: trayColors },
+      paper: { width, height, background, dpi, exportScale, colors: trayColors, symmetry },
       activeLayer: activeIndex(stack),
       view: view.getSaved(),
       layers: stack.layers.map(layer => ({
@@ -1245,7 +1259,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const paper = { ...project, exportScale, colors: trayColors }
+    const paper = { ...project, exportScale, colors: trayColors, symmetry }
     const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
     isModified = false
     changed(false)
@@ -1270,6 +1284,24 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   function setLiquifyMode(mode: LiquifyMode) {
     liquify.settings.mode = mode
+  }
+
+  // Change how strokes are mirrored (see symmetry.ts)
+  function setSymmetry(change: Partial<Symmetry>) {
+    symmetry = { ...symmetry, ...change }
+    if (symmetry.mode === 'off') isMovingSymmetry = false
+    changed()
+  }
+
+  // Put the center of the symmetry back in the middle of the paper
+  function centerSymmetry() {
+    setSymmetry({ center: noSymmetry(grid.width, grid.height).center })
+  }
+
+  // The left button moves the center of the symmetry, or goes back to the tool
+  function setMovingSymmetry(on: boolean) {
+    isMovingSymmetry = on
+    changed(false)
   }
 
   // Tell "listener" the color of every stroke of the brush (not the eraser) and every fill, once done, for the colors
@@ -2002,6 +2034,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setBrushTip,
     setMixStrength,
     setLiquifyMode,
+    setSymmetry,
+    centerSymmetry,
+    setMovingSymmetry,
     quietSnapshot,
     onGraphicsLost,
     packTile: memory.pack,

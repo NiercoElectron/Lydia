@@ -2258,6 +2258,47 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   too, with `chrome://gpucrash` on a paper of 10000×10000 with 10 layers and `chrome://crash` for the Recover list, as
   this stage was the one not to release untested.
 
+## 77. Symmetry
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** drawing a face, a character or a mandala by hand on both sides is slow and never quite even. Krita and
+  ibisPaint paint both sides at once.
+- **Decision:** my choices:
+  - **Left and right, up and down, four parts, and radial** with 2 to 12 parts.
+  - **A center that can be moved**, starting in the middle of the paper, with a button back to it, and saved in the
+    `.lyd`.
+  - **Every tool that works through dabs follows it:** the brush, the eraser, straight lines, smudge, blur and liquify. I
+    chose that over only the brush and the eraser, knowing that smudge and liquify read the layer they change, so where a
+    stroke and its copy cross they work on each other's paint.
+  - I also kept the Guides stage as one version, 0.17.0, with the rulers and the shapes, over splitting the shapes off.
+- **How:**
+  - `src/engine/symmetry.ts` turns a dab into the dab and its copies, and each tool asks for them where its dabs become
+    paint. So a stroke and its copies are one stroke: one step of undo, and no darker where they meet, because a stroke
+    covers no more than its opacity however many dabs pass over a place. The stroke's own path doesn't know about them,
+    so taper and pixel-perfect work out the one stroke, and the copies follow.
+  - A mirrored dab has its tip mirrored too (`flipped`), or a calligraphy tip would lean the wrong way. The noise is
+    mirrored with it, since a copy keeps its dab's seed.
+  - The paper's grain isn't mirrored: it stays fixed to the paper (decision 67), so each side falls on grooves of its
+    own, as on real paper.
+  - Smudge keeps one carried picture for each copy, since each carries its own paint. Liquify's push moves each copy by
+    its own movement, and a mirrored twirl turns the other way.
+  - The center is on whole or half pixels, so a mirrored pixel falls exactly on a pixel. A pixel brush's copies stay on
+    the pixels, and its tip doesn't turn in a radial symmetry: a turned pixel tip wouldn't be pixels.
+  - A corner of a pixel-perfect stroke can't be taken back with the backup of the last dab, as there are several, so
+    with symmetry its tiles are painted again from the stroke's dabs.
+  - **Move center** is a button, not a handle always under the pen: a handle in the middle of the drawing would be
+    grabbed by accident while painting there.
+  - In the file, `symmetry` is in the header, left out when off. Older versions of Lydia don't know it, and open the
+    drawing without it.
+- **Checked:** `tests/app/symmetry.mjs`: the copies of a dab; the list and the Y key; each kind of symmetry; one step of
+  undo; a half opaque stroke no darker where it meets its copy; Calligraphy, Chalk and the Pencil; a pixel brush and
+  pixel-perfect strokes, exactly the same on both sides, with no doubled corners; a selection; the eraser; straight
+  lines; smudge, blur, liquify and its twirl; moving the center; the file and the autosave. Soft edges differ by up to a
+  few levels of 255, on a few pixels: the graphics card rounds a mirrored tip a little differently. One thing isn't
+  explained: in a straight line, 6 pixels at the edge differed by up to 54 levels, as if one dab were half a pixel off.
+  It can't be seen on a drawing, and the test keeps it under 0.1% of the paint.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

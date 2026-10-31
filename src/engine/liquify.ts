@@ -8,6 +8,7 @@ import type { History, StepSide } from './history'
 import { createLayer, type Layer, type LayerStack } from './layers'
 import type { Projection } from './projection'
 import { PAD, SMART_PROGRAM } from './smartObject'
+import { symmetricDabs, type Symmetry } from './symmetry'
 import { createTileWriter, type LayerSelection } from './tileWriter'
 import { isOnPaper, parseTileKey, TILE_SIZE, tileKey, tilesTouching, type Grid } from './tiles'
 import type { LiquifyMode } from './tools'
@@ -60,6 +61,7 @@ export function createLiquify(
   history: History,
   brush: Brush,
   selection: LayerSelection,
+  getSymmetry: () => Symmetry,
 ) {
   const settings: { mode: LiquifyMode; strength: number } = { mode: 'push', strength: 0.5 }
   const writer = createTileWriter(renderer, gpu, projection, history, selection)
@@ -215,12 +217,11 @@ export function createLiquify(
 
   // Each point of the map under the dab now shows what was at another place (fromX, fromY away), through what the map
   // says there. The dab fades toward its edge, and it is its pressure that changes how much it does
-  function workDab(dab: Dab, touched: Set<string>) {
+  function workDab(dab: Dab, before: Dab | undefined, touched: Set<string>) {
     const { map } = session!
     const amount = settings.strength * dab.pressure
-    const moveX = lastDab ? dab.x - lastDab.x : 0
-    const moveY = lastDab ? dab.y - lastDab.y : 0
-    lastDab = dab
+    const moveX = before ? dab.x - before.x : 0
+    const moveY = before ? dab.y - before.y : 0
     const longest = mode === 'push' ? amount * Math.hypot(moveX, moveY) : radius * Math.max(SCALE_RATE, TWIRL_RATE)
     const margin = mode === 'reconstruct' ? 0 : Math.ceil(longest / CELL) + 1
 
@@ -264,7 +265,7 @@ export function createLiquify(
           fromX = -strength * moveX
           fromY = -strength * moveY
         } else if (mode === 'twirl') {
-          const turn = -TWIRL_RATE * strength
+          const turn = (dab.flipped ? TWIRL_RATE : -TWIRL_RATE) * strength // a mirrored dab turns the other way
           const cos = Math.cos(turn)
           const sin = Math.sin(turn)
           fromX = dx * cos - dy * sin - dx
@@ -410,7 +411,7 @@ export function createLiquify(
   let path: DabPath | null = null
   let mode: LiquifyMode = 'push'
   let radius = 0
-  let lastDab: Dab | null = null
+  let lastCopies: Dab[] = [] // the latest dab, with its copies (see symmetry.ts)
   let lastDabTime = 0
   // What the stroke changed in the map, as it was: tiles of the map, and the tiles shown
   let strokeBefore = new Map<string, MapTile | null>()
@@ -419,7 +420,12 @@ export function createLiquify(
   function workDabs(dabs: Dab[]) {
     if (dabs.length === 0) return
     const touched = new Set<string>()
-    for (const dab of dabs) workDab(dab, touched)
+    const symmetry = getSymmetry()
+    for (const dab of dabs) {
+      const copies = symmetricDabs(symmetry, dab, false)
+      copies.forEach((copy, index) => workDab(copy, lastCopies[index], touched))
+      lastCopies = copies
+    }
     for (const key of touched) drawTile(key)
     lastDabTime = performance.now()
   }
@@ -433,7 +439,7 @@ export function createLiquify(
     mode = settings.mode
     const size = Math.max(brush.settings.size, MIN_LIQUIFY_SIZE)
     radius = size / 2
-    lastDab = null
+    lastCopies = []
     strokeBefore = new Map()
     shownBefore = new Set(session.shown)
     const shape = { ...DEFAULT_SHAPE, spacing: Math.max(SPACING, 1 / size), pressureSize: false }
@@ -447,8 +453,8 @@ export function createLiquify(
 
   // While the pen holds still, Bloat, Pucker, Twirl and Reconstruct go on working where it is. Called every frame
   function hold() {
-    if (!path || !lastDab || mode === 'push' || performance.now() - lastDabTime < HOLD_MS) return
-    workDabs([lastDab])
+    if (!path || lastCopies.length === 0 || mode === 'push' || performance.now() - lastDabTime < HOLD_MS) return
+    workDabs([lastCopies[0]])
   }
 
   // Keep with an undo step what the stroke changed in the map, so undo and redo take the map with the layer's pixels

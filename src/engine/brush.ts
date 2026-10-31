@@ -21,6 +21,7 @@ import type { LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
 import { strokeBlend, type Projection, type ShownStroke } from './projection'
 import type { Point } from './selection'
+import { symmetricDabs, type Symmetry } from './symmetry'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
 import type { PaintTool } from './tools'
 
@@ -55,6 +56,7 @@ export function createBrush(
   startTip: BrushTip,
   startShape: BrushShape,
   selection: StrokeCutter,
+  getSymmetry: () => Symmetry,
 ) {
   const settings: BrushSettings = {
     tool: 'brush',
@@ -185,11 +187,13 @@ export function createBrush(
     painter.setTip(tip, shape)
   }
 
-  // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed)
+  // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed), with their copies (see
+  // symmetry.ts)
   function dabsByTile(dabs: Dab[]) {
     const isPixel = shape.pixel !== 'none'
     const byTile = new Map<string, Dab[]>()
-    for (const dab of dabs) {
+    const symmetry = getSymmetry()
+    for (const dab of dabs.flatMap(each => symmetricDabs(symmetry, each, isPixel))) {
       // A pixel tip is a square that never turns; drops of noise can stick out of the tip a little
       const radius = isPixel ? dab.size / 2 : dab.size * (tip.reach / 2 + noiseReach(shape))
       const area = tilesInRect(grid, dab.x - radius, dab.y - radius, dab.x + radius, dab.y + radius)
@@ -298,14 +302,14 @@ export function createBrush(
       return
     }
     let painted = strokeDabs.length // how many of the stroke's dabs are painted
-    let isCornerPainted = false
+    let corner: Dab | null = null
     for (const dab of dabs) {
       const count = strokeDabs.length
       if (count >= 2 && isCorner(strokeDabs[count - 2], strokeDabs[count - 1], dab)) {
-        strokeDabs.pop()
+        const left = strokeDabs.pop()!
         if (strokeDabs.length < painted) {
           // Only the latest dab painted can be: once it is taken out, the one before it is followed by a new dab
-          isCornerPainted = true
+          corner = left
           painted = strokeDabs.length
         }
       }
@@ -313,7 +317,18 @@ export function createBrush(
     }
     const added = strokeDabs.slice(painted)
     if (added.length === 0) return // nothing taken out either, since that only happens with a new dab
-    const restored = isCornerPainted ? restoreBackups() : []
+    if (getSymmetry().mode !== 'off') {
+      // What is under each copy of a corner can't be kept like that: its tiles are painted again from the stroke's dabs
+      if (corner) {
+        const allDabs = dabsByTile(strokeDabs)
+        const changed = dabsByTile([corner, ...added])
+        paintTiles(new Map([...changed.keys()].map(key => [key, allDabs.get(key) ?? []])), true)
+      } else {
+        paintTiles(dabsByTile(added))
+      }
+      return
+    }
+    const restored = corner ? restoreBackups() : []
     forgetBackups()
     const byTile = dabsByTile(added)
     paintTiles(byTile, false, added.at(-1)!)

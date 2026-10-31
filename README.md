@@ -19,6 +19,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
+- Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with every tool
+  that paints
 - Liquify: push, bloat, pucker and twirl the picture with the pen, and brush it back to the very pixels it had, with
   no loss of sharpness however many strokes
 - Smudge and blur: drag or soften the paint on the active layer through the brush's tip, more or less as the pen

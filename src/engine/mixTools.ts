@@ -19,6 +19,7 @@ import type { GpuTiles } from './gpuTiles'
 import type { History } from './history'
 import type { Layer, LayerStack } from './layers'
 import type { Projection } from './projection'
+import { copiesOf, symmetricDabs, type Symmetry } from './symmetry'
 import { createTileWriter, type LayerSelection } from './tileWriter'
 import { TILE_SIZE, tileKey, tilesInRect, type Grid } from './tiles'
 import type { MixTool } from './tools'
@@ -69,6 +70,7 @@ uniform sampler2D uTip;
 uniform vec2 uSize; // of the dab's box, in pixels
 uniform vec2 uCenter; // the dab's center in its box
 uniform vec2 uTurn; // the cosine and sine of its angle
+uniform float uFlip; // -1 when its tip is mirrored
 uniform vec2 uTipSize; // the tip's picture on the paper, in pixels
 uniform float uAmount;
 uniform float uThroughTip;
@@ -78,7 +80,7 @@ void main(void) {
   if (uThroughTip > 0.5) {
     vec2 point = vUV * uSize - uCenter;
     vec2 turned = vec2(uTurn.x * point.x + uTurn.y * point.y, uTurn.x * point.y - uTurn.y * point.x);
-    vec2 tipUV = turned / uTipSize + 0.5;
+    vec2 tipUV = turned * vec2(uFlip, 1.0) / uTipSize + 0.5;
     vec2 inside = step(vec2(0.0), tipUV) * step(tipUV, vec2(1.0));
     amount *= texture(uTip, tipUV).a * inside.x * inside.y;
   }
@@ -112,6 +114,7 @@ export function createMixTools(
   history: History,
   brush: Brush,
   selection: LayerSelection,
+  getSymmetry: () => Symmetry,
 ) {
   const settings: { tool: MixTool; strength: number } = { tool: 'smudge', strength: 0.5 }
   const writer = createTileWriter(renderer, gpu, projection, history, selection)
@@ -125,6 +128,7 @@ export function createMixTools(
     uSize: { value: new Float32Array(2), type: 'vec2<f32>' },
     uCenter: { value: new Float32Array(2), type: 'vec2<f32>' },
     uTurn: { value: new Float32Array(2), type: 'vec2<f32>' },
+    uFlip: { value: 1, type: 'f32' },
     uTipSize: { value: new Float32Array(2), type: 'vec2<f32>' },
     uAmount: { value: 0, type: 'f32' },
     uThroughTip: { value: 0, type: 'f32' },
@@ -168,13 +172,20 @@ export function createMixTools(
   let size = 1
   let reachOfBlur = MIN_BLUR
   let side = 0 // of a dab's box, in pixels
-  let hasCarried = false // smudge has picked up the paint under its first dab
+  let hasCarried: boolean[] = [] // smudge has picked up the paint under its first dab, each of the dab's copies
   let shownTip: BrushTip | null = null
   let tipTexture: Texture | null = null
 
-  // The pictures as big as a dab's box: the paint under it, what smudge carries (or the blur's first way), the same
-  // about to replace it (or the blur), and the mix that goes on the layer
-  let boxes: { under: RenderTexture; carried: RenderTexture; next: RenderTexture; mixed: RenderTexture } | null = null
+  // The pictures as big as a dab's box: the paint under it, the blur's first way, what smudge carries about to replace
+  // it (or the blur), the mix that goes on the layer, and what smudge carries, for each of the dab's copies
+  type Boxes = {
+    under: RenderTexture
+    blurred: RenderTexture
+    next: RenderTexture
+    mixed: RenderTexture
+    carried: RenderTexture[]
+  }
+  let boxes: Boxes | null = null
 
   const workTiles = new Map<string, RenderTexture>()
   // As they were before the stroke, in the tiles where what the dabs did can't all go on the layer
@@ -182,12 +193,13 @@ export function createMixTools(
   const spareTiles: RenderTexture[] = []
   const spareTile = () => spareTiles.pop() ?? RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
 
-  function setBoxes(newSide: number) {
-    if (boxes && newSide === side) return
+  function setBoxes(newSide: number, copies: number) {
+    if (boxes && newSide === side && boxes.carried.length === copies) return
     forgetBoxes()
     side = newSide
     const box = () => RenderTexture.create({ width: side, height: side })
-    boxes = { under: box(), carried: box(), next: box(), mixed: box() }
+    const carried = Array.from({ length: copies }, box)
+    boxes = { under: box(), blurred: box(), next: box(), mixed: box(), carried }
   }
 
   function forgetBoxes() {
@@ -195,7 +207,10 @@ export function createMixTools(
     mixShader.resources.uBase = Texture.EMPTY.source
     mixShader.resources.uOver = Texture.EMPTY.source
     blurShader.resources.uBase = Texture.EMPTY.source
-    if (boxes) for (const box of Object.values(boxes)) box.destroy(true)
+    if (boxes) {
+      const { under, blurred, next, mixed, carried } = boxes
+      for (const box of [under, blurred, next, mixed, ...carried]) box.destroy(true)
+    }
     boxes = null
   }
 
@@ -271,6 +286,7 @@ export function createMixTools(
       const scale = dab.size / Math.max(image.width, image.height)
       values.uCenter.set([dab.x - Math.floor(dab.x - side / 2), dab.y - Math.floor(dab.y - side / 2)])
       values.uTurn.set([Math.cos(dab.angle), Math.sin(dab.angle)])
+      values.uFlip = dab.flipped ? -1 : 1
       values.uTipSize.set([image.width * scale, image.height * scale])
     }
     mixUniforms.update()
@@ -288,30 +304,30 @@ export function createMixTools(
     renderer.render({ container: blurRoot, target, clear: true, clearColor: [0, 0, 0, 0] })
   }
 
-  // One dab of smudge. Its first one only picks up the paint under it
-  function smudgeDab(dab: Dab, left: number, top: number, touched: Set<string>) {
+  // One dab of smudge. Its first one only picks up the paint under it. "copy": which of the dab's copies it is
+  function smudgeDab(dab: Dab, left: number, top: number, touched: Set<string>, copy: number) {
     const box = boxes!
     readBox(left, top)
-    if (!hasCarried) {
-      draw(box.under, box.carried)
-      hasCarried = true
+    if (!hasCarried[copy]) {
+      draw(box.under, box.carried[copy])
+      hasCarried[copy] = true
       return
     }
     // How much of the picture stays at each dab. Each dab overlaps what the last one left, so only what comes in at
     // the front of the dab thins the picture: at 50%, the paint fades away over a little more than a brush size
     const keep = settings.strength * dab.pressure
-    mix(box.mixed, box.under, box.carried, keep, dab)
+    mix(box.mixed, box.under, box.carried[copy], keep, dab)
     writeBox(left, top, touched)
-    mix(box.next, box.under, box.carried, keep, null)
-    ;[box.carried, box.next] = [box.next, box.carried]
+    mix(box.next, box.under, box.carried[copy], keep, null)
+    ;[box.carried[copy], box.next] = [box.next, box.carried[copy]]
   }
 
   function blurDab(dab: Dab, left: number, top: number, touched: Set<string>) {
     const box = boxes!
     readBox(left, top)
     const step = reachOfBlur / 4 / side
-    blurWay(box.carried, box.under, step, 0)
-    blurWay(box.next, box.carried, 0, step)
+    blurWay(box.blurred, box.under, step, 0)
+    blurWay(box.next, box.blurred, 0, step)
     mix(box.mixed, box.under, box.next, settings.strength * dab.pressure, dab)
     writeBox(left, top, touched)
   }
@@ -319,7 +335,12 @@ export function createMixTools(
   function workDabs(dabs: Dab[]) {
     const touched = new Set<string>()
     const workDab = tool === 'smudge' ? smudgeDab : blurDab
-    for (const dab of dabs) workDab(dab, Math.floor(dab.x - side / 2), Math.floor(dab.y - side / 2), touched)
+    const symmetry = getSymmetry()
+    for (const dab of dabs) {
+      symmetricDabs(symmetry, dab, false).forEach((copy, index) => {
+        workDab(copy, Math.floor(copy.x - side / 2), Math.floor(copy.y - side / 2), touched, index)
+      })
+    }
     for (const key of touched) writer.publish(layer!, key, workTiles.get(key)!, beforeTiles.get(key))
   }
 
@@ -333,8 +354,9 @@ export function createMixTools(
     const tip = brush.getTip()
     setTip(tip)
     reachOfBlur = Math.min(MAX_BLUR, Math.max(MIN_BLUR, size * BLUR_SHARE))
-    setBoxes(Math.ceil(size * tip.reach) + 2 * Math.ceil(reachOfBlur) + 4)
-    hasCarried = false
+    const copies = copiesOf(getSymmetry())
+    setBoxes(Math.ceil(size * tip.reach) + 2 * Math.ceil(reachOfBlur) + 4, copies)
+    hasCarried = new Array<boolean>(copies).fill(false)
     const { angle, followStroke } = brush.getShape()
     const spacing = Math.max(SPACING[tool], 1 / size) // at least a pixel apart
     const shape = { ...DEFAULT_SHAPE, angle, followStroke, spacing, pressureSize: false }

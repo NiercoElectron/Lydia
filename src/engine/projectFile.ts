@@ -1,5 +1,6 @@
 import { LydiaError } from '../errors'
 import { LAYER_BLEND_MODES, type BlendMode } from './layers'
+import { isSymmetry, type Symmetry } from './symmetry'
 import { decompress } from './lz4'
 import type { StoredTile } from './memory'
 import type { Point } from './selection'
@@ -64,6 +65,7 @@ export type ProjectData = {
   view?: ViewData // none for a new drawing, which shows the whole paper
   exportScale?: number // how many times bigger images are exported (see EXPORT_SCALES); 1 when missing
   colors?: string[] // the drawing's own colors in the color tray (see ColorTray.tsx), "#rrggbb"; none when missing
+  symmetry?: Symmetry // see symmetry.ts; off when missing
   fromAutosave?: string // recovered from this copy (see autosave.ts): it isn't in any file yet
 }
 
@@ -121,7 +123,8 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // "folder" makes a layer a folder (see isFolder in layers.ts), with no tiles, and "parent" is the position of the
 // folder a layer or folder is in: a folder is above what is in it, and all that is between them is in it too. The
 // header's
-// "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing
+// "exportScale" (since 0.10) is how many times bigger images are exported; 1 when missing. "symmetry" (since 0.17) is
+// how strokes are mirrored (see symmetry.ts), left out when off; older versions of Lydia don't know it
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -146,13 +149,22 @@ type FileHeader = {
   view?: ViewData
   exportScale?: number
   colors?: string[] // older versions of Lydia don't know it, and open the file without them
+  symmetry?: Symmetry
   layers: (Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileEntry[]; smart?: SmartData<TileEntry[]> })[]
 }
 
 // Turn a drawing into the contents of a .lyd file. "wholeTiles": its tiles are whole, some of them off the paper
 // (version 4); otherwise they are on the paper, cut at its edge
 export function serializeProject(
-  { width, height, background, dpi, exportScale = 1, colors = [] }: Paper & Pick<ProjectData, 'exportScale' | 'colors'>,
+  {
+    width,
+    height,
+    background,
+    dpi,
+    exportScale = 1,
+    colors = [],
+    symmetry,
+  }: Paper & Pick<ProjectData, 'exportScale' | 'colors' | 'symmetry'>,
   activeLayer: number,
   view: ViewData,
   layers: LayerToSave[],
@@ -185,6 +197,7 @@ export function serializeProject(
     view,
     exportScale,
     colors: colors.length > 0 ? colors : undefined,
+    symmetry: symmetry?.mode === 'off' ? undefined : symmetry,
     layers: layers.map(({ tiles, smart, ...layer }) => ({
       ...layer,
       tiles: entries(tiles),
@@ -250,7 +263,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     throw new LydiaError('LYD-103')
   }
 
-  const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, colors, layers } = header
+  const { width, height, tileSize, background, dpi, activeLayer, view, exportScale, colors, symmetry, layers } = header
   const isSize = (n: unknown) => isInteger(n) && n >= MIN_SIZE && n <= MAX_SIZE
   if (!isSize(width) || !isSize(height) || tileSize !== TILE_SIZE || !Array.isArray(layers)) throw damaged()
   const grid = createGrid(width as number, height as number)
@@ -348,6 +361,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     project.activeLayer = activeLayer
   }
   if (isView(view)) project.view = view
+  if (isSymmetry(symmetry, grid.width, grid.height)) project.symmetry = symmetry
   if (EXPORT_SCALES.includes(exportScale as number)) project.exportScale = exportScale as number
   if (Array.isArray(colors)) {
     const kept = colors.filter(isColor).map(color => color.toLowerCase())

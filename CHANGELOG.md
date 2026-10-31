@@ -7,6 +7,13 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Symmetry** ([decision 77](docs/decisions.md#77-symmetry)): what is painted on one side shows on the others too: left
+  and right, up and down, in four parts, or radial with 2 to 12 parts. The brush, the eraser, straight lines, smudge, blur
+  and liquify all follow it, each stroke and its copies as one step of undo. **Y** turns it on and off, **Move center**
+  puts its center anywhere on the paper, and each drawing keeps its own.
+
 ## [0.16.0] - 2026-10-31
 
 ### Added
