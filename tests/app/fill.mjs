@@ -149,7 +149,11 @@ const brightness = hex => [1, 3, 5].reduce((sum, i) => sum + parseInt(hex.slice(
 // ----- The button, the key, the cursor and the settings -----
 await newDrawing(1500, 1000, false)
 const labels = await page.$$eval('.tool-column button', bs => bs.map(b => b.getAttribute('aria-label')).join())
-check('the column has the fill bucket after the eraser', labels.startsWith('Brush,Eraser,Fill,'), labels)
+check(
+  'the column has the fill bucket after the eraser, smudge and blur',
+  labels.startsWith('Brush,Eraser,Smudge,Blur,Fill,'),
+  labels,
+)
 await page.keyboard.press('f')
 await sleep(50)
 check(

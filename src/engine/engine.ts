@@ -37,6 +37,7 @@ import {
 import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
+import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
 import { createSmoothZoom } from './smoothZoom'
 import { createProjection } from './projection'
@@ -89,7 +90,7 @@ import {
   wholeTileMask,
   type Grid,
 } from './tiles'
-import { isPaintTool, type Tool } from './tools'
+import { isMixTool, isPaintTool, usesTip, type Tool } from './tools'
 import { createView } from './view'
 
 // What the screen needs to know about the drawing. A new object every time something changes, so React can tell
@@ -298,11 +299,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const painted = (color: string) => {
     for (const listener of paintListeners) listener(color)
   }
-  const view = createView(app, world, grid, brush, projection, gpu, {
+  const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView)
+  const view = createView(app, world, grid, brush, mixTools, projection, gpu, {
     onStrokeEnd: () => {
       changed()
       if (brush.settings.tool === 'brush') painted(brush.settings.color)
     },
+    onMixEnd: () => changed(),
     onColorPick: color => {
       for (const listener of colorListeners) listener(color)
     },
@@ -317,7 +320,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     // A smart object (see smartObject.ts) or a folder can't be painted on, and the eraser can't take paint out of a layer
     // whose transparency is locked
     canUse: tool =>
-      !((stack.active.smart || isFolder(stack.active)) && (isPaintTool(tool) || tool === 'fill')) &&
+      !((stack.active.smart || isFolder(stack.active)) && (usesTip(tool) || tool === 'fill')) &&
       !(tool === 'eraser' && stack.active.alphaLocked),
     getTransform: () => (transform ? { bounds: transform.object.bounds, corners: transform.corners } : null),
     onTransform: corners => setTransformCorners(corners),
@@ -1114,6 +1117,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function setTool(tool: Tool) {
     view.setTool(tool)
     if (isPaintTool(tool)) brush.settings.tool = tool
+    if (isMixTool(tool)) mixTools.settings.tool = tool
+  }
+
+  // How strongly smudge or blur work, from 0 to 1 (see mixTools.ts). Each has its own: this is the chosen tool's
+  function setMixStrength(strength: number) {
+    mixTools.settings.strength = strength
   }
 
   // Tell "listener" the color of every stroke of the brush (not the eraser) and every fill, once done, for the colors
@@ -1204,7 +1213,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // shows the pixels zoomed in as sharp squares (see setZoom in projection.ts)
   function setBrushTip(tip: BrushTip, shape: BrushShape) {
     brush.setTip(tip, shape)
-    projection.setPixelArt(shape.pixel !== 'none', isGridOn)
+    showPixelArt()
   }
 
   // ----- Selection -----
@@ -1712,11 +1721,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Turn the pixel grid on or off. When on, it shows from 800% zoom (see pixelGrid.ts), with the pixels as sharp
   // squares (see setZoom in projection.ts)
   let isGridOn = true
+  let isSharpOn = false
   function setPixelGrid(on: boolean) {
     isGridOn = on
     pixelGrid.setOn(on)
-    projection.setPixelArt(brush.getShape().pixel !== 'none', on)
+    showPixelArt()
   }
+
+  // Show the pixels as sharp squares at every zoom from 100%, or as usual (see setZoom in projection.ts)
+  function setSharpPixels(on: boolean) {
+    isSharpOn = on
+    showPixelArt()
+  }
+
+  const showPixelArt = () => projection.setPixelArt(brush.getShape().pixel !== 'none', isGridOn, isSharpOn)
 
   // ----- The brush's outline -----
 
@@ -1744,6 +1762,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     checkers?.texture.destroy(true)
     view.destroy()
     brush.destroy()
+    mixTools.destroy()
     projection.destroy()
     blender.destroy()
     gpu.destroy()
@@ -1765,7 +1784,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setFill,
     setWand,
     setBrushTip,
+    setMixStrength,
     setPixelGrid,
+    setSharpPixels,
     setBrushOutline,
     setStabilizer,
     setBackdrop,
@@ -1821,7 +1842,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     saveProject,
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)
-    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, world, pixelGrid, selectionView }),
+    inspect: () => ({ app, stack, gpu, projection, history, memory, brush, mixTools, world, pixelGrid, selectionView }),
   }
 
   return engine

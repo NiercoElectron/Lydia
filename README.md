@@ -10,8 +10,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   choose from
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
-- Tools in a column at the left, like in Photoshop and Krita: brush, eraser, fill bucket, eyedropper, rectangle select,
-  lasso, magic wand, move, hand, zoom and rotate view
+- Tools in a column at the left, like in Photoshop and Krita: brush, eraser, smudge, blur, fill bucket, eyedropper,
+  rectangle select, lasso, magic wand, move, hand, zoom and rotate view
 - A color panel: a ring of hues around a triangle of shades that turns with it, a background color swapped with X, the
   color's code, H/S/V sliders and the colors painted with lately; and a color tray of colors kept on purpose, for all
   drawings or saved with one
@@ -19,6 +19,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
+- Smudge and blur: drag or soften the paint on the active layer through the brush's tip, more or less as the pen
+  presses
 - A fill bucket, with a tolerance, looking at all the visible layers or only the active one, and expanding under the
   soft edge of the lines, so that no light rim is left between the color and the line
 - An eyedropper that picks the color the screen shows, by clicking or dragging over the drawing (or holding Alt while
@@ -53,7 +55,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
 - Zoom, move, turn and flip the view (the drawing itself doesn't change), with the zoom and the angle shown in the
-  bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art
+  bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art (the Sharp button)
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
 - Choose how much of the graphics card's memory Lydia may use (on the start screen)
@@ -95,9 +97,9 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Distort: smudge and blur tools, a liquify tool (push, bloat and pucker the picture with the pen, and brush it
-      back to how it was) and a mesh mode for transforming (a grid of points that bend the picture where each one is
-      dragged)
+- [ ] Distort: smudge and blur tools (done), a liquify tool (push, bloat and pucker the picture with the pen, and
+      brush it back to how it was) and a mesh mode for transforming (a grid of points that bend the picture where each
+      one is dragged)
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)

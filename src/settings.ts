@@ -92,6 +92,25 @@ export function saveBrushOutline(on: boolean) {
   }
 }
 
+// Whether the pixels show as sharp squares at every zoom from 100% (the Sharp button). They don't at first
+const SHARP_PIXELS_KEY = 'lydia.sharpPixels'
+
+export function loadSharpPixels() {
+  try {
+    return localStorage.getItem(SHARP_PIXELS_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function saveSharpPixels(on: boolean) {
+  try {
+    localStorage.setItem(SHARP_PIXELS_KEY, on ? 'on' : 'off')
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // Whether pixel brushes leave out the doubled corners of their lines (see dabs.ts). They don't at first
 const PIXEL_PERFECT_KEY = 'lydia.pixelPerfect'
 

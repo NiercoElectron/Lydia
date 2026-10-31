@@ -7,6 +7,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [The editor](#the-editor)
 - [Colors](#colors)
 - [Brush and eraser](#brush-and-eraser)
+- [Smudge and blur](#smudge-and-blur)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -144,6 +145,20 @@ until taken out. The button with a palette, next to the color's code, opens and 
   and off.
 - With a selection, the brush and the eraser only work inside it. A smart object can't be painted on (see
   [Transforming](#transforming-and-smart-objects)).
+
+## Smudge and blur
+
+**Smudge (U)** drags the paint along, like a finger. **Blur (J)** softens the paint it goes over, more each time it
+passes.
+
+- Both work with the tip of the chosen brush, so a textured brush smudges with its texture.
+- **Size** and **Strength** are in the bar, and each tool keeps its own. With Smudge, the Strength is how far the paint
+  goes: at 50%, a little more than the brush's size, and at 100% it never fades. With a pen, pressing harder makes it
+  stronger; the size stays.
+- They only read the active layer, and only change that layer: a line on the layer above isn't pulled in.
+- With a selection, they only change what is inside it. With the layer's transparency locked, they only color the paint
+  already there.
+- **The stabilizer**, under Advanced, works here too.
 
 ## Eyedropper
 
@@ -293,7 +308,7 @@ Changing the view never changes the drawing.
 - **Fit**, or **Ctrl+0**, shows the whole drawing.
 - The bar shows the zoom and the angle: click either one to type it (a zoom from 1% to 3200%, any angle).
 - Zoomed in, the pixels are smoothed. While a pixel brush is chosen, and where the pixel grid shows, they are sharp
-  squares instead, for pixel art.
+  squares instead, for pixel art. The **Sharp** button, next to Grid, shows them that way at every zoom from 100%.
 
 ## Undo and redo
 
@@ -354,6 +369,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | Shortcut                                       | What it does                                       |
 | ---------------------------------------------- | -------------------------------------------------- |
 | B / E                                          | Brush / eraser                                     |
+| U / J                                          | Smudge / blur                                      |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |

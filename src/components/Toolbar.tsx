@@ -4,7 +4,7 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
-import type { Tool } from '../engine/tools'
+import { isMixTool, isPaintTool, usesTip, type Tool } from '../engine/tools'
 import { AdvancedMenu } from './AdvancedMenu'
 import { SliderValue } from './SliderValue'
 
@@ -37,6 +37,7 @@ type Props = {
   tool: Tool
   size: number
   opacity: number // in percent
+  strength: number // of smudge or blur, in percent
   fill: FillSettings
   wand: WandSettings
   selection: SelectionControls
@@ -45,28 +46,33 @@ type Props = {
   taper: TaperSettings
   isGridOn: boolean
   isOutlineOn: boolean
+  isSharpOn: boolean
   isAlphaLocked: boolean // the active layer's transparency is locked: the eraser can't be used
   isFolder: boolean // the active one is a folder, which can't be painted on (see isFolder in layers.ts)
   isPixelBrush: boolean
   isPixelPerfectOn: boolean
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
+  onStrengthChange: (strength: number) => void
   onFillChange: (change: Partial<FillSettings>) => void
   onWandChange: (change: Partial<WandSettings>) => void
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
   onTaperChange: (change: Partial<TaperSettings>) => void
   onGridToggle: () => void
   onOutlineToggle: () => void
+  onSharpToggle: () => void
   onPixelPerfectToggle: () => void
 }
 
 // The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity, with its stabilizer and taper under
-// Advanced and, for a pixel brush, Pixel-perfect; the fill bucket's settings, or the selection's, with the magic
-// wand's. The move tool has none. While a transform is made, its own settings instead
+// Advanced and, for a pixel brush, Pixel-perfect; the size and strength of smudge or blur, with the stabilizer; the
+// fill bucket's settings, or the selection's, with the magic wand's. The move tool has none. While a transform is made,
+// its own settings instead
 export function Toolbar({
   tool,
   size,
   opacity,
+  strength,
   fill,
   wand,
   selection,
@@ -75,18 +81,21 @@ export function Toolbar({
   taper,
   isGridOn,
   isOutlineOn,
+  isSharpOn,
   isAlphaLocked,
   isFolder,
   isPixelBrush,
   isPixelPerfectOn,
   onSizeChange,
   onOpacityChange,
+  onStrengthChange,
   onFillChange,
   onWandChange,
   onStabilizerChange,
   onTaperChange,
   onGridToggle,
   onOutlineToggle,
+  onSharpToggle,
   onPixelPerfectToggle,
 }: Props) {
   const { t } = useLanguage()
@@ -100,7 +109,8 @@ export function Toolbar({
       </div>
     )
   }
-  const isBlocked = transform.isSmartLayer && (tool === 'brush' || tool === 'eraser' || tool === 'fill')
+  const paintsLayer = usesTip(tool) || tool === 'fill'
+  const isBlocked = transform.isSmartLayer && paintsLayer
   return (
     <div className="toolbar">
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
@@ -122,7 +132,7 @@ export function Toolbar({
           </button>
         </>
       )}
-      {isFolder && (tool === 'brush' || tool === 'eraser' || tool === 'fill') && (
+      {isFolder && paintsLayer && (
         <span className="notice">{t('This is a folder: choose a layer in it to paint on.')}</span>
       )}
       {tool === 'eraser' && isAlphaLocked && !isBlocked && (
@@ -141,7 +151,20 @@ export function Toolbar({
           <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={onSizeChange} />
         </label>
       )}
-      {!isSelecting && !isMoving && (
+      {isMixTool(tool) && (
+        <label title={t('How much it moves or softens the paint. With a pen, the pressure changes it too')}>
+          {t('Strength')}
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={strength}
+            onChange={e => onStrengthChange(Number(e.target.value))}
+          />
+          <SliderValue value={strength} min={1} max={100} unit="%" onChange={onStrengthChange} />
+        </label>
+      )}
+      {!isSelecting && !isMoving && !isMixTool(tool) && (
         <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
           {t('Opacity')}
           <input
@@ -154,10 +177,10 @@ export function Toolbar({
           <SliderValue value={opacity} min={1} max={100} unit="%" onChange={onOpacityChange} />
         </label>
       )}
-      {(tool === 'brush' || tool === 'eraser') && (
+      {usesTip(tool) && (
         <AdvancedMenu>
           <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
-          <TaperControls taper={taper} onChange={onTaperChange} />
+          {isPaintTool(tool) && <TaperControls taper={taper} onChange={onTaperChange} />}
         </AdvancedMenu>
       )}
       {(tool === 'brush' || tool === 'eraser') && isPixelBrush && (
@@ -170,6 +193,7 @@ export function Toolbar({
         </button>
       )}
       <GridButton isOn={isGridOn} onToggle={onGridToggle} />
+      <SharpButton isOn={isSharpOn} onToggle={onSharpToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
     </div>
   )
@@ -468,6 +492,20 @@ export function GridButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => 
       title={t('Pixel grid, shown from {zoom}% zoom (G)', { zoom: PIXEL_GRID_ZOOM * 100 })}
     >
       {t('Grid')}
+    </button>
+  )
+}
+
+// Shows the pixels as sharp squares at every zoom from 100%, instead of smoothing them. Also used by the Brush Designer
+export function SharpButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
+  const { t } = useLanguage()
+  return (
+    <button
+      aria-pressed={isOn}
+      onClick={onToggle}
+      title={t('Show the pixels as sharp squares when zoomed in, instead of smoothing them')}
+    >
+      {t('Sharp')}
     </button>
   )
 }

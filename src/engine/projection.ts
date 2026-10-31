@@ -1160,26 +1160,29 @@ export function createProjection(
 
   // Zoomed out, pixels are blended smoothly. Zoomed in, they are smoothed too, like ibisPaint and Procreate do, so a
   // line doesn't turn into steps (decision 68), except for pixel art: with a pixel brush, or where the pixel grid shows
-  // (from 800%, when it is on), each pixel is a sharp square, like Photoshop shows it
+  // (from 800%, when it is on), each pixel is a sharp square, like Photoshop shows it. The Sharp button asks for that at
+  // every zoom from 100%
   let scaleMode: 'nearest' | 'linear' = 'linear'
   let zoom = 1
   let isPixelBrush = false
   let isGridOn = true // as the pixel grid starts (see pixelGrid.ts)
+  let isSharpOn = false
 
   function setZoom(newZoom: number) {
     zoom = newZoom
     applyZoomMode()
   }
 
-  // Whether the brush chosen is a pixel brush, and whether the pixel grid is on
-  function setPixelArt(pixelBrush: boolean, gridOn: boolean) {
+  // Whether the brush chosen is a pixel brush, whether the pixel grid is on, and whether the Sharp button is
+  function setPixelArt(pixelBrush: boolean, gridOn: boolean, sharpOn: boolean) {
     isPixelBrush = pixelBrush
     isGridOn = gridOn
+    isSharpOn = sharpOn
     applyZoomMode()
   }
 
   function applyZoomMode() {
-    const isSharp = zoom >= 1 && (isPixelBrush || (isGridOn && zoom >= PIXEL_GRID_ZOOM))
+    const isSharp = zoom >= 1 && (isSharpOn || isPixelBrush || (isGridOn && zoom >= PIXEL_GRID_ZOOM))
     const mode = isSharp ? 'nearest' : 'linear'
     if (mode === scaleMode) return
     scaleMode = mode

@@ -1,5 +1,6 @@
 import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
+import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
@@ -11,7 +12,7 @@ import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
 import { tilesInRect, type Grid } from './tiles'
-import { isPaintTool, type Tool } from './tools'
+import { isMixTool, isPaintTool, usesTip, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, transformed, type TransformTarget } from './transformHandles'
 
 export const MIN_ZOOM = 0.01 // 1% (zoomed far out)
@@ -27,6 +28,8 @@ const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen sho
 const CURSORS: Record<Tool, string> = {
   brush: 'crosshair',
   eraser: 'crosshair',
+  smudge: 'crosshair',
+  blur: 'crosshair',
   fill: FILL_CURSOR,
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
@@ -49,6 +52,7 @@ type Gesture = { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void;
 // What the view asks of the rest of the engine
 export type ViewActions = {
   onStrokeEnd: () => void
+  onMixEnd: () => void
   onColorPick: (color: string) => void // a color picked with the eyedropper
   canPickColors: () => boolean // whether anyone wants those colors: if not, holding Alt doesn't pick them
   onFill: (x: number, y: number) => void // the fill bucket went down at this point of the paper
@@ -78,6 +82,7 @@ export function createView(
   world: Container,
   grid: Grid,
   brush: Brush,
+  mixTools: MixTools,
   projection: Projection,
   gpu: GpuTiles,
   actions: ViewActions,
@@ -239,6 +244,27 @@ export function createView(
         if (stabilizer && e.type === 'pointerup') brush.continueStroke(stabilizer.finish())
         stabilizer = null
         if (brush.endStroke()) actions.onStrokeEnd()
+      },
+    }
+  }
+
+  // Smudge and blur go along the pointer like the brush, stabilizer included (see mixTools.ts)
+  function mix(e: PointerEvent): Gesture {
+    hoverPoint = null
+    const point = { ...toPaper(e), pressure: pressureOf(e) }
+    mixTools.startStroke(point.x, point.y, point.pressure)
+    if (stabilizerSettings.strength > 0) {
+      stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
+    }
+    return {
+      move(e) {
+        const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
+        mixTools.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
+      },
+      up(e) {
+        if (stabilizer && e.type === 'pointerup') mixTools.continueStroke(stabilizer.finish())
+        stabilizer = null
+        if (mixTools.endStroke()) actions.onMixEnd()
       },
     }
   }
@@ -435,6 +461,8 @@ export function createView(
   const startGesture: Record<Tool, (e: PointerEvent) => Gesture> = {
     brush: paint,
     eraser: paint,
+    smudge: mix,
+    blur: mix,
     fill,
     eyedropper: pick,
     select: selectRectangle,
@@ -516,12 +544,13 @@ export function createView(
   function showBrushOutline() {
     const at = pointer
     const used = gesture?.tool ?? currentTool()
-    const pressure = penPressure !== null && brush.getShape().pressureSize ? penPressure : 1
+    // Smudge and blur keep their size: the pen's pressure changes their strength
+    const pressure = penPressure !== null && brush.getShape().pressureSize && !isMixTool(used) ? penPressure : 1
     const size = brush.settings.size * pressure
     const isShown =
       isOutlineOn &&
       at !== null &&
-      isPaintTool(used) &&
+      usesTip(used) &&
       actions.canUse(used) &&
       !actions.getTransform() &&
       size * currentZoom() >= MIN_OUTLINE
@@ -532,7 +561,7 @@ export function createView(
     // While the stabilizer holds the brush back, the outline is where the brush is, and a line joins it to the pen.
     // With Shift held, the straight line a click would paint shows, and the outline at its end. The lines show even
     // when the outline doesn't
-    const isLagging = stabilizer !== null && isPaintTool(used)
+    const isLagging = stabilizer !== null && usesTip(used)
     const canLine = isShiftDown && !gesture && at !== null && isPaintTool(used) && actions.canUse(used)
     const line = canLine && !actions.getTransform() ? straightLineTo(at) : null
     brushOutline.visible = isShown || (at !== null && (isLagging || line !== null))
@@ -702,7 +731,7 @@ export function createView(
       ? cursorFor(handleAt(target, onScreen(e), toPaper(e), toScreen), target, toScreen, e.ctrlKey || e.metaKey)
       : null
     showCursor()
-    if (isPaintTool(currentTool())) hoverPoint = toPaper(e)
+    if (usesTip(currentTool())) hoverPoint = toPaper(e)
   }
 
   function handlePointerUp(e: PointerEvent) {
@@ -800,7 +829,7 @@ export function createView(
         listeners.delete(listener)
       }
     },
-    isPainting: () => gesture !== null && isPaintTool(gesture.tool),
+    isPainting: () => gesture !== null && usesTip(gesture.tool),
     destroy,
   }
 }

@@ -12,6 +12,7 @@ import {
   useDrawingShortcuts,
   useEngineSnapshot,
   usePixelGrid,
+  useSharpPixels,
   useStabilizer,
   useTaper,
 } from '../components/engineHooks'
@@ -21,6 +22,7 @@ import {
   MAX_BRUSH_SIZE,
   MIN_BRUSH_SIZE,
   OutlineButton,
+  SharpButton,
   StabilizerControls,
   TaperControls,
 } from '../components/Toolbar'
@@ -147,6 +149,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
+  const [isSharpOn, toggleSharp] = useSharpPixels(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
   const [taper, changeTaper] = useTaper(engine)
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
@@ -312,6 +315,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
             <TaperControls taper={taper} onChange={changeTaper} />
           </AdvancedMenu>
           <GridButton isOn={isGridOn} onToggle={toggleGrid} />
+          <SharpButton isOn={isSharpOn} onToggle={toggleSharp} />
           <OutlineButton isOn={isOutlineOn} onToggle={toggleOutline} />
         </div>
         <div className="actions">

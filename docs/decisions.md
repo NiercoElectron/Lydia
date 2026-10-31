@@ -1985,7 +1985,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   600%. ibisPaint and Procreate smooth the pixels when zooming in.
 - **Decision:** zoomed in, the pixels are **smoothed by default** (my choice), and shown as sharp squares only for
   pixel art: while a pixel brush is chosen, or where the pixel grid shows (from 800%, when it is on). Only the screen
-  changes: the drawing, and what is exported, stay as they are.
+  changes: the drawing, and what is exported, stay as they are. On a big drawing I wanted to see the pixels below 800%
+  too, with any brush, so a **Sharp** button, next to Grid (my choice), shows them as sharp squares at every zoom from
+  100%, and is remembered.
 - **How:**
   - `setZoom` and `setPixelArt` in `projection.ts` choose how the tiles' pictures are read: smoothed
     ("linear") or sharp ("nearest"). The engine tells it when the brush or the pixel grid changes.
@@ -1997,7 +1999,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     Once the frame is drawn, everything is as before, for whatever else draws the drawing. The paint off the paper and the squares of a transparent background are drawn as they were.
 - **Checked:** `tests/app/smooth-zoom.mjs`: smoothed at 644%, as one picture in a frame and as before after it;
   blended zoomed out; sharp where the pixel grid shows, smoothed again with the grid off; sharp with a pixel brush, and
-  smoothed again with another brush; screenshots of a line across the edge between tiles.
+  smoothed again with another brush; the Sharp button, at 150% and with the grid off, blended zoomed out, remembered;
+  screenshots of a line across the edge between tiles.
 
 ## 69. The brush's outline follows the pen
 
@@ -2049,6 +2052,41 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   saving the copy afterwards; an image on the paper at its size, undone, inverted, retouched; a file that isn't an
   image; a tip across the whole of the biggest paper; an image on a pixel brush's paper; and a soft tip keeping its
   paint exactly.
+
+## 71. Smudge and blur
+
+- **Date:** 2026-10-30
+- **Status:** adopted
+- **Problem:** Lydia could only put paint down or take it away. Mixing colors, softening a shadow or dragging a strand
+  of hair needs tools that work with the paint already on the drawing. It is the first part of the Distort stage.
+- **Decision:** my choices:
+  - **Two tools** in the column, after the eraser: **Smudge (U)** drags the paint, and **Blur (J)** softens it. They use
+    the chosen brush's tip, so a textured tip smudges with its texture, and each has its own **Size** and **Strength**
+    in the bar, with the stabilizer under Advanced.
+  - **Only the active layer** is read, like in Procreate and ibisPaint: smudging a color doesn't pull in the line on the
+    layer above.
+  - **The pen's pressure changes the strength**, not the size, for fine control over wide areas. With the mouse, the
+    strength is the one in the bar.
+- **How:** in `src/engine/mixTools.ts`.
+  - A brush's stroke is kept apart and put on the layer at its end, but here each dab depends on what the ones before
+    it left, so the dabs work on the pixels: on copies of the layer's tiles, which go to the layer after each batch.
+    There, they are kept to the selection and to a locked transparency. So the dabs never lose what is left out of the
+    layer, and a soft edge of a selection isn't cut again at each dab.
+  - **Smudge** carries a picture of the paint, as big as the dab's box. At each dab, the paint under it is mixed with
+    the picture through the tip, and the picture takes on some of the paint under it. The Strength is how much of the
+    picture stays at each dab. My first version made it the share left after a brush size, which was wrong: each dab
+    overlaps the paint the last one left, so only what comes in at its front thins the picture, and at 50% the paint
+    never faded. At 50% it now fades away over a little more than a brush size.
+  - The dabs are 3% of the size apart, at least a pixel: at 10%, the fade showed a stripe at each dab.
+  - The box moves by whole pixels, so the picture carried is never resampled and doesn't blur along the stroke.
+  - **Blur** mixes the paint under each dab with a blurred copy of it through the tip, as far as 4% of the size (from 1
+    to 12 pixels). Going over a place blurs it more.
+  - The steps of undo are kept like a stroke's.
+- **Checked:** `tests/app/mix-tools.mjs`: the buttons, the keys and each tool's own settings; smudge dragging paint that
+  stays red and fades without a jump at a tile's edge, further the stronger; blur softening an edge and nothing away
+  from it; both undone exactly; only the active layer; only inside a selection; a locked transparency kept; and with a
+  pen, more pressure dragging further at the same size. On a 4000×4000 drawing, a movement of the pen took about 1 ms
+  on average at any size up to 500, and 16 ms at worst.
 
 ## Open questions
 

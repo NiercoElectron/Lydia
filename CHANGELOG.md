@@ -7,6 +7,14 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Smudge (U)** and **Blur (J)** ([decision 71](docs/decisions.md#71-smudge-and-blur)), after the eraser in the tool
+  column: smudge drags the paint on the active layer, and blur softens it, through the chosen brush's tip. Each has its
+  own Size and Strength, and the pen's pressure changes the strength.
+- A **Sharp** button, next to Grid, shows the pixels as sharp squares at every zoom from 100%, with any brush
+  ([decision 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
+
 ## [0.14.0] - 2026-10-30
 
 ### Added

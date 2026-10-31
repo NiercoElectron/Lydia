@@ -8,11 +8,13 @@ import {
   loadBrushOutline,
   loadPixelGrid,
   loadPixelPerfect,
+  loadSharpPixels,
   loadStabilizer,
   loadTaper,
   saveBrushOutline,
   savePixelGrid,
   savePixelPerfect,
+  saveSharpPixels,
   saveStabilizer,
   saveTaper,
 } from '../settings'
@@ -83,6 +85,19 @@ export function useBrushOutline(engine: Engine | null) {
   }, [engine, isOn])
   const toggle = useCallback(() => {
     saveBrushOutline(!isOn)
+    setIsOn(!isOn)
+  }, [isOn])
+  return [isOn, toggle] as const
+}
+
+// The pixels as sharp squares at every zoom, or smoothed zoomed in, as chosen last time
+export function useSharpPixels(engine: Engine | null) {
+  const [isOn, setIsOn] = useState(loadSharpPixels)
+  useEffect(() => {
+    engine?.setSharpPixels(isOn)
+  }, [engine, isOn])
+  const toggle = useCallback(() => {
+    saveSharpPixels(!isOn)
     setIsOn(!isOn)
   }, [isOn])
   return [isOn, toggle] as const

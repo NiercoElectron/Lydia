@@ -10,6 +10,7 @@ import {
   useEngineSnapshot,
   useBrushOutline,
   usePixelGrid,
+  useSharpPixels,
   usePixelPerfect,
   useStabilizer,
   useTaper,
@@ -30,7 +31,7 @@ import type { Engine, ImageType } from '../engine/engine'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
-import type { Tool } from '../engine/tools'
+import { isMixTool, type MixTool, type Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
 import { isTyping } from '../engine/view'
 import {
@@ -62,8 +63,29 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   const [recentColors, setRecentColors] = useState(loadRecentColors)
   const [trayColors, setTrayColors] = useState(loadTrayColors) // the color tray's, for all drawings
   const [isColorTrayOpen, setIsColorTrayOpen] = useState(false)
-  const [size, setSize] = useState(20)
+  const [brushSize, setBrushSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
+  // Smudge's and blur's own size and strength (in percent)
+  const [mixSettings, setMixSettings] = useState<Record<MixTool, { size: number; strength: number }>>({
+    smudge: { size: 40, strength: 50 },
+    blur: { size: 40, strength: 50 },
+  })
+  const mixTool = isMixTool(tool) ? tool : null
+  const size = mixTool ? mixSettings[mixTool].size : brushSize
+  const setSize = useCallback(
+    (change: number | ((size: number) => number)) => {
+      if (!mixTool) {
+        setBrushSize(change)
+        return
+      }
+      setMixSettings(settings => {
+        const mixed = settings[mixTool]
+        const newSize = typeof change === 'function' ? change(mixed.size) : change
+        return { ...settings, [mixTool]: { ...mixed, size: newSize } }
+      })
+    },
+    [mixTool],
+  )
   const [fill, setFill] = useState<FillSettings>(DEFAULT_FILL)
   const [wand, setWand] = useState<WandSettings>(DEFAULT_WAND)
   const [hardSelectionEdges, setHardSelectionEdges] = useState(false)
@@ -92,6 +114,11 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
   useEffect(() => {
     engine?.setBrush({ color, size, opacity: opacity / 100 })
   }, [engine, color, size, opacity])
+
+  const strength = mixTool ? mixSettings[mixTool].strength : 0
+  useEffect(() => {
+    if (mixTool) engine?.setMixStrength(strength / 100)
+  }, [engine, mixTool, strength])
 
   useEffect(() => {
     engine?.setFill(fill)
@@ -160,7 +187,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
         if (cancelled) return
         engine.setBrushTip(tip, brush.preset)
         // A drawn pixel brush starts at 1×, its tip as it was drawn (see dabs.ts)
-        if (brush.preset.pixel === 'drawn') setSize(Math.max(tip.image.width, tip.image.height))
+        if (brush.preset.pixel === 'drawn') setBrushSize(Math.max(tip.image.width, tip.image.height))
       },
       error => alert(errorMessage(error, 'LYD-210')),
     )
@@ -317,6 +344,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
 
   const [isGridOn, toggleGrid] = usePixelGrid(engine)
   const [isOutlineOn, toggleOutline] = useBrushOutline(engine)
+  const [isSharpOn, toggleSharp] = useSharpPixels(engine)
   const [isPixelPerfectOn, togglePixelPerfect] = usePixelPerfect(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
   const [taper, changeTaper] = useTaper(engine)
@@ -379,6 +407,7 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           tool={tool}
           size={size}
           opacity={opacity}
+          strength={strength}
           fill={fill}
           wand={wand}
           selection={{
@@ -402,18 +431,24 @@ export function Editor({ project, gpuMemory, tray, onTrayChange, onBack }: Props
           taper={taper}
           isGridOn={isGridOn}
           isOutlineOn={isOutlineOn}
+          isSharpOn={isSharpOn}
           isAlphaLocked={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.alphaLocked ?? false}
           isFolder={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isFolder ?? false}
           isPixelBrush={isPixelBrush}
           isPixelPerfectOn={isPixelPerfectOn}
           onSizeChange={setSize}
           onOpacityChange={setOpacity}
+          onStrengthChange={value =>
+            mixTool &&
+            setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
+          }
           onFillChange={change => setFill(current => ({ ...current, ...change }))}
           onWandChange={change => setWand(current => ({ ...current, ...change }))}
           onStabilizerChange={changeStabilizer}
           onTaperChange={changeTaper}
           onGridToggle={toggleGrid}
           onOutlineToggle={toggleOutline}
+          onSharpToggle={toggleSharp}
           onPixelPerfectToggle={togglePixelPerfect}
         />
         <div className="actions">
