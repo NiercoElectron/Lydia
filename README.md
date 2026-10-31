@@ -94,13 +94,12 @@ stroke opacity, a tool column, the eyedropper, the brush's outline, a stabilizer
 magic wand selections, the move tool, smart objects and transforming, importing images with a tray, a dark mode, new drawings
 with common sizes, a resolution (DPI) and a background color or transparency, `.lyd` projects, PNG and JPEG export, enlarged too, the
 interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
-color tray, a paper grain for brushes, and changing any brush in the Brush Designer, from images too.
+color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
+a mesh for transforming, and liquify.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [x] Distort: smudge and blur tools, a mesh mode for transforming, and a liquify tool (push, bloat, pucker and twirl
-      the picture with the pen, and brush it back to how it was)
 - [ ] Safety: autosave and recovery after a crash, and a message when the browser loses the graphics card
 - [ ] Guides: symmetry, rulers (straight lines, ellipses, perspective) and shapes (rectangles, ellipses and more,
       outlined with the brush's own tip or filled, that stay editable and can be transformed)

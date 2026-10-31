@@ -240,8 +240,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Spanish and codes for the errors (decision 63). 0.13.0 brought the Colors stage: the color panel, with its triangle,
   and the color tray (decisions 65 and 66). 0.14.0 brought the Brushes stage: the paper grain and changing brushes in
   the Brush Designer, from images too (decisions 67 and 70), with smooth pixels when zoomed in and an outline that
-  follows the pen (decisions 68 and 69). 1.0.0 will be the desktop app, packaged with Electron. The full list is in
-  [CHANGELOG.md](../CHANGELOG.md).
+  follows the pen (decisions 68 and 69). 0.15.0 brought the Distort stage: smudge and blur, a mesh for transforming and
+  liquify (decisions 71 to 73), with a Sharp button for the pixels. 1.0.0 will be the desktop app, packaged with
+  Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
   worth trying, and its changelog tells what the stage brought.
