@@ -13,6 +13,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   and right, up and down, in four parts, or radial with 2 to 12 parts. The brush, the eraser, straight lines, smudge, blur
   and liquify all follow it, each stroke and its copies as one step of undo. **Y** turns it on and off, **Move center**
   puts its center anywhere on the paper, and each drawing keeps its own.
+- **Rulers** ([decision 78](docs/decisions.md#78-rulers)): strokes follow a line, an ellipse or a vanishing point. A stroke
+  starts anywhere, and goes parallel to the line, around an ellipse of the same shape, or straight through the point. With
+  several on the paper, the pen's direction chooses, so two vanishing points make a perspective of two points. The brush,
+  the eraser, smudge, blur and liquify all follow them. **K** turns them on and off, and each drawing keeps its own.
 
 ## [0.16.0] - 2026-10-31
 

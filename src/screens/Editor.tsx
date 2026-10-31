@@ -468,6 +468,15 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             onCenter: () => engine?.centerSymmetry(),
             onMovingChange: on => engine?.setMovingSymmetry(on),
           }}
+          rulers={{
+            rulers: snapshot.rulers,
+            isEditing: snapshot.isEditingRulers,
+            hasChosen: snapshot.chosenRuler !== null,
+            onOnChange: on => engine?.setRulersOn(on),
+            onAdd: kind => engine?.addRuler(kind),
+            onEditingChange: on => engine?.setEditingRulers(on),
+            onRemove: () => engine?.removeRuler(),
+          }}
           stabilizer={stabilizer}
           taper={taper}
           isGridOn={isGridOn}

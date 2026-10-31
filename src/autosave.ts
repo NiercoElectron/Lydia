@@ -35,7 +35,7 @@ const UNFINISHED_MS = 60 * 60 * 1000 // a first copy still unfinished after this
 
 // A drawing as it was at one moment, kept for writing: its tiles can go on changing in the layers meanwhile. "thumbnail"
 // is null when there is no graphics card to make one
-type SavedPaper = Paper & Pick<ProjectData, 'exportScale' | 'colors' | 'symmetry'>
+type SavedPaper = Paper & Pick<ProjectData, 'exportScale' | 'colors' | 'symmetry' | 'rulers'>
 export type DrawingSnapshot = {
   paper: SavedPaper
   activeLayer: number

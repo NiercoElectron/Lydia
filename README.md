@@ -21,6 +21,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
 - Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with every tool
   that paints
+- Rulers: strokes follow lines, ellipses and vanishing points, with every tool that follows a stroke
 - Liquify: push, bloat, pucker and twirl the picture with the pen, and brush it back to the very pixels it had, with
   no loss of sharpness however many strokes
 - Smudge and blur: drag or soften the paint on the active layer through the brush's tip, more or less as the pen

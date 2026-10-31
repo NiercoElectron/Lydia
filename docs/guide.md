@@ -10,6 +10,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Smudge and blur](#smudge-and-blur)
 - [Liquify](#liquify)
 - [Symmetry](#symmetry)
+- [Rulers](#rulers)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -201,6 +202,25 @@ More about it:
 - Smudge and Liquify work with the paint on the layer, so where a stroke meets its copy they move each other's paint.
 - A brush with a paper grain falls on different grooves on each side, like real paper. A pixel brush stays on the pixels,
   and its tip doesn't turn in a radial symmetry.
+- Each drawing keeps its own, in its file.
+
+## Rulers
+
+**Rulers**, at the end of the bar, makes strokes follow what you place on the paper. **K** turns them on and off, and they
+stay where they are while off.
+
+- **Line**: strokes go parallel to it, wherever they start.
+- **Ellipse**: strokes go around an ellipse of the same shape, as big as where they start. For a stroke right on the
+  ruler, start on it.
+- **Vanishing point**: strokes go straight, along a line through the point. It can be off the paper: zoom out to place it
+  there. Two of them make a perspective of two points, and three of three.
+- With several rulers, the pen chooses: a stroke waits for its first few pixels, then takes the ruler that goes the way
+  the pen is going. Add a Line for the upright edges of a building, next to its vanishing points.
+- **Edit rulers**: drag a ruler's handles, or its line to move all of it. Click one to choose it, and **Remove ruler** or
+  **Delete** takes it away. Press **Edit rulers** again to go back to the tool.
+- The brush, the eraser, Smudge, Blur and Liquify follow them, and the symmetry goes on working with them. Shift's
+  straight line doesn't: it goes where you click.
+- Blue lines show them. They aren't part of the drawing: they never come out in an exported image.
 - Each drawing keeps its own, in its file.
 
 ## Eyedropper
@@ -443,6 +463,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | U / J                                          | Smudge / blur                                      |
 | Q                                              | Liquify                                            |
 | Y                                              | Symmetry on and off                                |
+| K                                              | Rulers on and off                                  |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |
@@ -457,7 +478,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | Ctrl + Shift + Z, Ctrl + Y                     | Redo                                               |
 | Shift / Alt + drag or click, with S, L or W    | Add to / take away from the selection              |
 | Ctrl + A / Ctrl + D / Ctrl + Shift + I         | Select everything / nothing / invert the selection |
-| Delete, Backspace                              | Take out what is selected                          |
+| Delete, Backspace                              | Take out what is selected, or the chosen ruler     |
 | Shift + drag, with V                           | Move only across, or only up and down              |
 | Ctrl + J / Ctrl + E                            | Duplicate the layer / merge it down                |
 | Ctrl + T, or Transform in the bar              | Transform (in a browser, use the button)           |

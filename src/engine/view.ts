@@ -1,5 +1,6 @@
 import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
+import type { StrokePoint } from './dabs'
 import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
@@ -9,6 +10,8 @@ import { MIN_LIQUIFY_SIZE, type Liquify } from './liquify'
 import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
+import { drawRulers, gripAt, movedRuler } from './rulerHandles'
+import { createHold, type Hold, type Ruler, type Rulers } from './rulers'
 import type { Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
@@ -26,6 +29,7 @@ const CLICK_DISTANCE = 4 // pixels of the screen a click may move before it coun
 const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of this many degrees
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
 const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen shows the cursor's cross, not its outline
+const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
 
 // The cursor of each tool over the drawing
 const CURSORS: Record<Tool, string> = {
@@ -78,6 +82,12 @@ export type ViewActions = {
   getSymmetry: () => Symmetry
   isMovingSymmetry: () => boolean
   onSymmetryCenter: (center: Point) => void
+  // What strokes follow (see rulers.ts), and whether the left button edits the rulers now
+  getRulers: () => Rulers
+  isEditingRulers: () => boolean
+  getChosenRuler: () => number | null
+  onRulerChosen: (index: number | null) => void
+  onRulerChange: (index: number, ruler: Ruler) => void
 }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
@@ -225,8 +235,8 @@ export function createView(
 
   // ----- What each tool does with the pointer -----
 
-  // The brush paints where the pen goes, or, with the stabilizer on, where the stabilizer lets it follow the pen. With
-  // Shift, a click paints a straight line from where the last stroke ended instead (see straightLineTo)
+  // The brush paints like any stroke (see stroke). With Shift, a click paints a straight line from where the last stroke
+  // ended instead (see straightLineTo), which is a line of its own: it doesn't follow the rulers
   function paint(e: PointerEvent): Gesture {
     hoverPoint = null
     const line = e.shiftKey ? straightLineTo(onScreen(e)) : null
@@ -239,8 +249,18 @@ export function createView(
         },
       }
     }
+    return stroke(e, brush, actions.onStrokeEnd)
+  }
+
+  // A stroke of the brush, the eraser, smudge, blur or liquify (see mixTools.ts and liquify.ts) goes where the pen goes,
+  // or, with the stabilizer on, where the stabilizer lets it follow the pen. Then the rulers hold it to their lines, so
+  // it stays exactly on them
+  function stroke(e: PointerEvent, worker: Brush | MixTools | Liquify, onChanged: () => void): Gesture {
+    hoverPoint = null
     const point = { ...toPaper(e), pressure: pressureOf(e) }
-    brush.startStroke(point.x, point.y, point.pressure)
+    const rulers = actions.getRulers()
+    if (rulers.isOn && rulers.list.length > 0) hold = createHold(rulers.list, point, CHOOSE_RULER / currentZoom())
+    worker.startStroke(point.x, point.y, point.pressure)
     if (stabilizerSettings.strength > 0) {
       stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
     }
@@ -248,34 +268,17 @@ export function createView(
       move(e) {
         // The browser groups fast movements into one event; get all the points in between
         const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
-        brush.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
+        worker.continueStroke(held(stabilizer ? stabilizer.follow(points, performance.now()) : points))
       },
       up(e) {
         // A stroke the browser took away ends where the brush is, not where the pen was
-        if (stabilizer && e.type === 'pointerup') brush.continueStroke(stabilizer.finish())
+        if (e.type === 'pointerup') {
+          if (stabilizer) worker.continueStroke(held(stabilizer.finish()))
+          if (hold) worker.continueStroke(hold.finish())
+        }
         stabilizer = null
-        if (brush.endStroke()) actions.onStrokeEnd()
-      },
-    }
-  }
-
-  // Smudge, blur and liquify go along the pointer like the brush, stabilizer included (see mixTools.ts and liquify.ts)
-  function layerStroke(e: PointerEvent, worker: MixTools | Liquify): Gesture {
-    hoverPoint = null
-    const point = { ...toPaper(e), pressure: pressureOf(e) }
-    worker.startStroke(point.x, point.y, point.pressure)
-    if (stabilizerSettings.strength > 0) {
-      stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
-    }
-    return {
-      move(e) {
-        const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
-        worker.continueStroke(stabilizer ? stabilizer.follow(points, performance.now()) : points)
-      },
-      up(e) {
-        if (stabilizer && e.type === 'pointerup') worker.continueStroke(stabilizer.finish())
-        stabilizer = null
-        if (worker.endStroke()) actions.onMixEnd()
+        hold = null
+        if (worker.endStroke()) onChanged()
       },
     }
   }
@@ -373,6 +376,45 @@ export function createView(
     }
     put(e)
     return { move: put, up() {}, cursor: 'move' }
+  }
+
+  // ----- The rulers -----
+
+  // Over everything, like the lines of the symmetry, and drawn again only when what they show changes
+  const rulerLines = new Graphics()
+  app.stage.addChild(rulerLines)
+  let shownRulers: Rulers | null = null
+  let rulersKey = ''
+
+  function showRulers() {
+    const rulers = actions.getRulers()
+    rulerLines.visible = rulers.isOn
+    if (!rulers.isOn) return
+    const chosen = actions.getChosenRuler()
+    const isEditing = actions.isEditingRulers()
+    const { position, scale, rotation } = world
+    const key = [chosen, isEditing, position.x, position.y, scale.x, scale.y, rotation].join()
+    if (rulers === shownRulers && key === rulersKey) return
+    shownRulers = rulers
+    rulersKey = key
+    drawRulers(rulerLines, { rulers: rulers.list, chosen, isEditing, ...grid, toScreen })
+  }
+
+  // While the rulers are edited, the left button chooses one and drags its handles, or all of it by its line
+  function editRuler(e: PointerEvent): Gesture {
+    const { list } = actions.getRulers()
+    const grip = gripAt(list, onScreen(e), toScreen)
+    actions.onRulerChosen(grip?.index ?? null)
+    if (!grip) return { move() {}, up() {} }
+    const ruler = list[grip.index]
+    const from = toPaper(e)
+    return {
+      move(e) {
+        actions.onRulerChange(grip.index, movedRuler(ruler, grip.part, from, toPaper(e)))
+      },
+      up() {},
+      cursor: 'move',
+    }
   }
 
   // While a transform is made, the left button drags its handles
@@ -537,9 +579,9 @@ export function createView(
   const startGesture: Record<Tool, (e: PointerEvent) => Gesture> = {
     brush: paint,
     eraser: paint,
-    smudge: e => layerStroke(e, mixTools),
-    blur: e => layerStroke(e, mixTools),
-    liquify: e => layerStroke(e, liquify),
+    smudge: e => stroke(e, mixTools, actions.onMixEnd),
+    blur: e => stroke(e, mixTools, actions.onMixEnd),
+    liquify: e => stroke(e, liquify, actions.onMixEnd),
     fill,
     eyedropper: pick,
     select: selectRectangle,
@@ -561,6 +603,7 @@ export function createView(
   let gesture: (Gesture & { pointerId: number; tool: Tool }) | null = null // the pointer that is down, if any
   let hoverPoint: Point | null = null // where the brush is waiting, or null when all is ready
   let transformCursor: string | null = null // the cursor over a transform's handles, where the pointer is
+  let rulerCursor = 'default' // and over the rulers, while they are edited
   let shownCursor = ''
 
   // The tool the left button uses right now. Space moves the view and Shift + Space turns it, like in Krita; Alt picks
@@ -582,6 +625,7 @@ export function createView(
     let cursor = CURSORS[shown]
     if (gesture?.cursor) cursor = gesture.cursor
     else if (!gesture && !isSpaceDown && transformCursor && actions.getTransform()) cursor = transformCursor
+    else if (!gesture && !isSpaceDown && actions.isEditingRulers()) cursor = rulerCursor
     else if (shown === 'hand' && gesture) cursor = 'grabbing'
     else if (shown === 'zoom' && isAltDown && !gesture) cursor = 'zoom-out'
     else if (isOutlineShown) cursor = 'none'
@@ -631,21 +675,22 @@ export function createView(
       usesTip(used) &&
       actions.canUse(used) &&
       !actions.getTransform() &&
+      !actions.isEditingRulers() &&
       size * currentZoom() >= MIN_OUTLINE
     if (isShown !== isOutlineShown) {
       isOutlineShown = isShown
       showCursor()
     }
-    // While the stabilizer holds the brush back, the outline is where the brush is, and a line joins it to the pen.
-    // With Shift held, the straight line a click would paint shows, and the outline at its end. The lines show even
-    // when the outline doesn't
-    const isLagging = stabilizer !== null && usesTip(used)
+    // While the stabilizer or a ruler holds the brush back, the outline is where the brush is, and a line joins it to
+    // the pen. With Shift held, the straight line a click would paint shows, and the outline at its end. The lines show
+    // even when the outline doesn't
+    const isLagging = (stabilizer !== null || hold !== null) && usesTip(used)
     const canLine = isShiftDown && !gesture && at !== null && isPaintTool(used) && actions.canUse(used)
     const line = canLine && !actions.getTransform() ? straightLineTo(at) : null
     brushOutline.visible = isShown || (at !== null && (isLagging || line !== null))
     if (!at || !brushOutline.visible) return
 
-    const center = line ? line.to : stabilizer ? stabilizer.brushAt() : paperAt(at)
+    const center = line ? line.to : ((hold ?? stabilizer)?.brushAt() ?? paperAt(at))
     const tip = brush.getTip()
     const pixelTip = brush.getShape().pixel
     const isPixel = pixelTip !== 'none'
@@ -711,6 +756,8 @@ export function createView(
 
   let stabilizerSettings = DEFAULT_STABILIZER
   let stabilizer: Stabilizer | null = null // the stroke's, while painting with it on (see stabilizer.ts)
+  let hold: Hold | null = null // the stroke's, while painting with rulers on (see rulers.ts)
+  const held = (points: StrokePoint[]) => (hold ? hold.along(points) : points)
 
   // While painting with the stabilizer, the brush goes on toward the pen every frame, even when the pen holds still, and
   // liquify goes on working where it is
@@ -718,7 +765,7 @@ export function createView(
     const stroke = gesture?.tool
     if (stabilizer) {
       const worker = stroke === 'liquify' ? liquify : stroke === 'smudge' || stroke === 'blur' ? mixTools : brush
-      worker.continueStroke(stabilizer.wait(performance.now()))
+      worker.continueStroke(held(stabilizer.wait(performance.now())))
     }
     if (stroke === 'liquify') liquify.hold()
   }
@@ -803,6 +850,11 @@ export function createView(
       showCursor()
       return
     }
+    if (actions.isEditingRulers() && e.button === 0 && !isSpaceDown) {
+      gesture = { ...editRuler(e), pointerId: e.pointerId, tool: 'move' }
+      showCursor()
+      return
+    }
     const used = e.button === 1 ? 'hand' : currentTool()
     // While a fill or Delete is worked out, only the tools that just look can be used
     const onlyLooks = used === 'hand' || used === 'zoom' || used === 'rotate' || used === 'eyedropper'
@@ -825,6 +877,9 @@ export function createView(
     transformCursor = target
       ? cursorFor(handleAt(target, onScreen(e), toPaper(e), toScreen), target, toScreen, e.ctrlKey || e.metaKey)
       : null
+    if (actions.isEditingRulers()) {
+      rulerCursor = gripAt(actions.getRulers().list, onScreen(e), toScreen) ? 'move' : 'default'
+    }
     showCursor()
     if (usesTip(currentTool())) hoverPoint = toPaper(e)
   }
@@ -883,6 +938,7 @@ export function createView(
   app.ticker.add(keepStabilizing)
   app.ticker.add(showBrushOutline)
   app.ticker.add(showSymmetry)
+  app.ticker.add(showRulers)
   showCursor()
   fitToScreen()
 
@@ -901,9 +957,12 @@ export function createView(
     app.ticker.remove(keepStabilizing)
     app.ticker.remove(showBrushOutline)
     app.ticker.remove(showSymmetry)
+    app.ticker.remove(showRulers)
     outline.destroy()
     handles.destroy()
     brushOutline.destroy()
+    symmetryLines.destroy()
+    rulerLines.destroy()
     listeners.clear()
   }
 
@@ -920,6 +979,11 @@ export function createView(
     getSaved,
     showSaved,
     paperAtWindow,
+    // The point of the paper in the middle of the screen, and how many of its pixels the screen is across
+    paperInView: () => ({
+      middle: paperAt(middle()),
+      side: Math.min(app.screen.width, app.screen.height) / currentZoom(),
+    }),
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => {

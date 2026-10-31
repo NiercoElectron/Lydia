@@ -39,6 +39,7 @@ import { createTileMemory, toStoredTile, type StoredTile } from './memory'
 import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createLiquify } from './liquify'
+import { newRuler, noRulers, type Ruler, type RulerKind, type Rulers } from './rulers'
 import { noSymmetry, type Symmetry } from './symmetry'
 import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
@@ -134,6 +135,9 @@ export type EngineSnapshot = {
   exportScales: number[] // the ones this drawing's images fit at
   symmetry: Symmetry
   isMovingSymmetry: boolean
+  rulers: Rulers
+  isEditingRulers: boolean
+  chosenRuler: number | null // the one being edited
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
 }
 
@@ -292,6 +296,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let isMovingSymmetry = false
   const getSymmetry = () => symmetry
 
+  // What strokes follow (see rulers.ts), and whether the left button edits them for now
+  let rulers: Rulers = project.rulers ?? noRulers()
+  let isEditingRulers = false
+  let chosenRuler: number | null = null
+
   // The brush starts as the Soft round brush, until the screen chooses one
   const startBrush = parseBrushFile(softRound, 'Soft round')
   const brush = createBrush(
@@ -364,6 +373,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     getSymmetry,
     isMovingSymmetry: () => isMovingSymmetry,
     onSymmetryCenter: center => setSymmetry({ center }),
+    getRulers: () => rulers,
+    isEditingRulers: () => isEditingRulers,
+    getChosenRuler: () => chosenRuler,
+    onRulerChosen: index => chooseRuler(index),
+    onRulerChange: (index, ruler) => changeRuler(index, ruler),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
@@ -458,6 +472,9 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       exportScales: EXPORT_SCALES.filter(scale => fitsExport(grid.width, grid.height, scale)),
       symmetry,
       isMovingSymmetry,
+      rulers,
+      isEditingRulers,
+      chosenRuler,
       trayColors,
     }
   }
@@ -1157,7 +1174,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function drawingInRam(thumbnail: Blob | null): DrawingSnapshot {
     const { width, height, background, dpi } = project
     return {
-      paper: { width, height, background, dpi, exportScale, colors: trayColors, symmetry },
+      paper: { width, height, background, dpi, exportScale, colors: trayColors, symmetry, rulers },
       activeLayer: activeIndex(stack),
       view: view.getSaved(),
       layers: stack.layers.map(layer => ({
@@ -1259,7 +1276,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         },
       })),
     )
-    const paper = { ...project, exportScale, colors: trayColors, symmetry }
+    const paper = { ...project, exportScale, colors: trayColors, symmetry, rulers }
     const file = serializeProject(paper, activeIndex(stack), view.getSaved(), layersToSave, wholeTiles)
     isModified = false
     changed(false)
@@ -1301,6 +1318,58 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // The left button moves the center of the symmetry, or goes back to the tool
   function setMovingSymmetry(on: boolean) {
     isMovingSymmetry = on
+    if (on) stopEditingRulers()
+    changed(false)
+  }
+
+  function stopEditingRulers() {
+    isEditingRulers = false
+    chosenRuler = null
+  }
+
+  // Turn the rulers on or off, keeping them: strokes follow them only while they are on (see rulers.ts)
+  function setRulersOn(isOn: boolean) {
+    rulers = { ...rulers, isOn }
+    if (!isOn) stopEditingRulers()
+    changed()
+  }
+
+  // Add a ruler in the middle of what is on the screen, and go on to place it
+  function addRuler(kind: RulerKind) {
+    const { middle, side } = view.paperInView()
+    rulers = { isOn: true, list: [...rulers.list, newRuler(kind, middle, side / 3)] }
+    isMovingSymmetry = false
+    isEditingRulers = true
+    chosenRuler = rulers.list.length - 1
+    changed()
+  }
+
+  function changeRuler(index: number, ruler: Ruler) {
+    rulers = { ...rulers, list: rulers.list.with(index, ruler) }
+    changed()
+  }
+
+  function removeRuler() {
+    if (chosenRuler === null) return
+    rulers = { ...rulers, list: rulers.list.toSpliced(chosenRuler, 1) }
+    chosenRuler = null
+    if (rulers.list.length === 0) isEditingRulers = false // with nothing to edit, its button can't be pressed
+    changed()
+  }
+
+  // The left button edits the rulers, or goes back to the tool
+  function setEditingRulers(on: boolean) {
+    if (on) {
+      isEditingRulers = true
+      isMovingSymmetry = false
+    } else {
+      stopEditingRulers()
+    }
+    changed(false)
+  }
+
+  function chooseRuler(index: number | null) {
+    chosenRuler = index
     changed(false)
   }
 
@@ -2037,6 +2106,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setSymmetry,
     centerSymmetry,
     setMovingSymmetry,
+    setRulersOn,
+    addRuler,
+    removeRuler,
+    setEditingRulers,
     quietSnapshot,
     onGraphicsLost,
     packTile: memory.pack,

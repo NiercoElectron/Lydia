@@ -4,6 +4,7 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
+import type { RulerKind, Rulers } from '../engine/rulers'
 import { MAX_SECTORS, MIN_SECTORS, SYMMETRY_MODES, type Symmetry, type SymmetryMode } from '../engine/symmetry'
 import {
   hasStrength,
@@ -54,6 +55,17 @@ export type SymmetryControls = {
   onMovingChange: (on: boolean) => void
 }
 
+// What strokes follow (see rulers.ts)
+export type RulerControls = {
+  rulers: Rulers
+  isEditing: boolean // the left button edits them
+  hasChosen: boolean
+  onOnChange: (on: boolean) => void
+  onAdd: (kind: RulerKind) => void
+  onEditingChange: (on: boolean) => void
+  onRemove: () => void
+}
+
 type Props = {
   tool: Tool
   size: number
@@ -65,6 +77,7 @@ type Props = {
   selection: SelectionControls
   transform: TransformControls
   symmetry: SymmetryControls
+  rulers: RulerControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
   isGridOn: boolean
@@ -103,6 +116,7 @@ export function Toolbar({
   selection,
   transform,
   symmetry,
+  rulers,
   stabilizer,
   taper,
   isGridOn,
@@ -224,6 +238,7 @@ export function Toolbar({
       <SharpButton isOn={isSharpOn} onToggle={onSharpToggle} />
       <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
       <SymmetryButtons controls={symmetry} />
+      <RulerButtons controls={rulers} />
     </div>
   )
 }
@@ -286,6 +301,49 @@ function SymmetryButtons({ controls }: { controls: SymmetryControls }) {
             {t('Center')}
           </button>
         </>
+      )}
+    </>
+  )
+}
+
+// Turning the rulers on and off, adding them, and editing them
+function RulerButtons({ controls }: { controls: RulerControls }) {
+  const { t } = useLanguage()
+  const { rulers, isEditing, hasChosen, onOnChange, onAdd, onEditingChange, onRemove } = controls
+  return (
+    <>
+      <button
+        aria-pressed={rulers.isOn}
+        onClick={() => onOnChange(!rulers.isOn)}
+        title={t('Strokes follow the rulers on the paper (K turns them on and off)')}
+      >
+        {t('Rulers')}
+      </button>
+      {rulers.isOn && (
+        <>
+          <button onClick={() => onAdd('line')} title={t('Add a ruler: strokes go parallel to it')}>
+            {t('Line')}
+          </button>
+          <button onClick={() => onAdd('ellipse')} title={t('Add a ruler: strokes go around it, at any size')}>
+            {t('Ellipse')}
+          </button>
+          <button onClick={() => onAdd('point')} title={t('Add a ruler: strokes go straight through this point')}>
+            {t('Vanishing point')}
+          </button>
+          <button
+            aria-pressed={isEditing}
+            disabled={rulers.list.length === 0}
+            onClick={() => onEditingChange(!isEditing)}
+            title={t('Drag the rulers and their handles on the drawing. Press it again to go back to the tool')}
+          >
+            {t('Edit rulers')}
+          </button>
+        </>
+      )}
+      {isEditing && (
+        <button disabled={!hasChosen} onClick={onRemove} title={t('Remove the chosen ruler (Delete)')}>
+          {t('Remove ruler')}
+        </button>
       )}
     </>
   )

@@ -2299,6 +2299,48 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   explained: in a straight line, 6 pixels at the edge differed by up to 54 levels, as if one dab were half a pixel off.
   It can't be seen on a drawing, and the test keeps it under 0.1% of the paint.
 
+## 78. Rulers
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** straight lines in a direction, ellipses and perspective are hard to draw by hand. Shift's straight line
+  starts from the last stroke and goes one way only, and Krita has its assistants for this.
+- **Decision:** my choices:
+  - **Three kinds:** a line, an ellipse and a vanishing point.
+  - **A stroke starts anywhere.** A line gives parallels, an ellipse gives others of the same shape around the same
+    center, and a vanishing point gives lines through it. Painting right on a ruler only means starting on it. I chose
+    that over a stroke having to start on the ruler, which would mean moving the ruler for each parallel.
+  - **Several at once, and the pen chooses.** Each vanishing point is a ruler, so two make a perspective of two points.
+    The stroke takes the ruler whose direction is closest to the pen's in its first few pixels, as in Krita. I chose that
+    over one active ruler, which never waits but would have to be changed for each direction.
+  - **Every tool that follows a stroke follows them:** the brush, the eraser, smudge, blur and liquify.
+- **How:**
+  - `src/engine/rulers.ts` holds the pen's points before they reach any tool, in one place in `view.ts`, so no tool
+    knows about rulers. The symmetry comes after them, in the dabs (decision 77), so the copies follow too.
+  - They come after the stabilizer, not before it: a stabilizer after them would cut the corners of an ellipse. So a
+    stroke stays exactly on its ruler, at any strength.
+  - With several rulers the stroke waits for 10 pixels of the screen, and then goes through the points that waited, so
+    nothing is lost. A single ruler needs no waiting.
+  - A pen can jump far between two events, and a stroke goes straight from point to point, so along an ellipse a point is
+    added every 4 pixels, or a fast stroke would be a polygon. The stroke takes the closest point on the ellipse to the
+    pen, not the one at the same angle, which would rush past the ends of a flat ellipse.
+  - Starting on a vanishing point, any line goes through it, so the pen's direction gives the line. Starting in the very
+    middle of an ellipse, no ellipse goes through there, so the stroke is free.
+  - Shift's straight line stays free: it is a line of its own, from one point to another.
+  - **Edit rulers** is a button, as Move center is (decision 77): handles always under the pen would be grabbed while
+    painting.
+  - A vanishing point can be off the paper, as it often is in perspective.
+  - Changing the rulers isn't a step of undo, as the center of the symmetry isn't: they aren't part of the picture.
+  - In the file, `rulers` is in the header, left out when there are none. Older versions of Lydia don't know it, and
+    open the drawing without it.
+- **Checked:** `tests/app/rulers.mjs`: the ways along each kind, at any angle; a stroke staying on one ellipse with the
+  pen jumping, with no gaps over 4 pixels; the wait, and the direction choosing, with strokes too short to choose; a
+  stroke starting on a vanishing point and in the middle of an ellipse; the bar, the K key, each handle and Delete, which
+  leaves the paint alone while editing; strokes on a line, an ellipse and two vanishing points; the eraser, smudge, blur
+  and liquify staying on a ruler with the pen far off it, and going with the pen with the rulers off; both kinds of
+  stabilizer; the symmetry; a pixel brush painting one row; Shift's line; the file and the autosave. A slanted stroke on a
+  ruler measured 11.32 pixels from its line, and a free line of the same slant, with no ruler, measured the same.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

@@ -4,6 +4,7 @@ import type { TaperSettings } from '../engine/dabs'
 import type { Engine, EngineSnapshot } from '../engine/engine'
 import { errorMessage } from '../errors'
 import type { StabilizerSettings } from '../engine/stabilizer'
+import { noRulers } from '../engine/rulers'
 import { noSymmetry, type SymmetryMode } from '../engine/symmetry'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
@@ -36,6 +37,9 @@ const startingSnapshot: EngineSnapshot = {
   isModified: false,
   symmetry: noSymmetry(1, 1),
   isMovingSymmetry: false,
+  rulers: noRulers(),
+  isEditingRulers: false,
+  chosenRuler: null,
   isUpdating: false,
   task: null,
   progress: null,
@@ -203,7 +207,8 @@ export function useTaper(engine: Engine | null) {
 }
 
 // The selection's shortcuts, as in Photoshop: Ctrl/Cmd + A selects everything, Ctrl/Cmd + D nothing, and
-// Ctrl/Cmd + Shift + I what isn't selected; Delete (or Backspace) takes the paint out of what is selected
+// Ctrl/Cmd + Shift + I what isn't selected; Delete (or Backspace) takes the paint out of what is selected, or, while
+// the rulers are edited, removes the chosen one
 export function useSelectionShortcuts(engine: Engine | null) {
   useEffect(() => {
     if (!engine) return
@@ -220,7 +225,8 @@ export function useSelectionShortcuts(engine: Engine | null) {
       }
       if (key === 'delete' || key === 'backspace') {
         e.preventDefault()
-        engine.deleteSelected()
+        if (engine.getSnapshot().isEditingRulers) engine.removeRuler()
+        else engine.deleteSelected()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -309,7 +315,7 @@ export function useDrawingShortcuts<T extends Tool>(
         const { mode } = engine.getSnapshot().symmetry
         if (mode !== 'off') lastSymmetry = mode
         engine.setSymmetry({ mode: mode === 'off' ? lastSymmetry : 'off' })
-      }
+      } else if (key === 'k') engine.setRulersOn(!engine.getSnapshot().rulers.isOn)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
