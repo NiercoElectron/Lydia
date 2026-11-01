@@ -999,7 +999,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **Ctrl+T**, or **Transform** in the bar of the move and selection tools, starts a transform. On a smart object, it
     transforms it. On a normal layer (my choice), the selected part goes into a new layer above as a smart
     object, or, with nothing selected, the whole layer becomes one. Browsers keep Ctrl+T for a new tab, so there only
-    the button works; the desktop app will have the key.
+    the button works; in the desktop app the key works too.
   - The handles (my choice, with skewing and distorting in this stage too): a corner scales both ways and a side
     one way, from the opposite corner or side (Shift keeps the proportions, Alt scales from the middle); outside the
     object turns it (Shift: in steps of 15°); inside moves it, by whole pixels. With Ctrl, a corner moves alone
@@ -2654,6 +2654,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     all drawings, and it stays between sessions (my choice).
   - **Not signed** for now (my choice): a certificate is paid every year. Windows warns when installing.
   - **Interface size**, in the settings of the desktop app: 100% to 200%. A browser has its zoom for that, and the window doesn't.
+  - On macOS the menu at the top of the screen has only what the system's keys need: the standard one would let Cmd+R reload
+    the page. Windows has no menu of its own, so no key of the browser is left there. Cmd works as Ctrl all over Lydia.
   - **Memory is read from the computer**, as decisions 14 and 28 planned. The RAM budget is a quarter of the real RAM. The
     graphics card's setting starts at **Automatic**, half of the card's memory, the rule the settings already gave, and can
     still be chosen by hand. Electron knows the card's name but not its memory: on Windows it comes from the registry, and

@@ -364,7 +364,7 @@ selection moves along.
 ## Transforming and smart objects
 
 Transforming scales, turns, skews, distorts or bends. **Ctrl+T** starts it, or **Transform** in the bar of the selection and
-move tools (in a browser, Ctrl+T opens a new tab instead, so use the button there).
+move tools. In a browser Ctrl+T opens a new tab instead, so use the button there; in the desktop app the key works.
 
 - With a selection, the selected part goes into a new layer above as a **smart object**. Without one, the whole layer
   becomes one. On a smart object, it transforms it.

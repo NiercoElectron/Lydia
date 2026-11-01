@@ -229,6 +229,16 @@ const press = async (...keys) => {
   for (const key of keys.slice(0, -1).reverse()) await page.keyboard.up(key)
 }
 await stroke(0)
+
+// A key a browser keeps for itself
+const isTransforming = () => page.$$eval('button', list => list.some(button => button.textContent === 'Apply'))
+await press('Control', 't')
+await sleep(300)
+check('Ctrl+T starts a transform', await isTransforming())
+await page.keyboard.press('Escape')
+await sleep(300)
+check('and Esc leaves it', !(await isTransforming()))
+
 const projectFile = path.join(projects, 'Untitled.lyd')
 await press('Control', 's')
 await page.waitForFunction(() => document.title.includes('Untitled'), { timeout: 10000 })

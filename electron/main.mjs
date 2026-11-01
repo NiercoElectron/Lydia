@@ -164,8 +164,10 @@ app.whenReady().then(async () => {
   setUpFiles()
   const started = projectIn(process.argv)
   if (started) openProject(started)
-  // macOS needs the standard menu for its own keys (Cmd+Q, copy, paste in text fields). Lydia has its menus in the window
-  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
+  // Lydia has its menus in the window. macOS needs one of its own for its keys (Cmd+Q, Cmd+M, copy and paste in text fields),
+  // without the standard View menu, whose keys would reload the page or open the developer's tools
+  const macMenu = [{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate(macMenu) : null)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
