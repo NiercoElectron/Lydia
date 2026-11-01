@@ -1,5 +1,23 @@
 # Histórico de alterações
 
+## [0.19.2] - 2026-11-01
+
+### Changed
+
+- **Uma nova tela inicial** ([decisão 83](docs/decisions.md#83-the-start-screen)): **Novo projeto**, **Abrir projeto** e **Editor de pincéis** no centro, com miniaturas dos desenhos para **Recuperar** logo abaixo. Uma engrenagem abre **Configurações**, com as opções de interface, salvamento automático e memória da placa de vídeo, e as opções do Editor de pincéis têm uma janela própria.
+- **IBM Plex Sans** agora é a fonte de toda a interface, igual em todos os computadores ([decisão 84](docs/decisions.md#84-the-interfaces-font)).
+
+### Fixed
+
+- A janela de novo desenho não muda mais de tamanho a cada escolha de resolução ou papel.
+
+## [0.19.1] - 2026-11-01
+
+### Fixed
+
+- **Torcer** e **Reconstruir**, em Dissolver, e os botões de **Avançado** não ficam mais fora de seus painéis.
+- A coluna de ferramentas tem a largura do nome mais longo, para que nenhuma ferramenta ou filtro fique cortado em qualquer idioma.
+
 ## [0.19.0] - 2026-11-01
 
 ### Changed

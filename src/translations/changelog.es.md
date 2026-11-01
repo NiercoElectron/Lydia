@@ -1,5 +1,23 @@
 # Historial de cambios
 
+## [0.19.2] - 2026-11-01
+
+### Changed
+
+- **Una nueva pantalla inicial** ([decisión 83](docs/decisions.md#83-the-start-screen)): **Nuevo proyecto**, **Abrir proyecto** y **Editor de pinceles** en el centro, con miniaturas de los dibujos para **Recuperar** debajo. Un engranaje abre **Configuración**, con las opciones de interfaz, guardado automático y memoria de la tarjeta gráfica, y las opciones del Editor de pinceles tienen una ventana propia.
+- **IBM Plex Sans** ahora es la fuente de toda la interfaz, igual en todos los equipos ([decisión 84](docs/decisions.md#84-the-interfaces-font)).
+
+### Fixed
+
+- La ventana de nuevo dibujo ya no cambia de tamaño con cada elección de resolución o papel.
+
+## [0.19.1] - 2026-11-01
+
+### Fixed
+
+- **Torcer** y **Reconstruir**, en Licuar, y los botones de **Avanzado** ya no quedan fuera de sus paneles.
+- La columna de herramientas tiene la anchura del nombre más largo, para que ninguna herramienta o filtro quede cortado en ningún idioma.
+
 ## [0.19.0] - 2026-11-01
 
 ### Changed
