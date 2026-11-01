@@ -243,7 +243,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   follows the pen (decisions 68 and 69). 0.15.0 brought the Distort stage: smudge and blur, a mesh for transforming and
   liquify (decisions 71 to 73), with a Sharp button for the pixels, and 0.15.1 fixed the numbers of new layers (decision
   74). 0.16.0 brought the Safety stage: autosave with a Recover list, and surviving a lost graphics card (decisions 75
-  and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), 0.18.0 filters and text (decisions 80 and 81), and 0.19.0 the new interface (decision 82), with 0.19.1 keeping every button and name inside its column. 1.0.0 will be the desktop
+  and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), 0.18.0 filters and text (decisions 80 and 81), and 0.19.0 the new interface (decision 82), with 0.19.1 keeping every button and name inside its column and 0.19.2 bringing a new start screen and the interface's own font (decisions 83 and 84). 1.0.0 will be the desktop
   app, packaged with
   Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
