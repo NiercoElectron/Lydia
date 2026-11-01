@@ -18,7 +18,7 @@ page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
 page.on('console', m => {
   if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
 })
-await page.setViewport({ width: 1600, height: 900 })
+await page.setViewport({ width: 1920, height: 1080 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let failures = 0
 const check = (name, ok, extra = '') => {
@@ -181,7 +181,7 @@ check('a new drawing shows the whole paper, straight', fitted.rotation === 0 && 
 
 // Turn it with the rotate tool, zoom in with Ctrl + wheel, flip it with M
 await keys('r')
-const box = await page.$eval('canvas', c => {
+const box = await page.$eval('.draw-space canvas', c => {
   const r = c.getBoundingClientRect()
   return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }
 })
@@ -251,7 +251,7 @@ check(
     near(centerSmaller.y, centerBefore.y, 0.01),
   `${JSON.stringify(centerSmaller)}`,
 )
-await page.setViewport({ width: 1600, height: 900 })
+await page.setViewport({ width: 1920, height: 1080 })
 await sleep(300)
 
 // A file saved before (no view in its header), and one with a view that makes no sense: the whole paper, straight

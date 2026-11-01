@@ -21,6 +21,8 @@ page.on('console', m => {
 })
 await page.setViewport({ width: 1600, height: 1000 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+const filtersOff = () =>
+  page.$$eval('.menu-items button', buttons => buttons.find(b => b.textContent === 'Levels').disabled)
 let failures = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failures++
@@ -101,7 +103,13 @@ const near = (a, b, by = 2) => Math.abs(a - b) <= by
 const toHex = text => parseInt(text.slice(1, 3), 16)
 
 const open = async kind => {
-  await page.select('.filter-menu', kind)
+  await page.evaluate(
+    kind =>
+      [...document.querySelectorAll('.menu-items button')]
+        .find(b => b.textContent === { hue: 'Hue and saturation', levels: 'Levels', blur: 'Gaussian blur' }[kind])
+        .click(),
+    kind,
+  )
   await page.waitForFunction(() => window.lydia.engine.getSnapshot().filter !== null, { timeout: 20000 })
   await sleep(100)
 }
@@ -156,7 +164,7 @@ await rectangle([100, 100], [500, 500], '#ff0000')
 check('red to start with', (await shownAt(300, 300)) === '#ff0000', await shownAt(300, 300))
 const ramBefore = await page.evaluate(() => [...window.lydia.stack.active.tiles.values()].length)
 await open('hue')
-check('the bar shows its controls', (await page.$('.filter-menu[disabled]')) !== null)
+check('the bar shows its controls', await filtersOff())
 await set({ hue: 120 })
 check('the hue turns, as a preview', (await shownAt(300, 300)) === '#00ff00', await shownAt(300, 300))
 const whileOpen = await page.evaluate(() => {
@@ -379,7 +387,7 @@ await page.evaluate(() => window.lydia.engine.setLayerAlphaLock(window.lydia.sta
 // ----- What it can't be used on -----
 await press('p')
 await drag([50, 50], [90, 90])
-check('not on a shape', (await page.$('.filter-menu[disabled]')) !== null)
+check('not on a shape', await filtersOff())
 await click('Undo')
 await waitIdle()
 await press('b')

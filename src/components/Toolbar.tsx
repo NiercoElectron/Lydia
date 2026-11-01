@@ -131,9 +131,6 @@ type Props = {
   filter: FilterControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
-  isGridOn: boolean
-  isOutlineOn: boolean
-  isSharpOn: boolean
   isAlphaLocked: boolean // the active layer's transparency is locked: the eraser can't be used
   isFolder: boolean // the active one is a folder, which can't be painted on (see isFolder in layers.ts)
   isPixelBrush: boolean
@@ -146,9 +143,6 @@ type Props = {
   onWandChange: (change: Partial<WandSettings>) => void
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
   onTaperChange: (change: Partial<TaperSettings>) => void
-  onGridToggle: () => void
-  onOutlineToggle: () => void
-  onSharpToggle: () => void
   onPixelPerfectToggle: () => void
 }
 
@@ -173,9 +167,6 @@ export function Toolbar({
   filter,
   stabilizer,
   taper,
-  isGridOn,
-  isOutlineOn,
-  isSharpOn,
   isAlphaLocked,
   isFolder,
   isPixelBrush,
@@ -188,9 +179,6 @@ export function Toolbar({
   onWandChange,
   onStabilizerChange,
   onTaperChange,
-  onGridToggle,
-  onOutlineToggle,
-  onSharpToggle,
   onPixelPerfectToggle,
 }: Props) {
   const { t } = useLanguage()
@@ -200,7 +188,6 @@ export function Toolbar({
     return (
       <div className="toolbar">
         <TransformButtons controls={transform} {...transform.transform} />
-        <GridButton isOn={isGridOn} onToggle={onGridToggle} />
       </div>
     )
   }
@@ -304,9 +291,6 @@ export function Toolbar({
           {t('Pixel-perfect')}
         </button>
       )}
-      <GridButton isOn={isGridOn} onToggle={onGridToggle} />
-      <SharpButton isOn={isSharpOn} onToggle={onSharpToggle} />
-      <OutlineButton isOn={isOutlineOn} onToggle={onOutlineToggle} />
       <SymmetryButtons controls={symmetry} />
       <RulerButtons controls={rulers} />
     </div>

@@ -27,6 +27,29 @@ export function saveGpuMemory(gigabytes: number) {
   }
 }
 
+// Which of the editor's panels are open
+export type OpenPanels = { tools: boolean; color: boolean; brushes: boolean; layers: boolean }
+export const ALL_PANELS: OpenPanels = { tools: true, color: true, brushes: true, layers: true }
+const PANELS_KEY = 'lydia.panels'
+
+export function loadOpenPanels(): OpenPanels {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? 'null')
+    const isPanel = (key: string) => typeof saved?.[key] === 'boolean'
+    return Object.keys(ALL_PANELS).every(isPanel) ? saved : ALL_PANELS
+  } catch {
+    return ALL_PANELS
+  }
+}
+
+export function saveOpenPanels(panels: OpenPanels) {
+  try {
+    localStorage.setItem(PANELS_KEY, JSON.stringify(panels))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // How often the drawing is autosaved, in minutes (0: never, see autosave.ts)
 export const AUTOSAVE_CHOICES = [1, 2, 5, 0]
 export const DEFAULT_AUTOSAVE = 2

@@ -111,7 +111,7 @@ const setSlider = (index, value) =>
   )
 
 // ----- The panel, and no color in the bar -----
-check('the color panel is above the layers', (await page.$('.side-panels .color-panel + .layers-panel')) !== null)
+check('the color panel is on the left, over the tool', (await page.$('.color-side .color-panel + .toolbar')) !== null)
 check('the bar has no color of its own', (await page.$('.toolbar input[type=color]')) === null)
 check('black at first', (await hexField()) === '#000000' && (await brushColor()) === '#000000')
 

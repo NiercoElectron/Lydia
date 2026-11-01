@@ -20,7 +20,7 @@ page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
 page.on('console', m => {
   if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
 })
-await page.setViewport({ width: 1600, height: 900 })
+await page.setViewport({ width: 1920, height: 1080 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let failures = 0
 const check = (name, ok, extra = '') => {
@@ -57,7 +57,7 @@ async function newDrawing(transparent) {
 }
 
 const view = () => page.evaluate(() => window.lydia.engine.getView())
-const bar = () => page.$$eval('.view-controls .slider-value', spans => spans.map(s => s.textContent))
+const bar = () => page.$$eval('.view-controls .slider-value', spans => spans.map(s => s.textContent).reverse())
 const pressedTool = () =>
   page.$$eval('.tool-column button[aria-pressed=true]', bs => bs.map(b => b.getAttribute('aria-label')).join())
 const cursor = () => page.evaluate(() => window.lydia.app.canvas.style.cursor)
@@ -109,7 +109,11 @@ await newDrawing(false)
 
 // ----- The column and the bar -----
 const labels = await page.$$eval('.tool-column button', bs => bs.map(b => b.getAttribute('aria-label')).join())
-check('the column has the hand, zoom and rotate tools', labels.includes('Hand,Zoom,Rotate view'), labels)
+check(
+  'the column has the hand, zoom and rotate tools',
+  ['Hand', 'Zoom', 'Rotate view'].every(name => labels.includes(name)),
+  labels,
+)
 let v = await view()
 check(
   'the bar shows the zoom and 0°',

@@ -28,12 +28,19 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`)
 }
+// The tool's bar first: the tool column has a Fill too
 const click = text =>
-  page.evaluate(text => [...document.querySelectorAll('button')].find(b => b.textContent === text).click(), text)
+  page.evaluate(text => {
+    const named = selector => [...document.querySelectorAll(selector)].find(b => b.textContent === text)
+    ;(named('.toolbar button') ?? named('button')).click()
+  }, text)
 const hasButton = text =>
   page.evaluate(text => [...document.querySelectorAll('button')].some(b => b.textContent === text), text)
 const isDisabled = text =>
-  page.evaluate(text => [...document.querySelectorAll('button')].find(b => b.textContent === text).disabled, text)
+  page.evaluate(text => {
+    const named = selector => [...document.querySelectorAll(selector)].find(b => b.textContent === text)
+    return (named('.toolbar button') ?? named('button')).disabled
+  }, text)
 const press = async key => {
   await page.keyboard.press(key)
   await sleep(100)
@@ -570,7 +577,7 @@ check(
   near(box.top, 640, 2) && near(box.bottom, 659, 2) && near(box.right, 709, 2),
   JSON.stringify(box),
 )
-check('with nothing to fill', !(await hasButton('Fill')))
+check('with nothing to fill', await page.$$eval('.toolbar button', bs => !bs.some(b => b.textContent === 'Fill')))
 check("and its outline can't go off", await isDisabled('Outline'))
 await click('Edit shape')
 await sleep(300)

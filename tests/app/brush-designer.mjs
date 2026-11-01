@@ -114,7 +114,7 @@ check(
 
 // ----- Painting the tip -----
 await page.evaluate(() => {
-  const s = document.querySelector('.editor-bar label[title^="Brush size"] input')
+  const s = document.querySelector('.toolbar label[title^="Brush size"] input')
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(s, '20')
   s.dispatchEvent(new Event('input', { bubbles: true }))
 })
@@ -370,7 +370,7 @@ await sleep(500)
 await click('Soft')
 await sleep(200)
 await page.evaluate(() => {
-  const s = document.querySelector('.editor-bar label[title^="Brush size"] input')
+  const s = document.querySelector('.toolbar label[title^="Brush size"] input')
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(s, '90')
   s.dispatchEvent(new Event('input', { bubbles: true }))
 })

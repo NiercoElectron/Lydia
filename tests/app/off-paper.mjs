@@ -20,7 +20,7 @@ page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
 page.on('console', m => {
   if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
 })
-await page.setViewport({ width: 1600, height: 900 })
+await page.setViewport({ width: 1920, height: 1080 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let failures = 0
 const check = (name, ok, extra = '') => {

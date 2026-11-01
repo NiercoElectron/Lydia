@@ -1,4 +1,5 @@
 import { useLanguage } from '../i18n'
+import { X } from 'lucide-react'
 import { useRef } from 'react'
 import { tipOf, type LibraryBrush } from '../brushLibrary'
 import { BRUSH_EXTENSION } from '../engine/brushFile'
@@ -11,9 +12,10 @@ type Props = {
   onImport: (files: File[]) => void
   onExport: (brush: LibraryBrush) => void
   onDelete: (brush: LibraryBrush) => void
+  onClose: () => void
 }
 
-export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport, onDelete }: Props) {
+export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport, onDelete, onClose }: Props) {
   const { t } = useLanguage()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const selected = brushes.find(brush => brush.id === selectedId)
@@ -26,7 +28,12 @@ export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport
 
   return (
     <aside className="brushes-panel">
-      <h2>{t('Brushes')}</h2>
+      <div className="panel-title">
+        <h2>{t('Brushes')}</h2>
+        <button className="top-icon" aria-label={t('Close')} title={t('Close')} onClick={onClose}>
+          <X size={16} aria-hidden />
+        </button>
+      </div>
       <div className="brushes-actions">
         <button
           onClick={() => fileInputRef.current?.click()}

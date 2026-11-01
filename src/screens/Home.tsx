@@ -17,16 +17,8 @@ import {
   GPU_MEMORY_CHOICES,
   loadAutosaveMinutes,
   saveAutosaveMinutes,
-  type ThemeChoice,
 } from '../settings'
-import { setThemeChoice, useTheme } from '../theme'
-
-// The choices for the interface's colors (see theme.ts)
-const THEME_CHOICES: [ThemeChoice, string][] = [
-  ['system', 'System'],
-  ['light', 'Light'],
-  ['dark', 'Dark'],
-]
+import { setThemeChoice, THEME_CHOICES, useTheme } from '../theme'
 
 type Props = {
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)

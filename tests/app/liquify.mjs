@@ -177,7 +177,7 @@ await sleep(300)
 
 // ----- The button, key, modes and settings -----
 const tools = await page.$$eval('.tool-column button', buttons => buttons.map(b => b.ariaLabel))
-check('Liquify comes after Blur', tools.slice(3, 5).join() === 'Blur,Liquify', tools.join())
+check('Liquify is under Special pen', tools.join().includes('Special pen,Smudge,Liquify'), tools.join())
 await press('q')
 check('Q chooses Liquify', await page.$eval('.tool-column button[aria-label=Liquify]', b => b.ariaPressed === 'true'))
 check('it has Strength, not Opacity', (await hasBarSlider('Strength')) && !(await hasBarSlider('Opacity')))

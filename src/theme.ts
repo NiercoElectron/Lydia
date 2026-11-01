@@ -50,3 +50,10 @@ export function useTheme() {
 export function themeColor(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
+
+// The choices for the interface's colors
+export const THEME_CHOICES: [ThemeChoice, string][] = [
+  ['system', 'System'],
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+]

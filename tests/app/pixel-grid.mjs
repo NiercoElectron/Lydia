@@ -144,7 +144,7 @@ const fitZoom = await page.evaluate(() => window.lydia.world.scale.x)
 check(
   'the button is on at first',
   await page.$eval(
-    '.toolbar button[title*="Pixel grid"]',
+    '.menu-items button[title*="Pixel grid"]',
     b => b.getAttribute('aria-pressed') === 'true' && b.textContent === 'Grid',
   ),
 )
@@ -215,7 +215,7 @@ check(
   'G turns it off: no lines, and the button shows it',
   !(await isShown()) &&
     rowOff.every(p => near(p, [255, 0, 0])) &&
-    (await page.$eval('.toolbar button[title*="Pixel grid"]', b => b.getAttribute('aria-pressed'))) === 'false',
+    (await page.$eval('.menu-items button[title*="Pixel grid"]', b => b.getAttribute('aria-pressed'))) === 'false',
 )
 await back()
 await page.reload({ waitUntil: 'networkidle0' })

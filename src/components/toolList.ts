@@ -51,3 +51,23 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
 }
 
 export const ALL_TOOLS = Object.keys(TOOLS) as Tool[]
+
+// The rows of the tool column, from the top. "filter" opens the filters, and a list of tools shares one row
+export const TOOL_ROWS: (Tool | 'filter' | Tool[])[] = [
+  'move',
+  'select',
+  'lasso',
+  'wand',
+  'filter',
+  'brush',
+  'eraser',
+  'zoom',
+  'fill',
+  'eyedropper',
+  'blur',
+  'text',
+  'shape',
+  ['smudge', 'liquify'],
+  'hand',
+  'rotate',
+]

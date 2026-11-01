@@ -22,6 +22,8 @@ import {
   useTransformShortcuts,
 } from '../components/engineHooks'
 import { ColorPanel } from '../components/ColorPanel'
+import { MenuBar, type Menu } from '../components/MenuBar'
+import { SettingsMenu } from '../components/SettingsMenu'
 import { ColorTray } from '../components/ColorTray'
 import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
@@ -32,22 +34,31 @@ import { ALL_TOOLS } from '../components/toolList'
 import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
+import { Redo2, Undo2 } from 'lucide-react'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
 import { downloadBlob, timestamp } from '../files'
+import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { isTyping } from '../engine/view'
 import {
   loadBrushId,
+  loadOpenPanels,
   loadRecentColors,
   loadTrayColors,
   MAX_RECENT_COLORS,
   saveBrushId,
+  saveOpenPanels,
   saveRecentColors,
   saveTrayColors,
+  type OpenPanels,
 } from '../settings'
 import { freeTrayImage, isImageFile, makeTrayImages, TRAY_DRAG_TYPE, type TrayImage } from '../tray'
+
+const REPOSITORY = 'https://github.com/NiercoElectron/Lydia/blob/main'
+const GUIDE_URL = `${REPOSITORY}/docs/guide.md`
+const CHANGES_URL = `${REPOSITORY}/CHANGELOG.md`
 
 type Props = {
   project: ProjectData
@@ -102,6 +113,13 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   const [brushId, setBrushId] = useState(() => loadBrushId() ?? DEFAULT_BRUSH_ID)
   const [isDroppingFiles, setIsDroppingFiles] = useState(false)
   const [isTrayOpen, setIsTrayOpen] = useState(false)
+  const [panels, setPanels] = useState(loadOpenPanels)
+  const togglePanel = (panel: keyof OpenPanels) =>
+    setPanels(current => {
+      const next = { ...current, [panel]: !current[panel] }
+      saveOpenPanels(next)
+      return next
+    })
   // The chosen brush. One that is no longer in the list (deleted in another tab) falls back to Soft round
   const brush = brushes.find(b => b.id === brushId) ?? brushes.find(b => b.id === DEFAULT_BRUSH_ID)
 
@@ -435,239 +453,384 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
 
   const cantExport = !engine || busy !== null || snapshot.filter !== null || snapshot.typing !== null
 
+  const activeLayer = snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)
+  const menus: Menu[] = [
+    {
+      title: t('File'),
+      items: [
+        {
+          label: t('Save'),
+          onClick: handleSave,
+          disabled: !engine || busy !== null,
+          hint:
+            autosave.lastTime === null
+              ? undefined
+              : t('Autosaved at {time}', { time: new Date(autosave.lastTime).toLocaleTimeString(locale) }),
+        },
+        null,
+        { label: t('Export PNG'), onClick: () => handleExport('png'), disabled: cantExport },
+        { label: t('Export JPEG'), onClick: () => handleExport('jpeg'), disabled: cantExport },
+        null,
+        { label: t('Back'), onClick: handleBack },
+      ],
+      extra: (
+        <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>
+          {t('Scale')}
+          <select
+            value={snapshot.exportScale}
+            disabled={!engine || snapshot.exportScales.length < 2}
+            onChange={e => engine?.setExportScale(Number(e.target.value))}
+          >
+            {snapshot.exportScales.map(scale => (
+              <option key={scale} value={scale}>
+                {scale}×
+              </option>
+            ))}
+          </select>
+        </label>
+      ),
+    },
+    {
+      title: t('Edit'),
+      items: [
+        { label: t('Undo'), keys: 'Ctrl+Z', onClick: () => engine?.undo(), disabled: !snapshot.canUndo },
+        { label: t('Redo'), keys: 'Ctrl+Shift+Z', onClick: () => engine?.redo(), disabled: !snapshot.canRedo },
+        null,
+        { label: t('Transform'), keys: 'Ctrl+T', onClick: () => engine?.startTransform(), disabled: !engine },
+        { label: t('Clear layer'), onClick: () => engine?.clearLayer(), disabled: !engine },
+      ],
+    },
+    {
+      title: t('Layer'),
+      items: [
+        { label: t('New layer'), onClick: () => engine?.addLayer(), disabled: !engine },
+        {
+          label: t('New folder'),
+          hint: t('Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)'),
+          onClick: () => engine?.addFolder(),
+          disabled: !engine,
+        },
+        {
+          label: t('New layer outside'),
+          hint: t('Add a layer above the folder the active layer is in (or above the active folder), out of it'),
+          onClick: () => engine?.addLayerOutside(),
+          disabled: !activeLayer || (!activeLayer.isFolder && activeLayer.parentId === null),
+        },
+        null,
+        { label: t('Duplicate'), keys: 'Ctrl+J', onClick: () => engine?.duplicateLayer(), disabled: !activeLayer },
+        {
+          label: t(activeLayer?.isFolder ? 'Merge folder' : 'Merge down'),
+          keys: 'Ctrl+E',
+          onClick: () => engine?.mergeDown(),
+          disabled: !snapshot.canMergeDown,
+        },
+        {
+          label: t(activeLayer?.isFolder ? 'Delete folder' : 'Delete layer'),
+          onClick: () => engine?.deleteLayer(),
+          disabled: !snapshot.canDelete,
+        },
+      ],
+    },
+    {
+      title: t('Filter'),
+      items: (['hue', 'levels', 'blur'] as FilterKind[]).map(kind => ({
+        label: t({ hue: 'Hue and saturation', levels: 'Levels', blur: 'Gaussian blur' }[kind]),
+        onClick: () => engine?.startFilter(kind),
+        disabled: !snapshot.canFilter || snapshot.filter !== null,
+      })),
+    },
+    {
+      title: t('Select'),
+      items: [
+        { label: t('Select all'), keys: 'Ctrl+A', onClick: () => engine?.selectAll(), disabled: !engine },
+        { label: t('Deselect'), keys: 'Ctrl+D', onClick: () => engine?.deselect(), disabled: !snapshot.hasSelection },
+        { label: t('Invert'), keys: 'Ctrl+Shift+I', onClick: () => engine?.invertSelection(), disabled: !engine },
+      ],
+    },
+    {
+      title: t('View'),
+      items: [
+        { label: t('Fit'), keys: 'Ctrl+0', onClick: () => engine?.fitToScreen(), disabled: !engine },
+        { label: t('Flip'), keys: 'M', onClick: () => engine?.flipView(), disabled: !engine },
+        null,
+        {
+          label: t('Grid'),
+          keys: 'G',
+          hint: t('Pixel grid, shown from {zoom}% zoom (G)', { zoom: PIXEL_GRID_ZOOM * 100 }),
+          onClick: toggleGrid,
+          isOn: isGridOn,
+        },
+        {
+          label: t('Sharp'),
+          hint: t('Show the pixels as sharp squares when zoomed in, instead of smoothing them'),
+          onClick: toggleSharp,
+          isOn: isSharpOn,
+        },
+        {
+          label: t('Brush outline'),
+          hint: t('The outline of the brush under the pointer'),
+          onClick: toggleOutline,
+          isOn: isOutlineOn,
+        },
+      ],
+    },
+    {
+      title: t('Window'),
+      items: [
+        { label: t('Tools'), onClick: () => togglePanel('tools'), isOn: panels.tools },
+        { label: t('Color'), onClick: () => togglePanel('color'), isOn: panels.color },
+        { label: t('Brushes'), onClick: () => togglePanel('brushes'), isOn: panels.brushes },
+        { label: t('Layers'), onClick: () => togglePanel('layers'), isOn: panels.layers },
+        null,
+        { label: t('Tray'), onClick: () => setIsTrayOpen(open => !open), isOn: isTrayOpen },
+        { label: t('Color tray'), onClick: () => setIsColorTrayOpen(open => !open), isOn: isColorTrayOpen },
+      ],
+    },
+    {
+      title: t('Help'),
+      items: [
+        { label: t('Guide'), onClick: () => window.open(GUIDE_URL, '_blank', 'noopener') },
+        { label: t('What changed'), onClick: () => window.open(CHANGES_URL, '_blank', 'noopener') },
+      ],
+    },
+  ]
+
+  const toolOptions = (
+    <Toolbar
+      tool={tool}
+      size={size}
+      opacity={opacity}
+      strength={strength}
+      liquifyMode={liquifyMode}
+      fill={fill}
+      wand={wand}
+      selection={{
+        hasSelection: snapshot.hasSelection,
+        hardEdges: hardSelectionEdges,
+        onHardEdgesChange: setHardSelectionEdges,
+        onSelectAll: () => engine?.selectAll(),
+        onDeselect: () => engine?.deselect(),
+        onInvert: () => engine?.invertSelection(),
+      }}
+      transform={{
+        transform: snapshot.transform,
+        isSmartLayer: activeLayer?.isSmart ?? false,
+        isShapeLayer: snapshot.isShapeLayer,
+        isTextLayer: snapshot.isTextLayer,
+        onStart: () => engine?.startTransform(),
+        onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
+        onModeChange: mode => engine?.setTransformMode(mode),
+        onWarpSideChange: side => engine?.setTransformWarpSide(side),
+        onApply: () => engine?.applyTransform(),
+        onCancel: () => engine?.cancelTransform(),
+        onConvertToPixels: () => engine?.convertToPixels(),
+      }}
+      symmetry={{
+        symmetry: snapshot.symmetry,
+        isMoving: snapshot.isMovingSymmetry,
+        onChange: change => engine?.setSymmetry(change),
+        onCenter: () => engine?.centerSymmetry(),
+        onMovingChange: on => engine?.setMovingSymmetry(on),
+      }}
+      filter={{
+        filter: snapshot.filter,
+        onChange: change => engine?.setFilter(change),
+        onApply: () => engine?.applyFilter(),
+        onCancel: () => engine?.cancelFilter(),
+      }}
+      shape={{
+        style: snapshot.shapeStyle,
+        isEditing: snapshot.isEditingShape,
+        onEditingChange: on => engine?.setEditingShape(on),
+        onChange: change => engine?.setShapeStyle(change),
+        onCommit: () => engine?.commitShapeStyle(),
+        onColor: part => engine?.setShapeColor(part),
+        onTakeBrush: () => engine?.takeBrushForShape(),
+      }}
+      text={{
+        style: snapshot.textStyle,
+        isTyping: snapshot.typing !== null,
+        isFontHere: snapshot.typing?.isFontHere ?? true,
+        onChange: change => engine?.setTextStyle(change),
+        onEdit: () => engine?.editText(),
+        onDone: () => engine?.finishText(),
+        onCancel: () => engine?.cancelText(),
+      }}
+      rulers={{
+        rulers: snapshot.rulers,
+        isEditing: snapshot.isEditingRulers,
+        hasChosen: snapshot.chosenRuler !== null,
+        onOnChange: on => engine?.setRulersOn(on),
+        onAdd: kind => engine?.addRuler(kind),
+        onEditingChange: on => engine?.setEditingRulers(on),
+        onRemove: () => engine?.removeRuler(),
+      }}
+      stabilizer={stabilizer}
+      taper={taper}
+      isAlphaLocked={activeLayer?.alphaLocked ?? false}
+      isFolder={activeLayer?.isFolder ?? false}
+      isPixelBrush={isPixelBrush}
+      isPixelPerfectOn={isPixelPerfectOn}
+      onSizeChange={setSize}
+      onOpacityChange={setOpacity}
+      onStrengthChange={value =>
+        mixTool && setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
+      }
+      onLiquifyModeChange={setLiquifyMode}
+      onFillChange={change => setFill(current => ({ ...current, ...change }))}
+      onWandChange={change => setWand(current => ({ ...current, ...change }))}
+      onStabilizerChange={changeStabilizer}
+      onTaperChange={changeTaper}
+      onPixelPerfectToggle={togglePixelPerfect}
+    />
+  )
+
   return (
     <div className="editor">
       <header className="editor-bar">
-        <Toolbar
-          tool={tool}
-          size={size}
-          opacity={opacity}
-          strength={strength}
-          liquifyMode={liquifyMode}
-          fill={fill}
-          wand={wand}
-          selection={{
-            hasSelection: snapshot.hasSelection,
-            hardEdges: hardSelectionEdges,
-            onHardEdgesChange: setHardSelectionEdges,
-            onSelectAll: () => engine?.selectAll(),
-            onDeselect: () => engine?.deselect(),
-            onInvert: () => engine?.invertSelection(),
-          }}
-          transform={{
-            transform: snapshot.transform,
-            isSmartLayer: snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isSmart ?? false,
-            isShapeLayer: snapshot.isShapeLayer,
-            isTextLayer: snapshot.isTextLayer,
-            onStart: () => engine?.startTransform(),
-            onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
-            onModeChange: mode => engine?.setTransformMode(mode),
-            onWarpSideChange: side => engine?.setTransformWarpSide(side),
-            onApply: () => engine?.applyTransform(),
-            onCancel: () => engine?.cancelTransform(),
-            onConvertToPixels: () => engine?.convertToPixels(),
-          }}
-          symmetry={{
-            symmetry: snapshot.symmetry,
-            isMoving: snapshot.isMovingSymmetry,
-            onChange: change => engine?.setSymmetry(change),
-            onCenter: () => engine?.centerSymmetry(),
-            onMovingChange: on => engine?.setMovingSymmetry(on),
-          }}
-          filter={{
-            filter: snapshot.filter,
-            onChange: change => engine?.setFilter(change),
-            onApply: () => engine?.applyFilter(),
-            onCancel: () => engine?.cancelFilter(),
-          }}
-          shape={{
-            style: snapshot.shapeStyle,
-            isEditing: snapshot.isEditingShape,
-            onEditingChange: on => engine?.setEditingShape(on),
-            onChange: change => engine?.setShapeStyle(change),
-            onCommit: () => engine?.commitShapeStyle(),
-            onColor: part => engine?.setShapeColor(part),
-            onTakeBrush: () => engine?.takeBrushForShape(),
-          }}
-          text={{
-            style: snapshot.textStyle,
-            isTyping: snapshot.typing !== null,
-            isFontHere: snapshot.typing?.isFontHere ?? true,
-            onChange: change => engine?.setTextStyle(change),
-            onEdit: () => engine?.editText(),
-            onDone: () => engine?.finishText(),
-            onCancel: () => engine?.cancelText(),
-          }}
-          rulers={{
-            rulers: snapshot.rulers,
-            isEditing: snapshot.isEditingRulers,
-            hasChosen: snapshot.chosenRuler !== null,
-            onOnChange: on => engine?.setRulersOn(on),
-            onAdd: kind => engine?.addRuler(kind),
-            onEditingChange: on => engine?.setEditingRulers(on),
-            onRemove: () => engine?.removeRuler(),
-          }}
-          stabilizer={stabilizer}
-          taper={taper}
-          isGridOn={isGridOn}
-          isOutlineOn={isOutlineOn}
-          isSharpOn={isSharpOn}
-          isAlphaLocked={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.alphaLocked ?? false}
-          isFolder={snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isFolder ?? false}
-          isPixelBrush={isPixelBrush}
-          isPixelPerfectOn={isPixelPerfectOn}
-          onSizeChange={setSize}
-          onOpacityChange={setOpacity}
-          onStrengthChange={value =>
-            mixTool &&
-            setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
-          }
-          onLiquifyModeChange={setLiquifyMode}
-          onFillChange={change => setFill(current => ({ ...current, ...change }))}
-          onWandChange={change => setWand(current => ({ ...current, ...change }))}
-          onStabilizerChange={changeStabilizer}
-          onTaperChange={changeTaper}
-          onGridToggle={toggleGrid}
-          onOutlineToggle={toggleOutline}
-          onSharpToggle={toggleSharp}
-          onPixelPerfectToggle={togglePixelPerfect}
-        />
-        <div className="actions">
-          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title={t('Undo (Ctrl+Z)')}>
-            {t('Undo')}
-          </button>
-          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title={t('Redo (Ctrl+Shift+Z)')}>
-            {t('Redo')}
-          </button>
-          <button onClick={() => engine?.clearLayer()} disabled={!engine}>
-            {t('Clear layer')}
-          </button>
-          <select
-            className="filter-menu"
-            aria-label={t('Filters')}
-            value=""
-            disabled={!snapshot.canFilter || snapshot.filter !== null}
-            title={t(
-              'Change the colors of the active layer or blur it. A smart object, a shape or a text is turned into pixels first',
-            )}
-            onChange={e => engine?.startFilter(e.target.value as FilterKind)}
-          >
-            <option value="" disabled>
-              {t('Filters')}
-            </option>
-            <option value="hue">{t('Hue and saturation')}</option>
-            <option value="levels">{t('Levels')}</option>
-            <option value="blur">{t('Gaussian blur')}</option>
-          </select>
-          <ViewControls engine={engine} />
-          <button onClick={() => handleExport('png')} disabled={cantExport}>
-            {t('Export PNG')}
-          </button>
-          <button onClick={() => handleExport('jpeg')} disabled={cantExport}>
-            {t('Export JPEG')}
-          </button>
-          <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>
-            {t('Scale')}
-            <select
-              value={snapshot.exportScale}
-              disabled={!engine || snapshot.exportScales.length < 2}
-              onChange={e => engine?.setExportScale(Number(e.target.value))}
-            >
-              {snapshot.exportScales.map(scale => (
-                <option key={scale} value={scale}>
-                  {scale}×
-                </option>
-              ))}
-            </select>
-          </label>
+        <MenuBar menus={menus} />
+        <div className="top-row">
           <button
-            onClick={handleSave}
-            disabled={!engine || busy !== null}
-            title={
-              autosave.lastTime === null
-                ? undefined
-                : t('Autosaved at {time}', { time: new Date(autosave.lastTime).toLocaleTimeString(locale) })
-            }
+            className="top-icon"
+            aria-label={t('Undo')}
+            title={t('Undo (Ctrl+Z)')}
+            onClick={() => engine?.undo()}
+            disabled={!snapshot.canUndo}
           >
-            {t('Save')}
+            <Undo2 size={20} aria-hidden />
+          </button>
+          <button
+            className="top-icon"
+            aria-label={t('Redo')}
+            title={t('Redo (Ctrl+Shift+Z)')}
+            onClick={() => engine?.redo()}
+            disabled={!snapshot.canRedo}
+          >
+            <Redo2 size={20} aria-hidden />
           </button>
           {autosave.failure && <span className="notice">{autosave.failure}</span>}
-          <button onClick={handleBack}>{t('Back')}</button>
-          {(busy || snapshot.task || snapshot.isUpdating) && (
-            <span className="busy">
-              {t(busy ?? snapshot.task ?? 'Updating…')}
-              {!busy && snapshot.task && snapshot.progress !== null && (
-                <progress value={snapshot.progress} aria-label={t(snapshot.task)} />
-              )}
-            </span>
-          )}
+          <SettingsMenu />
         </div>
       </header>
       <div className="editor-main">
-        <ToolColumn
-          tool={tool}
-          onToolChange={setTool}
-          isTrayOpen={isTrayOpen}
-          onTrayToggle={() => setIsTrayOpen(open => !open)}
-        />
-        <BrushesPanel
-          brushes={brushes}
-          selectedId={brush?.id ?? brushId}
-          onSelect={selectBrush}
-          onImport={importBrushes}
-          onExport={exportBrush}
-          onDelete={deleteBrush}
-        />
-        <div className="draw-area">
-          <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine}>
-            {snapshot.typing && <TextBox engine={engine} typing={snapshot.typing} />}
-          </DrawSpace>
-          {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
-          {isColorTrayOpen && (
-            <ColorTray
-              color={color}
-              general={trayColors}
-              drawing={snapshot.trayColors}
-              onPick={setColor}
-              onGeneralChange={setTrayColors}
-              onDrawingChange={colors => engine?.setTrayColors(colors)}
-            />
-          )}
+        <div className="editor-work">
+          <div className="editor-row">
+            {(panels.tools || panels.color) && (
+              <div className="left-panels">
+                {panels.tools && (
+                  <ToolColumn
+                    tool={tool}
+                    onToolChange={setTool}
+                    canFilter={snapshot.canFilter && snapshot.filter === null}
+                    onFilter={kind => engine?.startFilter(kind)}
+                    isTrayOpen={isTrayOpen}
+                    onTrayToggle={() => setIsTrayOpen(open => !open)}
+                  />
+                )}
+                {panels.color && (
+                  <div className="color-side">
+                    <ColorPanel
+                      color={color}
+                      background={background}
+                      recent={recentColors}
+                      isTrayOpen={isColorTrayOpen}
+                      onColorChange={setColor}
+                      onSwap={swapColors}
+                      onTrayToggle={() => setIsColorTrayOpen(open => !open)}
+                    />
+                    {toolOptions}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="draw-area">
+              <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine}>
+                {snapshot.typing && <TextBox engine={engine} typing={snapshot.typing} />}
+              </DrawSpace>
+              {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
+              {isColorTrayOpen && (
+                <ColorTray
+                  color={color}
+                  general={trayColors}
+                  drawing={snapshot.trayColors}
+                  onPick={setColor}
+                  onGeneralChange={setTrayColors}
+                  onDrawingChange={colors => engine?.setTrayColors(colors)}
+                />
+              )}
+            </div>
+          </div>
+          <footer className="draw-footer">
+            <div className="panel-dock">
+              <button
+                aria-pressed={panels.tools}
+                onClick={() => togglePanel('tools')}
+                title={t('Show or hide the tools')}
+              >
+                {t('Tools')}
+              </button>
+              <button
+                aria-pressed={panels.color}
+                onClick={() => togglePanel('color')}
+                title={t('Show or hide the color')}
+              >
+                {t('Color')}
+              </button>
+              <span className="paper-size">
+                {project.width} × {project.height} px
+              </span>
+              {(busy || snapshot.task || snapshot.isUpdating) && (
+                <span className="busy">
+                  {t(busy ?? snapshot.task ?? 'Updating…')}
+                  {!busy && snapshot.task && snapshot.progress !== null && (
+                    <progress value={snapshot.progress} aria-label={t(snapshot.task)} />
+                  )}
+                </span>
+              )}
+            </div>
+            <ViewControls engine={engine} />
+          </footer>
         </div>
-        <div className="side-panels">
-          <ColorPanel
-            color={color}
-            background={background}
-            recent={recentColors}
-            isTrayOpen={isColorTrayOpen}
-            onColorChange={setColor}
-            onSwap={swapColors}
-            onTrayToggle={() => setIsColorTrayOpen(open => !open)}
-          />
-          <LayersPanel
-            layers={snapshot.layers}
-            activeLayerId={snapshot.activeLayerId}
-            canDelete={snapshot.canDelete}
-            canMergeDown={snapshot.canMergeDown}
-            onAdd={() => engine?.addLayer()}
-            onAddFolder={() => engine?.addFolder()}
-            onAddOutside={() => engine?.addLayerOutside()}
-            onDelete={() => engine?.deleteLayer()}
-            onDuplicate={() => engine?.duplicateLayer()}
-            onMergeDown={() => engine?.mergeDown()}
-            onSelect={id => engine?.selectLayer(id)}
-            onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
-            onRename={(id, name) => engine?.renameLayer(id, name)}
-            onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
-            onOpenChange={(id, open) => engine?.setFolderOpen(id, open)}
-            onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
-            onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
-            onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}
-            onBlendModeChange={(id, mode) => engine?.setLayerBlendMode(id, mode)}
-            onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
-            onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
-          />
-        </div>
+        {(panels.brushes || panels.layers) && (
+          <div className="side-panels">
+            {panels.brushes && (
+              <BrushesPanel
+                brushes={brushes}
+                selectedId={brush?.id ?? brushId}
+                onSelect={selectBrush}
+                onImport={importBrushes}
+                onExport={exportBrush}
+                onDelete={deleteBrush}
+                onClose={() => togglePanel('brushes')}
+              />
+            )}
+            {panels.layers && (
+              <LayersPanel
+                layers={snapshot.layers}
+                activeLayerId={snapshot.activeLayerId}
+                canDelete={snapshot.canDelete}
+                canMergeDown={snapshot.canMergeDown}
+                onAdd={() => engine?.addLayer()}
+                onAddFolder={() => engine?.addFolder()}
+                onAddOutside={() => engine?.addLayerOutside()}
+                onDelete={() => engine?.deleteLayer()}
+                onDuplicate={() => engine?.duplicateLayer()}
+                onMergeDown={() => engine?.mergeDown()}
+                onSelect={id => engine?.selectLayer(id)}
+                onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
+                onRename={(id, name) => engine?.renameLayer(id, name)}
+                onVisibleChange={(id, visible) => engine?.setLayerVisible(id, visible)}
+                onOpenChange={(id, open) => engine?.setFolderOpen(id, open)}
+                onOffPaperChange={(id, show) => engine?.setLayerOffPaper(id, show)}
+                onAlphaLockChange={(id, locked) => engine?.setLayerAlphaLock(id, locked)}
+                onClipChange={(id, clipped) => engine?.setLayerClipped(id, clipped)}
+                onBlendModeChange={(id, mode) => engine?.setLayerBlendMode(id, mode)}
+                onOpacityChange={(id, opacity) => engine?.setLayerOpacity(id, opacity)}
+                onOpacityChangeEnd={() => engine?.finishLayerOpacity()}
+              />
+            )}
+          </div>
+        )}
       </div>
       {isDroppingFiles && (
         <div className="drop-hint">

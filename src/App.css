@@ -3,6 +3,13 @@
    transparent paper) keeps its colors */
 :root {
   color-scheme: light;
+  --text: #111;
+  --control: #666; /* a button's text and its border */
+  --control-line: #999;
+  --slider-dot: #000000;
+  --slider-done: #a0a0a0; /* the line where the dot has passed */
+  --slider-left: #d8d8d8;
+  --slider-edge: #a0a0a0; /* the thin line around the dot */
   --muted: #666;
   --icon: #222;
   --panel: #fff;
@@ -26,6 +33,13 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --text: #f0f0f0;
+  --control: #a8a8a8;
+  --control-line: #6a6a6a;
+  --slider-dot: #ffffff;
+  --slider-done: #7d7d7d;
+  --slider-left: #2b2b2b;
+  --slider-edge: #7d7d7d;
   --muted: #a0a0a0;
   --icon: #ddd;
   --panel: #262626;
@@ -52,9 +66,77 @@
   filter: invert(1);
 }
 
-button[aria-pressed='true'] {
-  font-weight: bold;
-  outline: 2px solid currentColor;
+/* A button is gray, with a line around it, and lighter under the pointer. One that stays on or off has no line, and when
+   it is on, a bright one */
+button {
+  padding: 3px 10px;
+  border: 1px solid var(--control-line);
+  border-radius: 4px;
+  background: none;
+  color: var(--control);
+  font: inherit;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--control);
+  color: var(--text);
+}
+
+button:disabled {
+  opacity: 0.45;
+}
+
+select {
+  font: inherit;
+}
+
+button[aria-pressed] {
+  border-color: transparent;
+  color: var(--text);
+}
+
+button[aria-pressed='true'],
+button[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* A slider is a thin line with a bright dot, lighter up to the dot and fainter after it. The dot draws the line itself, in a
+   border image that goes far past it each way and is cut at the slider's ends, so no slider needs to say its value */
+input[type='range'] {
+  --line: linear-gradient(90deg, var(--slider-done) 50%, var(--slider-left) 0) 0 1 / calc(50% - 1px) 100vw / 0 100vw;
+
+  height: 16px;
+  margin: 0;
+  overflow: hidden;
+  background: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--slider-dot);
+  box-shadow: 0 0 0 0.5px var(--slider-edge); /* the border is taken by the line */
+  border-image: var(--line);
+  appearance: none;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--slider-dot);
+  box-shadow: 0 0 0 0.5px var(--slider-edge); /* the border is taken by the line */
+  border-image: var(--line);
+}
+
+input[type='range']:disabled {
+  opacity: 0.45;
 }
 
 /* The start screen: its choices at the left, and what's new in each version at the right, below them in a narrow
@@ -255,8 +337,8 @@ fieldset.new-project-row {
   color: var(--danger);
 }
 
-/* The editor fills the window: the bar on top, the brushes on the left, the drawing in the middle and the layers on
-   the right */
+/* The editor fills the window: the menus and a row of buttons on top, the tools and the color on the left, the drawing
+   in the middle, and the brushes and the layers on the right */
 .editor {
   display: flex;
   flex-direction: column;
@@ -265,26 +347,178 @@ fieldset.new-project-row {
 
 .editor-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 24px;
-  padding: 6px 8px;
+  flex-direction: column;
   border-bottom: 1px solid var(--border);
 }
 
-.toolbar,
-.actions {
+.menu-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px 8px;
+}
+
+.menu {
+  position: relative;
+}
+
+.menu-title {
+  padding: 3px 10px;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+.menu-title:hover,
+.menu.open .menu-title {
+  background: var(--hover);
+}
+
+/* Always on the page, only hidden */
+.menu-items {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+
+.menu.open .menu-items {
+  display: flex;
+}
+
+.menu-items button {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.menu-items button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.menu-items button[aria-pressed='true']::before {
+  content: '✓';
+}
+
+.menu-items button[aria-pressed='false']::before {
+  content: '✓';
+  visibility: hidden;
+}
+
+/* A shortcut isn't part of the item's name */
+.menu-items button[data-keys]::after {
+  content: attr(data-keys);
+  color: var(--muted);
+}
+
+.menu-items hr {
+  width: 100%;
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.menu-items label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+}
+
+.top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px 2px;
+}
+
+.top-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: none;
+  background: none;
+  color: var(--icon);
+}
+
+.top-icon:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.settings-menu {
+  position: relative;
+  margin-left: auto;
+}
+
+.settings-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 16px var(--shadow);
+  white-space: nowrap;
+}
+
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-/* The tool's settings always have a row of their own, above the actions, so that the drawing area keeps its size when
-   another tool, with more or fewer settings, is chosen */
-.editor-bar > .toolbar {
+/* The tools' settings are in the panel under the color: a slider has its name and number over it, on a row of its own,
+   and buttons go side by side */
+.color-side .toolbar {
+  padding: 8px;
+}
+
+.color-side .toolbar label {
+  display: grid;
   flex-basis: 100%;
-  min-height: 28px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.color-side .toolbar .notice {
+  flex-basis: 100%;
+}
+
+.color-side .toolbar label input[type='range'] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+}
+
+.color-side .advanced-panel {
+  position: static;
+  width: auto;
+  box-shadow: none;
+}
+
+.color-side .advanced-panel label {
+  grid-template-columns: 1fr auto;
 }
 
 /* The Advanced panel opens below its button, over the drawing, so the drawing area keeps its size. Its sliders line up
@@ -341,9 +575,24 @@ fieldset.new-project-row {
 /* How far the task is, when it can tell (see setProgress in engine.ts) */
 .busy progress {
   width: 120px;
+  height: 2px;
   margin-left: 8px;
+  border: none;
   vertical-align: middle;
-  accent-color: var(--accent);
+  background: var(--slider-left);
+  appearance: none;
+}
+
+.busy progress::-webkit-progress-bar {
+  background: var(--slider-left);
+}
+
+.busy progress::-webkit-progress-value {
+  background: var(--slider-dot);
+}
+
+.busy progress::-moz-progress-bar {
+  background: var(--slider-dot);
 }
 
 /* The view's zoom and rotation, with its buttons */
@@ -359,26 +608,94 @@ fieldset.new-project-row {
   min-height: 0; /* let the drawing area shrink instead of pushing the window bigger */
 }
 
-/* The tools, in a narrow column at the left edge, like in Photoshop and Krita */
+/* All but the brushes and the layers: the tools, the color and the drawing, with the bar under them */
+.editor-work {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The tools and the color */
+.left-panels {
+  display: flex;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+
+.color-side {
+  width: 250px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+}
+
+/* The buttons that show and hide the tools and the color, in the bar under the drawing, so they never change size */
+.panel-dock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paper-size {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* The tools, each with its name */
 .tool-column {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  width: 160px;
   padding: 8px 4px;
-  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.tool-column svg {
+  flex-shrink: 0;
 }
 
 .tool-column button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: none;
   color: var(--icon);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tool-column button span {
+  color: var(--text);
+}
+
+.tool-column button.chosen {
+  border-color: var(--control-line);
+}
+
+/* The filters, and the tools that share one row, opened under it */
+.tool-list {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+}
+
+.tool-list.open {
+  display: flex;
 }
 
 .tool-column button:hover {
@@ -391,10 +708,9 @@ fieldset.new-project-row {
 }
 
 .tool-column button[aria-pressed='true'] {
-  outline: none;
-  border-color: var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  border-color: var(--text);
+  background: none;
+  color: var(--text);
 }
 
 /* The drawing, with the tray floating over it */
@@ -402,13 +718,27 @@ fieldset.new-project-row {
   position: relative;
   display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
+}
+
+.draw-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.zoom-slider {
+  width: 160px;
 }
 
 .draw-space {
   position: relative;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -519,10 +849,17 @@ fieldset.new-project-row {
 }
 
 .brushes-panel {
-  width: 190px;
+  flex: 1;
+  min-height: 0;
   padding: 8px;
-  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   overflow-y: auto;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .layers-panel h2,
@@ -564,10 +901,8 @@ button.brush {
 }
 
 button.brush[aria-pressed='true'] {
-  font-weight: normal;
-  outline: none;
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  border-color: var(--text);
+  background: none;
 }
 
 .brush-preview {
@@ -801,7 +1136,7 @@ input.slider-value {
 }
 
 .layers-list li.active {
-  background: var(--accent-bg);
+  background: var(--hover);
 }
 
 .layers-list li.dragging {
@@ -852,7 +1187,7 @@ button.layer-name {
 .side-panels {
   display: flex;
   flex-direction: column;
-  width: 220px;
+  width: 300px;
   min-height: 0;
   border-left: 1px solid var(--border);
 }
