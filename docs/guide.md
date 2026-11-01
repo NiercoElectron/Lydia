@@ -480,7 +480,10 @@ forgotten.
 
 ## Saving and exporting
 
-- **Save** downloads the drawing as a `.lyd` file, with its layers and smart objects, to open it again later. It
+- **Save** (Ctrl+S) keeps the drawing as a `.lyd` file, with its layers and smart objects, to open it again later. In the
+  desktop app it asks for a name once, in `Documents\Lydia\Projects`, and then goes over the same file, with **Save as…** for
+  another; **Export** goes straight to `Documents\Lydia\Exports`, and **Open Lydia folder**, in the File menu, shows them. In a
+  browser it downloads the file. It
   opens as it was shown: with the same zoom, angle and flip. Paint off the paper is saved too; versions of Lydia
   before 0.10 can't open a drawing that has some.
 - **Export PNG** saves the picture at full size, keeping a transparent background transparent.

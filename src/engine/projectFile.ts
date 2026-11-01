@@ -80,6 +80,7 @@ export type ProjectData = {
   symmetry?: Symmetry // see symmetry.ts; off when missing
   rulers?: Rulers // see rulers.ts; none when missing
   fromAutosave?: string // recovered from this copy (see autosave.ts): it isn't in any file yet
+  file?: string // where it is on the computer, in the desktop app
 }
 
 // At most this many colors in each list of the color tray

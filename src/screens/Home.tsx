@@ -1,4 +1,5 @@
 import { deleteAutosaved, listAutosaved, loadAutosaved, type AutosavedDrawing } from '../autosave'
+import { desktop, readFile } from '../desktop'
 import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
 import { FilePlus, FolderOpen, Paintbrush, Settings } from 'lucide-react'
@@ -100,6 +101,23 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
     }
   }
 
+  // In the desktop app the system's window opens in Lydia's own folder
+  async function handleOpen() {
+    if (!desktop) {
+      fileInputRef.current?.click()
+      return
+    }
+    setIsOpening(true)
+    try {
+      const file = await desktop.chooseToOpen()
+      if (file) onOpenProject({ ...parseProject(await readFile(file)), file })
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-105'))
+    } finally {
+      setIsOpening(false)
+    }
+  }
+
   async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = '' // reset the input so choosing the same file again still triggers onChange
@@ -137,7 +155,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
               <FilePlus size={20} aria-hidden />
               {t('New project…')}
             </button>
-            <button onClick={() => fileInputRef.current?.click()} disabled={isOpening}>
+            <button onClick={handleOpen} disabled={isOpening}>
               <FolderOpen size={20} aria-hidden />
               {isOpening ? t('Opening…') : t('Open project')}
             </button>

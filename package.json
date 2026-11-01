@@ -31,6 +31,13 @@
       "package.json",
       "!node_modules/**/*"
     ],
+    "fileAssociations": [
+      {
+        "ext": "lyd",
+        "name": "Lydia project",
+        "role": "Editor"
+      }
+    ],
     "win": {
       "target": "nsis"
     },

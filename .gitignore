@@ -16,6 +16,12 @@ release
 # What the tests of the app write (see tests/app/README.md)
 tests/app/output
 
+# Lydia's own folders, for a copy of this code in Documents\Lydia
+/Projects
+/Exports
+/Brushes
+/Tray
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

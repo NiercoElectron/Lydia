@@ -2672,6 +2672,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     setTrayColors,
     exportImage,
     saveProject,
+    noteNotSaved: () => changed(),
     destroy,
     // The engine's parts, to inspect them from the browser's console while developing (see DrawSpace)
     inspect: () => ({

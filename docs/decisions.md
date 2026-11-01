@@ -2645,6 +2645,11 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     all drawings, and it stays between sessions (my choice).
   - **Not signed** for now (my choice): a certificate is paid every year. Windows warns when installing.
   - **Interface size**, in the settings of the desktop app: 100% to 200%. A browser has its zoom for that, and the window doesn't.
+  - **Saving is real now** (my idea: a folder for what Lydia makes): `Projects` and `Exports` in `Documents\Lydia`, apart so
+    that the `.lyd` files don't mix with the images (my choice). Save asks for a name once, in `Projects`, and then **Ctrl+S** goes
+    over the same file; **Save as…** asks again. Export goes straight to `Exports`, with no window, named after the drawing and
+    the date (my choice). In the browser Ctrl+S saves too, as a download.
+  - A `.lyd` opens with a double click. With a drawing open, Lydia asks first if it has changes.
 - **How:**
   - The window shows the same pages as the browser, built by Vite, at an address of Lydia's own (`app://lydia/`), so that
     fonts and files are found as on a web server, and what the browser keeps stays in one place between versions.
@@ -2652,8 +2657,14 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     comes with Lydia. PixiJS writes code as it runs by default, which that doesn't allow, so `pixi.js/unsafe-eval` does the same
     without it, in the browser too.
   - A page that asks before closing gets no answer in Electron by itself, and the window would just refuse to close, so the
-    window asks.
-- **Checked:** `tests/app/desktop.mjs` opens the built pages in Electron itself and paints; the installer's program was opened too.
+    window asks, with the words of the page, in its language.
+  - A project is written beside its file, with `.saving` in its name, and takes the file's place only when complete, so a full
+    disk can't ruin the last save. If it fails, the drawing counts as not saved. It goes to the app in pieces of 64 MB, as a
+    big drawing is too much to hand over at once.
+  - The page can only reach a file that came from a window of the system or from these folders.
+- **Checked:** `tests/app/desktop.mjs` opens the built pages in Electron itself, paints, saves over the same file, exports, opens
+  the project again from the start screen and from a second Lydia, over a drawing with changes too. The installer's program
+  was opened too. The double click itself, on the installed app, and macOS were not checked by a test.
 
 ## Open questions
 

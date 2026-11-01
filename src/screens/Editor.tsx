@@ -49,6 +49,7 @@ import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
+import { desktop, nameOfFile, writeFile } from '../desktop'
 import { downloadBlob, timestamp } from '../files'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { isTyping } from '../engine/view'
@@ -70,16 +71,23 @@ const REPOSITORY = 'https://github.com/NiercoElectron/Lydia/blob/main'
 const GUIDE_URL = `${REPOSITORY}/docs/guide.md`
 const CHANGES_URL = `${REPOSITORY}/CHANGELOG.md`
 
+const EXPORTED_SHOWN_MS = 6000 // how long the name of an exported image stays on the bar
+
 type Props = {
   project: ProjectData
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   tray: TrayImage[] // see tray.ts
   onTrayChange: (change: (tray: TrayImage[]) => TrayImage[]) => void
+  wantsToLeave: boolean // another project is waiting to open: leave this one, asking first if it has changes
+  onStay: () => void // this drawing stays open after that
   onBack: () => void
 }
 
-export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack }: Props) {
+export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsToLeave, onStay, onBack }: Props) {
   const { t, locale } = useLanguage()
+  const [filePath, setFilePath] = useState(opened.file ?? null) // where it is saved, in the desktop app
+  const [exported, setExported] = useState<string | null>(null) // the image just exported, shown for a moment
+  const drawingName = filePath === null ? null : nameOfFile(filePath)
   // The drawing the engine starts from: the one opened, or the one in RAM when the graphics card was lost
   const [project, setProject] = useState(opened)
   const [engine, setEngine] = useState<Engine | null>(null)
@@ -457,14 +465,35 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
     const extension = type === 'jpeg' ? 'jpg' : 'png' // ".jpg" is the name most programs use for JPEG files
     // An enlarged image says how many times in its name, as "@4x"
     const scale = snapshot.exportScales.includes(snapshot.exportScale) ? snapshot.exportScale : 1
-    const name = `lydia-${timestamp()}${scale > 1 ? `@${scale}x` : ''}.${extension}`
-    runTask('Exporting…', 'LYD-305', async () => downloadBlob(await engine.exportImage(type), name))
+    const name = `${drawingName ?? 'lydia'}-${timestamp()}${scale > 1 ? `@${scale}x` : ''}.${extension}`
+    runTask('Exporting…', 'LYD-305', async () => {
+      const image = await engine.exportImage(type)
+      if (!desktop) {
+        downloadBlob(image, name)
+        return
+      }
+      await writeFile(await desktop.exportPath(name), image)
+      setExported(name)
+    })
   }
 
-  function handleSave() {
-    if (!engine) return
+  // Ctrl+S: in the desktop app, over the drawing's own file, once it has one. "asNew" always asks where
+  function handleSave(asNew = false) {
+    if (!engine || busy !== null) return
     runTask('Saving…', 'LYD-106', async () => {
-      downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+      if (desktop) {
+        const target = (!asNew && filePath) || (await desktop.chooseToSave(drawingName ?? t('Untitled')))
+        if (!target) return
+        try {
+          await writeFile(target, await engine.saveProject())
+        } catch (error) {
+          engine.noteNotSaved()
+          throw error
+        }
+        setFilePath(target)
+      } else {
+        downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+      }
       await autosave.saver.current?.markSaved()
     })
   }
@@ -474,12 +503,40 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
       snapshot.isModified &&
       !window.confirm(t('Discard the changes to this drawing and go back to the start screen?'))
     ) {
+      if (wantsToLeave) onStay()
       return
     }
     // After "Discard", the last copy stays in the Recover list, in case it was a mistake
     if (!snapshot.isModified) void autosave.saver.current?.close()
     onBack()
   }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return
+      e.preventDefault()
+      handleSave(e.shiftKey && desktop !== undefined)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
+  useEffect(() => {
+    if (wantsToLeave) handleBack()
+  })
+
+  useEffect(() => {
+    if (exported === null) return
+    const timer = setTimeout(() => setExported(null), EXPORTED_SHOWN_MS)
+    return () => clearTimeout(timer)
+  }, [exported])
+
+  useEffect(() => {
+    document.title = drawingName === null ? 'Lydia' : `${drawingName}${snapshot.isModified ? ' *' : ''} - Lydia`
+    return () => {
+      document.title = 'Lydia'
+    }
+  }, [drawingName, snapshot.isModified])
 
   const thumbnailOf = useCallback((id: number) => engine?.layerThumbnail(id) ?? null, [engine])
   const cantExport = !engine || busy !== null || snapshot.filter !== null || snapshot.typing !== null
@@ -491,16 +548,28 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
       items: [
         {
           label: t('Save'),
-          onClick: handleSave,
+          keys: 'Ctrl+S',
+          onClick: () => handleSave(),
           disabled: !engine || busy !== null,
           hint:
             autosave.lastTime === null
               ? undefined
               : t('Autosaved at {time}', { time: new Date(autosave.lastTime).toLocaleTimeString(locale) }),
         },
+        ...(desktop
+          ? [
+              {
+                label: t('Save as…'),
+                keys: 'Ctrl+Shift+S',
+                onClick: () => handleSave(true),
+                disabled: !engine || busy !== null,
+              },
+            ]
+          : []),
         null,
         { label: t('Export PNG'), onClick: () => handleExport('png'), disabled: cantExport },
         { label: t('Export JPEG'), onClick: () => handleExport('jpeg'), disabled: cantExport },
+        ...(desktop ? [{ label: t('Open Lydia folder'), onClick: () => void desktop?.openFolder() }] : []),
         null,
         { label: t('Back'), onClick: handleBack },
       ],
@@ -743,6 +812,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
           >
             <Redo2 size={20} aria-hidden />
           </button>
+          {exported && <span className="notice">{t('Exported: {name}', { name: exported })}</span>}
           {autosave.failure && <span className="notice">{autosave.failure}</span>}
           <SettingsMenu />
         </div>

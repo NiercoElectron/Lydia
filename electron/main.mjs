@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog, Menu, net, protocol, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
+import { allowFile, setUpFiles } from './files.mjs'
 
 // The desktop app: a window that shows Lydia. It is the same app as in the browser, built by Vite into "dist", and this
 // file adds what a browser can't do
@@ -27,6 +28,29 @@ const CONTENT_POLICY = [
 protocol.registerSchemesAsPrivileged([
   { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ])
+
+// A project the system asked to open, until the page takes it
+let openedFile = null
+// The words of the question on closing, in the interface's language, from the page
+let closeTexts = {
+  message: 'There are changes that are not saved.',
+  leave: 'Close without saving',
+  stay: 'Cancel',
+}
+
+// On Windows a file opened with Lydia comes as an argument, when it starts and when a second Lydia starts
+const projectIn = args => args.slice(1).find(arg => arg.toLowerCase().endsWith('.lyd')) ?? null
+
+function openProject(file) {
+  allowFile(file)
+  const [window] = BrowserWindow.getAllWindows()
+  if (window) {
+    if (window.isMinimized()) window.restore()
+    window.focus()
+  }
+  if (window && !window.webContents.isLoading()) window.webContents.send('file-opened', file)
+  else openedFile = file
+}
 
 // A file of the built app for each address, and never one outside its folder
 async function serveBuiltApp(request) {
@@ -74,10 +98,10 @@ function createWindow() {
   window.webContents.on('will-prevent-unload', event => {
     const answer = dialog.showMessageBoxSync(window, {
       type: 'warning',
-      buttons: ['Close without saving', 'Cancel'],
+      buttons: [closeTexts.leave, closeTexts.stay],
       defaultId: 1,
       cancelId: 1,
-      message: 'There are changes that are not saved.',
+      message: closeTexts.message,
     })
     if (answer === 0) event.preventDefault()
   })
@@ -88,15 +112,39 @@ function createWindow() {
 // Only one Lydia at a time for now: all windows would share the same autosaves and brushes
 if (!app.requestSingleInstanceLock()) app.quit()
 
-app.on('second-instance', () => {
+app.on('second-instance', (_event, args) => {
+  const file = projectIn(args)
+  if (file) {
+    openProject(file)
+    return
+  }
   const [window] = BrowserWindow.getAllWindows()
   if (!window) return
   if (window.isMinimized()) window.restore()
   window.focus()
 })
 
+// On macOS a file opened with Lydia comes as an event, also before the window exists
+app.on('open-file', (event, file) => {
+  event.preventDefault()
+  openProject(file)
+})
+
+ipcMain.on('close-texts', (_event, texts) => {
+  closeTexts = texts
+})
+
+ipcMain.handle('take-opened-file', () => {
+  const file = openedFile
+  openedFile = null
+  return file
+})
+
 app.whenReady().then(() => {
   protocol.handle(SCHEME, serveBuiltApp)
+  setUpFiles()
+  const started = projectIn(process.argv)
+  if (started) openProject(started)
   // macOS needs the standard menu for its own keys (Cmd+Q, copy, paste in text fields). Lydia has its menus in the window
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
   createWindow()
