@@ -13,10 +13,10 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Tools in a column at the left, like in Photoshop and Krita: brush, eraser, smudge, blur, liquify, fill bucket, eyedropper,
   rectangle select, lasso, magic wand, move, hand, zoom and rotate view
 - A color panel: a ring of hues around a triangle of shades that turns with it, a background color swapped with X, the
-  color's code, H/S/V sliders and the colors painted with lately; and a color tray of colors kept on purpose, for all
+  color's code, H/S/V sliders and the colors painted with lately; and a palette of colors kept on purpose, for all
   drawings or saved with one
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
-- The brush's outline under the pointer, in the shape of its tip and as big as it paints (the Outline button)
+- The brush's outline under the pointer, in the shape of its tip and as big as it paints (View > Brush outline)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
 - Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with every tool
@@ -55,7 +55,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
 - Pixel-perfect strokes: pixel brushes can leave out the doubled corners of lines drawn by hand
 - Straight lines with Shift + click, kept to the angles of pixel art (or every 15°) with Ctrl
-- A pixel grid from 800% zoom, in a color that shows on any pixel (the Grid button, or G)
+- A pixel grid from 800% zoom, in a color that shows on any pixel (View > Grid, or G)
 - Brush Designer (on the start screen): draw the tip of a new brush or change any brush, from a drawing or an image,
   choose its settings, try it, and save it to the brush list or as a file
 - Pixel brushes drawn in the Brush Designer, pixel by pixel, that paint their tip at 1×, 2×, 3×… its size
@@ -66,7 +66,7 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Undo and redo of every change, painting and layers alike (buttons, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y)
 - Clear a layer (it can be undone too)
 - Zoom, move, turn and flip the view (the drawing itself doesn't change), with the zoom and the angle shown in the
-  bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art (the Sharp button)
+  bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art (View > Sharp)
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
 - Autosave in the browser, with a Recover list after a crash, and the drawing reopened by itself when the browser loses
@@ -107,12 +107,12 @@ with common sizes, a resolution (DPI) and a background color or transparency, `.
 interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
 color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
 a mesh for transforming, liquify, autosave and recovery, surviving a lost graphics card, symmetry, rulers, shapes that stay
-editable, filters, and editable text.
+editable, filters, editable text, and a new interface with menus, named tools, brush categories, a blend mode for the brush and
+pictures of the layers.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
       from the computer
 

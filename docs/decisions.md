@@ -243,7 +243,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   follows the pen (decisions 68 and 69). 0.15.0 brought the Distort stage: smudge and blur, a mesh for transforming and
   liquify (decisions 71 to 73), with a Sharp button for the pixels, and 0.15.1 fixed the numbers of new layers (decision
   74). 0.16.0 brought the Safety stage: autosave with a Recover list, and surviving a lost graphics card (decisions 75
-  and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), and 0.18.0 filters and text (decisions 80 and 81). 1.0.0 will be the desktop
+  and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), 0.18.0 filters and text (decisions 80 and 81), and 0.19.0 the new interface (decision 82). 1.0.0 will be the desktop
   app, packaged with
   Electron. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
@@ -2501,7 +2501,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     even the two with no brush yet. A brush added with no category goes to Special, and nothing is hidden until a
     category is pressed.
   - **Layers with a picture and an eye**, and the paper as the row at the bottom.
-  - **A palette always under the color**, which was the color tray floating over the drawing.
+  - **A palette always under the color**, which was the color tray floating over the drawing. Its two lists go side by side, so
+    the brush's settings fit with no scrolling on my screen, 2560×1440 at 150%.
   - **A blend mode for the brush**, her "Modo de Mistura" in the color panel: each stroke mixes with the paint on its layer.
   - **The new one replaces the old one**, with no switch between them: 0.18.0 is there to compare with.
   - **A plainer look, like Photoshop's.** A button that stays on or off is just its name, with a bright line around it when
@@ -2522,12 +2523,14 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - A brush with a blend mode is put on the layer by the layers' own blender (see `blendModes.ts`), with the same maths and modes. The
     stroke's tile is colored first, in a whole tile, as a tile at the paper's edge is smaller. Normal goes the old way, so it
     costs nothing new, and the eraser ignores the mode.
-- **Checked:** `tests/app/thumbnails.mjs`, `tests/app/brushes-panel.mjs` and `tests/app/brush-blend.mjs`, with the other tests
+- **Checked:** `tests/app/thumbnails.mjs`, `tests/app/brushes-panel.mjs`, `tests/app/brush-blend.mjs` and `tests/app/left-panel.mjs`, with the other tests
   moved to the new screen: pictures with paint where the layer has it, through undo, redo and a copy; the paper's eye on the
   screen and in a PNG; the categories, the search, favorites and the brushes used last, kept for the next time; Multiply
   giving 100, 50, 25 for 200, 100, 50 under a gray of 128, the same while painting and after, and Screen, half the
-  opacity, a locked transparency and a tile at the paper's edge. On a paper of 10000×10000, with 1600 tiles of one color each
-  going through a picture, the longest frame took 7 ms. A layer full of detail wasn't measured.
+  opacity, a locked transparency and a tile at the paper's edge. Measured on a paper of 10000×10000 with my RTX 4060 Ti, where a
+  frame takes 7 ms: 1600 compressed tiles full of detail reach their picture in 0.8 to 2.4 s, with 99% of the frames at 7.3 ms
+  or less. A stroke of size 500 over paint, on one layer, takes 0.6 ms of a frame with Multiply or Overlay and 0.5 ms with Normal,
+  and no frame goes past 8 ms with any of them.
 
 ## Open questions
 
