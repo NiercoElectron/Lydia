@@ -227,6 +227,15 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
     return keys
   }
 
+  // A tile's copy on the graphics card shows what isn't in RAM (a filter's preview): let it go. RAM is what is true
+  function dropTile(layer: Layer, key: string) {
+    const cached = getCached(layer, key)
+    if (!cached) return
+    cached.texture.destroy(true)
+    cache.delete(`${layer.id}/${key}`)
+    pinned.delete(cached)
+  }
+
   // A layer that is gone for good (deleted, and its undo step forgotten): free its copies on the graphics card
   function dropLayer(layer: Layer) {
     for (const [id, cached] of cache) {
@@ -396,6 +405,7 @@ export function createGpuTiles(renderer: WebGLRenderer, memory: TileMemory, cach
     unpinAll,
     trim,
     tilesWithPaint,
+    dropTile,
     dropLayer,
     finishReads,
     startSaving,

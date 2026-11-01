@@ -7,6 +7,12 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Filters** ([decision 80](docs/decisions.md#80-filters)): **Hue and saturation**, **Levels** and **Gaussian blur**, in the
+  **Filters** list, on the active layer or what is selected in it. They show live on the drawing, and **Apply** keeps them
+  as one step of undo.
+
 ## [0.17.0] - 2026-10-31
 
 ### Added

@@ -4,6 +4,7 @@ import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
+import { MAX_BLUR_RADIUS, MAX_MIDDLE, MIN_MIDDLE, type FilterChange, type FilterSettings } from '../engine/filters'
 import type { RulerKind, Rulers } from '../engine/rulers'
 import {
   canFill,
@@ -89,6 +90,14 @@ export type ShapeControls = {
   onTakeBrush: () => void
 }
 
+// The filter whose controls are open (see filters.ts), which takes the bar's place
+export type FilterControls = {
+  filter: FilterSettings | null
+  onChange: (change: FilterChange) => void
+  onApply: () => void
+  onCancel: () => void
+}
+
 type Props = {
   tool: Tool
   size: number
@@ -102,6 +111,7 @@ type Props = {
   symmetry: SymmetryControls
   rulers: RulerControls
   shape: ShapeControls
+  filter: FilterControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
   isGridOn: boolean
@@ -142,6 +152,7 @@ export function Toolbar({
   symmetry,
   rulers,
   shape,
+  filter,
   stabilizer,
   taper,
   isGridOn,
@@ -172,6 +183,13 @@ export function Toolbar({
       <div className="toolbar">
         <TransformButtons controls={transform} {...transform.transform} />
         <GridButton isOn={isGridOn} onToggle={onGridToggle} />
+      </div>
+    )
+  }
+  if (filter.filter) {
+    return (
+      <div className="toolbar">
+        <FilterSliders controls={filter} settings={filter.filter} />
       </div>
     )
   }
@@ -332,6 +350,59 @@ function SymmetryButtons({ controls }: { controls: SymmetryControls }) {
           </button>
         </>
       )}
+    </>
+  )
+}
+
+// The controls of the filter that is open. What they do shows on the drawing as they move
+function FilterSliders({ controls, settings }: { controls: FilterControls; settings: FilterSettings }) {
+  const { t } = useLanguage()
+  const { onChange, onApply, onCancel } = controls
+  const slider = (label: string, name: string, value: number, min: number, max: number, unit = '', scale = 1) => (
+    <label>
+      {label}
+      <input
+        type="range"
+        min={min * scale}
+        max={max * scale}
+        value={Math.round(value * scale)}
+        onChange={e => onChange({ [name]: Number(e.target.value) / scale })}
+      />
+      <SliderValue
+        value={value}
+        min={min}
+        max={max}
+        step={1 / scale}
+        unit={unit}
+        onChange={typed => onChange({ [name]: typed })}
+      />
+    </label>
+  )
+  return (
+    <>
+      {settings.kind === 'hue' && (
+        <>
+          {slider(t('Hue'), 'hue', settings.hue, -180, 180, '°')}
+          {slider(t('Saturation'), 'saturation', settings.saturation, -100, 100, '%')}
+          {slider(t('Lightness'), 'lightness', settings.lightness, -100, 100, '%')}
+        </>
+      )}
+      {settings.kind === 'levels' && (
+        <>
+          {slider(t('Black'), 'black', settings.black, 0, Math.max(0, settings.white - 1))}
+          {slider(t('Middle'), 'middle', settings.middle, MIN_MIDDLE, MAX_MIDDLE, '', 100)}
+          {slider(t('White'), 'white', settings.white, Math.min(255, settings.black + 1), 255)}
+          {slider(t('Output black'), 'outputBlack', settings.outputBlack, 0, 255)}
+          {slider(t('Output white'), 'outputWhite', settings.outputWhite, 0, 255)}
+        </>
+      )}
+      {settings.kind === 'blur' && slider(t('Radius'), 'radius', settings.radius, 1, MAX_BLUR_RADIUS, ' px')}
+      <button onClick={onApply} title={t('Keep it (Enter)')}>
+        {t('Apply')}
+      </button>
+      <button onClick={onCancel} title={t('Leave the layer as it was (Esc)')}>
+        {t('Cancel')}
+      </button>
     </>
   )
 }

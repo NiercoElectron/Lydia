@@ -37,30 +37,34 @@ export function createTileWriter(
 
   // What a worked out tile gives the layer's tile: only the paint of the layer's tile when its transparency is locked,
   // and only what is selected. "before" is the tile as it was, for those two cases
+  function compose(layer: Layer, key: string, work: Texture, before: Texture | undefined, target: RenderTexture) {
+    if (!before) {
+      draw(work, target)
+      return
+    }
+    kept ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    if (layer.alphaLocked) {
+      draw(before, kept)
+      draw(work, kept, 0, 0, LOCKED_ALPHA)
+    } else {
+      draw(work, kept)
+    }
+    if (selection.isCut(key)) {
+      selection.cut(kept, key)
+      draw(before, target)
+      selection.cutAway(target, key)
+      draw(kept, target, 0, 0, 'add')
+    } else {
+      draw(kept, target)
+    }
+  }
+
+  // Put a worked out tile on the layer, as part of the change being recorded
   function publish(layer: Layer, key: string, work: Texture, before?: Texture) {
     if (!selection.canPaint(key)) return
     const { column, row } = parseTileKey(key)
     history.backUpTile(key) // before the tile changes: the graphics card works in order
-    const target = gpu.getTexture(layer, column, row, true)!
-    if (!before) {
-      draw(work, target)
-    } else {
-      kept ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
-      if (layer.alphaLocked) {
-        draw(before, kept)
-        draw(work, kept, 0, 0, LOCKED_ALPHA)
-      } else {
-        draw(work, kept)
-      }
-      if (selection.isCut(key)) {
-        selection.cut(kept, key)
-        draw(before, target)
-        selection.cutAway(target, key)
-        draw(kept, target, 0, 0, 'add')
-      } else {
-        draw(kept, target)
-      }
-    }
+    compose(layer, key, work, before, gpu.getTexture(layer, column, row, true)!)
     gpu.markDirty(layer, key)
     projection.composeTile(column, row)
   }
@@ -70,7 +74,7 @@ export function createTileWriter(
     kept?.destroy(true)
   }
 
-  return { clear, draw, publish, destroy }
+  return { clear, draw, compose, publish, destroy }
 }
 
 export type TileWriter = ReturnType<typeof createTileWriter>

@@ -40,6 +40,7 @@ import { movedKeys, movedTile, shiftSelection } from './move'
 import { createOutsideView } from './outsideView'
 import { createLiquify } from './liquify'
 import { newRuler, noRulers, type Ruler, type RulerKind, type Rulers } from './rulers'
+import { createFilters, type FilterChange, type FilterKind, type FilterSettings } from './filters'
 import { createShapePainter } from './shapePainter'
 import {
   canFill,
@@ -152,6 +153,8 @@ export type EngineSnapshot = {
   shapeStyle: ShapeStyle // of the active layer's shape, or of the next one drawn
   isShapeLayer: boolean
   isEditingShape: boolean // the bar changes the active layer's shape, not the next one
+  filter: FilterSettings | null // the filter whose controls are open (see filters.ts)
+  canFilter: boolean // a filter can be used on the active layer
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
 }
 
@@ -370,6 +373,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
   let brushPreset: BrushPreset = startBrush
   const shapePainter = createShapePainter(renderer, grid)
+  const filters = createFilters(renderer, grid, gpu, projection, history, selectionView)
   const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, {
@@ -388,7 +392,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     onMoveStart: () => startMove(),
     onMove: (dx, dy) => dragMove(dx, dy),
     onMoveEnd: keep => releaseMove(keep),
-    isWorking: () => task !== null,
+    isWorking: () => task !== null || filters.isOpen(),
     // A smart object (see smartObject.ts) or a folder can't be painted on, and the eraser can't take paint out of a layer
     // whose transparency is locked
     canUse: tool =>
@@ -426,7 +430,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
   // Painting, filling, undoing, transforming and changing the layers wait for each other
-  const isBusy = () => view.isPainting() || task !== null || transform !== null
+  const isBusy = () => view.isPainting() || task !== null || transform !== null || filters.isOpen()
 
   // ----- Telling React about changes -----
 
@@ -523,6 +527,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       shapeStyle: styleOf(shownShape() ?? newShapeStyle),
       isShapeLayer: stack.active.shape !== undefined,
       isEditingShape: isEditingShape(),
+      filter: filters.settings(),
+      canFilter: canFilter(),
       trayColors,
     }
   }
@@ -548,6 +554,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   function backgroundWork() {
     const isPainting = view.isPainting()
     projection.composeWaiting(isPainting ? 2 : 5)
+    if (filters.isOpen()) {
+      const { left, top, right, bottom } = view.paperOnScreen()
+      filters.showPreview(left, top, right, bottom, view.getState().zoom)
+    }
     // A move or a transform stops showing once the tiles it changed are put together, in the same frame (see endLift)
     if (isMoveEnding && !projection.isUpdating()) {
       projection.endMove()
@@ -2086,6 +2096,44 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     changed()
   }
 
+  // ----- Filters -----
+
+  // A filter works on the pixels of a layer that shows: a smart object or a shape is turned into a normal layer first
+  function canFilter() {
+    const active = stack.active
+    return !isFolder(active) && !active.smart && !active.shape && isShown(active)
+  }
+
+  // Open a filter's controls (see filters.ts)
+  function startFilter(kind: FilterKind) {
+    if (isBusy() || !canFilter()) return
+    const layer = stack.active
+    return runTask('Filtering…', async () => {
+      filters.open(layer, kind)
+      return false
+    })
+  }
+
+  function setFilter(change: FilterChange) {
+    filters.change(change)
+    changed(false)
+  }
+
+  function applyFilter() {
+    const work = filters.finish()
+    if (!work) return
+    return runTask('Filtering…', async () => {
+      await work(createPacer(), setProgress)
+      return true
+    })
+  }
+
+  function cancelFilter() {
+    if (!filters.isOpen()) return
+    filters.cancel()
+    changed(false)
+  }
+
   // ----- Shapes -----
 
   // A shape always shows something: a line has only its outline, and a shape with neither keeps its fill
@@ -2289,6 +2337,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     addRuler,
     removeRuler,
     setEditingRulers,
+    startFilter,
+    setFilter,
+    applyFilter,
+    cancelFilter,
     setEditingShape,
     setShapeStyle,
     commitShapeStyle,

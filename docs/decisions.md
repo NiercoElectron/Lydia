@@ -2388,6 +2388,45 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   a transform and a mesh keeping the outline 20 pixels wide; the move tool; a line's ends; painting blocked, Convert to
   pixels, and undo of it; a copy; the file, opened again and changed, with its brush out of the file; the autosave.
 
+## 80. Filters
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** changing the colors of a finished layer, or softening it, meant painting it again. The roadmap asked for hue
+  and saturation, levels and a blur.
+- **Decision:** my choices:
+  - **Applied to the layer, with a live preview**, as one step of undo, respecting the selection and a locked transparency.
+    I chose that over adjustment layers, which can always change but go into the sum of all the layers, and would weigh on
+    10000×10000 with 20 of them.
+  - Smart objects and shapes are turned into pixels first, so a filter never has to say what happens to their originals.
+  - It goes in the 0.18.0 with text, filters first since they are smaller.
+- **How:**
+  - While the controls are open, the layer's tiles in RAM stay as they were, and only the tiles on the screen are worked
+    out. They go in the layer's place on the graphics card without being marked as painted. So saving, undo and the
+    autosave still see the layer as it was, and Esc only lets them go.
+  - All the tiles on the screen are worked out and shown in the same frame. It took me two tries to accept it: a few tiles
+    every frame left tiles of different colors side by side on a big drawing, like chunks loading in Minecraft, and
+    showing them together once they were all ready lagged behind the slider, which got in the way of being precise.
+    Putting 1600 tiles together takes my graphics card 30 ms, so the lag was only the limit per frame, which is gone.
+  - The preview of a blur blurs all that is on the screen once, no finer than the screen shows it, and the tiles take their
+    part of that, since blurring each tile with the ones around it was four times too slow to follow a slider. Apply
+    still works out each tile exactly, and the test finds them the same.
+  - Apply works out all the tiles from the same originals, so what is off the screen is never left out.
+  - Colors are worked out on the color itself, not multiplied by the alpha, and the alpha is kept to the pixel.
+  - Hue, saturation and lightness are HSL, as in Photoshop's dialog.
+  - **Levels** has no histogram: black, middle and white, and the two output levels, on all the channels together.
+  - **The blur** is a true Gaussian, with its radius as the standard deviation. Past a small radius it is worked out on the
+    tiles made smaller by a power of 2, each half of the last, so every pixel counts and a radius of 250 costs about the
+    same as one of 8. The power of 2 keeps the tiles' pixels lined up, so no seam shows between them.
+  - A blur mixes in nothing from outside the paper, or a layer that covers the paper would fade at its edge. So it stays on
+    the paper, and paint off the paper isn't blurred.
+- **Checked:** `tests/app/filters.mjs`: exact colors for the hue, saturation, lightness and each level; the alpha unchanged;
+  half covered pixels not darkened; a blur against the Gaussian's formula, from 161 measured for 160.8 at a radius of 1.5
+  to 128 for 128.3 at 60; no seam at any radius; the paper's edge; a selection and a locked transparency; Esc, Enter, undo
+  and redo; a drawing saved during the preview; tiles off the screen. On a paper of 10000×10000 with its 1600 tiles painted,
+  in the test browser on my graphics card, Apply and reading the tiles back took 2.6 to 3.2 seconds, and a slider moving
+  fast showed 15 new pictures a second with the hue, and 11 to 13 with a blur, none with tiles of different values.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

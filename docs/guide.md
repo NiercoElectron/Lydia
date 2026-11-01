@@ -12,6 +12,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Symmetry](#symmetry)
 - [Rulers](#rulers)
 - [Shapes](#shapes)
+- [Filters](#filters)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
 - [Selections](#selections)
@@ -248,6 +249,23 @@ Press it again to draw new ones: dragging on the drawing does nothing while it i
 - It is a layer like any other: opacity, blend modes, folders and clipping all work.
 - It can't be painted on: **Convert to pixels** makes it a normal layer, which can't be edited as a shape any more.
 - A drawing keeps its shapes' brushes in its file, so they open the same on any computer.
+
+## Filters
+
+The **Filters** list, next to Clear layer, changes the active layer, or what is selected in it. The bar shows its sliders, and
+the drawing shows what they do as they move. **Apply** (Enter) keeps it, as one step of undo, and **Cancel** (Esc) leaves the
+layer as it was.
+
+- **Hue and saturation**: **Hue** turns the colors around the color wheel, **Saturation** takes them toward gray or makes them
+  stronger, and **Lightness** takes them toward black or white.
+- **Levels**: what is at **Black** or below becomes black, what is at **White** or above becomes white, and **Middle** lightens
+  or darkens what is between them. **Output black** and **Output white** say how dark and how light the result can be.
+- **Gaussian blur**: softens the layer, as far as **Radius** says. It stays on the paper: paint off the paper isn't blurred.
+
+The transparency of half covered paint stays as it was with the first two. With its transparency locked, a blur only mixes the
+colors inside the paint.
+
+Filters work on pixels: a smart object or a shape needs **Convert to pixels** first, and a folder can't be filtered.
 
 ## Eyedropper
 

@@ -1,4 +1,5 @@
 import { projectOf } from '../autosave'
+import type { FilterKind } from '../engine/filters'
 import { errorMessage, LydiaError, type ErrorCode } from '../errors'
 import { useLanguage } from '../i18n'
 import { useCallback, useEffect, useState } from 'react'
@@ -469,6 +470,12 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             onCenter: () => engine?.centerSymmetry(),
             onMovingChange: on => engine?.setMovingSymmetry(on),
           }}
+          filter={{
+            filter: snapshot.filter,
+            onChange: change => engine?.setFilter(change),
+            onApply: () => engine?.applyFilter(),
+            onCancel: () => engine?.cancelFilter(),
+          }}
           shape={{
             style: snapshot.shapeStyle,
             isEditing: snapshot.isEditingShape,
@@ -522,11 +529,28 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
           <button onClick={() => engine?.clearLayer()} disabled={!engine}>
             {t('Clear layer')}
           </button>
+          <select
+            className="filter-menu"
+            aria-label={t('Filters')}
+            value=""
+            disabled={!snapshot.canFilter || snapshot.filter !== null}
+            title={t(
+              'Change the colors of the active layer or blur it. A smart object or a shape is turned into pixels first',
+            )}
+            onChange={e => engine?.startFilter(e.target.value as FilterKind)}
+          >
+            <option value="" disabled>
+              {t('Filters')}
+            </option>
+            <option value="hue">{t('Hue and saturation')}</option>
+            <option value="levels">{t('Levels')}</option>
+            <option value="blur">{t('Gaussian blur')}</option>
+          </select>
           <ViewControls engine={engine} />
-          <button onClick={() => handleExport('png')} disabled={!engine || busy !== null}>
+          <button onClick={() => handleExport('png')} disabled={!engine || busy !== null || snapshot.filter !== null}>
             {t('Export PNG')}
           </button>
-          <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null}>
+          <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null || snapshot.filter !== null}>
             {t('Export JPEG')}
           </button>
           <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>

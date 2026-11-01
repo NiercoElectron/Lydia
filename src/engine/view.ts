@@ -1064,6 +1064,19 @@ export function createView(
     getSaved,
     showSaved,
     paperAtWindow,
+    // The part of the paper on the screen, as the rectangle around it (it can be turned)
+    paperOnScreen: () => {
+      const { width, height } = app.screen
+      const corners = [
+        paperAt({ x: 0, y: 0 }),
+        paperAt({ x: width, y: 0 }),
+        paperAt({ x: 0, y: height }),
+        paperAt({ x: width, y: height }),
+      ]
+      const xs = corners.map(corner => corner.x)
+      const ys = corners.map(corner => corner.y)
+      return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) }
+    },
     // The point of the paper in the middle of the screen, and how many of its pixels the screen is across
     paperInView: () => ({
       middle: paperAt(middle()),

@@ -44,6 +44,8 @@ const startingSnapshot: EngineSnapshot = {
   shapeStyle: DEFAULT_SHAPE_STYLE,
   isShapeLayer: false,
   isEditingShape: false,
+  filter: null,
+  canFilter: false,
   isUpdating: false,
   task: null,
   progress: null,
@@ -238,7 +240,8 @@ export function useSelectionShortcuts(engine: Engine | null) {
   }, [engine])
 }
 
-// Transforms, as in Photoshop: Ctrl/Cmd + T starts one, Enter applies it, and Escape leaves everything as it was.
+// Transforms, as in Photoshop: Ctrl/Cmd + T starts one, Enter applies it, and Escape leaves everything as it was. The
+// same two keys apply and cancel a filter.
 // Browsers keep Ctrl+T for a new tab, so there the bar's Transform button starts one (the desktop app will have the
 // key)
 export function useTransformShortcuts(engine: Engine | null) {
@@ -252,8 +255,12 @@ export function useTransformShortcuts(engine: Engine | null) {
       } else if (e.key === 'Enter' && engine.getSnapshot().transform) {
         e.preventDefault() // a focused button would be pressed too
         engine.applyTransform()
+      } else if (e.key === 'Enter' && engine.getSnapshot().filter) {
+        e.preventDefault()
+        engine.applyFilter()
       } else if (e.key === 'Escape') {
         engine.cancelTransform()
+        engine.cancelFilter()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
