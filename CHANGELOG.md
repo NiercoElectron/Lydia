@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-31
+
 ### Added
 
 - **Filters** ([decision 80](docs/decisions.md#80-filters)): **Hue and saturation**, **Levels** and **Gaussian blur**, in the
@@ -546,7 +548,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/NiercoElectron/Lydia/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/NiercoElectron/Lydia/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/NiercoElectron/Lydia/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/NiercoElectron/Lydia/compare/v0.15.0...v0.15.1
