@@ -604,4 +604,18 @@ export const ptBR: Record<string, string> = {
   'Hue and saturation': 'Matiz e saturação',
   Levels: 'Níveis',
   'Gaussian blur': 'Desfoque gaussiano',
+  'its own way of painting': 'seu modo próprio de pintar',
+  'the colors of its tip': 'as cores da ponta',
+  'the other pictures of its tip': 'as outras imagens da ponta',
+  'its tip (it is not in the file)': 'a ponta (não está no arquivo)',
+  'its own pressure curves': 'suas curvas próprias de pressão',
+  'what changes it besides pressure': 'o que o altera além da pressão',
+  'its second tip': 'a segunda ponta',
+  'its texture': 'a textura',
+  'its way of mixing or effects': 'seu modo de mistura ou efeitos',
+  'Brushes added': 'Pincéis adicionados',
+  '{count} brushes added.': '{count} pincéis adicionados.',
+  'These may paint differently from their original. Left out:':
+    'Estes pincéis podem pintar de forma diferente dos originais. Não foram incluídos:',
+  'Not added:': 'Não adicionados:',
 }

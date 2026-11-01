@@ -607,4 +607,18 @@ export const es: Record<string, string> = {
   'Hue and saturation': 'Tono y saturación',
   Levels: 'Niveles',
   'Gaussian blur': 'Desenfoque gaussiano',
+  'its own way of painting': 'su forma propia de pintar',
+  'the colors of its tip': 'los colores de la punta',
+  'the other pictures of its tip': 'las otras imágenes de la punta',
+  'its tip (it is not in the file)': 'la punta (no está en el archivo)',
+  'its own pressure curves': 'sus curvas propias de presión',
+  'what changes it besides pressure': 'lo que lo modifica además de la presión',
+  'its second tip': 'la segunda punta',
+  'its texture': 'la textura',
+  'its way of mixing or effects': 'su forma de mezclar o sus efectos',
+  'Brushes added': 'Pinceles añadidos',
+  '{count} brushes added.': '{count} pinceles añadidos.',
+  'These may paint differently from their original. Left out:':
+    'Estos pinceles pueden pintar de forma diferente a los originales. No se incluyeron:',
+  'Not added:': 'No se añadieron:',
 }

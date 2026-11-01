@@ -1,5 +1,21 @@
 # Histórico de alterações
 
+## [0.20.0] - 2026-11-01
+
+### Added
+
+- **Pincéis de outros aplicativos** ([decisão 85](docs/decisions.md#85-brushes-from-other-apps)): **Importar…** também abre `.kpp` e `.bundle` do Krita, `.gbr` e `.gih` do GIMP e `.abr` do Photoshop. Cada um vira um pincel do Lydia, com sua ponta, espaçamento, ângulo, dispersão, o que varia com a pressão e a textura do Krita como textura do papel. Uma janela lista o que não foi incluído de cada pincel.
+- **Espaçamento**, em **Avançado**, aproxima ou afasta as cópias da ponta de qualquer pincel enquanto o desenho estiver aberto, sem alterar o pincel.
+
+### Changed
+
+- O contorno do pincel agora é uma linha fina cuja cor depende do que está por baixo, em vez de um contorno grosso branco e preto ([decisão 86](docs/decisions.md#86-a-thin-outline-that-takes-its-color-from-the-drawing)).
+
+### Fixed
+
+- Uma ponta de pincel formada por pequenas marcas agora mostra um contorno ao redor da área onde pinta, em vez de quase nenhum contorno.
+- Um nome de pincel longo não desloca mais a lista de pincéis para os lados: fica cortado e aparece inteiro ao passar o ponteiro.
+
 ## [0.19.2] - 2026-11-01
 
 ### Changed
