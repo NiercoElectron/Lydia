@@ -109,10 +109,13 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] Pen tilt: the brush follows how the pen leans, like a pencil
 - [ ] Interface: a new look and layout for the screens, made from a friend's design and compared with the one now
 - [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
       from the computer
+
+Later, once there is a pen with tilt to try it on:
+
+- [ ] Pen tilt: the brush follows how the pen leans, like a pencil
 
 ## Getting started
 
