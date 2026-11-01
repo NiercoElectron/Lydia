@@ -34,6 +34,7 @@ import { ALL_TOOLS } from '../components/toolList'
 import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
 import type { Engine, ImageType } from '../engine/engine'
+import type { BlendMode } from '../engine/layers'
 import { Redo2, Undo2 } from 'lucide-react'
 import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
@@ -79,9 +80,9 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   const [background, setBackground] = useState('#ffffff') // the color kept behind the brush's, swapped by X
   const [recentColors, setRecentColors] = useState(loadRecentColors)
   const [trayColors, setTrayColors] = useState(loadTrayColors) // the color tray's, for all drawings
-  const [isColorTrayOpen, setIsColorTrayOpen] = useState(false)
   const [brushSize, setBrushSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
+  const [brushBlend, setBrushBlend] = useState<BlendMode>('normal')
   // Smudge's, blur's and liquify's own size and strength (in percent)
   const [mixSettings, setMixSettings] = useState<Record<StrengthTool, { size: number; strength: number }>>({
     smudge: { size: 40, strength: 50 },
@@ -138,8 +139,8 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   }, [engine, tool])
 
   useEffect(() => {
-    engine?.setBrush({ color, size, opacity: opacity / 100 })
-  }, [engine, color, size, opacity])
+    engine?.setBrush({ color, size, opacity: opacity / 100, blendMode: brushBlend })
+  }, [engine, color, size, opacity, brushBlend])
 
   const strength = mixTool ? mixSettings[mixTool].strength : 0
   useEffect(() => {
@@ -584,7 +585,6 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
         { label: t('Layers'), onClick: () => togglePanel('layers'), isOn: panels.layers },
         null,
         { label: t('Tray'), onClick: () => setIsTrayOpen(open => !open), isOn: isTrayOpen },
-        { label: t('Color tray'), onClick: () => setIsColorTrayOpen(open => !open), isOn: isColorTrayOpen },
       ],
     },
     {
@@ -601,6 +601,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
       tool={tool}
       size={size}
       opacity={opacity}
+      brushBlend={brushBlend}
       strength={strength}
       liquifyMode={liquifyMode}
       fill={fill}
@@ -674,6 +675,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
       isPixelPerfectOn={isPixelPerfectOn}
       onSizeChange={setSize}
       onOpacityChange={setOpacity}
+      onBrushBlendChange={setBrushBlend}
       onStrengthChange={value =>
         mixTool && setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
       }
@@ -734,10 +736,16 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
                       color={color}
                       background={background}
                       recent={recentColors}
-                      isTrayOpen={isColorTrayOpen}
                       onColorChange={setColor}
                       onSwap={swapColors}
-                      onTrayToggle={() => setIsColorTrayOpen(open => !open)}
+                    />
+                    <ColorTray
+                      color={color}
+                      general={trayColors}
+                      drawing={snapshot.trayColors}
+                      onPick={setColor}
+                      onGeneralChange={setTrayColors}
+                      onDrawingChange={colors => engine?.setTrayColors(colors)}
                     />
                     {toolOptions}
                   </div>
@@ -749,16 +757,6 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
                 {snapshot.typing && <TextBox engine={engine} typing={snapshot.typing} />}
               </DrawSpace>
               {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
-              {isColorTrayOpen && (
-                <ColorTray
-                  color={color}
-                  general={trayColors}
-                  drawing={snapshot.trayColors}
-                  onPick={setColor}
-                  onGeneralChange={setTrayColors}
-                  onDrawingChange={colors => engine?.setTrayColors(colors)}
-                />
-              )}
             </div>
           </div>
           <footer className="draw-footer">

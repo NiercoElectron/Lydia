@@ -1406,29 +1406,13 @@ button.layer-name {
   border-radius: 2px;
 }
 
-.color-tray-button {
-  display: flex;
-  flex-shrink: 0;
-  padding: 3px 4px;
-}
-
-/* The color tray (see ColorTray.tsx), floating over the drawing next to the color panel */
+/* The palette (see ColorTray.tsx), under the color panel */
 .color-tray {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 220px;
-  max-height: calc(100% - 16px);
+  gap: 6px;
   padding: 8px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  box-shadow: 0 4px 16px var(--shadow);
-  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
 }
 
 .color-tray h2 {

@@ -25,6 +25,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Shapes: rectangles, ellipses, lines, polygons and stars that stay editable, outlined with a brush's own tip or filled
 - Filters: hue and saturation, levels and a Gaussian blur, with a live preview
 - Text typed on the drawing that stays editable and sharp at any size, with nine open fonts and the computer's own
+- A blend mode for the brush, each stroke mixing with the paint on its layer
+- Brushes found by name, favorites, recent ones and categories
+- Layers with a small picture of their paint
 - Liquify: push, bloat, pucker and twirl the picture with the pen, and brush it back to the very pixels it had, with
   no loss of sharpness however many strokes
 - Smudge and blur: drag or soften the paint on the active layer through the brush's tip, more or less as the pen

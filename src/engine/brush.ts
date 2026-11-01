@@ -17,9 +17,9 @@ import {
 import type { GpuTiles } from './gpuTiles'
 import { createGrainPass, grainOf, type GrainSettings } from './grain'
 import type { History } from './history'
-import type { LayerStack } from './layers'
+import type { BlendMode, LayerStack } from './layers'
 import { noiseReach } from './noiseDabs'
-import { strokeBlend, type Projection, type ShownStroke } from './projection'
+import { mixesWithLayer, strokeBlend, type Projection, type ShownStroke } from './projection'
 import type { Point } from './selection'
 import { symmetricDabs, type Symmetry } from './symmetry'
 import { parseTileKey, TILE_SIZE, tileKey, tilesInRect, tileSize, type Grid } from './tiles'
@@ -30,6 +30,7 @@ export type BrushSettings = {
   color: string
   size: number // the tip's longer side, in pixels of the paper, at full pressure
   opacity: number // how much the whole stroke covers, from 0 to 1
+  blendMode: BlendMode // how a stroke mixes with the paint on the layer
   taper: TaperSettings // how the stroke's ends thin out (see dabs.ts)
   pixelPerfect: boolean // whether a pixel brush leaves out the doubled corners of its lines (see dabs.ts)
 }
@@ -63,6 +64,7 @@ export function createBrush(
     color: '#000000',
     size: 20,
     opacity: 1,
+    blendMode: 'normal',
     taper: NO_TAPER,
     pixelPerfect: false,
   }
@@ -168,8 +170,13 @@ export function createBrush(
       // anything to color, and they mustn't leave an empty tile there
       if (!(shown.erase || shown.alphaLocked) || gpu.getTexture(layer, column, row, false)) {
         history.backUpTile(key)
-        mergeSprite.texture = strokeTexture
-        renderer.render({ container: mergeRoot, target: gpu.getTexture(layer, column, row, true)!, clear: false })
+        const target = gpu.getTexture(layer, column, row, true)!
+        if (mixesWithLayer(shown)) {
+          projection.mixStrokeInto(target, strokeTexture, shown)
+        } else {
+          mergeSprite.texture = strokeTexture
+          renderer.render({ container: mergeRoot, target, clear: false })
+        }
         gpu.markDirty(layer, key)
       }
       recycle(strokeTexture)
@@ -356,9 +363,9 @@ export function createBrush(
   // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1
   function startStroke(x: number, y: number, pressure: number) {
     history.begin(stack.active)
-    const { color, opacity } = settings
+    const { color, opacity, blendMode } = settings
     const erase = settings.tool === 'eraser'
-    stroke = { tiles: strokeTiles, color, opacity, erase, alphaLocked: stack.active.alphaLocked }
+    stroke = { tiles: strokeTiles, color, opacity, blendMode, erase, alphaLocked: stack.active.alphaLocked }
     projection.showStroke(stroke)
     strokeStart = {
       size: settings.size,

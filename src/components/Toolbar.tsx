@@ -31,7 +31,9 @@ import {
   type TransformMode,
 } from '../engine/tools'
 import { WARP_SIDES } from '../engine/warp'
+import type { BlendMode } from '../engine/layers'
 import { AdvancedMenu } from './AdvancedMenu'
+import { BLEND_MODE_GROUPS } from './blendModeList'
 import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
@@ -118,6 +120,7 @@ type Props = {
   tool: Tool
   size: number
   opacity: number // in percent
+  brushBlend: BlendMode
   strength: number // of smudge, blur or liquify, in percent
   liquifyMode: LiquifyMode
   fill: FillSettings
@@ -137,6 +140,7 @@ type Props = {
   isPixelPerfectOn: boolean
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
+  onBrushBlendChange: (mode: BlendMode) => void
   onStrengthChange: (strength: number) => void
   onLiquifyModeChange: (mode: LiquifyMode) => void
   onFillChange: (change: Partial<FillSettings>) => void
@@ -154,6 +158,7 @@ export function Toolbar({
   tool,
   size,
   opacity,
+  brushBlend,
   strength,
   liquifyMode,
   fill,
@@ -173,6 +178,7 @@ export function Toolbar({
   isPixelPerfectOn,
   onSizeChange,
   onOpacityChange,
+  onBrushBlendChange,
   onStrengthChange,
   onLiquifyModeChange,
   onFillChange,
@@ -274,6 +280,22 @@ export function Toolbar({
             onChange={e => onOpacityChange(Number(e.target.value))}
           />
           <SliderValue value={opacity} min={1} max={100} unit="%" onChange={onOpacityChange} />
+        </label>
+      )}
+      {tool === 'brush' && (
+        <label title={t('How a stroke mixes with the paint already on the layer')}>
+          {t('Brush blend')}
+          <select value={brushBlend} onChange={e => onBrushBlendChange(e.target.value as BlendMode)}>
+            {BLEND_MODE_GROUPS.map(({ label, modes }) => (
+              <optgroup key={label} label={t(label)}>
+                {modes.map(([mode, name]) => (
+                  <option key={mode} value={mode}>
+                    {t(name, {}, 'blend')}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </label>
       )}
       {usesTip(tool) && (

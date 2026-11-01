@@ -80,14 +80,7 @@ const add = async index => {
 }
 
 // ----- The button -----
-check('closed at first', (await page.$('.color-tray')) === null)
-await page.click('.color-tray-button')
-await sleep(50)
-check(
-  'its button opens it',
-  (await page.$('.color-tray')) !== null &&
-    (await page.$eval('.color-tray-button', b => b.getAttribute('aria-pressed'))) === 'true',
-)
+check('the palette is under the color panel', (await page.$('.color-side .color-panel + .color-tray')) !== null)
 
 // ----- Keeping colors, picking them, taking them out -----
 await typeHex('#e63946')
@@ -137,7 +130,6 @@ await sleep(300)
 await page.evaluate(() => delete window.lydia)
 await page.reload({ waitUntil: 'networkidle0' })
 await newDrawing()
-await page.click('.color-tray-button')
 await sleep(50)
 check(
   'a new drawing: the list for all drawings is kept, its own is empty',
@@ -152,9 +144,7 @@ await chooser.accept([OUT + '/color-tray.lyd'])
 await page.waitForFunction(() => window.lydia?.engine && document.querySelectorAll('button.brush').length > 0, {
   timeout: 60000,
 })
-await sleep(300)
-await page.click('.color-tray-button')
-await sleep(50)
+await sleep(350)
 check(
   'the saved drawing opens with its own colors',
   JSON.stringify(await listColors(1)) === '["#ffb4a2"]' && !(await snapshot()).isModified,

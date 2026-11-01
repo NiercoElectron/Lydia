@@ -11,14 +11,14 @@ type Props = {
   onDrawingChange: (colors: string[]) => void
 }
 
-// The color tray (decision 66): colors kept on purpose, to pick again quickly, which stay until taken out, unlike the
-// colors painted with lately. Floating over the drawing next to the color panel, opened with its button. Two lists:
+// The palette (decision 66): colors kept on purpose, to pick again quickly, which stay until taken out, unlike the
+// colors painted with lately. Under the color panel, always there. Two lists:
 // one for all drawings, kept by the browser, and one for this drawing, kept in its file
 export function ColorTray({ color, general, drawing, onPick, onGeneralChange, onDrawingChange }: Props) {
   const { t } = useLanguage()
   return (
-    <aside className="color-tray" aria-label={t('Color tray')}>
-      <h2>{t('Color tray')}</h2>
+    <aside className="color-tray" aria-label={t('Palette')}>
+      <h2>{t('Palette')}</h2>
       <ColorList
         title={t('All drawings')}
         hint={t('Kept by this browser, the same in every drawing')}

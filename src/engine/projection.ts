@@ -16,6 +16,7 @@ import {
   splitIndex,
   type Layer,
   type LayerStack,
+  type BlendMode,
 } from './layers'
 import { forEachTile, isOnPaper, parseTileKey, TILE_SIZE, tileKey, tilesTouching, tileSize, type Grid } from './tiles'
 
@@ -40,6 +41,7 @@ export type ShownStroke = {
   tiles: Map<string, Texture>
   color: string
   opacity: number
+  blendMode: BlendMode
   erase: boolean
   alphaLocked: boolean
 }
@@ -47,6 +49,9 @@ export type ShownStroke = {
 // How a stroke goes onto its layer: taking paint away, only over the paint there, or as any paint does
 export const strokeBlend = (shown: ShownStroke) =>
   (shown.erase ? 'erase' : shown.alphaLocked ? LOCKED_ALPHA : 'normal') as BLEND_MODES
+
+// Whether a stroke mixes with the paint on its layer, as a layer does with what is under it (see blendModes.ts)
+export const mixesWithLayer = ({ blendMode, erase }: ShownStroke) => blendMode !== 'normal' && !erase
 
 // What a transform draws, for the exact way of showing a move (see createSmartView in smartObject.ts): into one tile
 // of the paper, and the tiles it covers
@@ -108,8 +113,35 @@ export function createProjection(
   const withStrokePaint = new Sprite()
   withStrokeRoot.addChild(withStrokeLayer, withStrokePaint)
 
+  // A stroke's tile in its color. Whole, for the blender: a tile at the paper's edge is smaller
+  const tintRoot = new Container()
+  const tintSprite = new Sprite()
+  tintRoot.addChild(tintSprite)
+  let tintedTile: RenderTexture | null = null
+
+  function tintedStroke(strokeTexture: Texture, color: string) {
+    tintedTile ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    tintSprite.texture = strokeTexture
+    tintSprite.tint = color
+    renderer.render({ container: tintRoot, target: tintedTile, clear: true, clearColor: [0, 0, 0, 0] })
+    return tintedTile
+  }
+
+  // Put a stroke that mixes with its layer into the layer's tile. With its transparency locked, only over its paint
+  function mixStrokeInto(target: RenderTexture, strokeTexture: Texture, shown: ShownStroke) {
+    const mask = shown.alphaLocked ? target : undefined
+    blender.blendOnto(target, tintedStroke(strokeTexture, shown.color), shown.opacity, shown.blendMode, mask)
+  }
+
   function withStroke(layerTexture: Texture | null, strokeTexture: Texture, shown: ShownStroke) {
+    if (mixesWithLayer(shown) && shown.alphaLocked && !layerTexture) return layerTexture
     withStrokeTexture ??= RenderTexture.create({ width: TILE_SIZE, height: TILE_SIZE })
+    if (mixesWithLayer(shown)) {
+      const paint = tintedStroke(strokeTexture, shown.color)
+      const mask = shown.alphaLocked ? layerTexture! : undefined
+      blender.blend(layerTexture, paint, shown.opacity, shown.blendMode, withStrokeTexture, mask)
+      return withStrokeTexture
+    }
     withStrokeLayer.visible = layerTexture !== null
     if (layerTexture) withStrokeLayer.texture = layerTexture
     withStrokePaint.texture = strokeTexture
@@ -1272,6 +1304,7 @@ export function createProjection(
     prepareTile,
     showOpacityLive,
     showStroke,
+    mixStrokeInto,
     finishLive,
     finishLiveLater,
     paintedAbove,

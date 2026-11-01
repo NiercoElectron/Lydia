@@ -7,6 +7,19 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Changed
+
+- **A new interface** ([decision 82](docs/decisions.md#82-the-new-interface)), from a friend's layout: menus on top, the tools
+  with their names, the color and the tool's settings on the left, the brushes and the layers on the right, and a plainer
+  look for buttons and sliders. **Tools** and **Color** close to give the drawing more room.
+- The color tray is now the **Palette**, always under the color.
+
+### Added
+
+- The **brushes panel** finds a brush by its name, keeps **Favorites** and **Recent** ones, and has seven categories.
+- **Layers** show a small picture of their paint and an eye, and the paper is a row of its own, which can be hidden.
+- A **blend mode for the brush**: each stroke can mix with the paint on its layer, with the same modes layers have.
+
 ## [0.18.0] - 2026-10-31
 
 ### Added

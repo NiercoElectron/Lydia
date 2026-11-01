@@ -242,16 +242,16 @@ export function createLayerBlender(renderer: WebGLRenderer) {
 
   // Put "paint" (a layer's tile) at this opacity onto "backdrop" (what is under it) with this mode, into "target",
   // only as much as "mask" covers (the tile of the layer's base, when it is clipped). All are whole tiles; "target"
-  // must be none of the others
+  // must be none of the others. No backdrop: nothing there
   function blend(
-    backdrop: Texture,
+    backdrop: Texture | null,
     paint: Texture,
     opacity: number,
     mode: BlendMode,
     target: RenderTexture,
     mask: Texture = NO_MASK,
   ) {
-    shader.resources.uBackdrop = backdrop.source
+    shader.resources.uBackdrop = (backdrop ?? NO_PAINT).source
     shader.resources.uPaint = paint.source
     shader.resources.uMask = mask.source
     uniforms.uniforms.uOpacity = opacity

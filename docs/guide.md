@@ -58,16 +58,18 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 ## The editor
 
-- **At the top:** the settings of the chosen tool on the first row; on the second, Undo, Redo, Clear layer, the view (zoom, angle, Straighten,
-  Flip, Fit), Export PNG, Export JPEG, Save and Back. What Lydia is busy with ("Saving…", "Filling…") shows at the
-  end.
-- **At the left:** the tools, with the **Tray** button at their foot, then the brushes.
-- **At the right:** the colors, and the layers under them.
+The menus on top have what isn't drawing: **File** saves and exports, **Edit** undoes and transforms, **Layer**, **Filter** and
+**Select** do what they say, **View** has the grid and how the drawing shows, **Window** shows and hides each panel, and **Help**
+opens this guide. The gear has the interface's colors and its language.
 
-Back goes to the start screen, and asks first when there are changes that weren't saved. So does closing the tab.
+On the left are the tools, with the color next to them, the palette under it, and the chosen tool's settings under that. On the
+right are the brushes and the layers. **Tools** and **Color** in the bar at the bottom show and hide those two panels, and the
+drawing takes the room. That bar also has the size of the paper, what is being worked on, and the view's controls.
+
+**File > Back** goes to the start screen, and asks first when there are changes that weren't saved. So does closing the tab.
 
 Every slider has its number next to it: click the number to type a value. Enter, or clicking elsewhere, keeps it
-(within the slider's range), and Esc leaves it as it was. The zoom and the angle in the bar work the same way.
+(within the slider's range), and Esc leaves it as it was. The zoom and the angle in the bottom bar work the same way.
 
 ## Colors
 
@@ -87,8 +89,8 @@ The color panel, at the top right, holds the brush's color, also used by the fil
 
 The eyedropper (I, or Alt while painting) changes the brush's color too.
 
-**The color tray** keeps colors on purpose, to pick them again quickly: unlike the colors painted with lately, they stay
-until taken out. The button with a palette, next to the color's code, opens and closes it, floating over the drawing.
+**The palette**, under the color, keeps colors on purpose, to pick them again quickly: unlike the colors painted with lately,
+they stay until taken out.
 
 - **All drawings**: the same colors in every drawing, kept by this browser.
 - **This drawing**: the drawing's own colors, saved in its file, so they come back when it is opened, on any
@@ -99,8 +101,13 @@ until taken out. The button with a palette, next to the color's code, opens and 
 
 **Brush (B)** paints with the chosen brush and color; **Eraser (E)** takes paint away with the same brush.
 
-- **Size** (1 to 500 pixels; **[** and **]** make it smaller and bigger) and **Opacity** in the bar.
+- **Size** (1 to 500 pixels; **[** and **]** make it smaller and bigger) and **Opacity** under the color.
   Opacity is how much a stroke covers, however many times it passes over the same place.
+- **Brush blend** is how a stroke mixes with the paint already on the layer, with the same modes layers have. Where the layer
+  has no paint, a stroke is plain paint. The eraser doesn't have it.
+- In the **Brushes** panel, the search finds a brush by its name. **All**, **Favorites** and **Recent** choose a list: the star on
+  a brush keeps it in the favorites, and Recent has the last ones used. A **category** shows only its brushes, and pressing it
+  again shows them all. A brush added to Lydia goes to Special.
 - With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
 - Hold **Alt** to pick a color from the drawing while painting.
 - **Straight lines:** **Shift + click** paints a straight line from where the last stroke ended, and again from
@@ -274,7 +281,7 @@ filtered until **Convert to pixels** turns it into a normal layer, which can be 
 
 ## Filters
 
-The **Filters** list, next to Clear layer, changes the active layer, or what is selected in it. The bar shows its sliders, and
+The **Filter** menu, or **Filter** in the tools, changes the active layer, or what is selected in it. The bar shows its sliders, and
 the drawing shows what they do as they move. **Apply** (Enter) keeps it, as one step of undo, and **Cancel** (Esc) leaves the
 layer as it was.
 
@@ -384,6 +391,12 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
   closed or reloaded.
 
 ## Layers
+
+Each layer has an eye, which hides it, and a small picture of its paint, which follows a moment after a stroke ends. The buttons
+are the **Layer** menu's, with icons for the ones used most: + and the copy on top, the folder and the trash at the foot.
+
+**Paper**, under the layers, is the paper's color. Its eye shows the drawing without it, on squares, and an image exported then
+has no paper. It isn't kept with the drawing.
 
 - **New layer** adds an empty layer above the active one; **Delete layer** deletes the active one (the last layer
   stays).

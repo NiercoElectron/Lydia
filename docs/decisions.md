@@ -2482,6 +2482,53 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   it where the transform took it; painting and filters blocked; a duplicate; Convert to pixels and its undo; a text wider
   than the paper in a file, opened again and changed; the autosave.
 
+## 82. The new interface
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Problem:** the editor had grown into two rows of buttons, a column of icons and a list of brushes with no way to find
+  one. An artist friend of mine drew a layout for it, and this stage makes the editor follow it.
+- **Decision:** my choices about her layout:
+  - **Menus on top**, for all that isn't drawing: File, Edit, Layer, Filter, Select, View, Window and Help.
+  - **The tools with their names**, in her order, and the color beside them. Her list has no magic wand, hand or rotate, so
+    they stayed in it. Her "Filter" opens the filters, and her "Special pen" gathers smudge and liquify.
+  - **The tool's settings under the color.** Her layout has no place for them, so that was Claude's proposal and I kept it.
+  - **The panels can close.** Tools and Color are shown and hidden by two buttons in the bar under the drawing, which never
+    change size, and the drawing takes the room. Brushes close with their X and Layers from the Window menu.
+  - **No tabs for now.** Her layout has them, but only one drawing can be open, so a tab that does nothing is gone.
+    They come with several drawings open at once, after 1.0.
+  - **The brushes panel as she drew it:** search, All, Favorites and Recent, and her seven categories with their counts,
+    even the two with no brush yet. A brush added with no category goes to Special, and nothing is hidden until a
+    category is pressed.
+  - **Layers with a picture and an eye**, and the paper as the row at the bottom.
+  - **A palette always under the color**, which was the color tray floating over the drawing.
+  - **A blend mode for the brush**, her "Modo de Mistura" in the color panel: each stroke mixes with the paint on its layer.
+  - **The new one replaces the old one**, with no switch between them: 0.18.0 is there to compare with.
+  - **A plainer look, like Photoshop's.** A button that stays on or off is just its name, with a bright line around it when
+    on. Other buttons are gray with a gray line, and a disabled one is dimmer. Sliders are a thin line, lighter where the
+    dot has passed, with a white dot. There is no blue left in what is chosen.
+  - Her layout also has a cloud and a camera. Nobody knows what they do, so they aren't here.
+- **How:**
+  - A menu's items are always on the page, only hidden, so they are plain buttons for anything looking for them. A shortcut
+    is drawn by CSS, so it isn't part of the item's name.
+  - The line of a slider is drawn by its dot, as a border image going far past it each way and cut at the slider's ends. So
+    no slider has to tell the page its value, and all of them follow any change, from a key or the mouse wheel too.
+  - The layers' pictures (`src/engine/thumbnails.ts`) come from the tiles in RAM, on the processor, and not from the graphics
+    card, which would need a big layer sent again for each change. Tiles never change (see `memory.ts`), so a different object
+    is a tile to read again, and a stroke costs only its own tiles. At most 2 ms of a frame go to them, and only when nothing
+    is being painted, so a picture is a moment late on purpose.
+  - The paper's eye shows what is under the drawing, and an image exported then has no paper. It isn't kept with the drawing or
+    undone, since it doesn't change the drawing.
+  - A brush with a blend mode is put on the layer by the layers' own blender (see `blendModes.ts`), with the same maths and modes. The
+    stroke's tile is colored first, in a whole tile, as a tile at the paper's edge is smaller. Normal goes the old way, so it
+    costs nothing new, and the eraser ignores the mode.
+- **Checked:** `tests/app/thumbnails.mjs`, `tests/app/brushes-panel.mjs` and `tests/app/brush-blend.mjs`, with the other tests
+  moved to the new screen: pictures with paint where the layer has it, through undo, redo and a copy; the paper's eye on the
+  screen and in a PNG; the categories, the search, favorites and the brushes used last, kept for the next time; Multiply
+  giving 100, 50, 25 for 200, 100, 50 under a gray of 128, the same while painting and after, and Screen, half the
+  opacity, a locked transparency and a tile at the paper's edge. On a paper of 10000×10000, with 1600 tiles of one color each
+  going through a picture, the longest frame took 7 ms. A layer full of detail wasn't measured.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

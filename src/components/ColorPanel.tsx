@@ -1,5 +1,5 @@
 import { useLanguage } from '../i18n'
-import { ArrowLeftRight, Palette } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   hexToHsv,
@@ -25,10 +25,8 @@ type Props = {
   color: string // the brush's color, "#rrggbb"
   background: string // the color kept behind it, swapped with it by X
   recent: string[] // the colors painted with lately, the newest first
-  isTrayOpen: boolean // the color tray (see ColorTray.tsx)
   onColorChange: (color: string) => void
   onSwap: () => void
-  onTrayToggle: () => void
 }
 
 // The color panel (decision 65), at the top of the right column: a ring of hues around a triangle of the shades of
@@ -36,7 +34,7 @@ type Props = {
 // corners); the brush's color and the background color, the color as "#rrggbb", sliders for its hue, saturation and
 // value, the colors painted with lately, and the button of the color tray. While the ring or the triangle is dragged, the panel shows each step at
 // once but hands the color on at most once a frame: the whole editor is drawn again for each new color
-export function ColorPanel({ color, background, recent, isTrayOpen, onColorChange, onSwap, onTrayToggle }: Props) {
+export function ColorPanel({ color, background, recent, onColorChange, onSwap }: Props) {
   const { t } = useLanguage()
   const [hsv, setHsv] = useState(() => hexToHsv(color))
   // The color handed on last, until it comes back: a color that comes from outside (the eyedropper, a recent color,
@@ -208,15 +206,6 @@ export function ColorPanel({ color, background, recent, isTrayOpen, onColorChang
             }
           }}
         />
-        <button
-          className="color-tray-button"
-          aria-pressed={isTrayOpen}
-          onClick={onTrayToggle}
-          title={t('Color tray: colors kept to pick again quickly')}
-          aria-label={t('Color tray')}
-        >
-          <Palette size={14} aria-hidden />
-        </button>
       </div>
       {slider('h', 'H', t('Hue'), 360, 1, '°')}
       {slider('s', 'S', t('Saturation'), 100, 100, '%')}
