@@ -346,6 +346,8 @@ await page.mouse.down()
 await page.mouse.move(from.x, (from.y + to.y) / 2, { steps: 4 })
 await page.mouse.move(to.x, to.y, { steps: 4 })
 const lit = await page.evaluate(() => !!document.querySelector('.layers-list li.drop-into'))
+const carried = await page.evaluate(() => document.querySelector('.layers-list li.dragging').style.transform)
+check('the row goes with the pointer', carried.startsWith('translate('), carried)
 await page.mouse.up()
 await waitIdle()
 const inFolder = (await snap()).layers.find(l => l.id === layer3).parentId

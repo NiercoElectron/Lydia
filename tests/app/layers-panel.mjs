@@ -218,15 +218,52 @@ for (let i = 1; i <= 10; i++) {
 }
 const grabbing = await page.$eval('li.dragging .layer-grip', element => getComputedStyle(element).cursor)
 check('and it closes while dragging', grabbing === 'grabbing', grabbing)
-const line1 = await page.evaluate(() =>
-  [...document.querySelectorAll('.layers-list li')].map(li => li.className).join('|'),
+const handX = from.x + from.width / 2
+const middle = await (await rowButton('Layer 2')).boundingBox()
+const middleY = middle.y + middle.height / 2
+await page.mouse.move(handX, middleY, { steps: 4 })
+const inHand = await (await rowGrip('Layer 1')).boundingBox()
+const inHandY = inHand.y + inHand.height / 2
+check('the row goes with the hand', Math.abs(inHandY - middleY) < 4, `${inHandY} ${middleY}`)
+await page.mouse.move(handX, 0, { steps: 4 })
+const list = await page.$eval('.layers-list', element => ({
+  top: element.getBoundingClientRect().top,
+  row: element.querySelector('li.dragging').getBoundingClientRect().top,
+}))
+check('and stays in the list', Math.abs(list.row - list.top) < 3, JSON.stringify(list))
+await page.mouse.move(handX, to.y + 2, { steps: 4 })
+await sleep(400) // the rows finish sliding
+const whileDragging = await page.evaluate(() =>
+  [...document.querySelectorAll('.layers-list li')].map(li => ({
+    isInHand: li.classList.contains('dragging'),
+    step: new DOMMatrix(getComputedStyle(li).transform).m42,
+  })),
 )
-await page.mouse.up()
-await sleep(100)
 check(
-  'while dragging, a line shows where it goes and the row is faded',
-  line1.includes('drop-before') && line1.includes('dragging'),
-  line1,
+  'the rows step aside for it, as far as a row',
+  whileDragging[2].isInHand && whileDragging[0].step > 30 && whileDragging[0].step === whileDragging[1].step,
+  JSON.stringify(whileDragging),
+)
+// Nothing jumps on letting go: a row that stepped aside is already where it stays
+await page.evaluate(() => {
+  window.rowTops = []
+  const look = () => {
+    const row = [...document.querySelectorAll('.layers-list li')].find(li => li.textContent.includes('Layer 3'))
+    window.rowTops.push(row.getBoundingClientRect().top)
+    window.looking = requestAnimationFrame(look)
+  }
+  look()
+})
+await page.mouse.up()
+await sleep(400)
+const rowTops = await page.evaluate(() => {
+  cancelAnimationFrame(window.looking)
+  return window.rowTops
+})
+check(
+  'a row stays put on letting go',
+  Math.max(...rowTops) - Math.min(...rowTops) < 2 && rowTops.length > 5,
+  `${Math.min(...rowTops)} to ${Math.max(...rowTops)}, ${rowTops.length} frames`,
 )
 px = await screenPx([cross])
 check(
@@ -263,6 +300,25 @@ check(
   'a click on the dots selects without moving',
   (await names()) === 'Layer 1,Layer 2,Layer 3' && (await activeName()) === 'Layer 3',
 )
+// a key can change the list in the middle of a drag: the drag ends there, and nothing moves
+from = await (await rowGrip('Layer 1')).boundingBox()
+to = await (await rowButton('Layer 3')).boundingBox()
+await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+await page.mouse.down()
+await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 6 })
+await page.evaluate(() => document.querySelector('[aria-label="New layer"]').click())
+await sleep(100)
+await page.mouse.move(from.x + from.width / 2, to.y + 12, { steps: 3 })
+await page.mouse.up()
+await sleep(100)
+check(
+  'a new layer in the middle of a drag ends it',
+  (await names()).startsWith('Layer 1,') && (await names()).split(',').length === 4,
+  await names(),
+)
+await undo()
+await page.evaluate(() => [...document.querySelectorAll('button.layer-name')].at(-1).click())
+await sleep(50)
 // a click that moves only a little stays a click
 from = await (await rowButton('Layer 2')).boundingBox()
 await page.mouse.move(from.x + 20, from.y + 8)

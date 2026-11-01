@@ -1604,7 +1604,14 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - Hiding a folder hides all that is in it, and its opacity applies to all of it. A folder can be the base of clipped
     layers (its layers' paint is the base), and can be clipped itself, as in Photoshop (my choice).
   - Since 1.0 layers and folders are dragged by the dots at the left of their row, which show a hand (my idea): the name is
-    only for choosing and renaming, so a click that slips no longer moves a layer.
+    only for choosing and renaming, so a click that slips no longer moves a layer. The row goes with the hand, with all
+    that is in an open folder, and stays within the list, and the other rows slide aside to open its place, like GitHub's
+    pins (my idea), in place of the line that showed it. Where it would go is worked out from the rows' places before the
+    drag: going by where they are on the screen, a row sliding away would change the answer and bring itself back.
+  - A row is passed when the leading edge of the one in hand gets to its middle (I noticed it: going by the pointer, up took
+    more than down). The gap under the end of a folder is in the folder and
+    out of it at once: a layer stays as deep as it was, and a little to the side takes it a folder in or out, showing it
+    on the way, as in Notion's lists. Before, that gap always meant out of the folder (I found it).
   - **New folder** adds an empty folder; dragging a layer onto a folder's row puts it in, on top, and dragging it
     between rows puts it there, in or out of folders; **Ctrl+G** puts the active layer into a new folder (my choice).
     A new layer goes into the active folder when it is open, on top, and above it when it is closed; **New layer

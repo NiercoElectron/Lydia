@@ -19,8 +19,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ### Changed
 
-- Layers and folders are dragged by the dots at the left of their row, which show a hand. The name is only for choosing and
-  renaming.
+- Layers and folders are dragged by the dots at the left of their row, which show a hand. The row goes with the hand, and the
+  others step aside to open its place. The name is only for choosing and renaming.
 
 ### Fixed
 

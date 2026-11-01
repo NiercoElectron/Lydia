@@ -1340,8 +1340,8 @@ input.slider-value {
   align-items: center;
   gap: 4px;
   padding: 2px;
+  padding-top: 4px;
   padding-left: 18px; /* its eye under the layers', which have the dots before them */
-  border-top: 2px solid transparent;
 }
 
 .paper-name {
@@ -1424,10 +1424,12 @@ input.slider-value {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px;
-  /* room for the line that shows where a dragged layer would go */
-  border-top: 2px solid transparent;
-  border-bottom: 2px solid transparent;
+  padding: 4px 2px;
+}
+
+/* The rows make way for the one in hand. Only while dragging: on letting go each is already where it stays */
+.layers-list.sorting li:not(.dragging) {
+  transition: transform 140ms ease;
 }
 
 /* a clipped layer is moved in (see LayersPanel.tsx), with an arrow down to the layer it is clipped to */
@@ -1440,16 +1442,13 @@ input.slider-value {
   background: var(--hover);
 }
 
+/* In hand: it goes with the pointer, over the other rows */
 .layers-list li.dragging {
-  opacity: 0.5;
-}
-
-.layers-list li.drop-before {
-  border-top-color: var(--accent);
-}
-
-.layers-list li.drop-after {
-  border-bottom-color: var(--accent);
+  position: relative;
+  z-index: 1;
+  background: var(--hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  opacity: 0.9;
 }
 
 /* a folder a dragged layer would go into */
