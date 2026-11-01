@@ -327,16 +327,20 @@ await click('New layer')
 await sleep(200)
 const layer3 = (await snap()).activeLayerId
 const layer3Name = (await snap()).layers.find(l => l.id === layer3).name
-const rowBox = name =>
-  page.evaluate(name => {
-    const li = [...document.querySelectorAll('.layers-list li')].find(
-      row => row.querySelector('.layer-name')?.textContent.trim() === name,
-    )
-    const box = li.querySelector('.layer-name').getBoundingClientRect()
-    return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
-  }, name)
-const from = await rowBox(layer3Name),
-  to = await rowBox('Folder 1')
+const rowBox = (name, part) =>
+  page.evaluate(
+    (name, part) => {
+      const li = [...document.querySelectorAll('.layers-list li')].find(
+        row => row.querySelector('.layer-name')?.textContent.trim() === name,
+      )
+      const box = li.querySelector(part).getBoundingClientRect()
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 }
+    },
+    name,
+    part,
+  )
+const from = await rowBox(layer3Name, '.layer-grip'),
+  to = await rowBox('Folder 1', '.layer-name')
 await page.mouse.move(from.x, from.y)
 await page.mouse.down()
 await page.mouse.move(from.x, (from.y + to.y) / 2, { steps: 4 })

@@ -758,6 +758,7 @@ fieldset.new-project-row {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .editor-main {
@@ -805,6 +806,7 @@ fieldset.new-project-row {
   margin-left: 8px;
   color: var(--muted);
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 /* The tools, each with its name */
@@ -897,8 +899,10 @@ fieldset.new-project-row {
   border-top: 1px solid var(--border);
 }
 
+/* The one thing in the bar that can give way on a narrow window */
 .zoom-slider {
-  width: 160px;
+  flex: 0 1 160px;
+  min-width: 48px;
 }
 
 .draw-space {
@@ -1060,6 +1064,7 @@ fieldset.new-project-row {
   display: grid;
   flex: 1;
   grid-template-columns: 124px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr); /* on a short screen each column scrolls, instead of going over the buttons */
   gap: 6px;
   min-height: 0;
 }
@@ -1068,10 +1073,13 @@ fieldset.new-project-row {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .brush-categories button {
   display: flex;
+  flex: none;
   justify-content: space-between;
   gap: 4px;
   padding: 2px 6px;
@@ -1332,6 +1340,7 @@ input.slider-value {
   align-items: center;
   gap: 4px;
   padding: 2px;
+  padding-left: 18px; /* its eye under the layers', which have the dots before them */
   border-top: 2px solid transparent;
 }
 
@@ -1455,6 +1464,25 @@ input.slider-value {
   text-align: left;
 }
 
+/* What a layer is dragged by */
+.layer-grip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none; /* dragging with a pen or a finger moves the layer instead of scrolling the panel */
+}
+
+.layer-grip:hover {
+  color: var(--text);
+}
+
+.layers-list li.dragging .layer-grip {
+  cursor: grabbing;
+}
+
 /* Marks a smart object in the list of layers */
 /* The color of a shape's fill or outline: pressing it takes the color chosen now */
 button.shape-color {
@@ -1469,7 +1497,6 @@ button.shape-color {
 }
 
 button.layer-name {
-  touch-action: none; /* dragging with a pen or a finger moves the layer instead of scrolling the panel */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

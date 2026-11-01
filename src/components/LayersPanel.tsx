@@ -10,6 +10,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  GripVertical,
   Lock,
   LockOpen,
   Paperclip,
@@ -153,6 +154,7 @@ export function LayersPanel({
       const { parentId, aboveId } = placeOf(drag.drop)
       onMove(drag.id, parentId, aboveId)
     }
+    onSelect(drag.id) // the one in hand becomes the active one, moved or not
     setDrag(null)
   }
 
@@ -230,6 +232,20 @@ export function LayersPanel({
               className={classes.filter(Boolean).join(' ') || undefined}
               style={{ paddingLeft: (layer.depth + (layer.clipped ? 1 : 0)) * INDENT_PX }}
             >
+              <span
+                className="layer-grip"
+                title={
+                  layer.isFolder
+                    ? t('Drag to move with all that is in it')
+                    : t('Drag to move (onto a folder to put it in)')
+                }
+                onPointerDown={e => handlePointerDown(e, layer.id)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={() => setDrag(null)}
+              >
+                <GripVertical size={14} aria-hidden />
+              </span>
               <label className="layer-eye">
                 <input
                   type="checkbox"
@@ -266,19 +282,9 @@ export function LayersPanel({
                 <button
                   className="layer-name"
                   aria-pressed={layer.id === activeLayerId}
-                  title={
-                    layer.isFolder
-                      ? t(
-                          'Drag to move with all that is in it, or drop a layer on it to put it in; double-click to rename',
-                        )
-                      : t('Drag to move (onto a folder to put it in), double-click to rename')
-                  }
+                  title={t('Double-click to rename')}
                   onClick={() => onSelect(layer.id)}
                   onDoubleClick={() => setRenamingId(layer.id)}
-                  onPointerDown={e => handlePointerDown(e, layer.id)}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={() => setDrag(null)}
                 >
                   {layer.isFolder &&
                     (layer.isOpen ? (

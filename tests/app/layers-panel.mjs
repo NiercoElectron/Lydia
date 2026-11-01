@@ -128,6 +128,9 @@ const rowButton = async name => {
     if ((await b.evaluate(el => el.textContent)) === name) return b
   throw new Error('no row ' + name)
 }
+// The dots at the left of a layer's row, which it is dragged by
+const rowGrip = async name =>
+  (await rowButton(name)).evaluateHandle(el => el.closest('li').querySelector('.layer-grip'))
 const is = (s, rgb, tolerance = 40) =>
   s
     .split(',')
@@ -201,12 +204,20 @@ check('redo deletes it again', (await names()) === 'Layer 1,Layer 2' && is((awai
 await undo()
 
 // ----- Move by dragging: Layer 1 (black, shown at the bottom) to the top -----
-let from = await (await rowButton('Layer 1')).boundingBox()
+let from = await (await rowGrip('Layer 1')).boundingBox()
 let to = await (await rowButton('Layer 3')).boundingBox()
-await page.mouse.move(from.x + 20, from.y + from.height / 2)
+check(
+  'the dots show a hand',
+  (await page.$eval('.layer-grip', element => getComputedStyle(element).cursor)) === 'grab' && from.width > 0,
+)
+await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
 await page.mouse.down()
-for (let i = 1; i <= 10; i++)
-  await page.mouse.move(from.x + 20, from.y + from.height / 2 + ((to.y + 2 - from.y - from.height / 2) * i) / 10)
+for (let i = 1; i <= 10; i++) {
+  const y = from.y + from.height / 2 + ((to.y + 2 - from.y - from.height / 2) * i) / 10
+  await page.mouse.move(from.x + from.width / 2, y)
+}
+const grabbing = await page.$eval('li.dragging .layer-grip', element => getComputedStyle(element).cursor)
+check('and it closes while dragging', grabbing === 'grabbing', grabbing)
 const line1 = await page.evaluate(() =>
   [...document.querySelectorAll('.layers-list li')].map(li => li.className).join('|'),
 )
@@ -235,6 +246,23 @@ check(
   (await names()) === 'Layer 2,Layer 3,Layer 1' && is((await screenPx([cross]))[0], BLACK),
 )
 await undo()
+// the name is for choosing a layer and renaming it: dragging it moves nothing
+from = await (await rowButton('Layer 1')).boundingBox()
+to = await (await rowButton('Layer 3')).boundingBox()
+await page.mouse.move(from.x + 20, from.y + 8)
+await page.mouse.down()
+await page.mouse.move(from.x + 20, to.y + 2, { steps: 8 })
+await page.mouse.up()
+await sleep(50)
+check('dragging a name moves nothing', (await names()) === 'Layer 1,Layer 2,Layer 3')
+// a click on the dots chooses the layer, without moving it
+from = await (await rowGrip('Layer 3')).boundingBox()
+await page.mouse.click(from.x + from.width / 2, from.y + from.height / 2)
+await sleep(50)
+check(
+  'a click on the dots selects without moving',
+  (await names()) === 'Layer 1,Layer 2,Layer 3' && (await activeName()) === 'Layer 3',
+)
 // a click that moves only a little stays a click
 from = await (await rowButton('Layer 2')).boundingBox()
 await page.mouse.move(from.x + 20, from.y + 8)

@@ -67,6 +67,8 @@ function createWindow() {
   const window = new BrowserWindow({
     width: 1600,
     height: 900,
+    minWidth: 1024, // below this the panels leave no room to draw (see tests/app/small-screens.mjs)
+    minHeight: 600,
     show: false,
     backgroundColor: '#1e1e1e',
     title: 'Lydia',

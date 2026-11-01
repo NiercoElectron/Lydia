@@ -17,9 +17,16 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   shows up in Lydia.
 - **Ctrl+S** saves in the browser too.
 
+### Changed
+
+- Layers and folders are dragged by the dots at the left of their row, which show a hand. The name is only for choosing and
+  renaming.
+
 ### Fixed
 
 - Adding one brush that left something out said "1 brushes added".
+- On small screens the brush categories went over **Import…**, **Export** and **Delete**, and the bottom bar went past its
+  place. The desktop window stops at 1024×600.
 
 ## [0.20.0] - 2026-11-01
 

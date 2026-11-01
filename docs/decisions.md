@@ -1603,6 +1603,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     layer.
   - Hiding a folder hides all that is in it, and its opacity applies to all of it. A folder can be the base of clipped
     layers (its layers' paint is the base), and can be clipped itself, as in Photoshop (my choice).
+  - Since 1.0 layers and folders are dragged by the dots at the left of their row, which show a hand (my idea): the name is
+    only for choosing and renaming, so a click that slips no longer moves a layer.
   - **New folder** adds an empty folder; dragging a layer onto a folder's row puts it in, on top, and dragging it
     between rows puts it there, in or out of folders; **Ctrl+G** puts the active layer into a new folder (my choice).
     A new layer goes into the active folder when it is open, on top, and above it when it is closed; **New layer

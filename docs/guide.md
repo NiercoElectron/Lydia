@@ -422,8 +422,8 @@ has no paper. It isn't kept with the drawing.
   - **New folder** adds one; **Ctrl+G** puts the active layer into a new folder. With an open folder active, a new
     layer goes into it, on top. **New layer outside** adds one above the folder the active layer is in (or above the
     active folder), out of it.
-  - **Drag** a layer onto a folder's row to put it in (the row lights up), or between rows to put it there, in or out
-    of folders. Dragging a folder moves all that is in it.
+  - **Drag** a layer by its dots onto a folder's row to put it in (the row lights up), or between rows to put it there,
+    in or out of folders. Dragging a folder moves all that is in it.
   - The arrow in a folder's row opens and closes it in the list.
   - Hiding a folder hides all that is in it, and its **Opacity** applies to all of it. Its **Blend** is **Pass
     Through** at first: the layers in it mix with all that is under them, as if there were no folder. Give it another
@@ -431,7 +431,7 @@ has no paper. It isn't kept with the drawing.
   - A folder can't be painted on: choose a layer in it. The **move tool** moves all of its layers together.
   - **Duplicate** copies it with all that is in it, **Merge folder** (Ctrl+E) makes it one layer, and **Delete
     folder** deletes it with all that is in it.
-- Click a layer to paint on it. **Drag** it up or down to move it in the list.
+- Click a layer to paint on it. **Drag** the dots at the left of its row up or down to move it in the list.
 - **Double-click** a name to rename it: Enter keeps the new name, Esc the old one.
 - The box at the left of each layer hides it or shows it.
 - The **lock** in each layer's row locks its transparency: the brush and the fill bucket then only color the paint
