@@ -57,6 +57,7 @@ import { createMixTools } from './mixTools'
 import { createPixelGrid } from './pixelGrid'
 import { createSmoothZoom } from './smoothZoom'
 import { createProjection } from './projection'
+import { createThumbnails } from './thumbnails'
 import {
   EXPORT_SCALES,
   fitsExport,
@@ -179,6 +180,8 @@ export type EngineSnapshot = {
   filter: FilterSettings | null // the filter whose controls are open (see filters.ts)
   canFilter: boolean // a filter can be used on the active layer
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
+  paperColor: string | null // the paper's, under the layers; null: transparent
+  isPaperShown: boolean
 }
 
 // A text being typed, for its text box (see TextBox.tsx): "area" is where its lines are in its own space (see text.ts),
@@ -229,6 +232,8 @@ function createCheckers(grid: Grid) {
 }
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+const THUMBNAIL_BUDGET_MS = 2 // at most this much of each frame goes to the layers' small pictures
 
 // The drawing engine: shows the drawing inside "host" and lets the user paint on it. Everything that touches the
 // graphics card lives here; React only shows the controls around it. "gpuMemory": how many GB of the graphics card's
@@ -304,6 +309,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const gpu = createGpuTiles(renderer, memory, tilesInGigabytes(gpuMemory))
   const blender = createLayerBlender(renderer)
   const projection = createProjection(renderer, grid, stack, gpu, blender, project.background)
+  const hasPaper = () => project.background !== null && isPaperShown
+  const thumbnails = createThumbnails(grid, memory)
   const history = createHistory(stack, gpu, projection, {
     get: () => selection,
     set: kept => {
@@ -319,10 +326,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const world = new Container()
   const outside = createOutsideView(grid, stack, gpu)
   world.addChild(outside.container, projection.ghost)
-  const checkers = project.background === null ? createCheckers(grid) : null
-  if (checkers) world.addChild(checkers)
+  const checkers = createCheckers(grid)
+  checkers.visible = project.background === null
+  world.addChild(checkers)
   world.addChild(projection.container)
-  const followZoom = () => checkers?.tileScale.set(1 / world.scale.y) // the zoom (see view.ts)
+  const followZoom = () => checkers.tileScale.set(1 / world.scale.y) // the zoom (see view.ts)
   // Everything the screen shows of the drawing. The pixel grid goes over it, and the selection's edge over both
   const scene = new Container()
   scene.addChild(world)
@@ -336,7 +344,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     scene,
     world,
     projection.container,
-    checkers ? [outside.container, projection.ghost, checkers] : [outside.container, projection.ghost],
+    [outside.container, projection.ghost, checkers],
     app.screen,
     projection.isSmoothZoom,
   )
@@ -367,6 +375,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // drawing: its layer if it has one already, and "place" takes its own space to the paper. A text stays in
   // "finishedTyping" until its letters are on the paper, so nothing blinks
   type Typing = { layer: Layer | null; words: string; style: TextStyle; place: Matrix3 }
+  let isPaperShown = true // the eye of the paper in the layers panel: not kept with the drawing
+  let thumbnailsLookOld = true // something changed, so the layers' small pictures should be looked at again
   const usualTextSize = Math.round(Math.min(project.width, project.height) / 16)
   let newTextStyle: TextStyle = {
     ...DEFAULT_TEXT_STYLE,
@@ -581,6 +591,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       filter: filters.settings(),
       canFilter: canFilter(),
       trayColors,
+      paperColor: project.background,
+      isPaperShown,
     }
   }
 
@@ -594,6 +606,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Something changed: make a new snapshot and tell whoever is listening. "modified" = the drawing itself changed
   function changed(modified = true) {
+    thumbnailsLookOld = true
     if (modified) {
       isModified = true
       changes++
@@ -627,6 +640,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       gpu.finishReads(isPainting ? 2 : 4)
       gpu.trim() // the tiles saved just now can leave the graphics card, if it is over its budget
       gpu.startSaving(isPainting ? 8 : Infinity, cached => history.isRecording(cached.layer, cached.key))
+    }
+    // The layers' small pictures come from RAM, so they wait for what was painted to get there
+    if (gpu.hasUnsaved()) thumbnailsLookOld = true
+    else if (!isPainting) {
+      if (thumbnailsLookOld) thumbnails.look(stack.layers)
+      thumbnailsLookOld = false
+      thumbnails.work(THUMBNAIL_BUDGET_MS)
     }
     if (offPaperStale && !gpu.hasUnsaved()) {
       offPaperStale = false
@@ -1215,7 +1235,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     // A tile's place and size in the image
     const drawTile = (picture: CanvasImageSource, column: number, row: number, width: number, height: number) =>
       ctx.drawImage(picture, column * TILE_SIZE * scale, row * TILE_SIZE * scale, width * scale, height * scale)
-    if (project.background === null && type === 'jpeg') {
+    if (!hasPaper() && type === 'jpeg') {
       // Where a JPEG would be transparent, browsers make it black
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -1224,7 +1244,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     const tileCtx = tileCanvas.getContext('2d')!
     for (const [key, texture] of projection.tiles) {
       const { column, row } = parseTileKey(key)
-      if (project.background !== null) {
+      if (hasPaper()) {
         const picture = renderer.extract.canvas(texture) as HTMLCanvasElement
         drawTile(picture, column, row, picture.width, picture.height)
         continue
@@ -2457,6 +2477,22 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const canWriteAgain = ({ text, bounds, corners, warp }: SmartObject) =>
     text !== undefined && isFontHere(text.font) && needsNewSource(text, bounds, corners, warp)
 
+  // ----- The paper and the layers' pictures -----
+
+  // Show the paper's color, or not: without it the drawing shows and exports as if the paper were transparent
+  function setPaperShown(shown: boolean) {
+    if (isBusy() || project.background === null || isPaperShown === shown) return
+    isPaperShown = shown
+    checkers.visible = !shown
+    projection.setPaperShown(shown)
+    changed(false)
+  }
+
+  function layerThumbnail(id: number) {
+    const layer = findLayer(id)
+    return layer ? thumbnails.canvasOf(layer) : null
+  }
+
   // The matrix from the space of the text being typed to the screen
   function textPlace() {
     const shown = typing ?? finishedTyping
@@ -2516,7 +2552,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     outside.destroy()
     transform?.view.destroy()
     selectionView.destroy()
-    checkers?.texture.destroy(true)
+    checkers.texture.destroy(true)
     view.destroy()
     brush.destroy()
     mixTools.destroy()
@@ -2560,6 +2596,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     commitShapeStyle,
     setShapeColor,
     takeBrushForShape,
+    setPaperShown,
+    layerThumbnail,
     editText,
     setTypedWords,
     setTextStyle,

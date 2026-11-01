@@ -451,6 +451,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
     onBack()
   }
 
+  const thumbnailOf = useCallback((id: number) => engine?.layerThumbnail(id) ?? null, [engine])
   const cantExport = !engine || busy !== null || snapshot.filter !== null || snapshot.typing !== null
 
   const activeLayer = snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)
@@ -809,13 +810,14 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
                 layers={snapshot.layers}
                 activeLayerId={snapshot.activeLayerId}
                 canDelete={snapshot.canDelete}
-                canMergeDown={snapshot.canMergeDown}
+                paperColor={snapshot.paperColor}
+                isPaperShown={snapshot.isPaperShown}
+                thumbnailOf={thumbnailOf}
                 onAdd={() => engine?.addLayer()}
                 onAddFolder={() => engine?.addFolder()}
-                onAddOutside={() => engine?.addLayerOutside()}
                 onDelete={() => engine?.deleteLayer()}
                 onDuplicate={() => engine?.duplicateLayer()}
-                onMergeDown={() => engine?.mergeDown()}
+                onPaperShownChange={shown => engine?.setPaperShown(shown)}
                 onSelect={id => engine?.selectLayer(id)}
                 onMove={(id, parentId, aboveId) => engine?.moveLayer(id, parentId, aboveId)}
                 onRename={(id, name) => engine?.renameLayer(id, name)}

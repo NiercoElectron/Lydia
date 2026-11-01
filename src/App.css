@@ -198,6 +198,13 @@ input[type='range']:disabled {
 
 .theme-choice {
   margin-top: 16px;
+  margin-right: 16px;
+}
+
+label.theme-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* The window for a new drawing */
@@ -381,6 +388,7 @@ fieldset.new-project-row {
   z-index: 20;
   display: none;
   flex-direction: column;
+  gap: 3px;
   min-width: 220px;
   padding: 4px;
   border: 1px solid var(--border);
@@ -398,7 +406,7 @@ fieldset.new-project-row {
   justify-content: space-between;
   gap: 24px;
   padding: 4px 8px;
-  border: none;
+  border: 1px solid transparent;
   background: none;
   color: inherit;
   text-align: left;
@@ -408,13 +416,8 @@ fieldset.new-project-row {
   background: var(--hover);
 }
 
-.menu-items button[aria-pressed='true']::before {
-  content: '✓';
-}
-
-.menu-items button[aria-pressed='false']::before {
-  content: '✓';
-  visibility: hidden;
+.menu-items button[aria-pressed='true'] {
+  border-color: var(--text);
 }
 
 /* A shortcut isn't part of the item's name */
@@ -849,11 +852,12 @@ fieldset.new-project-row {
 }
 
 .brushes-panel {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
   padding: 8px;
   border-bottom: 1px solid var(--border);
-  overflow-y: auto;
 }
 
 .panel-title {
@@ -868,10 +872,78 @@ fieldset.new-project-row {
   font-size: 1rem;
 }
 
+.brush-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--icon);
+}
+
+.brush-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.brush-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+/* The categories beside the brushes */
+.brushes-columns {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 124px minmax(0, 1fr);
+  gap: 6px;
+  min-height: 0;
+}
+
+.brush-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brush-categories button {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 6px;
+  text-align: left;
+}
+
+.brush-count {
+  color: var(--muted);
+}
+
+.brushes-list li {
+  position: relative;
+}
+
+.brushes-list li[hidden] {
+  display: none;
+}
+
+.brush-favorite {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  padding: 2px;
+  border: none;
+  color: var(--icon);
+}
+
+button.brush-favorite[aria-pressed='true'] {
+  border: none;
+}
+
 .brushes-actions {
   display: flex;
   gap: 4px;
-  margin: 8px 0;
+  margin-top: 6px;
 }
 
 .brushes-actions button {
@@ -885,8 +957,10 @@ fieldset.new-project-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 0;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
@@ -1078,15 +1152,64 @@ input.slider-value {
   pointer-events: none; /* the drop goes to the window underneath */
 }
 
-.layers-actions {
+.panel-icons {
   display: flex;
-  flex-wrap: wrap; /* two buttons in each row */
-  gap: 4px;
-  margin-top: 8px;
+  gap: 2px;
 }
 
-.layers-actions button {
-  flex: 1 1 40%;
+/* The paper, under the layers, and the buttons at the foot of the panel */
+.paper-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-top: 2px solid transparent;
+}
+
+.paper-name {
+  padding-left: 11px;
+}
+
+.layers-footer {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+/* The eye that shows and hides a layer: a checkbox, with its icon where it shows */
+.layer-eye {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  color: var(--icon);
+}
+
+.layer-eye input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* On gray and white squares, for what is transparent */
+.layer-thumbnail {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 12px 12px;
+}
+
+.layer-thumbnail canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .layer-blend {
@@ -1187,7 +1310,7 @@ button.layer-name {
 .side-panels {
   display: flex;
   flex-direction: column;
-  width: 300px;
+  width: 340px;
   min-height: 0;
   border-left: 1px solid var(--border);
 }

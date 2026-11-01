@@ -3,14 +3,20 @@ import {
   Box,
   ChevronDown,
   ChevronRight,
+  Copy,
   CornerLeftDown,
+  Eye,
+  EyeOff,
   Folder,
   FolderOpen,
+  FolderPlus,
   Lock,
   LockOpen,
   Paperclip,
+  Plus,
   ScanEye,
   Shapes,
+  Trash2,
   Type,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -22,13 +28,14 @@ type Props = {
   layers: EngineSnapshot['layers'] // from the bottom to the top
   activeLayerId: number
   canDelete: boolean
-  canMergeDown: boolean
+  paperColor: string | null // null: a transparent paper
+  isPaperShown: boolean
+  thumbnailOf: (id: number) => HTMLCanvasElement | null // a layer's small picture, which keeps itself up to date
   onAdd: () => void
   onAddFolder: () => void
-  onAddOutside: () => void // a layer above the folder the active one is in, out of it
   onDelete: () => void
   onDuplicate: () => void
-  onMergeDown: () => void
+  onPaperShownChange: (shown: boolean) => void
   onSelect: (id: number) => void
   // Move a layer or folder into the folder "parentId" (null: none), right above "aboveId" in it, or at its bottom
   onMove: (id: number, parentId: number | null, aboveId: number | null) => void
@@ -100,13 +107,14 @@ export function LayersPanel({
   layers,
   activeLayerId,
   canDelete,
-  canMergeDown,
+  paperColor,
+  isPaperShown,
+  thumbnailOf,
   onAdd,
   onAddFolder,
-  onAddOutside,
   onDelete,
   onDuplicate,
-  onMergeDown,
+  onPaperShownChange,
   onSelect,
   onMove,
   onRename,
@@ -205,43 +213,22 @@ export function LayersPanel({
 
   return (
     <aside className="layers-panel">
-      <h2>{t('Layers')}</h2>
-      <div className="layers-actions">
-        <button onClick={onAdd}>{t('New layer')}</button>
-        <button
-          onClick={onAddFolder}
-          title={t('Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)')}
-        >
-          {t('New folder')}
-        </button>
-        <button
-          onClick={onAddOutside}
-          disabled={!active || (!active.isFolder && active.parentId === null)}
-          title={t('Add a layer above the folder the active layer is in (or above the active folder), out of it')}
-        >
-          {t('New layer outside')}
-        </button>
-        <button onClick={onDuplicate} title={t('Copy the active layer or folder above it (Ctrl+J)')}>
-          {t('Duplicate')}
-        </button>
-        <button
-          onClick={onMergeDown}
-          disabled={!canMergeDown}
-          title={
-            active?.isFolder
-              ? t('Merge all that is in the active folder into one layer (Ctrl+E)')
-              : t('Merge the active layer into the one under it (Ctrl+E). Both must be shown')
-          }
-        >
-          {t(active?.isFolder ? 'Merge folder' : 'Merge down')}
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={!canDelete}
-          title={active?.isFolder ? t('Delete the active folder with all that is in it') : t('Delete the active layer')}
-        >
-          {t(active?.isFolder ? 'Delete folder' : 'Delete layer')}
-        </button>
+      <div className="panel-title">
+        <h2>{t('Layers')}</h2>
+        <span className="panel-icons">
+          <button className="top-icon" aria-label={t('New layer')} title={t('New layer')} onClick={onAdd}>
+            <Plus size={18} aria-hidden />
+          </button>
+          <button
+            className="top-icon"
+            aria-label={t('Duplicate')}
+            title={t('Duplicate')}
+            disabled={!active}
+            onClick={onDuplicate}
+          >
+            <Copy size={16} aria-hidden />
+          </button>
+        </span>
       </div>
       {active && (
         <label className="layer-blend" title={t("How the active layer's paint goes onto what is under it")}>
@@ -284,13 +271,17 @@ export function LayersPanel({
               className={classes.filter(Boolean).join(' ') || undefined}
               style={{ paddingLeft: (layer.depth + (layer.clipped ? 1 : 0)) * INDENT_PX }}
             >
-              <input
-                type="checkbox"
-                checked={layer.visible}
-                onChange={e => onVisibleChange(layer.id, e.target.checked)}
-                aria-label={t('Show {name}', { name: layer.name })}
-                title={layer.visible ? t('Hide') : t('Show')}
-              />
+              <label className="layer-eye">
+                <input
+                  type="checkbox"
+                  checked={layer.visible}
+                  onChange={e => onVisibleChange(layer.id, e.target.checked)}
+                  aria-label={t('Show {name}', { name: layer.name })}
+                  title={layer.visible ? t('Hide') : t('Show')}
+                />
+                {layer.visible ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
+              </label>
+              {!layer.isFolder && <LayerThumbnail id={layer.id} thumbnailOf={thumbnailOf} />}
               {layer.clipped && (
                 <CornerLeftDown className="clip-arrow" size={14} aria-label={t('Clipped to the layers under it')} />
               )}
@@ -393,8 +384,56 @@ export function LayersPanel({
           )
         })}
       </ul>
+      <div className="paper-row">
+        <label className="layer-eye">
+          <input
+            type="checkbox"
+            checked={isPaperShown}
+            disabled={paperColor === null}
+            onChange={e => onPaperShownChange(e.target.checked)}
+            aria-label={t('Show the paper')}
+            title={
+              paperColor === null
+                ? t('This drawing has a transparent paper')
+                : t('Without its color, the drawing shows and exports as if the paper were transparent')
+            }
+          />
+          {isPaperShown ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
+        </label>
+        <span className="layer-thumbnail" style={paperColor ? { background: paperColor } : undefined} />
+        <span className="paper-name">{t('Paper')}</span>
+      </div>
+      <div className="layers-footer">
+        <button
+          className="top-icon"
+          aria-label={t('New folder')}
+          title={t('Add a folder to keep layers in (Ctrl+G puts the active layer in a new one)')}
+          onClick={onAddFolder}
+        >
+          <FolderPlus size={18} aria-hidden />
+        </button>
+        <button
+          className="top-icon"
+          aria-label={t(active?.isFolder ? 'Delete folder' : 'Delete layer')}
+          title={active?.isFolder ? t('Delete the active folder with all that is in it') : t('Delete the active layer')}
+          disabled={!canDelete}
+          onClick={onDelete}
+        >
+          <Trash2 size={18} aria-hidden />
+        </button>
+      </div>
     </aside>
   )
+}
+
+// A layer's small picture. The engine keeps it up to date by itself, so it only has to be put here
+function LayerThumbnail({ id, thumbnailOf }: { id: number; thumbnailOf: (id: number) => HTMLCanvasElement | null }) {
+  const boxRef = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const canvas = thumbnailOf(id)
+    if (canvas) boxRef.current!.replaceChildren(canvas)
+  }, [id, thumbnailOf])
+  return <span ref={boxRef} className="layer-thumbnail" />
 }
 
 type NameInputProps = {

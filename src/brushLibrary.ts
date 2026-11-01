@@ -1,5 +1,11 @@
 import { LydiaError, type ImportProblem } from './errors'
-import { BRUSH_EXTENSION, MAX_BRUSH_FILE_BYTES, parseBrushFile, type BrushPreset } from './engine/brushFile'
+import {
+  BRUSH_EXTENSION,
+  MAX_BRUSH_FILE_BYTES,
+  parseBrushFile,
+  type BrushCategory,
+  type BrushPreset,
+} from './engine/brushFile'
 import { decodeTip, type BrushTip } from './engine/brushTip'
 
 // The brushes the user can choose from: the ones that come with Lydia (the .lydbrush files in src/brushes) and the
@@ -29,6 +35,23 @@ const BUILT_IN_ORDER = [
   'sponge',
 ]
 export const DEFAULT_BRUSH_ID = 'built-in/soft-round'
+
+const BUILT_IN_CATEGORIES: Record<string, BrushCategory> = {
+  'soft-round': 'basic',
+  'hard-round': 'basic',
+  airbrush: 'basic',
+  calligraphy: 'pen',
+  pencil: 'pen',
+  bristles: 'artistic',
+  chalk: 'texture',
+  sponge: 'texture',
+  dashes: 'special',
+  pixel: 'special',
+}
+
+// A brush's category in the brushes panel: its own, if its file says, or Special
+export const categoryOf = ({ id, preset }: LibraryBrush): BrushCategory =>
+  preset.category ?? BUILT_IN_CATEGORIES[id.slice('built-in/'.length)] ?? 'special'
 
 const builtInBrushes: LibraryBrush[] = Object.entries(builtInFiles)
   .map(([path, file]) => {

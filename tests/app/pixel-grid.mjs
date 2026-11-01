@@ -20,7 +20,7 @@ page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
 page.on('console', m => {
   if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
 })
-await page.setViewport({ width: 1400, height: 900 })
+await page.setViewport({ width: 1920, height: 1080 })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let failures = 0
 const check = (name, ok, extra = '') => {
@@ -300,7 +300,7 @@ console.log(`   a frame at 800% on 10000×10000: ${frameTimes.on} ms with the gr
 
 // ----- A display at 150%: still one pixel of the display -----
 await back()
-await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1.5 })
+await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1.5 })
 await page.reload({ waitUntil: 'networkidle0' })
 await newDrawing(200, 100)
 await choose('Hard round')
@@ -318,7 +318,7 @@ check(
 
 // ----- The Brush Designer has it too -----
 await back()
-await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 1 })
+await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 })
 await page.reload({ waitUntil: 'networkidle0' })
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && window.lydia.app.renderer, { timeout: 90000 })

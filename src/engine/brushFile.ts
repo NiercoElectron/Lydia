@@ -49,7 +49,16 @@ export type NoiseMode = (typeof NOISE_MODES)[number]
 
 // A brush, as it is in its file: a name, the picture of its tip (a PNG image), its shape, and the picture of its
 // paper grain (a PNG image), if it has one
-export type BrushPreset = BrushShape & { name: string; tip: Uint8Array; grain?: Uint8Array }
+export type BrushPreset = BrushShape & {
+  name: string
+  tip: Uint8Array
+  grain?: Uint8Array
+  category?: BrushCategory
+}
+
+// Where a brush is listed in the brushes panel (see categoryOf in brushLibrary.ts)
+export const BRUSH_CATEGORIES = ['basic', 'pen', 'watercolor', 'artistic', 'texture', 'special', 'materials'] as const
+export type BrushCategory = (typeof BRUSH_CATEGORIES)[number]
 
 export const DEFAULT_SHAPE: BrushShape = {
   spacing: 0.1,
@@ -169,7 +178,8 @@ export function parseBrushFile(text: string, fallbackName: string): BrushPreset 
   shape.pixel = PIXEL_TIPS.find(pixelTip => pixelTip === data.pixel) ?? DEFAULT_SHAPE.pixel
 
   const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : fallbackName
-  return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip, ...(grain && { grain }) }
+  const category = BRUSH_CATEGORIES.find(each => each === data.category)
+  return { ...shape, name: name.slice(0, MAX_NAME_LENGTH), tip, ...(grain && { grain }), ...(category && { category }) }
 }
 
 // The text of a .lydbrush file for this brush

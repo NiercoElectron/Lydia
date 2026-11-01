@@ -89,6 +89,14 @@ export function createProjection(
 
   const paperTile = new Graphics()
   if (background !== null) paperTile.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(background)
+
+  // Show the paper's color under the layers, or nothing. All the tiles change, and show at once when they are ready
+  function setPaperShown(shown: boolean) {
+    paperTile.clear()
+    if (shown && background !== null) paperTile.rect(0, 0, TILE_SIZE, TILE_SIZE).fill(background)
+    markAllBelowStale()
+    composeLater(projection.keys())
+  }
   const belowSprite = new Sprite()
 
   let stroke: ShownStroke | null = null
@@ -1247,6 +1255,7 @@ export function createProjection(
     tiles: projection,
     composeTile,
     composeAll,
+    setPaperShown,
     composeLayerTiles,
     composeClippedTiles,
     composeLater,

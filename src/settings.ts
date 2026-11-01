@@ -50,6 +50,33 @@ export function saveOpenPanels(panels: OpenPanels) {
   }
 }
 
+// The brushes kept as favorites and the ones used last, by their id (see brushLibrary.ts)
+export const MAX_RECENT_BRUSHES = 12
+const FAVORITE_BRUSHES_KEY = 'lydia.favoriteBrushes'
+const RECENT_BRUSHES_KEY = 'lydia.recentBrushes'
+
+function loadIds(key: string) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveIds(key: string, ids: string[]) {
+  try {
+    localStorage.setItem(key, JSON.stringify(ids))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
+export const loadFavoriteBrushes = () => loadIds(FAVORITE_BRUSHES_KEY)
+export const saveFavoriteBrushes = (ids: string[]) => saveIds(FAVORITE_BRUSHES_KEY, ids)
+export const loadRecentBrushes = () => loadIds(RECENT_BRUSHES_KEY)
+export const saveRecentBrushes = (ids: string[]) => saveIds(RECENT_BRUSHES_KEY, ids)
+
 // How often the drawing is autosaved, in minutes (0: never, see autosave.ts)
 export const AUTOSAVE_CHOICES = [1, 2, 5, 0]
 export const DEFAULT_AUTOSAVE = 2

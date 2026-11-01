@@ -59,6 +59,8 @@ const startingSnapshot: EngineSnapshot = {
   exportScale: 1,
   trayColors: [],
   exportScales: [1],
+  paperColor: null,
+  isPaperShown: true,
 }
 const startingView: ViewState = { zoom: 1, rotation: 0, flipped: false }
 const subscribeToNothing = () => () => {}
