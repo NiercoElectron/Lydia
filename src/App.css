@@ -523,10 +523,21 @@ fieldset.new-project-row {
   width: 100%;
 }
 
+/* Open, Advanced takes a row of its own, and what is in it stays inside the column */
+.color-side .advanced-menu:has(.advanced-panel) {
+  flex-basis: 100%;
+}
+
 .color-side .advanced-panel {
   position: static;
+  align-items: stretch;
   width: auto;
   box-shadow: none;
+  white-space: normal;
+}
+
+.color-side .button-group {
+  flex-wrap: wrap;
 }
 
 .color-side .advanced-panel label {
@@ -665,8 +676,10 @@ fieldset.new-project-row {
 .tool-column {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 2px;
-  width: 160px;
+  width: max-content; /* as wide as the longest name, which depends on the language */
+  min-width: 160px;
   padding: 8px 4px;
   overflow-y: auto;
 }
@@ -698,16 +711,22 @@ fieldset.new-project-row {
   border-color: var(--control-line);
 }
 
-/* The filters, and the tools that share one row, opened under it */
+/* The filters, and the tools that share one row, opened under it. Closed, a list has no height but still counts for the
+   width of the column, so opening it doesn't change the size of the drawing */
 .tool-list {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 2px;
+  height: 0;
   padding-left: 12px;
+  overflow: hidden;
+  visibility: hidden;
 }
 
 .tool-list.open {
-  display: flex;
+  height: auto;
+  overflow: visible;
+  visibility: visible;
 }
 
 .tool-column button:hover {
