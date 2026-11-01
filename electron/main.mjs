@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { allowFile, setUpFiles } from './files.mjs'
+import { readMemory } from './memory.mjs'
 
 // The desktop app: a window that shows Lydia. It is the same app as in the browser, built by Vite into "dist", and this
 // file adds what a browser can't do
@@ -31,6 +32,8 @@ protocol.registerSchemesAsPrivileged([
 
 // A project the system asked to open, until the page takes it
 let openedFile = null
+// How much memory the computer has, read once before the window opens: the page needs it to start a drawing
+let memory = null
 // The words of the question on closing, in the interface's language, from the page
 let closeTexts = {
   message: 'There are changes that are not saved.',
@@ -139,6 +142,10 @@ app.on('open-file', (event, file) => {
   openProject(file)
 })
 
+ipcMain.on('memory', event => {
+  event.returnValue = memory
+})
+
 ipcMain.on('minimize', event => BrowserWindow.fromWebContents(event.sender).minimize())
 
 ipcMain.on('close-texts', (_event, texts) => {
@@ -151,7 +158,8 @@ ipcMain.handle('take-opened-file', () => {
   return file
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  memory = await readMemory()
   protocol.handle(SCHEME, serveBuiltApp)
   setUpFiles()
   const started = projectIn(process.argv)

@@ -58,7 +58,8 @@ The gear at the top right opens **Settings**:
 - **Autosave**: how often Lydia keeps a copy of the drawing (see [Autosave](#autosave-and-recovering-a-drawing)).
 - **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes
   switching layers and undoing faster, but choosing more than the card has makes everything very slow or loses the
-  drawing. Choose at most half of your card's memory; if you're not sure, keep the default.
+  drawing. Choose at most half of your card's memory; if you're not sure, keep the default. The desktop app reads the
+  memory of the computer and keeps this at **Automatic**, half of the card's memory.
 
 ## The editor
 

@@ -7,7 +7,7 @@ import { useLanguage } from './i18n'
 import { BrushDesigner } from './screens/BrushDesigner'
 import { Editor } from './screens/Editor'
 import { Home } from './screens/Home'
-import { loadGpuMemory, saveGpuMemory } from './settings'
+import { gpuMemoryInUse, loadGpuMemory, saveGpuMemory } from './settings'
 import { readTrayFolder, type TrayImage } from './tray'
 import './App.css'
 
@@ -81,7 +81,7 @@ function App() {
     return (
       <Editor
         project={screen.project}
-        gpuMemory={gpuMemory}
+        gpuMemory={gpuMemoryInUse(gpuMemory)}
         tray={tray}
         onTrayChange={setTray}
         wantsToLeave={fileToOpen !== null}
@@ -92,7 +92,15 @@ function App() {
   }
   if (screen.name === 'designer') {
     const { tipSize, pixel, brush } = screen
-    return <BrushDesigner tipSize={tipSize} pixel={pixel} brush={brush} gpuMemory={gpuMemory} onBack={goHome} />
+    return (
+      <BrushDesigner
+        tipSize={tipSize}
+        pixel={pixel}
+        brush={brush}
+        gpuMemory={gpuMemoryInUse(gpuMemory)}
+        onBack={goHome}
+      />
+    )
   }
   return (
     <Home

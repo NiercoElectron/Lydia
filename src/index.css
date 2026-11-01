@@ -6,6 +6,7 @@ body,
 }
 
 body {
+  background: var(--page);
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
 

@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron')
 // is the only door. window.lydiaDesktop is missing in a browser
 contextBridge.exposeInMainWorld('lydiaDesktop', {
   platform: process.platform,
+  memory: ipcRenderer.sendSync('memory'),
   setInterfaceSize: percent => webFrame.setZoomFactor(percent / 100),
   minimize: () => ipcRenderer.send('minimize'),
   setCloseTexts: texts => ipcRenderer.send('close-texts', texts),

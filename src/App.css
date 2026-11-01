@@ -12,6 +12,7 @@
   --slider-edge: #a0a0a0; /* the thin line around the dot */
   --muted: #666;
   --icon: #222;
+  --page: #fff; /* behind everything: without it, the desktop app's window would show through */
   --panel: #fff;
   --well: #f2f2f2;
   --hover: #eee;
@@ -42,6 +43,7 @@
   --slider-edge: #7d7d7d;
   --muted: #a0a0a0;
   --icon: #ddd;
+  --page: #121212;
   --panel: #262626;
   --well: #303030;
   --hover: #333;

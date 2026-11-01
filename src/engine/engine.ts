@@ -1,6 +1,7 @@
 // Without this PixiJS writes code as it runs, which the desktop app doesn't allow (see electron/main.mjs)
 import 'pixi.js/unsafe-eval'
 import type { DrawingSnapshot } from '../autosave'
+import { desktop } from '../desktop'
 import { translate } from '../i18n'
 import { LydiaError } from '../errors'
 import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js'
@@ -197,9 +198,11 @@ export type TextTyping = {
   isFontHere: boolean
 }
 
-// Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
-// budget for uncompressed tiles is a quarter of that guess
-const ramGigabytes = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4
+// Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), and the
+// desktop app knows it. The budget for uncompressed tiles is a quarter of that
+const ramGigabytes = desktop
+  ? desktop.memory.ram / 1024 ** 3
+  : ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4)
 const RAW_BUDGET = Math.max(0.5, ramGigabytes / 4) * 1024 ** 3
 
 // PNG keeps every pixel exactly, and the transparency of a transparent background; JPEG makes much smaller files by

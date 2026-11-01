@@ -220,8 +220,10 @@ export function LayersPanel({
 
   function handlePointerUp(e: React.PointerEvent) {
     if (!drag || drag.pointerId !== e.pointerId) return
-    if (moving?.drop) {
-      const { parentId, aboveId } = placeOf(moving.drop)
+    // From where the pointer is now: the last move may not have reached the screen yet
+    const drop = moving && dropAt(moving, movedTo(e.clientY, moving), e.clientX)
+    if (moving && drop) {
+      const { parentId, aboveId } = placeOf(drop)
       onMove(moving.id, parentId, aboveId)
     }
     onSelect(drag.id) // the one in hand becomes the active one, moved or not

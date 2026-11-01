@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { desktop } from '../desktop'
 import { useLanguage } from '../i18n'
 import { tilesInGigabytes } from '../engine/tiles'
 import {
+  AUTOMATIC_GPU_MEMORY,
+  automaticGpuMemory,
   AUTOSAVE_CHOICES,
   DEFAULT_GPU_MEMORY,
   GPU_MEMORY_CHOICES,
@@ -14,7 +17,7 @@ import { InterfaceSettings } from './SettingsMenu'
 type Props = {
   isOpen: boolean
   onClose: () => void
-  gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
+  gpuMemory: number // GB of the graphics card's memory to use, or AUTOMATIC_GPU_MEMORY (see settings.ts)
   onGpuMemoryChange: (gigabytes: number) => void
 }
 
@@ -23,6 +26,7 @@ type Props = {
 export function SettingsWindow({ isOpen, onClose, gpuMemory, onGpuMemoryChange }: Props) {
   const { t, locale } = useLanguage()
   const [autosaveMinutes, setAutosaveMinutes] = useState(loadAutosaveMinutes)
+  const gigabytesOf = (bytes: number) => Math.round(bytes / 1024 ** 3).toLocaleString(locale)
 
   return (
     <ModalWindow className="settings-window" title={t('Settings')} isOpen={isOpen} onClose={onClose}>
@@ -53,14 +57,29 @@ export function SettingsWindow({ isOpen, onClose, gpuMemory, onGpuMemoryChange }
         <label>
           {t('Memory Lydia may use to keep layers ready')}
           <select value={gpuMemory} onChange={e => onGpuMemoryChange(Number(e.target.value))}>
+            {desktop && (
+              <option value={AUTOMATIC_GPU_MEMORY}>
+                {t('Automatic ({amount} GB)', { amount: automaticGpuMemory().toLocaleString(locale) })}
+              </option>
+            )}
             {GPU_MEMORY_CHOICES.map(gigabytes => (
               <option key={gigabytes} value={gigabytes}>
                 {gigabytes.toLocaleString(locale)} GB ({tilesInGigabytes(gigabytes).toLocaleString(locale)} {t('tiles')}
-                {gigabytes === DEFAULT_GPU_MEMORY ? t(', default') : ''})
+                {!desktop && gigabytes === DEFAULT_GPU_MEMORY ? t(', default') : ''})
               </option>
             ))}
           </select>
         </label>
+        {desktop && (
+          <p className="hint">
+            {desktop.memory.card === null
+              ? t('This computer has {ram} GB of RAM.', { ram: gigabytesOf(desktop.memory.ram) })
+              : t('This computer has {card} GB on its graphics card and {ram} GB of RAM.', {
+                  card: gigabytesOf(desktop.memory.card),
+                  ram: gigabytesOf(desktop.memory.ram),
+                })}
+          </p>
+        )}
         <p className="hint">
           {t('A tile is a square of 256×256 pixels of a layer. A full layer of 10000×10000 has 1,600 tiles.')}
         </p>
@@ -75,10 +94,16 @@ export function SettingsWindow({ isOpen, onClose, gpuMemory, onGpuMemoryChange }
           </p>
           <p>
             <strong>{t("Choose at most half of your graphics card's memory.")}</strong>{' '}
-            {t(
-              'To see it on Windows: Task Manager → Performance → GPU → Dedicated GPU memory. If you are unsure, keep',
-            )}{' '}
-            {DEFAULT_GPU_MEMORY} GB.
+            {desktop ? (
+              t('If you are unsure, keep Automatic.')
+            ) : (
+              <>
+                {t(
+                  'To see it on Windows: Task Manager → Performance → GPU → Dedicated GPU memory. If you are unsure, keep',
+                )}{' '}
+                {DEFAULT_GPU_MEMORY} GB.
+              </>
+            )}
           </p>
         </div>
       </section>

@@ -148,7 +148,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Decision:** keep tiles uncompressed while there is RAM to spare, and compress the least recently used ones beyond a
   budget. A compressed tile that is needed again is unpacked and kept uncompressed for a while too. Browsers only tell
   roughly how much RAM the computer has (Chrome says at most 8 GB), so the budget is a quarter of that guess (2 GB on
-  most computers). The desktop app will be able to use the real amount.
+  most computers). The desktop app uses a quarter of the real amount (decision 87).
 - **Why:** with every tile compressed, painting over several layers of detailed painting spent most of the time
   unpacking (650 ms of a ~1 s stroke over 6 layers). Krita and Photoshop also work with a memory limit.
 - **Evidence:** test without a screen, with the budget forced to 512 MB and two 10000×10000 layers full of detailed
@@ -379,7 +379,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 28. The user chooses the graphics card memory, for now
 
 - **Date:** 2026-10-22
-- **Status:** adopted (until the desktop app)
+- **Status:** adopted in the browser; the desktop app chooses by itself (decision 87)
 - **Decision:** the start screen has a choice of how much of the graphics card's memory Lydia may use to keep layers
   ready (the cache of decision 27): 0.5, 1, 2, 3, 4, 6 or 8 GB, 2 GB by default, remembered by the browser. Each
   choice shows how many tiles it keeps (2 GB = 8,192), next to a reminder that a full layer has 1,600. Under it,
@@ -2654,6 +2654,11 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     all drawings, and it stays between sessions (my choice).
   - **Not signed** for now (my choice): a certificate is paid every year. Windows warns when installing.
   - **Interface size**, in the settings of the desktop app: 100% to 200%. A browser has its zoom for that, and the window doesn't.
+  - **Memory is read from the computer**, as decisions 14 and 28 planned. The RAM budget is a quarter of the real RAM. The
+    graphics card's setting starts at **Automatic**, half of the card's memory, the rule the settings already gave, and can
+    still be chosen by hand. Electron knows the card's name but not its memory: on Windows it comes from the registry, and
+    on a laptop with two cards it is the one drawing the window. A Mac's card shares the RAM, so there it is a quarter of the
+    RAM. Elsewhere, or if the reading fails, it is the browser's 2 GB.
   - **Saving is real now** (my idea: a folder for what Lydia makes): `Projects` and `Exports` in `Documents\Lydia`, apart so
     that the `.lyd` files don't mix with the images (my choice). Save asks for a name once, in `Projects`, and then **Ctrl+S** goes
     over the same file; **Save as…** asks again. Export goes straight to `Exports`, with no window, named after the drawing and
@@ -2684,7 +2689,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - The window goes on getting frames out of sight (`backgroundThrottling: false`). The autosave waits for a frame, so with
     Lydia minimized or behind another window it stopped, the moment it is needed most. A test found it, by failing only when
     I had another window in front. In a browser a hidden tab still waits: a page can't change that.
-- **Checked:** `tests/app/desktop.mjs` opens the built pages in Electron itself, paints, saves over the same file, exports, opens
+- **Checked:** a page of the app kept 10.5 GB of tiles' worth of memory, so a budget of a quarter of the RAM fits on my computer
+  with room to spare. `tests/app/desktop.mjs` opens the built pages in Electron itself, paints, saves over the same file, exports, opens
   the project again from the start screen and from a second Lydia, over a drawing with changes too. The installer's program
   was opened too. It also copies, imports, changes and removes brushes and images in the folders, saves from the Brush
   Designer, and kills the app to find the drawing in Recover, with the brushes and the tray still there. The double click

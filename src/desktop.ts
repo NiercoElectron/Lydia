@@ -5,6 +5,7 @@ type KeptFile = { file: string; name: string; size: number; time: number }
 // What only the desktop app can do (see electron/preload.cjs). It is undefined in a browser
 type Desktop = {
   platform: string
+  memory: { ram: number; card: number | null } // in bytes. "card": null where it can't be told
   setInterfaceSize: (percent: number) => void
   setCloseTexts: (texts: { message: string; leave: string; stay: string }) => void
   chooseToSave: (name: string) => Promise<string | null>

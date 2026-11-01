@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
+import { tmpdir, totalmem } from 'node:os'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
 import { PORT, ROOT } from './setup.mjs'
@@ -158,6 +158,49 @@ await page.waitForFunction(() => document.querySelectorAll('button').length > 0)
 await sleep(500)
 const afterReload = await page.evaluate(() => window.devicePixelRatio)
 check('and stays so', afterReload === bigger.ratio, String(afterReload))
+
+// ----- The computer's memory -----
+const memory = await page.evaluate(() => window.lydiaDesktop.memory)
+check('it knows the real RAM', memory.ram === totalmem(), String(memory.ram))
+if (process.platform === 'win32') check('and the graphics card', memory.card > 0, String(memory.card))
+await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
+await page.click('button[aria-label="Settings"]')
+await page.waitForFunction(() => document.querySelector('.gpu-memory select'))
+const firstChoice = await page.$eval('.gpu-memory select', select => ({
+  shown: select.selectedOptions[0].textContent,
+  isFirst: select.selectedIndex === 0,
+}))
+check('it chooses by itself', firstChoice.isFirst && firstChoice.shown.startsWith('Automatic ('), firstChoice.shown)
+const half = memory.card / 2 / 1024 ** 3
+const chosen = Number(firstChoice.shown.match(/[\d.]+/)?.[0])
+if (process.platform === 'win32') {
+  check('at most half of the card', chosen <= half * 1.01 && chosen * 2 > half / 2, `${chosen} of ${half * 2}`)
+}
+await page.reload()
+
+// ----- Both themes -----
+// The window has a color of its own, which a page without one shows: its text would be dark on dark in the light theme
+for (const [theme, background, text] of [
+  ['light', 'rgb(255, 255, 255)', 'rgb(0, 0, 0)'],
+  ['dark', 'rgb(18, 18, 18)', 'rgb(255, 255, 255)'],
+]) {
+  await page.evaluate(theme => localStorage.setItem('lydia.theme', theme), theme)
+  await page.reload()
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
+  await page.screenshot({ path: path.join(ROOT, 'tests/app/output', `desktop-${theme}.png`) })
+  const colors = await page.evaluate(() => ({
+    background: getComputedStyle(document.body).backgroundColor,
+    text: getComputedStyle(document.querySelector('.home')).color,
+    theme: document.documentElement.dataset.theme,
+  }))
+  check(
+    `the ${theme} theme has its own colors`,
+    colors.background === background && colors.text === text,
+    JSON.stringify(colors),
+  )
+}
+await page.evaluate(() => localStorage.removeItem('lydia.theme'))
+await page.reload()
 
 // ----- Saving and exporting -----
 check('the folders are there', existsSync(projects) && existsSync(exportsFolder))

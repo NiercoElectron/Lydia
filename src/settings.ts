@@ -1,3 +1,4 @@
+import { desktop } from './desktop'
 import { MAX_TAPER, NO_TAPER, TAPER_THINS, type TaperSettings } from './engine/dabs'
 import { DEFAULT_DPI, isColor, isDpi, MAX_SIZE, MAX_TRAY_COLORS, MIN_SIZE } from './engine/projectFile'
 import { DEFAULT_STABILIZER, MAX_STABILIZER, STABILIZER_MODES, type StabilizerSettings } from './engine/stabilizer'
@@ -5,17 +6,33 @@ import { DEFAULT_STABILIZER, MAX_STABILIZER, STABILIZER_MODES, type StabilizerSe
 // Choices remembered by this browser between visits
 
 // How much of the graphics card's memory Lydia may use to keep layers ready (see decision 28), in GB. Browsers don't
-// tell how much memory the graphics card has, so the user chooses
+// tell how much memory the graphics card has, so there the user chooses. The desktop app chooses by itself, unless the
+// user chooses
 export const GPU_MEMORY_CHOICES = [0.5, 1, 2, 3, 4, 6, 8]
 export const DEFAULT_GPU_MEMORY = 2
+export const AUTOMATIC_GPU_MEMORY = 0
 const GPU_MEMORY_KEY = 'lydia.gpuMemory'
 
+// What the desktop app chooses: half of the graphics card's, as the settings tell anyone choosing by hand. A Mac's
+// graphics card shares the RAM with everything else, so there it is a quarter of that
+export function automaticGpuMemory() {
+  const { ram, card } = desktop!.memory
+  const share = desktop!.platform === 'darwin' ? ram / 4 : card === null ? null : card / 2
+  if (share === null) return DEFAULT_GPU_MEMORY
+  // A card sold as 8 GB says a little less
+  return GPU_MEMORY_CHOICES.findLast(gigabytes => gigabytes * 1024 ** 3 <= share * 1.01) ?? GPU_MEMORY_CHOICES[0]
+}
+
+// What the setting comes to, in GB
+export const gpuMemoryInUse = (choice: number) => (choice === AUTOMATIC_GPU_MEMORY ? automaticGpuMemory() : choice)
+
 export function loadGpuMemory() {
+  const usual = desktop ? AUTOMATIC_GPU_MEMORY : DEFAULT_GPU_MEMORY
   try {
     const saved = Number(localStorage.getItem(GPU_MEMORY_KEY))
-    return GPU_MEMORY_CHOICES.includes(saved) ? saved : DEFAULT_GPU_MEMORY
+    return GPU_MEMORY_CHOICES.includes(saved) ? saved : usual
   } catch {
-    return DEFAULT_GPU_MEMORY // the browser doesn't let this page keep anything (a private window, for example)
+    return usual // the browser doesn't let this page keep anything (a private window, for example)
   }
 }
 
