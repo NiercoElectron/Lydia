@@ -49,7 +49,7 @@ import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
-import { desktop, nameOfFile, writeFile } from '../desktop'
+import { desktop, nameOfFile, sameItems, writeFile } from '../desktop'
 import { downloadBlob, timestamp } from '../files'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { isTyping } from '../engine/view'
@@ -65,7 +65,15 @@ import {
   saveTrayColors,
   type OpenPanels,
 } from '../settings'
-import { freeTrayImage, isImageFile, makeTrayImages, TRAY_DRAG_TYPE, type TrayImage } from '../tray'
+import {
+  addToTrayFolder,
+  freeTrayImage,
+  isImageFile,
+  makeTrayImages,
+  removeFromTrayFolder,
+  TRAY_DRAG_TYPE,
+  type TrayImage,
+} from '../tray'
 
 const REPOSITORY = 'https://github.com/NiercoElectron/Lydia/blob/main'
 const GUIDE_URL = `${REPOSITORY}/docs/guide.md`
@@ -237,11 +245,17 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
 
   useEffect(() => {
     let cancelled = false
-    loadBrushes().then(list => {
-      if (!cancelled) setBrushes(list)
-    })
+    const load = () => {
+      loadBrushes().then(list => {
+        if (!cancelled) setBrushes(current => (sameItems(current, list) ? current : list))
+      })
+    }
+    load()
+    // What is copied into the Brushes folder shows up on coming back to Lydia
+    if (desktop) window.addEventListener('focus', load)
     return () => {
       cancelled = true
+      window.removeEventListener('focus', load)
     }
   }, [])
 
@@ -313,7 +327,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
   const addToTray = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return []
-      const { added, problems } = await makeTrayImages(files)
+      const { added, problems } = await (desktop ? addToTrayFolder(files) : makeTrayImages(files))
       if (added.length > 0) {
         onTrayChange(images => [...images, ...added])
         setIsTrayOpen(true)
@@ -329,7 +343,13 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
     [onTrayChange, t],
   )
 
-  function removeFromTray(image: TrayImage) {
+  async function removeFromTray(image: TrayImage) {
+    try {
+      if (image.keptAs) await removeFromTrayFolder(image)
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-306'))
+      return
+    }
     onTrayChange(images => images.filter(other => other !== image))
     freeTrayImage(image)
   }

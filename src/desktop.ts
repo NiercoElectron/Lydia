@@ -1,3 +1,7 @@
+// A folder of what stays for all drawings, as files (see electron/files.mjs)
+type KeptFolder = 'brushes' | 'tray'
+type KeptFile = { file: string; name: string; size: number; time: number }
+
 // What only the desktop app can do (see electron/preload.cjs). It is undefined in a browser
 type Desktop = {
   platform: string
@@ -6,6 +10,10 @@ type Desktop = {
   chooseToSave: (name: string) => Promise<string | null>
   chooseToOpen: () => Promise<string | null>
   exportPath: (name: string) => Promise<string>
+  listKept: (folder: KeptFolder) => Promise<KeptFile[]>
+  placeToKeep: (folder: KeptFolder, name: string) => Promise<string>
+  keptFile: (folder: KeptFolder, name: string) => Promise<string>
+  removeKept: (folder: KeptFolder, name: string) => Promise<void>
   startWriting: (file: string) => Promise<number>
   writeChunk: (id: number, bytes: Uint8Array) => Promise<void>
   finishWriting: (id: number) => Promise<void>
@@ -44,5 +52,21 @@ export async function readFile(file: string) {
   return bytes.buffer
 }
 
+// The name of a file, without its folder
+export const baseName = (file: string) => file.split(/[\\/]/).pop() ?? file
+
 // The name of a file, without its folder and extension
-export const nameOfFile = (file: string) => (file.split(/[\\/]/).pop() ?? file).replace(/\.[^.]*$/, '')
+export const nameOfFile = (file: string) => baseName(file).replace(/\.[^.]*$/, '')
+
+// Work on a folder one at a time: looking into it while a file is added would miss that file. Coming back from the
+// system's window that chose the file does both at once
+export function oneAtATime() {
+  let last: Promise<unknown> = Promise.resolve()
+  return <T>(work: () => Promise<T>) => {
+    const running = last.then(work, work)
+    last = running
+    return running
+  }
+}
+
+export const sameItems = <T>(a: T[], b: T[]) => a.length === b.length && a.every((item, index) => item === b[index])

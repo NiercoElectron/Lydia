@@ -1,17 +1,19 @@
+import { baseName, desktop, oneAtATime, readFile, writeFile } from './desktop'
 import { LydiaError, type ImportProblem } from './errors'
 
-// The tray (decision 43): images imported to put into drawings, kept while Lydia is open so they can be dragged onto
-// a drawing again and again without importing them again. Each keeps its file (compressed, so small) and a small
-// picture to show; the image itself is decoded again every time it goes into a drawing, so the tray holds no big
-// images in memory
+// The tray (decision 43): images imported to put into drawings, kept so they can be dragged onto a drawing again and
+// again without importing them again. Each keeps its file (compressed, so small) and a small picture to show; the image
+// itself is decoded again every time it goes into a drawing, so the tray holds no big images in memory. In the browser
+// it lasts while Lydia is open. The desktop app keeps it as files in its Tray folder, for all drawings
 
 export type TrayImage = {
   id: number
   name: string // the file's name without its extension, for the new layer
-  file: Blob
+  file: File
   thumbnail: string // the address of its small picture (an object URL)
   width: number
   height: number
+  keptAs?: string // the name of its file in the Tray folder of the desktop app
 }
 
 // What a tray image dragged onto the drawing carries: its id
@@ -54,3 +56,64 @@ export async function makeTrayImages(files: File[]) {
 export function freeTrayImage(image: TrayImage) {
   URL.revokeObjectURL(image.thumbnail)
 }
+
+// ----- The folder of the desktop app -----
+
+// What is in the folder, by the name of its file: a file is only read once
+const kept = new Map<string, TrayImage>()
+const inTurn = oneAtATime()
+// The files of the folder that are images: anything else there is left alone
+const IMAGE_FILE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i
+
+function keepImage(name: string, image: TrayImage) {
+  const keptImage = { ...image, keptAs: name }
+  kept.set(name, keptImage)
+  return keptImage
+}
+
+// The tray as the folder has it now
+export const readTrayFolder = () =>
+  inTurn(async () => {
+    const files = await desktop!.listKept('tray')
+    const found = files.filter(({ name }) => IMAGE_FILE.test(name))
+    for (const [name, image] of kept) {
+      if (found.some(each => each.name === name)) continue
+      kept.delete(name)
+      freeTrayImage(image)
+    }
+    for (const { file, name } of found) {
+      if (kept.has(name)) continue
+      try {
+        const { added } = await makeTrayImages([new File([await readFile(file)], name)])
+        // A file that doesn't open is tried again next time: it may still have been on its way here
+        if (added.length > 0) keepImage(name, added[0])
+      } catch (error) {
+        console.warn(`The image ${name} can't be read:`, error)
+      }
+    }
+    return [...kept.values()]
+  })
+
+// Make tray images of these files, with a copy in the folder
+export const addToTrayFolder = (files: File[]) =>
+  inTurn(async () => {
+    const { added, problems } = await makeTrayImages(files)
+    const keptImages: TrayImage[] = []
+    for (const image of added) {
+      try {
+        const place = await desktop!.placeToKeep('tray', image.file.name)
+        await writeFile(place, image.file)
+        keptImages.push(keepImage(baseName(place), image))
+      } catch (error) {
+        freeTrayImage(image)
+        problems.push({ name: image.file.name, error })
+      }
+    }
+    return { added: keptImages, problems }
+  })
+
+export const removeFromTrayFolder = ({ keptAs }: TrayImage) =>
+  inTurn(async () => {
+    await desktop!.removeKept('tray', keptAs!)
+    kept.delete(keptAs!)
+  })

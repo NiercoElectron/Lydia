@@ -1,6 +1,15 @@
 // The desktop app itself: the built pages in Electron's window, at Lydia's own address, with a drawing on the graphics card
 import { execSync, spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -25,32 +34,44 @@ const exportsFolder = path.join(folder, 'Lydia', 'Exports')
 const env = { ...process.env, LYDIA_TEST_FOLDER: folder, LYDIA_TEST_OPEN: 'Untitled.lyd' }
 delete env.ELECTRON_RUN_AS_NODE
 delete env.LYDIA_DEV_URL
-const app = spawn(electron, ['.', `--remote-debugging-port=${PORT}`, `--user-data-dir=${userData}`, '--lang=en-US'], {
-  cwd: ROOT,
-  env,
-  stdio: 'ignore',
-})
+const problems = []
+let app, browser, page
+
+async function start() {
+  app = spawn(electron, ['.', `--remote-debugging-port=${PORT}`, `--user-data-dir=${userData}`, '--lang=en-US'], {
+    cwd: ROOT,
+    env,
+    stdio: 'ignore',
+  })
+  browser = null
+  page = undefined
+  for (let i = 0; i < 100 && !browser; i++) {
+    await sleep(200)
+    browser = await puppeteer
+      .connect({ browserURL: `http://127.0.0.1:${PORT}`, defaultViewport: null })
+      .catch(() => null)
+  }
+  check('the app starts', browser !== null)
+  for (let i = 0; i < 50 && !page; i++) {
+    page = (await browser.pages()).find(each => each.url().startsWith('app://'))
+    if (!page) await sleep(200)
+  }
+  page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
+  page.on('console', m => {
+    if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
+  })
+  // Lydia's questions are the system's windows here, which a test can't answer: they would stay on the screen
+  const answerYes = () => {
+    window.confirm = () => true
+  }
+  await page.evaluateOnNewDocument(answerYes)
+  await page.evaluate(answerYes)
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
+}
 
 process.on('exit', () => app.kill()) // also when a step fails
 
-let browser = null
-for (let i = 0; i < 100 && !browser; i++) {
-  await sleep(200)
-  browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${PORT}`, defaultViewport: null }).catch(() => null)
-}
-check('the app starts', browser !== null)
-
-let page
-for (let i = 0; i < 50 && !page; i++) {
-  page = (await browser.pages()).find(each => each.url().startsWith('app://'))
-  if (!page) await sleep(200)
-}
-const problems = []
-page.on('pageerror', e => problems.push('PAGE ERROR ' + e))
-page.on('console', m => {
-  if (m.type() === 'error' || m.type() === 'warn') problems.push(m.type() + ': ' + m.text())
-})
-await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
+await start()
 check('at its own address', page.url() === 'app://lydia/', page.url())
 
 const facts = await page.evaluate(async () => ({
@@ -140,7 +161,6 @@ check('and stays so', afterReload === bigger.ratio, String(afterReload))
 
 // ----- Saving and exporting -----
 check('the folders are there', existsSync(projects) && existsSync(exportsFolder))
-page.on('dialog', dialog => dialog.accept())
 const startButton = text =>
   page.evaluate(text => [...document.querySelectorAll('button')].find(b => b.textContent === text).click(), text)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
@@ -223,6 +243,158 @@ const other = spawn(electron, ['.', `--user-data-dir=${userData}`, projectFile],
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
 check('and over a drawing with changes, after asking', true)
 await new Promise(resolve => other.once('close', resolve))
+
+// ----- Brushes and the tray, as files -----
+const brushesFolder = path.join(folder, 'Lydia', 'Brushes')
+const trayFolder = path.join(folder, 'Lydia', 'Tray')
+check('their folders are there', existsSync(brushesFolder) && existsSync(trayFolder))
+const until = async (isDone, what) => {
+  for (let i = 0; i < 100 && !(await isDone()); i++) await sleep(100)
+  check(what, await isDone())
+}
+const comeBack = async () => {
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await sleep(600)
+}
+const brushCount = () =>
+  page.$$eval('.brush-count', counts => counts.reduce((sum, each) => sum + Number(each.textContent), 0))
+const brushFile = name =>
+  JSON.stringify({ ...JSON.parse(readFileSync(path.join(ROOT, 'src/brushes/pencil.lydbrush'), 'utf8')), name })
+const brushNames = () => readdirSync(brushesFolder).join()
+
+const builtIn = await brushCount()
+writeFileSync(path.join(brushesFolder, 'Copied here.lydbrush'), brushFile('Copied here'))
+writeFileSync(path.join(brushesFolder, 'broken.lydbrush'), 'not a brush')
+writeFileSync(path.join(brushesFolder, 'notes.txt'), 'not a brush')
+await comeBack()
+await comeBack()
+check('a brush copied into the folder shows up', (await brushCount()) === builtIn + 1, String(await brushCount()))
+const broken = problems.filter(problem => problem.includes('broken.lydbrush'))
+check('a broken file is left out, and only said once', broken.length === 1, String(broken.length))
+problems.splice(0, problems.length, ...problems.filter(problem => !broken.includes(problem)))
+
+const toImport = path.join(folder, 'Imported here.lydbrush')
+writeFileSync(toImport, brushFile('Imported here'))
+await (await page.$('.brushes-panel input[type=file]')).uploadFile(toImport)
+await until(
+  async () => existsSync(path.join(brushesFolder, 'Imported here.lydbrush')) && (await brushCount()) === builtIn + 2,
+  'an imported brush goes into the folder',
+)
+await page.evaluate(() =>
+  [...document.querySelectorAll('.brushes-actions button')].find(b => b.textContent === 'Delete').click(),
+)
+await until(
+  async () => !existsSync(path.join(brushesFolder, 'Imported here.lydbrush')) && (await brushCount()) === builtIn + 1,
+  'and Delete takes its file away',
+)
+writeFileSync(path.join(brushesFolder, 'Copied here.lydbrush'), brushFile('Changed outside'))
+await comeBack()
+const changedName = await page.$$eval('button.brush', list => list.some(b => b.title === 'Changed outside'))
+check('a file changed outside is read again', changedName && (await brushCount()) === builtIn + 1)
+rmSync(path.join(brushesFolder, 'Copied here.lydbrush'))
+await comeBack()
+check('and one taken away is gone', (await brushCount()) === builtIn, String(await brushCount()))
+writeFileSync(path.join(brushesFolder, 'Copied here.lydbrush'), brushFile('Copied here'))
+await comeBack()
+
+await page.click('.tray-button')
+await page.waitForSelector('.tray-panel')
+const trayCount = () => page.$$eval('.tray-images li', list => list.length)
+const image = path.join(exportsFolder, images[0])
+copyFileSync(image, path.join(trayFolder, 'copied.png'))
+writeFileSync(path.join(trayFolder, 'notes.txt'), 'not an image')
+await comeBack()
+await until(async () => (await trayCount()) === 1, 'an image copied into the Tray folder shows up')
+await (await page.$('.tray-panel input[type=file]')).uploadFile(image)
+await until(
+  async () => existsSync(path.join(trayFolder, images[0])) && (await trayCount()) === 2,
+  'an imported image goes into the folder',
+)
+check('nothing left over', readdirSync(trayFolder).length === 3, readdirSync(trayFolder).join())
+await page.evaluate(() => [...document.querySelectorAll('.tray-remove')].at(-1).click())
+await until(
+  async () => !existsSync(path.join(trayFolder, images[0])) && (await trayCount()) === 1,
+  'and taking it out takes its file away',
+)
+
+// The Brush Designer saves into the folder too: a new file for a copy, and the same file for its changes
+await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Brush Designer'))
+await startButton('Brush Designer')
+await page.waitForSelector('.designer-start select.start-brush')
+await page.waitForFunction(() => document.querySelector('select.start-brush').options.length > 1)
+await page.select('select.start-brush', 'added/Copied here.lydbrush')
+await startButton('Open Brush Designer')
+await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Save copy'), {
+  timeout: 30000,
+})
+await sleep(800)
+await startButton('Save copy')
+await until(() => brushNames().includes('Copied here copy.lydbrush'), 'the Brush Designer keeps a copy in the folder')
+const nameField = await page.$('.name-row input')
+await nameField.click({ clickCount: 3 })
+await nameField.type('Renamed')
+await page.waitForFunction(() =>
+  [...document.querySelectorAll('button')].some(b => b.textContent === 'Save changes' && !b.disabled),
+)
+await startButton('Save changes')
+await until(
+  () => readFileSync(path.join(brushesFolder, 'Copied here copy.lydbrush'), 'utf8').includes('Renamed'),
+  'and saving changes goes over that file',
+)
+check('with no new file', readdirSync(brushesFolder).length === 4, brushNames())
+rmSync(path.join(brushesFolder, 'broken.lydbrush'))
+await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
+
+// ----- Closing all of a sudden -----
+// The autosave stays in what the app keeps by itself (decision 87): here it must bring a drawing back after a crash
+await page.evaluate(() => localStorage.setItem('lydia.autosave', '1'))
+await startButton('New project…')
+await page.waitForSelector('dialog.new-project[open]')
+await page.click('button[type=submit]')
+await page.waitForFunction(() => document.querySelectorAll('button.brush').length > 0, { timeout: 60000 })
+await sleep(800)
+await stroke(0)
+// Lydia out of sight goes on keeping copies, and no frames are drawn for a window out of sight unless it asks for them
+await page.evaluate(() => window.lydiaDesktop.minimize())
+const hasCopy = () =>
+  page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open('lydia-autosave', 1)
+        request.onerror = () => reject(request.error)
+        request.onsuccess = () => {
+          const database = request.result
+          const all = database.transaction('drawings').objectStore('drawings').getAll()
+          all.onsuccess = () => {
+            database.close()
+            resolve(all.result.some(drawing => drawing.isComplete && !drawing.isSaved))
+          }
+        }
+      }),
+  )
+let copied = false
+for (let i = 0; i < 40 && !copied; i++) {
+  await sleep(2000)
+  copied = await hasCopy()
+}
+check('the drawing is autosaved', copied)
+await browser.disconnect()
+app.kill('SIGKILL')
+await sleep(2000)
+await start()
+await page.waitForSelector('.recover', { timeout: 10000 })
+check('after a crash it is in Recover', true)
+await page.evaluate(() => [...document.querySelectorAll('.recover button')].find(b => b.textContent === 'Open').click())
+await page.waitForSelector('.draw-space canvas', { timeout: 30000 })
+check('and opens', true)
+await page.waitForFunction(() => document.querySelectorAll('button.brush').length > 0, { timeout: 60000 })
+await sleep(500)
+check('the brushes are still there', (await brushCount()) === builtIn + 2, String(await brushCount()))
+await page.click('.tray-button')
+await page.waitForSelector('.tray-panel')
+await until(async () => (await trayCount()) === 1, 'and so is the tray')
 
 check('no errors', problems.length === 0, problems.join(' | '))
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED')

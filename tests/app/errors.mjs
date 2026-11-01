@@ -74,7 +74,7 @@ assert.equal(errorMessage(new LydiaError('LYD-104'), 'LYD-105'), 'LYD-104: This 
 assert.equal(logged.length, 0)
 const unexpected = new Error('QuotaExceededError')
 assert.equal(errorMessage(unexpected, 'LYD-106'), 'LYD-106: Could not save the project. (QuotaExceededError)')
-assert.equal(errorMessage('no space', 'LYD-212'), 'LYD-212: Could not save the brush in this browser. (no space)')
+assert.equal(errorMessage('no space', 'LYD-212'), 'LYD-212: Could not save the brush. (no space)')
 assert.deepEqual(logged, [unexpected, 'no space'])
 console.log('ok an unexpected error is told under its code, with its own message, and goes to the console')
 console.log('ALL PASSED')

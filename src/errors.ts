@@ -25,7 +25,7 @@ export const ERRORS = {
   'LYD-209': 'Could not add this brush.',
   'LYD-210': 'Could not use this brush.',
   'LYD-211': 'Could not delete the brush.',
-  'LYD-212': 'Could not save the brush in this browser.',
+  'LYD-212': 'Could not save the brush.',
   'LYD-213': 'Could not make a picture of the tip.',
   'LYD-214': 'Lydia has no brush called "{name}".',
   'LYD-215': 'The paper grain of this brush is not a PNG image.',
@@ -39,6 +39,7 @@ export const ERRORS = {
   'LYD-303': 'Could not put the image into the drawing.',
   'LYD-304': 'This image is too big for this browser.',
   'LYD-305': 'Could not export the image.',
+  'LYD-306': 'Could not take the image out of the tray.',
   'LYD-401': 'Lydia needs WebGL 2, which this browser or graphics card does not support.',
   'LYD-402': 'Could not start the drawing.',
   'LYD-403':

@@ -159,6 +159,9 @@ they stay until taken out.
     doesn't bring its tip: use the `.bundle` it came in, if there is one.
   - **Export** saves the chosen brush as a file, to share it.
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
+  - In the desktop app added brushes are files in `Documents\Lydia\Brushes`. Copying a `.lydbrush` file there adds it, when you
+    come back to Lydia. Brushes from other apps go through **Import…**, which makes them `.lydbrush` files. **Delete** sends
+    the file to the Recycle Bin.
 - **The Pixel brush** is for pixel art: whole pixels with hard edges, from 1 pixel up. While it or any other pixel
   brush is chosen, new selections get hard edges (see [Selections](#selections)).
 - **Pixel-perfect**, in the bar while a pixel brush is chosen, leaves out the doubled corners of lines drawn by hand:
@@ -398,8 +401,9 @@ The **Tray** button, at the foot of the tool column, opens the tray over the dra
 - An image bigger than the paper keeps its size: the part off the paper shows faded while it is placed, and stays
   in the layer, hidden, to be moved onto the paper later. (Only an image bigger than 10000 pixels is made smaller.)
 - Pointing at an image in the tray shows a **×** that takes it out of the tray.
-- The tray stays the same from one drawing to the next while Lydia is open, and is empty again after the page is
-  closed or reloaded.
+- The tray stays the same from one drawing to the next. In the browser it is empty again after the page is closed or
+  reloaded. In the desktop app it stays: its images are files in `Documents\Lydia\Tray`, an image copied there shows up
+  when you come back to Lydia, and the **×** sends the file to the Recycle Bin.
 
 ## Layers
 

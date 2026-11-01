@@ -1,6 +1,7 @@
 import { useLanguage } from '../i18n'
 import { X } from 'lucide-react'
 import { useRef } from 'react'
+import { desktop } from '../desktop'
 import { TRAY_DRAG_TYPE, type TrayImage } from '../tray'
 
 type Props = {
@@ -36,9 +37,13 @@ export function TrayPanel({ images, onImport, onRemove }: Props) {
       <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={handleFilesChosen} />
       {images.length === 0 ? (
         <p className="notice">
-          {t(
-            'Import images, then drag them onto the drawing as often as you like. They stay here while Lydia is open.',
-          )}
+          {desktop
+            ? t(
+                'Import images, then drag them onto the drawing as often as you like. They stay here, in the Tray folder of Lydia.',
+              )
+            : t(
+                'Import images, then drag them onto the drawing as often as you like. They stay here while Lydia is open.',
+              )}
         </p>
       ) : (
         <ul className="tray-images">

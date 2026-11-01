@@ -12,7 +12,9 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **The desktop app** ([decision 87](docs/decisions.md#87-the-desktop-app)): Lydia in a window of its own, for now from the code
   (`npm run desktop`), with **Interface size** in its settings. Projects go to `Documents\Lydia\Projects`, where **Ctrl+S**
   saves over the same file after the first time, with **Save as…** for another, exported images go straight to
-  `Documents\Lydia\Exports`, and a `.lyd` opens with a double click.
+  `Documents\Lydia\Exports`, and a `.lyd` opens with a double click. Added brushes and the tray are files in
+  `Documents\Lydia\Brushes` and `Documents\Lydia\Tray`, so the tray stays between sessions, and what is copied there
+  shows up in Lydia.
 - **Ctrl+S** saves in the browser too.
 
 ### Fixed

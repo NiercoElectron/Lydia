@@ -1,3 +1,4 @@
+import { baseName, desktop, oneAtATime, readFile, writeFile } from './desktop'
 import { LydiaError, type ImportProblem } from './errors'
 import {
   BRUSH_EXTENSION,
@@ -17,12 +18,12 @@ import {
 } from './engine/foreignBrushFile'
 
 // The brushes the user can choose from: the ones that come with Lydia (the .lydbrush files in src/brushes) and the
-// ones the user added. A browser can't look into a folder of the computer by itself, so added brushes are kept by
-// the browser, in its database for pages (IndexedDB). The desktop version will read them from a real folder instead
-// (see decision 29)
+// ones the user added. A browser can't look into a folder of the computer by itself, so there added brushes are kept by
+// the browser, in its database for pages (IndexedDB). The desktop app keeps them as files in its Brushes folder, where
+// adding a brush is just copying its file (see decision 29)
 
 export type LibraryBrush = {
-  id: string // "built-in/<file name>" or "added/<number>"
+  id: string // "built-in/<file name>", or "added/<number>", or "added/<file name>" in the desktop app
   isBuiltIn: boolean
   preset: BrushPreset
   file: string // the text of its .lydbrush file, to export it again just as it came
@@ -80,8 +81,11 @@ export function builtInBrush(name: string) {
   return brush
 }
 
-// The number an added brush is kept under in the browser's database: "added/12" -> 12
-const keyOf = (id: string) => Number(id.slice('added/'.length))
+const ADDED = 'added/'
+
+// The number an added brush is kept under in the browser's database, or its file in the desktop app
+const keyOf = (id: string) => Number(id.slice(ADDED.length))
+const fileNameOf = (id: string) => id.slice(ADDED.length)
 
 // ----- Tips -----
 
@@ -130,10 +134,66 @@ async function withStore<T>(mode: IDBTransactionMode, work: (store: IDBObjectSto
   }
 }
 
+// ----- The folder of the desktop app -----
+
+// What was read from each file, by its name: a file is only read again when it changes. No brush: it can't be used
+const kept = new Map<string, { time: number; brush: LibraryBrush | null }>()
+const inTurn = oneAtATime()
+
+type KeptBrushFile = { file: string; name: string; size: number }
+
+// The brush in a file. One that reads the same stays the same object, so that it isn't given to the engine again
+async function readKeptBrush({ file, name, size }: KeptBrushFile, known?: LibraryBrush | null) {
+  try {
+    if (size > MAX_BRUSH_FILE_BYTES) throw new LydiaError('LYD-207')
+    const text = new TextDecoder().decode(await readFile(file))
+    if (known?.file === text) return known
+    const id = ADDED + name
+    tips.delete(id) // its tip may have changed
+    return { id, isBuiltIn: false, preset: parseBrushFile(text, name.slice(0, -BRUSH_EXTENSION.length)), file: text }
+  } catch (error) {
+    console.warn(`The brush file ${name} can't be used:`, error)
+    return null
+  }
+}
+
+async function readBrushesFolder() {
+  const files = await desktop!.listKept('brushes')
+  const found = files.filter(({ name }) => name.toLowerCase().endsWith(BRUSH_EXTENSION))
+  for (const name of kept.keys()) {
+    if (found.some(each => each.name === name)) continue
+    kept.delete(name)
+    tips.delete(ADDED + name)
+  }
+  const brushes: LibraryBrush[] = []
+  for (const each of found) {
+    let entry = kept.get(each.name)
+    if (entry?.time !== each.time) {
+      entry = { time: each.time, brush: await readKeptBrush(each, entry?.brush) }
+      kept.set(each.name, entry)
+    }
+    if (entry.brush) brushes.push(entry.brush)
+  }
+  return brushes
+}
+
+// A new added brush, in the folder or in the browser's database
+async function keepBrush(file: string, preset: BrushPreset): Promise<LibraryBrush> {
+  if (!desktop) {
+    const key = await withStore('readwrite', store => store.add({ file }))
+    return { id: ADDED + key, isBuiltIn: false, preset, file }
+  }
+  const place = await desktop.placeToKeep('brushes', preset.name + BRUSH_EXTENSION)
+  await writeFile(place, new Blob([file]))
+  const name = baseName(place)
+  const brush = { id: ADDED + name, isBuiltIn: false, preset, file }
+  kept.set(name, { time: 0, brush })
+  return brush
+}
+
 // ----- The library -----
 
-// All the brushes: first the ones that come with Lydia, then the added ones, in the order they were added
-export async function loadBrushes(): Promise<LibraryBrush[]> {
+async function readBrowserBrushes() {
   let stored: StoredBrush[] = []
   try {
     stored = await withStore('readonly', store => store.getAll() as IDBRequest<StoredBrush[]>)
@@ -143,13 +203,25 @@ export async function loadBrushes(): Promise<LibraryBrush[]> {
   const added: LibraryBrush[] = []
   for (const { id, file } of stored) {
     try {
-      added.push({ id: `added/${id}`, isBuiltIn: false, preset: parseBrushFile(file, 'Brush'), file })
+      added.push({ id: ADDED + id, isBuiltIn: false, preset: parseBrushFile(file, 'Brush'), file })
     } catch (error) {
       console.warn(`An added brush (${id}) can't be used anymore:`, error)
     }
   }
-  return [...builtInBrushes, ...added]
+  return added
 }
+
+// All the brushes: first the ones that come with Lydia, then the added ones, in the order they were added
+export const loadBrushes = () =>
+  inTurn(async (): Promise<LibraryBrush[]> => {
+    if (!desktop) return [...builtInBrushes, ...(await readBrowserBrushes())]
+    try {
+      return [...builtInBrushes, ...(await readBrushesFolder())]
+    } catch (error) {
+      console.warn('Could not read the brushes folder:', error)
+      return builtInBrushes
+    }
+  })
 
 // What a brush from another app had that stayed out of it
 export type BrushNote = { name: string; leftOut: LeftOut[] }
@@ -158,7 +230,9 @@ export const BRUSH_FILE_TYPES = [BRUSH_EXTENSION, ...FOREIGN_BRUSH_EXTENSIONS]
 
 // Add brush files to the library, Lydia's or another app's, which become Lydia's. A file that isn't a brush that works, or
 // that is already in the library, is left out with a message saying why
-export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
+export const addBrushFiles = (files: File[], library: LibraryBrush[]) => inTurn(() => addFiles(files, library))
+
+async function addFiles(files: File[], library: LibraryBrush[]) {
   const added: LibraryBrush[] = []
   const problems: ImportProblem[] = []
   const notes: BrushNote[] = []
@@ -166,8 +240,7 @@ export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
   async function add(text: string, preset: BrushPreset) {
     if ([...library, ...added].some(brush => brush.file === text)) throw new LydiaError('LYD-208')
     await decodeTip(preset.tip, preset.grain) // a tip that can't be painted with is found now, not at the first stroke
-    const id = await withStore('readwrite', store => store.add({ file: text }))
-    added.push({ id: `added/${id}`, isBuiltIn: false, preset, file: text })
+    added.push(await keepBrush(text, preset))
   }
 
   async function addForeign(file: File) {
@@ -209,19 +282,38 @@ export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
   return { added, problems, notes }
 }
 
-export async function removeBrush(brush: LibraryBrush) {
-  if (brush.isBuiltIn) return
-  await withStore('readwrite', store => store.delete(keyOf(brush.id)))
-  tips.delete(brush.id)
-}
+export const removeBrush = (brush: LibraryBrush) =>
+  inTurn(async () => {
+    if (brush.isBuiltIn) return
+    if (desktop) {
+      await desktop.removeKept('brushes', fileNameOf(brush.id))
+      kept.delete(fileNameOf(brush.id))
+    } else {
+      await withStore('readwrite', store => store.delete(keyOf(brush.id)))
+    }
+    tips.delete(brush.id)
+  })
 
 // Keep a brush made in the Brush Designer. "replacing" is the id it got the last time it was saved, so saving again
 // changes that brush instead of adding another one. Returns the brush's id
 export async function saveBrush(file: string, replacing?: string) {
+  if (desktop) return saveInFolder(file, replacing)
   const key = await withStore('readwrite', store =>
     replacing ? store.put({ id: keyOf(replacing), file }) : store.add({ file }),
   )
-  const id = `added/${key}`
+  const id = ADDED + key
   tips.delete(id) // its tip may have changed
   return id
 }
+
+const saveInFolder = (file: string, replacing?: string) =>
+  inTurn(async () => {
+    const name = parseBrushFile(file, 'Brush').name + BRUSH_EXTENSION
+    const place = replacing
+      ? await desktop!.keptFile('brushes', fileNameOf(replacing))
+      : await desktop!.placeToKeep('brushes', name)
+    await writeFile(place, new Blob([file]))
+    const id = ADDED + baseName(place)
+    tips.delete(id) // its tip may have changed
+    return id
+  })

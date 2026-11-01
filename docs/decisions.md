@@ -395,7 +395,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 29. Brushes are files
 
 - **Date:** 2026-10-22
-- **Status:** adopted (the brushes folder: planned for the desktop app)
+- **Status:** adopted (the brushes folder came with the desktop app, decision 87)
 - **Decision:**
   - A brush is a `.lydbrush` file. It is JSON text with three things in it:
     - a name;
@@ -408,7 +408,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
       (IndexedDB);
     - **Export** saves the chosen brush as a file;
     - **Delete** removes an added brush.
-  - The desktop app (1.0) will read a real folder of brushes, where adding a brush is just copying its file there.
+  - The desktop app reads a real folder of brushes, where adding a brush is just copying its file there (decision 87).
   - A Brush Designer, for drawing a tip and saving it as a brush, comes in 0.5.0.
 - **Why:**
   - It was my idea: brushes that can be shared and added just by moving a file, like the brushes of Krita
@@ -2662,9 +2662,24 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     disk can't ruin the last save. If it fails, the drawing counts as not saved. It goes to the app in pieces of 64 MB, as a
     big drawing is too much to hand over at once.
   - The page can only reach a file that came from a window of the system or from these folders.
+  - **Brushes and the tray are files too**, in `Brushes` and `Tray` in `Documents\Lydia`, kept between sessions, with one tray for
+    all drawings (my choice). What is copied there shows up on coming back to Lydia, and changes and removals too. It looks
+    when the window gets the focus instead of watching the folders: nothing runs while I paint, and a file still being
+    copied is simply read at the next look. Only `.lydbrush` files count: a file from another app can hold hundreds of
+    brushes, so those go through **Import…**, which writes one `.lydbrush` for each.
+  - An added brush is known by its file's name, so favorites follow the file. Deleting one, or taking an image out of the
+    tray, sends the file to the Recycle Bin, as it may be the only copy.
+  - The **autosave stays where it was**, in the database the app keeps by itself, and doesn't become files (Claude's
+    call). It is written so that a crash at any moment leaves a whole copy, and writes only the tiles that changed. As
+    files it would have to prove all that again, for copies nobody needs to see. `desktop.mjs` kills the app and recovers.
+  - The window goes on getting frames out of sight (`backgroundThrottling: false`). The autosave waits for a frame, so with
+    Lydia minimized or behind another window it stopped, the moment it is needed most. A test found it, by failing only when
+    I had another window in front. In a browser a hidden tab still waits: a page can't change that.
 - **Checked:** `tests/app/desktop.mjs` opens the built pages in Electron itself, paints, saves over the same file, exports, opens
   the project again from the start screen and from a second Lydia, over a drawing with changes too. The installer's program
-  was opened too. The double click itself, on the installed app, and macOS were not checked by a test.
+  was opened too. It also copies, imports, changes and removes brushes and images in the folders, saves from the Brush
+  Designer, and kills the app to find the drawing in Recover, with the brushes and the tray still there. The double click
+  itself, on the installed app, and macOS were not checked by a test.
 
 ## Open questions
 

@@ -43,7 +43,7 @@ longer used. The list in the code is in `src/errors.ts`.
 | LYD-209 | Could not add this brush.                                                                       | Something else went wrong while adding it: the cause is in parentheses.                                                        |
 | LYD-210 | Could not use this brush.                                                                       | The chosen brush couldn't be made ready to paint with: the cause is in parentheses.                                            |
 | LYD-211 | Could not delete the brush.                                                                     | The browser didn't let Lydia take it out of its storage: the cause is in parentheses.                                          |
-| LYD-212 | Could not save the brush in this browser.                                                       | The browser didn't let Lydia keep it, for example in a private window: the cause is in parentheses.                            |
+| LYD-212 | Could not save the brush.                                                                       | The browser didn't let Lydia keep it, for example in a private window: the cause is in parentheses.                            |
 | LYD-213 | Could not make a picture of the tip.                                                            | The browser couldn't make the tip's image.                                                                                     |
 | LYD-214 | Lydia has no brush called "{name}".                                                             | One of the brushes that come with Lydia is missing. It should never happen: it is a mistake in Lydia.                          |
 | LYD-215 | The paper grain of this brush is not a PNG image.                                               | The brush file is damaged: the picture of its paper grain can't be read.                                                       |
@@ -55,13 +55,14 @@ longer used. The list in the code is in `src/errors.ts`.
 
 ## 3: images and the tray
 
-| Code    | Message                                   | What it means                                                                       |
-| ------- | ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| LYD-301 | Not an image Lydia can open.              | The browser can't open this file as an image.                                       |
-| LYD-302 | Could not add this image.                 | Something else went wrong while adding it to the tray: the cause is in parentheses. |
-| LYD-303 | Could not put the image into the drawing. | Something went wrong while placing it: the cause is in parentheses.                 |
-| LYD-304 | This image is too big for this browser.   | The exported image is bigger than the browser can make. Try a smaller **Scale**.    |
-| LYD-305 | Could not export the image.               | Something else went wrong while exporting: the cause is in parentheses.             |
+| Code    | Message                                   | What it means                                                                           |
+| ------- | ----------------------------------------- | --------------------------------------------------------------------------------------- |
+| LYD-301 | Not an image Lydia can open.              | The browser can't open this file as an image.                                           |
+| LYD-302 | Could not add this image.                 | Something else went wrong while adding it to the tray: the cause is in parentheses.     |
+| LYD-303 | Could not put the image into the drawing. | Something went wrong while placing it: the cause is in parentheses.                     |
+| LYD-304 | This image is too big for this browser.   | The exported image is bigger than the browser can make. Try a smaller **Scale**.        |
+| LYD-305 | Could not export the image.               | Something else went wrong while exporting: the cause is in parentheses.                 |
+| LYD-306 | Could not take the image out of the tray. | The desktop app couldn't move its file to the Recycle Bin: the cause is in parentheses. |
 
 ## 4: the browser and the graphics card
 

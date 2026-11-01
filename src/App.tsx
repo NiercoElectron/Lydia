@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LibraryBrush } from './brushLibrary'
-import { desktop, readFile } from './desktop'
+import { desktop, readFile, sameItems } from './desktop'
 import { parseProject, type ProjectData } from './engine/projectFile'
 import { errorMessage } from './errors'
 import { useLanguage } from './i18n'
@@ -8,7 +8,7 @@ import { BrushDesigner } from './screens/BrushDesigner'
 import { Editor } from './screens/Editor'
 import { Home } from './screens/Home'
 import { loadGpuMemory, saveGpuMemory } from './settings'
-import type { TrayImage } from './tray'
+import { readTrayFolder, type TrayImage } from './tray'
 import './App.css'
 
 // The screen being shown: the start screen, a drawing, or the Brush Designer with the size of its paper, for a smooth
@@ -24,7 +24,7 @@ function App() {
   // A project the system asked to open, waiting to get to the start screen (see Editor's wantsToLeave)
   const [fileToOpen, setFileToOpen] = useState<string | null>(null)
   const [gpuMemory, setGpuMemory] = useState(loadGpuMemory)
-  // The tray (see tray.ts) stays the same from one drawing to the next, until Lydia is closed
+  // The tray (see tray.ts) stays the same from one drawing to the next
   const [tray, setTray] = useState<TrayImage[]>([])
 
   function handleGpuMemoryChange(gigabytes: number) {
@@ -47,6 +47,20 @@ function App() {
       stay: t('Cancel'),
     })
   }, [t])
+
+  // What is copied into the Tray folder shows up on coming back to Lydia
+  useEffect(() => {
+    if (!desktop) return
+    const read = () => {
+      readTrayFolder().then(
+        images => setTray(current => (sameItems(current, images) ? current : images)),
+        error => console.warn('Could not read the tray folder:', error),
+      )
+    }
+    read()
+    window.addEventListener('focus', read)
+    return () => window.removeEventListener('focus', read)
+  }, [])
 
   const isHome = screen.name === 'home'
   useEffect(() => {

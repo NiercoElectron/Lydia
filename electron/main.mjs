@@ -76,6 +76,9 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       preload: path.join(HERE, 'preload.cjs'),
+      // The autosave and the work under way go on with Lydia out of sight: they wait for frames, which a window out of
+      // sight doesn't get otherwise
+      backgroundThrottling: false,
     },
   })
   window.once('ready-to-show', () => {
@@ -96,6 +99,10 @@ function createWindow() {
   // A page that asks before closing (changes not saved) only gets an answer here: Electron shows nothing by itself, and
   // the window would just refuse to close
   window.webContents.on('will-prevent-unload', event => {
+    if (process.env.LYDIA_TEST_FOLDER) {
+      event.preventDefault() // a test has nobody to answer the system's windows (see files.mjs)
+      return
+    }
     const answer = dialog.showMessageBoxSync(window, {
       type: 'warning',
       buttons: [closeTexts.leave, closeTexts.stay],
@@ -129,6 +136,8 @@ app.on('open-file', (event, file) => {
   event.preventDefault()
   openProject(file)
 })
+
+ipcMain.on('minimize', event => BrowserWindow.fromWebContents(event.sender).minimize())
 
 ipcMain.on('close-texts', (_event, texts) => {
   closeTexts = texts
