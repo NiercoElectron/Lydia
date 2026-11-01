@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+release
 *.local
 
 # What the tests of the app write (see tests/app/README.md)

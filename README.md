@@ -116,8 +116,9 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] 1.0: the desktop app for Windows, macOS and Linux (Electron), with a real brushes folder and memory limits read
-      from the computer
+- [ ] 1.0: the desktop app for Windows and macOS (Electron), with real folders for brushes and the tray, and memory
+      limits read from the computer
+- [ ] 1.x: Linux, opening and pasting images
 
 Later, once there is a pen with tilt to try it on:
 
@@ -138,15 +139,17 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 
 ### Available scripts
 
-| Command                | Description                                |
-| ---------------------- | ------------------------------------------ |
-| `npm run dev`          | Start the development server               |
-| `npm run build`        | Type-check and build for production        |
-| `npm run preview`      | Preview the production build locally       |
-| `npm run lint`         | Run ESLint                                 |
-| `npm run format`       | Format all files with Prettier             |
-| `npm run format:check` | Check that all files follow the code style |
-| `npm run test:app`     | Run the tests of the app in Chrome         |
+| Command                 | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `npm run dev`           | Start the development server                         |
+| `npm run build`         | Type-check and build for production                  |
+| `npm run preview`       | Preview the production build locally                 |
+| `npm run desktop`       | Open the desktop app on the development server       |
+| `npm run desktop:build` | Build the installer for this computer into `release` |
+| `npm run lint`          | Run ESLint                                           |
+| `npm run format`        | Format all files with Prettier                       |
+| `npm run format:check`  | Check that all files follow the code style           |
+| `npm run test:app`      | Run the tests of the app in Chrome                   |
 
 ## Project structure
 

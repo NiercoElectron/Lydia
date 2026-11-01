@@ -1,12 +1,22 @@
 import { Settings } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { desktop } from '../desktop'
 import { useLanguage, type LanguageChoice } from '../i18n'
+import { INTERFACE_SIZES, loadInterfaceSize, saveInterfaceSize } from '../settings'
 import { setThemeChoice, THEME_CHOICES, useTheme } from '../theme'
 
 // The interface's colors and language, in the editor's gear and in the start screen's
 export function InterfaceSettings() {
   const { t, choice, setChoice } = useLanguage()
   const theme = useTheme()
+  const [size, setSize] = useState(loadInterfaceSize)
+
+  function chooseSize(chosen: number) {
+    setSize(chosen)
+    saveInterfaceSize(chosen)
+    desktop?.setInterfaceSize(chosen)
+  }
+
   return (
     <>
       <div
@@ -31,6 +41,18 @@ export function InterfaceSettings() {
           <option value="es">Español</option>
         </select>
       </label>
+      {desktop && (
+        <label className="theme-choice" title={t("How big Lydia's buttons and panels are. The drawing never changes")}>
+          {t('Interface size')}
+          <select value={size} onChange={e => chooseSize(Number(e.target.value))}>
+            {INTERFACE_SIZES.map(each => (
+              <option key={each} value={each}>
+                {each}%
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </>
   )
 }

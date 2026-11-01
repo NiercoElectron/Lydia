@@ -5,6 +5,8 @@ drawing, clicks, presses keys, paints with the mouse, and checks what comes out:
 layers, what undo brings back, the files Lydia saves. They were written along with the features they check (the
 decisions in [docs/decisions.md](../../docs/decisions.md) say what each feature was checked for).
 
+`desktop.mjs` is different: it opens the built pages in Electron's own window.
+
 ## Running them
 
 You need Google Chrome (Lydia needs WebGL 2, which Chrome has even with no window). If it isn't where it usually is,

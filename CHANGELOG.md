@@ -7,6 +7,15 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **The desktop app** ([decision 87](docs/decisions.md#87-the-desktop-app)): Lydia in a window of its own, for now from the code
+  (`npm run desktop`), with **Interface size** in its settings.
+
+### Fixed
+
+- Adding one brush that left something out said "1 brushes added".
+
 ## [0.20.0] - 2026-11-01
 
 ### Added

@@ -2,9 +2,15 @@
   "name": "lydia",
   "private": true,
   "version": "0.20.0",
+  "description": "An open source drawing app",
+  "author": "Enrico",
+  "license": "MIT",
   "type": "module",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "vite",
+    "desktop": "node scripts/desktop.mjs",
+    "desktop:build": "npm run build && electron-builder",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -12,6 +18,33 @@
     "format:check": "prettier . --check",
     "test:app": "node tests/app/run.mjs",
     "translations": "node scripts/translations.mjs"
+  },
+  "build": {
+    "appId": "io.github.nierco.lydia",
+    "productName": "Lydia",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": {
+        "target": "dmg",
+        "arch": "universal"
+      },
+      "category": "public.app-category.graphics-design"
+    }
   },
   "dependencies": {
     "@fontsource/bangers": "^5.3.0",
@@ -35,6 +68,8 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",

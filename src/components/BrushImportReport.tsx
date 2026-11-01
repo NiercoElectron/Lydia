@@ -28,7 +28,7 @@ export function BrushImportReport({ added, notes, problems, onClose }: Props) {
   }
   return (
     <ModalWindow className="brush-report" title={t('Brushes added')} isOpen onClose={onClose}>
-      <p>{t('{count} brushes added.', { count: added })}</p>
+      <p>{added === 1 ? t('1 brush added.') : t('{count} brushes added.', { count: added })}</p>
       {notes.length > 0 && (
         <>
           <p className="hint">{t('These may paint differently from their original. Left out:')}</p>

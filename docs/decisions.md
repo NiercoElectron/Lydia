@@ -2632,6 +2632,29 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   a skin tone, half off the paper, and the outlines of the 168 smooth brushes of Lydia and the real Krita and Photoshop files
   against the old ones: the same size, 18 of them with a few parts more or less.
 
+## 87. The desktop app
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Decision:**
+  - **Windows and macOS** in 1.0, the two I have to try it on (my choice). Linux comes in a 1.x, when someone can open it.
+  - Open image, paste image and my list of small improvements wait for 1.x (my choice): the desktop app comes first.
+  - **Updates** come by themselves from GitHub's releases, downloaded in the background and installed on closing or when I
+    accept them, never in the middle of a drawing (my choice).
+  - **Brushes and the tray** are real folders, `Brushes` and `Tray` in `Documents\Lydia`, in plain sight. There is one tray for
+    all drawings, and it stays between sessions (my choice).
+  - **Not signed** for now (my choice): a certificate is paid every year. Windows warns when installing.
+  - **Interface size**, in the settings of the desktop app: 100% to 200%. A browser has its zoom for that, and the window doesn't.
+- **How:**
+  - The window shows the same pages as the browser, built by Vite, at an address of Lydia's own (`app://lydia/`), so that
+    fonts and files are found as on a web server, and what the browser keeps stays in one place between versions.
+  - The page has no access to the computer: `electron/preload.cjs` is the only door, and what the page can run is kept to what
+    comes with Lydia. PixiJS writes code as it runs by default, which that doesn't allow, so `pixi.js/unsafe-eval` does the same
+    without it, in the browser too.
+  - A page that asks before closing gets no answer in Electron by itself, and the window would just refuse to close, so the
+    window asks.
+- **Checked:** `tests/app/desktop.mjs` opens the built pages in Electron itself and paints; the installer's program was opened too.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

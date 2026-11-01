@@ -164,6 +164,27 @@ export function saveBrushOutline(on: boolean) {
   }
 }
 
+// How big the interface is in the desktop app, in percent: a browser has its own zoom for that
+export const INTERFACE_SIZES = [100, 125, 150, 175, 200]
+const INTERFACE_SIZE_KEY = 'lydia.interfaceSize'
+
+export function loadInterfaceSize() {
+  try {
+    const size = Number(localStorage.getItem(INTERFACE_SIZE_KEY))
+    return INTERFACE_SIZES.includes(size) ? size : 100
+  } catch {
+    return 100
+  }
+}
+
+export function saveInterfaceSize(size: number) {
+  try {
+    localStorage.setItem(INTERFACE_SIZE_KEY, String(size))
+  } catch {
+    // not remembered next time, but used now
+  }
+}
+
 // Whether the pixels show as sharp squares at every zoom from 100% (the Sharp button). They don't at first
 const SHARP_PIXELS_KEY = 'lydia.sharpPixels'
 

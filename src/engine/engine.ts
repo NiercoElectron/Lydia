@@ -1,3 +1,5 @@
+// Without this PixiJS writes code as it runs, which the desktop app doesn't allow (see electron/main.mjs)
+import 'pixi.js/unsafe-eval'
 import type { DrawingSnapshot } from '../autosave'
 import { translate } from '../i18n'
 import { LydiaError } from '../errors'
@@ -263,7 +265,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   app.canvas.style.touchAction = 'none' // the pen and the fingers paint instead of scrolling the page
   host.appendChild(app.canvas)
   // PixiJS only follows the size of the window; follow the host's own size too (when panels around it change)
-  const resizeObserver = new ResizeObserver(() => app.resize())
+  const resizeObserver = new ResizeObserver(() => {
+    // Zooming the page or the interface changes the pixels of the display behind each pixel of the screen
+    const ratio = window.devicePixelRatio || 1
+    if (renderer.resolution !== ratio) renderer.resolution = ratio
+    app.resize()
+  })
   resizeObserver.observe(host)
 
   // ----- The drawing -----
