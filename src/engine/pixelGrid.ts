@@ -5,6 +5,7 @@ import {
   MeshGeometry,
   RenderTexture,
   Shader,
+  Texture,
   UniformGroup,
   UPDATE_PRIORITY,
   type Container,
@@ -181,6 +182,7 @@ export function createPixelGrid(
       stage.removeChildAt(index)
       stage.addChildAt(scene, index)
     }
+    for (const each of shaders) each.resources.uTexture = Texture.WHITE.source // the lines may outlast the picture
     mesh.destroy()
     geometry.destroy()
     shader.destroy()

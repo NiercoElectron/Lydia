@@ -246,6 +246,39 @@ await page.keyboard.press('Escape')
 await sleep(300)
 check('and Esc leaves it', !(await isTransforming()))
 
+// The brush's outline takes its color from what is under it, in the built app too: it reads a picture of the screen, and
+// reading the wrong texture happened to work only in development
+const blockAt = await page.$eval('.draw-space canvas', element => {
+  const { left, top, width, height } = element.getBoundingClientRect()
+  return { x: left + width / 2, y: top + height / 2 - 100 }
+})
+for (let y = -48; y <= 48; y += 8) {
+  await page.mouse.move(blockAt.x - 120, blockAt.y + y)
+  await page.mouse.down()
+  await page.mouse.move(blockAt.x + 120, blockAt.y + y, { steps: 6 })
+  await page.mouse.up()
+  await sleep(40)
+}
+await page.mouse.move(blockAt.x + 2, blockAt.y)
+await page.mouse.move(blockAt.x, blockAt.y)
+await sleep(500)
+const shot = await page.screenshot({
+  clip: { x: blockAt.x - 40, y: blockAt.y, width: 80, height: 1 },
+  encoding: 'base64',
+})
+const brightest = await page.evaluate(async data => {
+  const image = new Image()
+  image.src = 'data:image/png;base64,' + data
+  await image.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d')
+  context.drawImage(image, 0, 0)
+  return Math.max(...context.getImageData(0, 0, image.width, 1).data.filter((_value, index) => index % 4 === 0))
+}, shot)
+check('on black, the outline of the brush is light', brightest > 150, String(brightest))
+
 const projectFile = path.join(projects, 'Untitled.lyd')
 await press('Control', 's')
 await page.waitForFunction(() => document.title.includes('Untitled'), { timeout: 10000 })

@@ -26,6 +26,7 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 ### Fixed
 
 - Adding one brush that left something out said "1 brushes added".
+- The brush's outline read the wrong picture in the desktop app, and stayed dark over dark paint.
 - On small screens the brush categories went over **Import…**, **Export** and **Delete**, and the bottom bar went past its
   place. The desktop window stops at 1024×600.
 

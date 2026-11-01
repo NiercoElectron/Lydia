@@ -2663,6 +2663,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     lets a signed app replace itself, so there the note leads to the download page.
   - The page's libraries are in the bundle Vite makes, so they became development dependencies, and the updater is the only
     thing the installed app takes from `node_modules`. The installer's file has no spaces in its name, which GitHub would change.
+  - The **icon** is provisional, an L made by Claude in `build/icon.svg`, and the browser's tab has it too. To change it, put a PNG of
+    1024×1024 at `build/icon.png`: the installers make the rest from it. The tab uses `public/favicon.svg`.
   - **Memory is read from the computer**, as decisions 14 and 28 planned. The RAM budget is a quarter of the real RAM. The
     graphics card's setting starts at **Automatic**, half of the card's memory, the rule the settings already gave, and can
     still be chosen by hand. Electron knows the card's name but not its memory: on Windows it comes from the registry, and

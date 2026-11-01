@@ -1,4 +1,4 @@
-import { GlProgram, Mesh, MeshGeometry, Shader, type Container } from 'pixi.js'
+import { GlProgram, Mesh, MeshGeometry, Shader, Texture, type Container } from 'pixi.js'
 import type { PixelGrid } from './pixelGrid'
 import type { Point } from './selection'
 
@@ -52,7 +52,9 @@ void main(void) {
 export function createContrastLines(stage: Container, pixelGrid: PixelGrid) {
   const shader = new Shader({
     glProgram: GlProgram.from({ vertex, fragment, name: 'contrast-lines' }),
-    resources: {},
+    // PixiJS only binds a texture the shader starts with: one set later would be silently left out, and the shader would
+    // read whatever texture was bound last
+    resources: { uTexture: Texture.WHITE.source },
   })
   pixelGrid.sharePicture(shader)
   const geometry = new MeshGeometry({
