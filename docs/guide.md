@@ -30,8 +30,6 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 ## The start screen
 
-- **Recover** shows up when there are drawings closed with changes that weren't saved (see
-  [Autosave](#autosave-and-recovering-a-drawing)).
 - **New project…** opens a window to choose the paper:
   - a size: paper sizes (A4, US Letter…) and screen sizes (Full HD…), or any width and height from 16 to 10000
     pixels;
@@ -42,16 +40,22 @@ On a Mac, Cmd works wherever Ctrl is written.
   Lydia remembers the last choice.
 
 - **Open project** opens a `.lyd` file saved by Lydia.
-- **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Choose first the kind of brush, **Smooth**
-  or **Pixel** (for pixel art), and the size of the paper for its tip: 256, 512 or 1024 pixels for a smooth brush,
-  16, 32 or 64 for a pixel brush.
+- **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Its window chooses first what it starts from, the
+  kind of brush, **Smooth** or **Pixel** (for pixel art), and the size of the paper for its tip: 256, 512 or 1024 pixels for
+  a smooth brush, 16, 32 or 64 for a pixel brush.
+- **Recover**, under them, shows up when there are drawings closed with changes that weren't saved (see
+  [Autosave](#autosave-and-recovering-a-drawing)).
+- **What's New?**, at the right (below, in a narrow window): what changed in each version, the newest open. Click a
+  version to open or close it.
+
+The gear at the top right opens **Settings**:
+
 - **Interface**: the colors of Lydia's buttons and panels: **System** (as the computer is set, changing with it),
   **Light** or **Dark**. The drawing never changes color.
 - **Language**: **System** (the browser's language: Brazilian Portuguese or Spanish, English for any other, changing
   with it), **Português (Brasil)**, **English** or **Español**. Names given to layers and brushes stay as they were;
   new layers and folders are named in the language chosen.
-- **What's New?**, at the right (below, in a narrow window): what changed in each version, the newest open. Click a
-  version to open or close it.
+- **Autosave**: how often Lydia keeps a copy of the drawing (see [Autosave](#autosave-and-recovering-a-drawing)).
 - **Graphics card memory**: how much of the graphics card's memory Lydia may use to keep layers ready. More makes
   switching layers and undoing faster, but choosing more than the card has makes everything very slow or loses the
   drawing. Choose at most half of your card's memory; if you're not sure, keep the default.
@@ -485,7 +489,7 @@ says 4 times as many pixels in an inch, so it too prints at that size, only shar
 ### Autosave and recovering a drawing
 
 Lydia keeps a copy of the drawing in the browser, every 2 minutes if it changed. It never interrupts painting: a stroke
-just puts it off. **Autosave**, on the start screen, chooses 1, 2 or 5 minutes, or off. Hover over **Save** to see when
+just puts it off. **Autosave**, in the settings of the start screen, chooses 1, 2 or 5 minutes, or off. Hover over **Save** to see when
 the last copy was made.
 
 If the browser closes or crashes with changes that weren't saved, **Recover**, on the start screen, lists the drawing
@@ -523,7 +527,7 @@ opens with its tip on the paper and its settings (the Pixel brush isn't there: i
   comes with Lydia never changes: it opens as a copy. Your own is saved with **Save changes**, or kept as a new brush,
   leaving it as it was, with **Save copy**.
 
-**A pixel brush** (Pixel on the start screen) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
+**A pixel brush** (Pixel in the window that opens it) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
 Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
 The tip is cut to its painted pixels. The settings that turn the tip or give it noise or a paper grain are left
 out; the new brush starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.

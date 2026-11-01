@@ -102,6 +102,7 @@ check(
   (await page.$eval('.designer-start .tip-paper', s => s.value)) === '512',
 )
 await page.select('.designer-start .tip-paper', '256')
+await page.click('.home-actions button:nth-child(3)')
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && window.lydia.app.renderer, { timeout: 60000 })
 await sleep(500)
@@ -364,6 +365,7 @@ await page.evaluate(() => {
 })
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
 await sleep(300)
+await page.click('.home-actions button:nth-child(3)')
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && window.lydia.app.renderer, { timeout: 60000 })
 await sleep(500)

@@ -71,16 +71,16 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
 - Save and open projects as `.lyd` files
 - Autosave in the browser, with a Recover list after a crash, and the drawing reopened by itself when the browser loses
   the graphics card
-- Choose how much of the graphics card's memory Lydia may use (on the start screen)
-- A light or a dark interface, or as the computer is set (on the start screen)
-- English, Brazilian Portuguese or Spanish, selected on the start screen or detected from the system language; the browser
+- Choose how much of the graphics card's memory Lydia may use (the gear on the start screen)
+- A light or a dark interface, or as the computer is set (the gear)
+- English, Brazilian Portuguese or Spanish, selected with the gear or detected from the system language; the browser
   remembers the choice
 
 How to use each tool, and every shortcut: [docs/guide.md](docs/guide.md).
 
 ## Language
 
-On the start screen, **Language / Idioma** offers **System / Sistema**, **Português (Brasil)**, **English** and **Español**.
+In the gear of the start screen or the editor, **Language / Idioma** offers **System / Sistema**, **Português (Brasil)**, **English** and **Español**.
 System uses Brazilian Portuguese or Spanish when the browser's first preferred language is Portuguese or Spanish,
 and English otherwise.
 The choice is remembered between visits and follows system language changes while System is selected.

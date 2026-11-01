@@ -119,6 +119,7 @@ for (const language of ['en', 'pt-BR', 'es']) {
   check(`${language}: so do the buttons of liquify`, found.length === 0, found.join(', '))
 
   const closed = await widths()
+  check(`${language}: the drawing starts on a whole pixel`, Number.isInteger(Number(closed.split(',')[0])), closed)
   await page.click('.tool-group > button')
   await sleep(200)
   found = await spilling()

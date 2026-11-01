@@ -23,7 +23,10 @@ const LETTERS: Record<string, string> = {
 }
 
 const FILES = import.meta.glob(
-  '../../node_modules/@fontsource/*/files/*-latin{,-ext}-{400,700}-{normal,italic}.woff2',
+  [
+    '../../node_modules/@fontsource/*/files/*-latin{,-ext}-{400,700}-{normal,italic}.woff2',
+    '!../../node_modules/@fontsource/ibm-plex-sans/**', // the interface's font, not one for text
+  ],
   {
     query: '?url',
     import: 'default',

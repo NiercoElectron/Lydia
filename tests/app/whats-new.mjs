@@ -86,7 +86,7 @@ await new Promise(r => setTimeout(r, 100))
 await page.screenshot({ path: OUT + '/whats-new-dark.png' })
 await page.setViewport({ width: 800, height: 900 })
 const narrow = await page.$eval('.whats-new', a => a.getBoundingClientRect().toJSON())
-const choicesBottom = await page.$eval('.home-choices', c => c.getBoundingClientRect().bottom)
+const choicesBottom = await page.$eval('.home-start', c => c.getBoundingClientRect().bottom)
 check(
   'in a narrow window: below the choices',
   narrow.top >= choicesBottom - 1,

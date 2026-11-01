@@ -2532,6 +2532,40 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   or less. A stroke of size 500 over paint, on one layer, takes 0.6 ms of a frame with Multiply or Overlay and 0.5 ms with Normal,
   and no frame goes past 8 ms with any of them.
 
+## 83. The start screen
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Problem:** the start screen was one long column: the buttons, the settings, the Brush Designer's choices and a big red
+  warning about the graphics card's memory, always there and taking half of the screen. What most people come to do was the
+  smallest thing on it. Claude proposed the options, and my choices were:
+- **Decision:**
+  - **What to do first in the middle**, under a thin bar like the editor's: New project, Open project and Brush Designer, with
+    the drawings to recover as pictures under them. What's new stays at the right, narrower, with the newest version open.
+  - **The settings in a window**, opened by a gear as in the editor: the interface, the language, the autosave and the memory.
+    The warning stays whole, but next to the choice it warns about, which is where it is needed.
+  - **The Brush Designer's choices in a window**, opened by its button: what it starts from, the kind of brush and its paper.
+- **How:** the two windows are always on the page, only closed, like the items of a menu, so what is chosen in them stays.
+  `src/components/ModalWindow.tsx` is what they share, and the interface's choices are the same ones as in the editor's gear.
+- **Checked:** `tests/app/home.mjs`, at my screen of 2560×1440 at 150%: the page needs no scrolling, nothing of the settings or
+  the warning shows until the gear is pressed, the window fits on the screen, its choices work and stay, and the Brush
+  Designer's window goes on to the Brush Designer.
+
+## 84. The interface's font
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Problem:** the interface used each computer's own font, so it looked different on each one and never quite like itself.
+- **Decision:** **IBM Plex Sans** in all of it, my choice. I saw it as IBM Plex Sans JP, whose letters are the same. Claude
+  pointed out that the JP one is that font with thousands of Japanese characters Lydia has no use for, so it is the plain one.
+- **How:** the Latin files of two weights, 78 KB in all, come with Lydia, so it works with no internet and in the desktop app.
+  Its license is in `public/fonts-licenses.txt`. The color's code stays in a monospaced font, so its digits line up, and text on
+  a drawing keeps its own fonts: this one isn't one of them.
+  The tool column is as wide as its longest name, and with this font that came to fractions of a pixel, which put the whole
+  drawing between two pixels of the page: images dropped on it landed 1 pixel off. So the column rounds its width up, in CSS.
+- **Checked:** `tests/app/home.mjs` and `tests/app/left-panel.mjs`: the font is in use, in fields too, every name still fits, and
+  the drawing starts on a whole pixel in the three languages. `tests/app/tray.mjs` is the one that found the pixel.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

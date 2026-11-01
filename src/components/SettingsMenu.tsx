@@ -3,10 +3,41 @@ import { useEffect, useRef, useState } from 'react'
 import { useLanguage, type LanguageChoice } from '../i18n'
 import { setThemeChoice, THEME_CHOICES, useTheme } from '../theme'
 
-// The gear on top of the editor: the interface's colors and language, as on the start screen
-export function SettingsMenu() {
+// The interface's colors and language, in the editor's gear and in the start screen's
+export function InterfaceSettings() {
   const { t, choice, setChoice } = useLanguage()
   const theme = useTheme()
+  return (
+    <>
+      <div
+        className="button-group theme-choice"
+        title={t(
+          "The colors of Lydia's buttons and panels (System: as the computer is set). The drawing never changes",
+        )}
+      >
+        {t('Interface')}
+        {THEME_CHOICES.map(([value, label]) => (
+          <button key={value} aria-pressed={theme.choice === value} onClick={() => setThemeChoice(value)}>
+            {t(label)}
+          </button>
+        ))}
+      </div>
+      <label className="theme-choice">
+        {t('Language')}
+        <select value={choice} onChange={e => setChoice(e.target.value as LanguageChoice)}>
+          <option value="system">{t('System')}</option>
+          <option value="pt-BR">Português (Brasil)</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+      </label>
+    </>
+  )
+}
+
+// The gear on top of the editor
+export function SettingsMenu() {
+  const { t } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
 
@@ -32,23 +63,7 @@ export function SettingsMenu() {
       </button>
       {isOpen && (
         <div className="settings-panel">
-          <div className="button-group">
-            {t('Interface')}
-            {THEME_CHOICES.map(([value, label]) => (
-              <button key={value} aria-pressed={theme.choice === value} onClick={() => setThemeChoice(value)}>
-                {t(label)}
-              </button>
-            ))}
-          </div>
-          <label>
-            {t('Language')}
-            <select value={choice} onChange={e => setChoice(e.target.value as LanguageChoice)}>
-              <option value="system">{t('System')}</option>
-              <option value="pt-BR">Português (Brasil)</option>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-            </select>
-          </label>
+          <InterfaceSettings />
         </div>
       )}
     </div>

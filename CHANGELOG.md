@@ -7,6 +7,14 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Changed
+
+- **A new start screen** ([decision 83](docs/decisions.md#83-the-start-screen)): **New project**, **Open project** and
+  **Brush Designer** in the middle, with the drawings to **Recover** as pictures under them. A gear opens **Settings**, with
+  the interface, the autosave and the graphics card's memory, and the Brush Designer's choices have a window of their own.
+- **IBM Plex Sans** is now the font of the whole interface, the same on every computer
+  ([decision 84](docs/decisions.md#84-the-interfaces-font)).
+
 ## [0.19.1] - 2026-11-01
 
 ### Fixed
