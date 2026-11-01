@@ -16,7 +16,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   color's code, H/S/V sliders and the colors painted with lately; and a palette of colors kept on purpose, for all
   drawings or saved with one
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
-- The brush's outline under the pointer, in the shape of its tip and as big as it paints (View > Brush outline)
+- The brush's outline under the pointer, in the shape of its tip and as big as it paints, one thin line that shows on
+  any color (View > Brush outline)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
 - Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with every tool
@@ -109,8 +110,8 @@ with common sizes, a resolution (DPI) and a background color or transparency, `.
 interface in English, Brazilian Portuguese and Spanish, error codes, a color panel with a color triangle and a
 color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
 a mesh for transforming, liquify, autosave and recovery, surviving a lost graphics card, symmetry, rulers, shapes that stay
-editable, filters, editable text, and a new interface with menus, named tools, brush categories, a blend mode for the brush and
-pictures of the layers.
+editable, filters, editable text, a new interface with menus, named tools, brush categories, a blend mode for the brush and
+pictures of the layers, and brushes opened from Krita, GIMP and Photoshop.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:

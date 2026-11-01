@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-01
+
 ### Added
 
 - **Brushes from other apps** ([decision 85](docs/decisions.md#85-brushes-from-other-apps)): **Import…** also opens Krita's
@@ -17,7 +19,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ### Changed
 
-- The brush's outline is one thin line that takes its color from what is under it, instead of a thick white and black one.
+- The brush's outline is one thin line that takes its color from what is under it, instead of a thick white and black one
+  ([decision 86](docs/decisions.md#86-a-thin-outline-that-takes-its-color-from-the-drawing)).
 
 ### Fixed
 
@@ -601,7 +604,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.19.2...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/NiercoElectron/Lydia/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/NiercoElectron/Lydia/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/NiercoElectron/Lydia/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/NiercoElectron/Lydia/compare/v0.18.0...v0.19.0
