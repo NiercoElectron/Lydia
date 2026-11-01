@@ -336,7 +336,6 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   scene.addChild(world)
   app.stage.addChild(scene)
   app.ticker.add(followZoom)
-  const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
   // Zoomed in, the paper's tiles are shown smoothed as one picture (see smoothZoom.ts)
   const smoothZoom = createSmoothZoom(
     renderer,
@@ -348,6 +347,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     app.screen,
     projection.isSmoothZoom,
   )
+  const pixelGrid = createPixelGrid(renderer, app.ticker, app.stage, scene, world, grid, app.screen)
   const selectionView = createSelectionView(renderer, app.ticker, app.stage, world, grid, app.screen, () => selection)
 
   // How strokes are mirrored (see symmetry.ts), and whether the left button moves its center for now
@@ -432,7 +432,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const filters = createFilters(renderer, grid, gpu, projection, history, selectionView)
   const mixTools = createMixTools(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
   const liquify = createLiquify(renderer, grid, stack, gpu, projection, history, brush, selectionView, getSymmetry)
-  const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, {
+  const view = createView(app, world, grid, brush, mixTools, liquify, projection, gpu, pixelGrid, {
     onStrokeEnd: () => {
       changed()
       if (brush.settings.tool === 'brush') painted(brush.settings.color)

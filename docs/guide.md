@@ -119,7 +119,8 @@ they stay until taken out.
   clean angles of pixel art (1 pixel across for 1, 2 or 3 down, or the other way round, across and down), in equal
   steps; with the others, every 15°.
 - **The outline:** over the drawing, the brush shows the outline of its tip instead of the cursor, as big as it paints
-  and turned as it paints (brushes like Dashes turn it with the stroke). With the mouse, that is its size at full
+  and turned as it paints (brushes like Dashes turn it with the stroke). It is one thin line that takes its color from
+  what is under it, so it shows on any color. With the mouse, that is its size at full
   pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with. The Pixel brush's outline
   goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.

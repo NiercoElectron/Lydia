@@ -111,7 +111,7 @@ await sleep(100)
 await moveTo(500, 400)
 let o = await outline()
 check('over the paper the outline shows and the cursor hides', o.visible && o.cursor === 'none', JSON.stringify(o))
-// Soft round fades to nothing at its edge: the outline goes a little inside it, plus the 3 pixel white line
+// Soft round fades to nothing at its edge: the outline goes a little inside it
 check(
   'Soft round: a circle nearly the brush size',
   near(o.width, o.height, 2) && o.width > 0.85 * 100 * o.zoom && o.width < 100 * o.zoom + 4,
@@ -213,12 +213,12 @@ o = await outline()
 const zoom = o.zoom
 check(
   "Pixel: 5 pixels across, on the paper's pixels",
-  o.visible && near(o.width, 5 * zoom + 3 * Math.SQRT2, 1),
+  o.visible && near(o.width, 5 * zoom + 3, 1),
   `${o.width.toFixed(1)} for ${(5 * zoom).toFixed(1)}`,
 )
 // Size 5 centered on the pixel under the pointer, (500, 400): from 498 to 503
 const corner = await pageOf(498, 398)
-const left = o.x - o.width / 2 + 1.5 * Math.SQRT2 + box.left
+const left = o.x - o.width / 2 + 1.5 + box.left
 check("…its left edge on a pixel's edge", near(left, corner.x, 1), `${left.toFixed(1)} vs ${corner.x.toFixed(1)}`)
 const pixCenter = await pageOf(500.5, 400.5)
 await page.screenshot({
@@ -278,6 +278,80 @@ check(
 await moveTo(500, 400)
 o = await outline()
 check('with the mouse, full size again', near(o.width, full, 2), `${o.width.toFixed(1)} of ${full.toFixed(1)}`)
+
+// The line takes its color from what is under it. The pixels of a square of the screen, as red, green, blue, alpha
+const pixelsOf = async clip => {
+  const data = await page.screenshot({ clip, encoding: 'base64' })
+  return page.evaluate(async data => {
+    const image = new Image()
+    image.src = 'data:image/png;base64,' + data
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')
+    context.drawImage(image, 0, 0)
+    return [...context.getImageData(0, 0, image.width, image.height).data]
+  }, data)
+}
+// The color of the outline's left edge, the one furthest from "paper", on a line across it
+const lineColor = async (x, y, paper) => {
+  const at = await pageOf(x, y)
+  const pixels = await pixelsOf({ x: at.x - 8, y: at.y, width: 16, height: 1 })
+  let line = [...paper]
+  let furthest = 0
+  for (let i = 0; i < pixels.length; i += 4) {
+    const away = [0, 1, 2].reduce((sum, c) => sum + Math.abs(pixels[i + c] - paper[c]), 0)
+    if (away > furthest) {
+      furthest = away
+      line = pixels.slice(i, i + 3)
+    }
+  }
+  return line
+}
+const paintBand = async (color, y) => {
+  await page.evaluate(color => window.lydia.engine.setBrush({ size: 90, color, tool: 'brush', opacity: 1 }), color)
+  const from = await pageOf(100, y)
+  const to = await pageOf(900, y)
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(to.x, to.y, { steps: 10 })
+  await page.mouse.up()
+  await sleep(200)
+}
+await chooseBrush('Hard round')
+await sleep(300)
+await paintBand('#000000', 150)
+await paintBand('#808080', 300)
+await page.evaluate(() => window.lydia.engine.setBrush({ size: 200 }))
+await moveTo(500, 650)
+await frames()
+const onWhite = await lineColor(400, 650, [255, 255, 255])
+check('on white the line is dark', Math.max(...onWhite) < 100, onWhite.join())
+await moveTo(500, 150)
+await frames()
+const onBlack = await lineColor(400, 150, [0, 0, 0])
+check('on black it is light', Math.min(...onBlack) > 150, onBlack.join())
+await moveTo(500, 300)
+await frames()
+const onGray = await lineColor(400, 300, [128, 128, 128])
+const gap = Math.max(...onGray.map(value => Math.abs(value - 128)))
+check('on middle gray it still shows', gap > 80, onGray.join())
+
+// The drawing stays as it is with the outline over it, far from the line
+const away = { x: box.left + 200, y: box.top + 200, width: 300, height: 200 }
+await chooseBrush('Soft round')
+await sleep(300)
+await page.evaluate(() => window.lydia.engine.setBrush({ size: 60 }))
+await moveTo(950, 750)
+await frames()
+const withOutline = await pixelsOf(away)
+const whileShown = (await outline()).visible
+await page.mouse.move(box.left - 100, box.top + 200)
+await frames()
+const withoutOutline = await pixelsOf(away)
+const worst = withOutline.reduce((most, value, i) => Math.max(most, Math.abs(value - withoutOutline[i])), 0)
+check('the drawing looks the same with the outline and without it', whileShown && worst <= 16, `${worst}`)
 
 check('no errors', problems.length === 0, problems.join(' | '))
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED')

@@ -2605,6 +2605,33 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   they look like themselves, with the grain the right way up. No real `.abr` of versions 1, 2, 7 or 10 was tried.
   `tests/app/foreign-brushes.mjs` makes its own files, byte by byte, to keep other people's brushes out of the repository.
 
+## 86. A thin outline that takes its color from the drawing
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Problem:** the brush's outline (decision 45) was a black line inside a white one, 3 pixels wide. It showed on any color, but
+  it was heavy for something that is always on the screen, next to the line being drawn.
+- **Decision:**
+  - My idea: the same logic as the pixel grid (decision 34). The outline is one line, 1 pixel of the screen wide, whose color
+    comes from what is under it.
+  - Each of red, green and blue goes to the far end from where it is, all or nothing: white becomes black, black white, red
+    cyan, blue yellow. Claude compared it on the screen with the grid's own color, which is gray on white and black alike and
+    looked faint in a line this thin. Plain inverted colors disappear on middle gray; these never do.
+  - It goes for all the outline shows: the circle of liquify, a pixel brush's outline, the line to the pen with the stabilizer and
+    the straight line with Shift. A selection's outline and the shapes' stay white and black.
+- **How:**
+  - While the grid shows, the screen is already a picture of the drawing, drawn through a shader. That picture now stays on
+    while the outline shows, at any zoom, and the outline reads its colors from it: the drawing is still drawn once, with one
+    more pass over the screen. Around the paper, the picture has the backdrop's color, so the line shows there too.
+  - The picture takes its smoothed edges from the graphics card as the screen does, and it is taken after the zoom's smoothing
+    (decision 68), so the drawing looks the same with the outline and without it.
+  - The thick line hid the steps of an outline traced on 64 squares. Now a tip is traced on up to 256, after smoothing away the
+    details below a 64th of it, so the curves are smooth and a grainy tip still gets a simple outline.
+- **Checked:** `tests/app/brush-outline.mjs`: the line's color on white, on black and on middle gray, and the drawing the same
+  with the outline and without it. On the screen, at Chrome's scale of 1.5: over black, white, two middle grays, red, blue and
+  a skin tone, half off the paper, and the outlines of the 168 smooth brushes of Lydia and the real Krita and Photoshop files
+  against the old ones: the same size, 18 of them with a few parts more or less.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

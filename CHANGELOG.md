@@ -15,6 +15,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **Spacing** under **Advanced** brings the copies of any brush's tip closer together or further apart, for as long as the
   drawing is open, without changing the brush.
 
+### Changed
+
+- The brush's outline is one thin line that takes its color from what is under it, instead of a thick white and black one.
+
 ### Fixed
 
 - A brush tip made of small marks shows a line around where it paints, instead of almost no outline.

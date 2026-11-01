@@ -5,9 +5,11 @@ import type { Point } from './selection'
 // The outline of a brush's tip, shown under the pointer (see view.ts) so that the size and the shape of the brush can
 // be seen before painting
 
-// The tip's picture is shrunk to at most this many squares across before its outline is worked out: enough to follow
-// its shape, few enough to work it out at once and draw it every frame
-const MAX_CELLS = 64
+// The tip's picture is shrunk to at most this many squares across before its outline is worked out: enough for a thin
+// line to look smooth on a big brush, few enough to work it out at once and draw it every frame
+const MAX_CELLS = 256
+// Details smaller than this part of the tip are smoothed away first, so the outline follows the tip's shape, not its grain
+const DETAIL = 1 / 64
 // The outline goes where the tip paints this much of the most it paints anywhere, so that a soft tip's outline is
 // nearly as big as all it paints, and the small holes of a grainy tip are filled in
 const PAINT_EDGE = 0.05
@@ -42,19 +44,22 @@ function traceTip(tip: BrushTip): Point[][] {
   const cell = Math.ceil(side / MAX_CELLS) // pixels of the tip on each side of a square
   const columns = Math.ceil(width / cell)
   const rows = Math.ceil(height / cell)
+  const reach = Math.floor(Math.ceil(side * DETAIL) / cell / 2) // how far the smoothing goes, in squares
 
-  // How much paint each square has on average, with a row of empty squares all around, so every loop closes
-  const across = columns + 2
-  const down = rows + 2
+  // How much paint each square has on average, with rows of empty squares all around, so every loop closes
+  const room = reach * 2 + 1
+  const across = columns + room * 2
+  const down = rows + room * 2
   const paint = new Float32Array(across * down)
   const data = tip.image.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, width, height).data
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      paint[(Math.floor(y / cell) + 1) * across + Math.floor(x / cell) + 1] += data[(y * width + x) * 4 + 3]
+      paint[(Math.floor(y / cell) + room) * across + Math.floor(x / cell) + room] += data[(y * width + x) * 4 + 3]
     }
   }
+  const smooth = smoothed(paint, across, down, reach)
   let most = 0
-  for (let i = 0; i < paint.length; i++) most = Math.max(most, paint[i])
+  for (let i = 0; i < smooth.length; i++) most = Math.max(most, smooth[i])
   if (most === 0) return []
   const edge = most * PAINT_EDGE
 
@@ -63,18 +68,18 @@ function traceTip(tip: BrushTip): Point[][] {
   // neighbors gives one or two pieces of the outline, joining the sides it crosses
   const crossings = new Map<string, Point>() // a side ("x,y" of its first square and "a" across or "d" down) -> where
   const joined = new Map<string, string[]>() // a side -> the sides it is joined to, two once all are found
-  const isIn = (x: number, y: number) => paint[y * across + x] > edge
+  const isIn = (x: number, y: number) => smooth[y * across + x] > edge
   // Where the outline crosses the side from square (x, y) to its neighbor across or down, in pixels of the tip
   function crossing(x: number, y: number, isAcross: boolean) {
     const key = `${x},${y}${isAcross ? 'a' : 'd'}`
     if (!crossings.has(key)) {
-      const from = paint[y * across + x]
-      const to = isAcross ? paint[y * across + x + 1] : paint[(y + 1) * across + x]
+      const from = smooth[y * across + x]
+      const to = isAcross ? smooth[y * across + x + 1] : smooth[(y + 1) * across + x]
       const t = (edge - from) / (to - from)
-      // A square's center is in the middle of its pixels; the empty squares around are one square outside the tip
+      // A square's center is in the middle of its pixels; the empty squares around are outside the tip
       crossings.set(key, {
-        x: (x - 0.5 + (isAcross ? t : 0)) * cell,
-        y: (y - 0.5 + (isAcross ? 0 : t)) * cell,
+        x: (x - room + 0.5 + (isAcross ? t : 0)) * cell,
+        y: (y - room + 0.5 + (isAcross ? 0 : t)) * cell,
       })
     }
     return key
@@ -105,10 +110,10 @@ function traceTip(tip: BrushTip): Point[][] {
         // Two opposite corners in and two out: the middle of the four decides whether the two in are joined. The
         // outline cuts off the top right corner (and the bottom left) when it differs from the middle
         const middle =
-          (paint[y * across + x] +
-            paint[y * across + x + 1] +
-            paint[(y + 1) * across + x] +
-            paint[(y + 1) * across + x + 1]) /
+          (smooth[y * across + x] +
+            smooth[y * across + x + 1] +
+            smooth[(y + 1) * across + x] +
+            smooth[(y + 1) * across + x + 1]) /
             4 >
           edge
         if (topRight !== middle) {
@@ -147,8 +152,8 @@ function traceTip(tip: BrushTip): Point[][] {
 
   // The corners of every square with paint, in pixels of the tip
   const corners: Point[] = []
-  for (let y = 1; y <= rows; y++) {
-    for (let x = 1; x <= columns; x++) {
+  for (let y = room; y < room + rows; y++) {
+    for (let x = room; x < room + columns; x++) {
       if (paint[y * across + x] < LEAST_PAINT) continue
       for (const [right, below] of [
         [0, 0],
@@ -156,13 +161,36 @@ function traceTip(tip: BrushTip): Point[][] {
         [1, 1],
         [0, 1],
       ]) {
-        corners.push({ x: (x - 1 + right) * cell, y: (y - 1 + below) * cell })
+        corners.push({ x: (x - room + right) * cell, y: (y - room + below) * cell })
       }
     }
   }
   const reached = hullOf(corners)
   if (filled >= SPARSE_TIP * Math.abs(area(reached))) return loops
   return [simplify(reached, SIMPLIFY * cell).map(toBrush)]
+}
+
+// Each square with the average of the squares up to "reach" away, across and down, done twice so that a hard edge turns
+// into an even slope
+function smoothed(paint: Float32Array, across: number, down: number, reach: number) {
+  if (reach === 0) return paint
+  const averaged = (from: Float32Array, step: number, lineStep: number, length: number, lines: number) => {
+    const result = new Float32Array(from.length)
+    for (let line = 0; line < lines; line++) {
+      for (let i = reach; i < length - reach; i++) {
+        let sum = 0
+        for (let near = i - reach; near <= i + reach; near++) sum += from[line * lineStep + near * step]
+        result[line * lineStep + i * step] = sum / (reach * 2 + 1)
+      }
+    }
+    return result
+  }
+  let result = paint
+  for (let pass = 0; pass < 2; pass++) {
+    result = averaged(result, 1, across, across, down)
+    result = averaged(result, across, 1, down, across)
+  }
+  return result
 }
 
 // The smallest loop with no dents around all these points, like a rubber band around them (Andrew's monotone chain): the

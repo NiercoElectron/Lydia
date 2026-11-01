@@ -101,7 +101,8 @@ export function createSmoothZoom(
     isShown = false
   }
 
-  // After everything else that changes the drawing in a frame (like the pixel grid), and after the screen is drawn
+  // After everything else that changes the drawing in a frame, but before the pixel grid takes its picture of it, and
+  // after the screen is drawn
   ticker.add(update, undefined, UPDATE_PRIORITY.LOW + 1)
   ticker.add(restore, undefined, UPDATE_PRIORITY.UTILITY)
 

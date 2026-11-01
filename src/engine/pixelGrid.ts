@@ -22,7 +22,8 @@ import type { Grid } from './tiles'
 // While the grid shows, the drawing is drawn first into a picture the size of the screen, and the screen shows that
 // picture through the grid's shader, which reads the color under each line from it. PixiJS's filters do the same,
 // but in PixiJS 8.22 they warn when the window changes size: PixiJS throws away the picture of the last frame while
-// its filters still point at it
+// its filters still point at it. That picture also serves other lines that take their color from the screen (see
+// contrastLines.ts), so it stays on while they show, at any zoom
 
 export const PIXEL_GRID_ZOOM = 8 // shown from 800%, where each pixel of the paper is 8 pixels of the screen or more
 const STRENGTH = 0.5 // how far the lines go toward that color: 1 = all the way, 0 = not at all
@@ -105,23 +106,31 @@ export function createPixelGrid(
     glProgram: GlProgram.from({ vertex, fragment, name: 'pixel-grid', preferredFragmentPrecision: 'highp' }),
     resources: { gridUniforms: uniforms, uTexture: picture.source },
   })
+  const shaders = [shader] // those that read the picture
   // A square of 1×1, stretched over the whole screen
   const square = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])
   const geometry = new MeshGeometry({ positions: square, uvs: square, indices: new Uint32Array([0, 1, 2, 0, 2, 3]) })
   const mesh = new Mesh({ geometry, shader })
 
   let isOn = true // chosen by the user
+  let isKept = false // whether something else needs the picture now
   let isShown = false
 
-  // The picture of the drawing, as big as the screen
+  // The picture of the drawing, as big as the screen, edges smoothed like the screen's own
   function createPicture() {
-    return RenderTexture.create({ width: screen.width, height: screen.height, resolution: renderer.resolution })
+    return RenderTexture.create({
+      width: screen.width,
+      height: screen.height,
+      resolution: renderer.resolution,
+      antialias: true,
+    })
   }
 
   // Every frame, before the screen is drawn: the grid shows when it is on and the view is zoomed in enough (the zoom
   // is the world's scale down; across, it is negative when the view is flipped)
   function update() {
-    const show = isOn && world.scale.y >= PIXEL_GRID_ZOOM
+    const isGrid = isOn && world.scale.y >= PIXEL_GRID_ZOOM
+    const show = isGrid || isKept
     if (show !== isShown) {
       const index = stage.getChildIndex(show ? scene : mesh)
       stage.removeChildAt(index)
@@ -135,7 +144,7 @@ export function createPixelGrid(
       // The window changed size: a new picture, given to the shader before the old one is thrown away
       const old = picture
       picture = createPicture()
-      shader.resources.uTexture = picture.source
+      for (const each of shaders) each.resources.uTexture = picture.source
       old.destroy(true)
     }
     mesh.scale.set(screen.width, screen.height)
@@ -143,13 +152,26 @@ export function createPixelGrid(
     world.updateLocalTransform()
     toPaper.copyFrom(world.localTransform).invert()
     uniforms.uniforms.uPixelRatio = renderer.resolution
-    renderer.render({ container: scene, target: picture, clear: true, clearColor: [0, 0, 0, 0] })
+    uniforms.uniforms.uStrength = isGrid ? STRENGTH : 0
+    // Around the paper, the color the screen has there
+    renderer.render({ container: scene, target: picture, clear: true, clearColor: renderer.background.colorRgba })
   }
   // After everything else that changes the drawing in a frame, just before PixiJS draws the screen
   ticker.add(update, undefined, UPDATE_PRIORITY.LOW + 1)
 
   function setOn(on: boolean) {
     isOn = on
+  }
+
+  // Keep the picture on or not, whatever the zoom
+  function keepPicture(on: boolean) {
+    isKept = on
+  }
+
+  // Give this shader the picture, now and whenever it is made again
+  function sharePicture(other: Shader) {
+    shaders.push(other)
+    other.resources.uTexture = picture.source
   }
 
   function destroy() {
@@ -165,7 +187,7 @@ export function createPixelGrid(
     picture.destroy(true)
   }
 
-  return { update, setOn, isShown: () => isShown, destroy }
+  return { update, setOn, keepPicture, sharePicture, isShown: () => isShown, destroy }
 }
 
 export type PixelGrid = ReturnType<typeof createPixelGrid>

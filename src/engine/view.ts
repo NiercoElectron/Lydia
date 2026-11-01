@@ -4,9 +4,11 @@ import type { StrokePoint } from './dabs'
 import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
+import { createContrastLines } from './contrastLines'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import { MIN_LIQUIFY_SIZE, type Liquify } from './liquify'
+import type { PixelGrid } from './pixelGrid'
 import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
@@ -123,6 +125,7 @@ export function createView(
   liquify: Liquify,
   projection: Projection,
   gpu: GpuTiles,
+  pixelGrid: PixelGrid,
   actions: ViewActions,
 ) {
   const canvas = app.canvas
@@ -740,14 +743,13 @@ export function createView(
 
   // With the brush or the eraser, the outline of the brush's tip follows the pointer, over everything, as big as the
   // brush paints and turned as its tip is, so the size and the shape of the brush show before painting. It takes the
-  // cursor's place, unless it would be too small to see. White with a black line inside, like a selection's outline,
-  // and drawn again only when what it shows changes.
+  // cursor's place, unless it would be too small to see. It is one thin line that takes its color from what is under
+  // it (see contrastLines.ts), and it is drawn again only when what it shows changes.
   //
   // With the mouse, it is as big as the brush paints at full pressure. With a pen and a brush whose size follows the
   // pressure, it is as big as the pen paints now: while painting, at the pen's pressure, and while the pen is in the
   // air, at the last pressure it painted with, so the outline is the size the next stroke will likely be (decision 69)
-  const brushOutline = new Graphics()
-  app.stage.addChild(brushOutline)
+  const brushOutline = createContrastLines(app.stage, pixelGrid)
   let isOutlineOn = true
   let isOutlineShown = false
   let pointer: Point | null = null // where the pointer is on the canvas, or null when it isn't over it
@@ -787,8 +789,9 @@ export function createView(
     const isLagging = (stabilizer !== null || hold !== null) && usesTip(used)
     const canLine = isShiftDown && !gesture && at !== null && isPaintTool(used) && actions.canUse(used)
     const line = canLine && !actions.getTransform() ? straightLineTo(at) : null
-    brushOutline.visible = isShown || (at !== null && (isLagging || line !== null))
-    if (!at || !brushOutline.visible) return
+    const hasLines = isShown || (at !== null && (isLagging || line !== null))
+    brushOutline.show(hasLines)
+    if (!at || !hasLines) return
 
     const center = line ? line.to : ((hold ?? stabilizer)?.brushAt() ?? paperAt(at))
     const tip = brush.getTip()
@@ -824,16 +827,10 @@ export function createView(
     const onScreenLoops = loops.map(loop => loop.map(toScreen))
     const brushOnScreen = toScreen(center)
     const hasLine = isLagging && Math.hypot(brushOnScreen.x - at.x, brushOnScreen.y - at.y) >= 1
-    brushOutline.clear()
-    for (const [width, color] of [
-      [3, 0xffffff],
-      [1, 0x000000],
-    ]) {
-      for (const loop of onScreenLoops) brushOutline.poly(loop, true)
-      if (hasLine) brushOutline.poly([brushOnScreen, at], false)
-      if (line) brushOutline.poly([toScreen(line.from), brushOnScreen], false)
-      brushOutline.stroke({ width, color })
-    }
+    const pieces = onScreenLoops.flatMap(loop => loop.map((p, i): [Point, Point] => [p, loop[(i + 1) % loop.length]]))
+    if (hasLine) pieces.push([brushOnScreen, at])
+    if (line) pieces.push([toScreen(line.from), brushOnScreen])
+    brushOutline.draw(pieces)
   }
 
   // ----- Straight lines -----
