@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('lydiaDesktop', {
   sizeOf: file => ipcRenderer.invoke('size-of', file),
   readChunk: (file, offset, length) => ipcRenderer.invoke('read-chunk', file, offset, length),
   openFolder: () => ipcRenderer.invoke('open-folder'),
+  takeUpdate: () => ipcRenderer.invoke('take-update'),
+  onUpdate: listener => ipcRenderer.on('update', (_event, update) => listener(update)),
+  installUpdate: () => ipcRenderer.send('install-update'),
+  openDownloadPage: () => ipcRenderer.send('open-download-page'),
   // A project the system asked Lydia to open: the one it started with, and any later
   takeOpenedFile: () => ipcRenderer.invoke('take-opened-file'),
   onFileOpened: listener => ipcRenderer.on('file-opened', (_event, file) => listener(file)),

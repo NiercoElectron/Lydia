@@ -31,7 +31,7 @@ const userData = mkdtempSync(path.join(tmpdir(), 'lydia-desktop-'))
 const folder = mkdtempSync(path.join(tmpdir(), 'lydia-documents-'))
 const projects = path.join(folder, 'Lydia', 'Projects')
 const exportsFolder = path.join(folder, 'Lydia', 'Exports')
-const env = { ...process.env, LYDIA_TEST_FOLDER: folder, LYDIA_TEST_OPEN: 'Untitled.lyd' }
+const env = { ...process.env, LYDIA_TEST_FOLDER: folder, LYDIA_TEST_OPEN: 'Untitled.lyd', LYDIA_TEST_UPDATE: '9.9.9' }
 delete env.ELECTRON_RUN_AS_NODE
 delete env.LYDIA_DEV_URL
 const problems = []
@@ -158,6 +158,13 @@ await page.waitForFunction(() => document.querySelectorAll('button').length > 0)
 await sleep(500)
 const afterReload = await page.evaluate(() => window.devicePixelRatio)
 check('and stays so', afterReload === bigger.ratio, String(afterReload))
+
+// ----- A new version -----
+const noticeText = () => page.$eval('.update-notice', element => element.textContent).catch(() => null)
+await page.waitForSelector('.update-notice')
+check('a new version is told in a corner', (await noticeText()).includes('Lydia 9.9.9 is ready'), await noticeText())
+await page.click('.update-notice .icon-button')
+check('and goes away', (await noticeText()) === null)
 
 // ----- The computer's memory -----
 const memory = await page.evaluate(() => window.lydiaDesktop.memory)
@@ -450,8 +457,14 @@ await page.waitForSelector('.tray-panel')
 await until(async () => (await trayCount()) === 1, 'and so is the tray')
 
 check('no errors', problems.length === 0, problems.join(' | '))
+
+// Last, as it closes Lydia: installing goes through the usual closing of the window
+await page.waitForSelector('.update-notice')
+const hasClosed = new Promise(resolve => app.once('exit', () => resolve(true)))
+await page.evaluate(() => [...document.querySelectorAll('.update-notice button')][0].click())
+check('Restart now closes Lydia', await Promise.race([hasClosed, sleep(10000).then(() => false)]))
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED')
-await browser.disconnect()
+await browser.disconnect().catch(() => {})
 app.kill()
 await sleep(500)
 try {

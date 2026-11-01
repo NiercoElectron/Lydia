@@ -732,6 +732,30 @@ fieldset.new-project-row {
   color: var(--muted);
 }
 
+/* A new version: in the top bar, away from the drawing and from the buttons */
+.update-notice {
+  position: fixed;
+  top: 6px;
+  right: 56px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 72px);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.update-notice p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* How far the task is, when it can tell (see setProgress in engine.ts) */
 .busy progress {
   width: 120px;

@@ -2656,6 +2656,13 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **Interface size**, in the settings of the desktop app: 100% to 200%. A browser has its zoom for that, and the window doesn't.
   - On macOS the menu at the top of the screen has only what the system's keys need: the standard one would let Cmd+R reload
     the page. Windows has no menu of its own, so no key of the browser is left there. Cmd works as Ctrl all over Lydia.
+  - **Updates** come from GitHub Releases, with `electron-updater`, in the background (my choice): a check 10 seconds after
+    starting and every 6 hours, a note in the top bar, away from the drawing and from the buttons, and the install when Lydia
+    closes. **Restart now** closes the window first, so that the question about changes that aren't saved comes before the
+    installer: run first, as the updater does by itself, the installer would close Lydia whatever the answer was. macOS only
+    lets a signed app replace itself, so there the note leads to the download page.
+  - The page's libraries are in the bundle Vite makes, so they became development dependencies, and the updater is the only
+    thing the installed app takes from `node_modules`. The installer's file has no spaces in its name, which GitHub would change.
   - **Memory is read from the computer**, as decisions 14 and 28 planned. The RAM budget is a quarter of the real RAM. The
     graphics card's setting starts at **Automatic**, half of the card's memory, the rule the settings already gave, and can
     still be chosen by hand. Electron knows the card's name but not its memory: on Windows it comes from the registry, and

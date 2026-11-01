@@ -15,7 +15,7 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   `Documents\Lydia\Exports`, and a `.lyd` opens with a double click. Added brushes and the tray are files in
   `Documents\Lydia\Brushes` and `Documents\Lydia\Tray`, so the tray stays between sessions, and what is copied there
   shows up in Lydia. It reads the computer's memory: the RAM budget follows the real RAM, and the graphics card's setting
-  starts at **Automatic**.
+  starts at **Automatic**. New versions download in the background and install when Lydia closes.
 - **Ctrl+S** saves in the browser too.
 
 ### Changed

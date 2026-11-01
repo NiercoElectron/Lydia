@@ -2,6 +2,9 @@
 type KeptFolder = 'brushes' | 'tray'
 type KeptFile = { file: string; name: string; size: number; time: number }
 
+// A new version of the desktop app. "isReady": downloaded, to install on closing; otherwise it has to be downloaded by hand
+export type Update = { version: string; isReady: boolean }
+
 // What only the desktop app can do (see electron/preload.cjs). It is undefined in a browser
 type Desktop = {
   platform: string
@@ -22,6 +25,10 @@ type Desktop = {
   sizeOf: (file: string) => Promise<number>
   readChunk: (file: string, offset: number, length: number) => Promise<Uint8Array>
   openFolder: () => Promise<string>
+  takeUpdate: () => Promise<Update | null>
+  onUpdate: (listener: (update: Update) => void) => void
+  installUpdate: () => void
+  openDownloadPage: () => void
   takeOpenedFile: () => Promise<string | null>
   onFileOpened: (listener: (file: string) => void) => void
 }

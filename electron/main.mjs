@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { allowFile, setUpFiles } from './files.mjs'
 import { readMemory } from './memory.mjs'
+import { installIfWanted, setUpUpdates } from './updates.mjs'
 
 // The desktop app: a window that shows Lydia. It is the same app as in the browser, built by Vite into "dist", and this
 // file adds what a browser can't do
@@ -162,6 +163,7 @@ app.whenReady().then(async () => {
   memory = await readMemory()
   protocol.handle(SCHEME, serveBuiltApp)
   setUpFiles()
+  setUpUpdates()
   const started = projectIn(process.argv)
   if (started) openProject(started)
   // Lydia has its menus in the window. macOS needs one of its own for its keys (Cmd+Q, Cmd+M, copy and paste in text fields),
@@ -175,5 +177,6 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
+  if (installIfWanted()) return
   if (process.platform !== 'darwin') app.quit()
 })

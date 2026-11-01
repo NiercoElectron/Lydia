@@ -61,6 +61,10 @@ The gear at the top right opens **Settings**:
   drawing. Choose at most half of your card's memory; if you're not sure, keep the default. The desktop app reads the
   memory of the computer and keeps this at **Automatic**, half of the card's memory.
 
+The desktop app looks for new versions on GitHub, and downloads them in the background. A note at the top says when one is
+ready: it installs when you close Lydia, or at once with **Restart now**, which first asks about changes that aren't saved. On a
+Mac the note has a **Download** button instead, for now.
+
 ## The editor
 
 The menus on top have what isn't drawing: **File** saves and exports, **Edit** undoes and transforms, **Layer**, **Filter** and
