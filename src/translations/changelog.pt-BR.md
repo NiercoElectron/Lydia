@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Uma nova interface** ([decisão 82](docs/decisions.md#82-the-new-interface)), a partir do layout de um amigo: menus no topo; ferramentas com seus nomes, cor e configurações da ferramenta à esquerda; pincéis e camadas à direita; e botões e controles deslizantes com visual mais simples. **Ferramentas** e **Cor** podem ser fechados para dar mais espaço ao desenho.
+- **Uma nova interface** ([decisão 82](docs/decisions.md#82-the-new-interface)), a partir do layout de uma amiga: menus no topo; ferramentas com seus nomes, cor e configurações da ferramenta à esquerda; pincéis e camadas à direita; e botões e controles deslizantes com visual mais simples. **Ferramentas** e **Cor** podem ser fechados para dar mais espaço ao desenho.
 - A bandeja de cores agora é a **Paleta**, sempre abaixo da cor.
 
 ### Added
@@ -288,7 +288,7 @@ Pincéis em arquivos, para compartilhar e importar. [decisão 29](docs/decisions
 
 ## [0.3.0] - 2026-10-22
 
-Camadas completas e alterações rápidas em desenhos grandes. [decisões 25 to 27](docs/decisions.md#25-every-layer-change-can-be-undone).
+Camadas completas e alterações rápidas em desenhos grandes. [decisões 25 a 27](docs/decisions.md#25-every-layer-change-can-be-undone).
 
 ### Added
 

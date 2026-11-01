@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Una nueva interfaz** ([decisión 82](docs/decisions.md#82-the-new-interface)), a partir del diseño de un amigo: menús arriba; herramientas con sus nombres, color y ajustes de la herramienta a la izquierda; pinceles y capas a la derecha; y botones y controles deslizantes con un aspecto más sencillo. **Herramientas** y **Color** se pueden cerrar para dar más espacio al dibujo.
+- **Una nueva interfaz** ([decisión 82](docs/decisions.md#82-the-new-interface)), a partir del diseño de una amiga: menús arriba; herramientas con sus nombres, color y ajustes de la herramienta a la izquierda; pinceles y capas a la derecha; y botones y controles deslizantes con un aspecto más sencillo. **Herramientas** y **Color** se pueden cerrar para dar más espacio al dibujo.
 - La bandeja de colores ahora es la **Paleta**, siempre debajo del color.
 
 ### Added
@@ -48,7 +48,7 @@
 
 - **Dedo (U)** y **Desenfocar (J)** ([decisión 71](docs/decisions.md#71-smudge-and-blur)), después del borrador en la columna de herramientas: Dedo arrastra la pintura de la capa activa y Desenfocar la suaviza, usando la punta del pincel elegido. Cada herramienta tiene Tamaño e Intensidad propios, y la presión del lápiz cambia la intensidad.
 - Una **malla** para transformar ([decisión 72](docs/decisions.md#72-the-mesh-of-a-transform)): **Malla**, en la barra de transformación, muestra una cuadrícula con 3, 4, 5 o 6 puntos en cada dirección, que deforman la imagen en curvas suaves al arrastrarlos. Funciona junto con Libre y se guarda en el objeto inteligente y en el archivo del dibujo, para poder modificarla de nuevo.
-- **Deshacer durante una transformación:** mientras se realiza, Ctrl+Z y Ctrl+Mayús+Z recorren cada arrastre de un control o de un punto.
+- **Deshacer durante una transformación:** mientras se realiza, Ctrl+Z y Ctrl+Shift+Z recorren cada arrastre de un control o de un punto.
 - **Licuar (Q)** ([decisión 73](docs/decisions.md#73-liquify)), después de Desenfocar en la columna de herramientas: un lápiz que mueve la imagen de la capa activa en lugar de pintar. **Empujar** sigue el trazo, **Inflar** y **Contraer** amplían o reducen la imagen en el centro del pincel, **Torcer** gira la imagen y **Reconstruir** restaura los píxeles originales con el pincel. Cada trazo modifica la capa de inmediato, sin necesidad de aplicar, y varios trazos no reducen la nitidez de la imagen.
 - El botón **Nítido**, junto a Cuadrícula, muestra los píxeles como cuadrados nítidos con cualquier ampliación a partir del 100%, con cualquier pincel ([decisión 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
 
@@ -81,7 +81,7 @@
 
 ### Added
 
-- La **varita mágica** (W) ([decisión 64](docs/decisions.md#64-the-magic-wand)): selecciona el área alrededor del punto elegido cuyos colores se parecen al de ese punto, como el relleno, con ajustes propios: Tolerancia, Referencia, Expandir (sobre el borde suave de las líneas, para colorear por dentro sin dejar un borde claro) y **Contiguo**, que, desactivado, selecciona el color en todo el dibujo. Mayús añade y Alt quita.
+- La **varita mágica** (W) ([decisión 64](docs/decisions.md#64-the-magic-wand)): selecciona el área alrededor del punto elegido cuyos colores se parecen al de ese punto, como el relleno, con ajustes propios: Tolerancia, Referencia, Expandir (sobre el borde suave de las líneas, para colorear por dentro sin dejar un borde claro) y **Contiguo**, que, desactivado, selecciona el color en todo el dibujo. Shift añade y Alt quita.
 - Español en toda la interfaz y el historial de versiones, con la opción Español y detección automática de variantes del idioma del sistema como es-ES, es-MX y es-AR.
 - Portugués brasileño en toda la interfaz, incluidos el Editor de pinceles y el historial de versiones. La pantalla inicial ofrece Sistema, Português (Brasil) y English, recuerda la elección y detecta el portugués a partir del idioma preferido del navegador. Los nombres de las capas y carpetas nuevas usan el idioma elegido; los nombres del usuario se conservan.
 - **Códigos de error**: cada mensaje de error empieza con un código, como LYD-201, y permanece en inglés en cualquier idioma, para consultarlo en [docs/errors.md](docs/errors.md) o incluirlo en un informe ([decisión 63](docs/decisions.md#63-lydia-in-portuguese-and-spanish)). Los errores inesperados usan el código de la operación en curso, con la causa entre paréntesis.

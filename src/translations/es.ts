@@ -486,7 +486,7 @@ export const es: Record<string, string> = {
   Polygon: 'Polígono',
   Star: 'Estrella',
   'Which shape it draws. Shift keeps it even, and Alt draws it from its middle':
-    'Forma que se dibuja. Mayús mantiene las proporciones y Alt dibuja desde el centro',
+    'Forma que se dibuja. Shift mantiene las proporciones y Alt dibuja desde el centro',
   Sides: 'Lados',
   'How many sides a polygon has, or points a star': 'Cantidad de lados del polígono o puntas de la estrella',
   'How far out the inside of a star is': 'Distancia de las puntas interiores de la estrella al centro',
@@ -575,7 +575,7 @@ export const es: Record<string, string> = {
   'softens the paint on the layer': 'suaviza la pintura de la capa',
   Liquify: 'Licuar',
   'moves and bends the picture on the layer': 'mueve y deforma la imagen de la capa',
-  'Shift keeps it even, Alt draws it from its middle': 'Mayús mantiene las proporciones, Alt dibuja desde el centro',
+  'Shift keeps it even, Alt draws it from its middle': 'Shift mantiene las proporciones, Alt dibuja desde el centro',
   'click on the drawing and type; Ctrl+Enter confirms': 'haz clic en el dibujo y escribe; Ctrl+Enter confirma',
   'Zoom out': 'Alejar',
   'Zoom in': 'Acercar',
