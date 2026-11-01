@@ -15,6 +15,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **IBM Plex Sans** is now the font of the whole interface, the same on every computer
   ([decision 84](docs/decisions.md#84-the-interfaces-font)).
 
+### Fixed
+
+- The window of a new drawing no longer changes size with each resolution or paper.
+
 ## [0.19.1] - 2026-11-01
 
 ### Fixed

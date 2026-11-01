@@ -276,6 +276,23 @@ label.theme-choice {
   max-width: min(560px, 100vw - 32px);
 }
 
+/* Its width doesn't follow what is in it, which changes with each choice */
+.new-project {
+  box-sizing: border-box;
+  width: min(580px, 100vw - 32px);
+}
+
+.new-project-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A line of its own, there even when it has nothing to say, so the window keeps its height */
+.size-on-paper {
+  display: block;
+  min-height: 1lh;
+}
+
 .window-title {
   display: flex;
   align-items: center;
@@ -319,7 +336,7 @@ label.theme-choice {
 }
 
 .new-project-row input[type='number'] {
-  width: 7ch;
+  width: 10ch; /* 10000, with the arrows the field shows under the pointer */
 }
 
 fieldset.new-project-row {

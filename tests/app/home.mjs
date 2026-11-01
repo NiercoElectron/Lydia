@@ -51,6 +51,60 @@ check('and the choices of the Brush Designer', !(await isShown('.start-brush')))
 const page_ = await page.evaluate(() => [document.documentElement.scrollHeight, document.documentElement.clientHeight])
 check('the page needs no scrolling', page_[0] <= page_[1], page_.join(' of '))
 
+// ----- A new drawing -----
+await pressAction(1)
+await page.waitForSelector('dialog.new-project[open]')
+const windowSize = () =>
+  page.$eval('dialog.new-project', box => {
+    const { width, height } = box.getBoundingClientRect()
+    return `${width}×${height}`
+  })
+const typeIn = async (at, value) => {
+  const inputs = await page.$$('dialog.new-project input[type=number]')
+  await inputs[at].click({ clickCount: 3 })
+  await inputs[at].type(value)
+}
+const first = await windowSize()
+const sizes = []
+for (const dpi of ['72', '150', '600', '300']) {
+  await page.evaluate(
+    dpi => [...document.querySelectorAll('dialog.new-project button')].find(b => b.textContent === dpi).click(),
+    dpi,
+  )
+  await sleep(50)
+  sizes.push(await windowSize())
+}
+await typeIn(0, '10000')
+await typeIn(1, '10000')
+await typeIn(2, '1')
+await sleep(50)
+sizes.push(await windowSize())
+const looks = await page.evaluate(() => {
+  const field = document.querySelector('dialog.new-project input[type=number]')
+  field.focus()
+  const line = getComputedStyle(document.querySelector('.size-on-paper'))
+  const hint = getComputedStyle(document.querySelector('dialog.new-project .hint'))
+  return {
+    isCut: field.scrollWidth > field.clientWidth,
+    isHintLook: line.fontSize === hint.fontSize && line.marginLeft === hint.marginLeft,
+  }
+})
+check('the biggest size fits in its field', !looks.isCut)
+check('the size on paper looks like the line above it', looks.isHintLook)
+await typeIn(0, '')
+await sleep(50)
+sizes.push(await windowSize())
+await page.select('dialog.new-project select', 'A3')
+await sleep(50)
+sizes.push(await windowSize())
+check(
+  'the window of a new drawing keeps its size',
+  sizes.every(size => size === first),
+  [first, ...sizes].join(', '),
+)
+await page.keyboard.press('Escape')
+await sleep(100)
+
 // ----- Settings -----
 await pressSettings()
 await sleep(100)

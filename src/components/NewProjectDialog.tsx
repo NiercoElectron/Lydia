@@ -204,7 +204,8 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
           ))}
         </div>
         <p className="hint">
-          {t('From')} {MIN_SIZE} {t('to')} {MAX_SIZE} {t('pixels on each side.')} {paperSize}
+          {t('From')} {MIN_SIZE} {t('to')} {MAX_SIZE} {t('pixels on each side.')}
+          <span className="size-on-paper">{paperSize}</span>
         </p>
         <fieldset className="new-project-row">
           <legend>{t('Background')}</legend>
