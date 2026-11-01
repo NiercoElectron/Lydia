@@ -1,5 +1,57 @@
 # Histórico de alterações
 
+## [0.19.0] - 2026-11-01
+
+### Changed
+
+- **Uma nova interface** ([decisão 82](docs/decisions.md#82-the-new-interface)), a partir do layout de um amigo: menus no topo; ferramentas com seus nomes, cor e configurações da ferramenta à esquerda; pincéis e camadas à direita; e botões e controles deslizantes com visual mais simples. **Ferramentas** e **Cor** podem ser fechados para dar mais espaço ao desenho.
+- A bandeja de cores agora é a **Paleta**, sempre abaixo da cor.
+
+### Added
+
+- O **painel de pincéis** permite buscar pelo nome, guarda **Favoritos** e **Recentes** e tem sete categorias.
+- As **Camadas** mostram uma miniatura da pintura e um olho, e o papel tem sua própria linha e pode ser ocultado.
+- Um **modo de mesclagem para o pincel**: cada traço pode se misturar com a tinta de sua camada, usando os mesmos modos das camadas.
+
+## [0.18.0] - 2026-10-31
+
+### Added
+
+- **Filtros** ([decisão 80](docs/decisions.md#80-filters)): **Matiz e saturação**, **Níveis** e **Desfoque gaussiano**, na lista de **Filtros**, alteram a camada ativa ou sua área selecionada. O resultado aparece em tempo real no desenho, e **Aplicar** confirma as alterações em uma única etapa de desfazer.
+- **Texto** ([decisão 81](docs/decisions.md#81-text)): a ferramenta **Texto**, na tecla **T**, permite digitar diretamente no desenho, em uma camada própria. **Editar texto** altera as palavras, a fonte, o tamanho, a cor, o negrito, o itálico e o alinhamento das linhas. **Transformar** mantém a nitidez em qualquer tamanho, e o desenho preserva a aparência em computadores sem a fonte usada. O Lydia inclui nove fontes abertas, e o Chrome também pode usar as fontes do computador.
+
+## [0.17.0] - 2026-10-31
+
+### Added
+
+- **Simetria** ([decisão 77](docs/decisions.md#77-symmetry)): o que é pintado de um lado aparece nos outros também: esquerda e direita, acima e abaixo, em quatro partes ou radial com 2 a 12 partes. Pincel, borracha, linhas retas e as ferramentas Borrar, Desfocar e Dissolver seguem a simetria; cada traço e suas cópias formam uma única etapa de desfazer. **Y** ativa e desativa, **Mover centro** posiciona o centro em qualquer lugar do papel, e cada desenho guarda sua configuração.
+- **Réguas** ([decisão 78](docs/decisions.md#78-rulers)): os traços seguem uma linha, uma elipse ou um ponto de fuga. O traço pode começar em qualquer lugar e segue paralelo à linha, ao redor de uma elipse de mesma forma ou em linha reta pelo ponto. Com várias réguas no papel, a direção da caneta escolhe qual seguir; assim, dois pontos de fuga criam uma perspectiva de dois pontos. Pincel, borracha e as ferramentas Borrar, Desfocar e Dissolver seguem as réguas. **K** ativa e desativa, e cada desenho guarda as suas.
+- **Formas** ([decisão 79](docs/decisions.md#79-shapes)): retângulos, elipses, linhas, polígonos e estrelas, cada um em sua própria camada, continuam editáveis com **Editar forma**: tipo, lados, preenchimento, contorno, cor e tamanho do contorno e até o pincel usado nele. **Transformar** preserva a espessura do contorno. A ferramenta **Forma** fica na tecla **P**.
+
+## [0.16.0] - 2026-10-31
+
+### Added
+
+- **Salvamento automático** ([decisão 75](docs/decisions.md#75-autosave-and-recovering-a-drawing)): o Lydia guarda uma cópia do desenho no navegador a cada 2 minutos, se houver alterações, sem interromper a pintura. Na tela inicial, escolha a frequência: 1, 2 ou 5 minutos, ou desativado.
+- **Recuperar**, na tela inicial: os cinco desenhos mais recentes fechados sem salvar, inclusive após uma falha, cada um com imagem, tamanho e horário.
+- **Perder a conexão com a placa de vídeo** não interrompe mais o Lydia ([decisão 76](docs/decisions.md#76-losing-the-graphics-card)): ele avisa e reabre o desenho automaticamente a partir da memória.
+
+## [0.15.1] - 2026-10-31
+
+### Fixed
+
+- Novas camadas e pastas não continuam contando as que foram excluídas: cada uma recebe o número seguinte ao maior ainda presente ([decisão 74](docs/decisions.md#74-the-numbers-of-new-layers)).
+
+## [0.15.0] - 2026-10-31
+
+### Added
+
+- **Borrar (U)** e **Desfocar (J)** ([decisão 71](docs/decisions.md#71-smudge-and-blur)), após a borracha na coluna de ferramentas: Borrar arrasta a tinta na camada ativa e Desfocar a suaviza, usando a ponta do pincel escolhido. Cada ferramenta tem Tamanho e Intensidade próprios, e a pressão da caneta altera a intensidade.
+- Uma **malha** para transformar ([decisão 72](docs/decisions.md#72-the-mesh-of-a-transform)): **Malha**, na barra de transformação, mostra uma grade com 3, 4, 5 ou 6 pontos em cada direção, que deformam a imagem em curvas suaves ao serem arrastados. Funciona junto com Livre e fica guardada no objeto inteligente e no arquivo do desenho, para poder ser alterada novamente.
+- **Desfazer durante uma transformação:** enquanto ela é feita, Ctrl+Z e Ctrl+Shift+Z percorrem cada arraste de uma alça ou de um ponto.
+- **Dissolver (Q)** ([decisão 73](docs/decisions.md#73-liquify)), após Desfocar na coluna de ferramentas: uma caneta que move a imagem na camada ativa em vez de pintar. **Empurrar** segue o traço, **Inflar** e **Contrair** ampliam ou reduzem a imagem no centro do pincel, **Torcer** gira a imagem e **Reconstruir** restaura os pixels originais com o pincel. Cada traço altera a camada imediatamente, sem precisar aplicar, e vários traços não reduzem a nitidez da imagem.
+- O botão **Nítido**, ao lado de Grade, mostra os pixels como quadrados nítidos em qualquer zoom a partir de 100%, com qualquer pincel ([decisão 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
+
 ## [0.14.0] - 2026-10-30
 
 ### Added

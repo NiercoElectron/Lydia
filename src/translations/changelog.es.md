@@ -1,5 +1,57 @@
 # Historial de cambios
 
+## [0.19.0] - 2026-11-01
+
+### Changed
+
+- **Una nueva interfaz** ([decisión 82](docs/decisions.md#82-the-new-interface)), a partir del diseño de un amigo: menús arriba; herramientas con sus nombres, color y ajustes de la herramienta a la izquierda; pinceles y capas a la derecha; y botones y controles deslizantes con un aspecto más sencillo. **Herramientas** y **Color** se pueden cerrar para dar más espacio al dibujo.
+- La bandeja de colores ahora es la **Paleta**, siempre debajo del color.
+
+### Added
+
+- El **panel de pinceles** permite buscar por nombre, guarda **Favoritos** y **Recientes** y tiene siete categorías.
+- Las **Capas** muestran una miniatura de la pintura y un ojo, y el papel tiene su propia fila y se puede ocultar.
+- Un **modo de fusión para el pincel**: cada trazo puede mezclarse con la pintura de su capa, usando los mismos modos de las capas.
+
+## [0.18.0] - 2026-10-31
+
+### Added
+
+- **Filtros** ([decisión 80](docs/decisions.md#80-filters)): **Tono y saturación**, **Niveles** y **Desenfoque gaussiano**, en la lista de **Filtros**, modifican la capa activa o su área seleccionada. El resultado se muestra en tiempo real en el dibujo, y **Aplicar** confirma los cambios en un solo paso de deshacer.
+- **Texto** ([decisión 81](docs/decisions.md#81-text)): la herramienta **Texto**, en la tecla **T**, permite escribir directamente en el dibujo, en una capa propia. **Editar texto** cambia las palabras, la fuente, el tamaño, el color, la negrita, la cursiva y la alineación de las líneas. **Transformar** mantiene la nitidez a cualquier tamaño, y el dibujo conserva su aspecto en equipos sin la fuente usada. Lydia incluye nueve fuentes abiertas, y Chrome también puede usar las fuentes del equipo.
+
+## [0.17.0] - 2026-10-31
+
+### Added
+
+- **Simetría** ([decisión 77](docs/decisions.md#77-symmetry)): lo que se pinta de un lado aparece también en los demás: izquierda y derecha, arriba y abajo, en cuatro partes o radial con 2 a 12 partes. El pincel, el borrador, las líneas rectas y las herramientas Dedo, Desenfocar y Licuar siguen la simetría; cada trazo y sus copias forman un solo paso de deshacer. **Y** activa y desactiva, **Mover centro** coloca el centro en cualquier lugar del papel, y cada dibujo guarda su configuración.
+- **Reglas** ([decisión 78](docs/decisions.md#78-rulers)): los trazos siguen una línea, una elipse o un punto de fuga. El trazo puede empezar en cualquier lugar y va paralelo a la línea, alrededor de una elipse de la misma forma o en línea recta por el punto. Con varias reglas en el papel, la dirección del lápiz elige cuál seguir; así, dos puntos de fuga crean una perspectiva de dos puntos. El pincel, el borrador y las herramientas Dedo, Desenfocar y Licuar siguen las reglas. **K** activa y desactiva, y cada dibujo guarda las suyas.
+- **Formas** ([decisión 79](docs/decisions.md#79-shapes)): rectángulos, elipses, líneas, polígonos y estrellas, cada uno en su propia capa, siguen siendo editables con **Editar forma**: tipo, lados, relleno, contorno, color y tamaño del contorno e incluso el pincel que lo dibuja. **Transformar** conserva el grosor del contorno. La herramienta **Forma** está en la tecla **P**.
+
+## [0.16.0] - 2026-10-31
+
+### Added
+
+- **Guardado automático** ([decisión 75](docs/decisions.md#75-autosave-and-recovering-a-drawing)): Lydia guarda una copia del dibujo en el navegador cada 2 minutos si hay cambios, sin interrumpir la pintura. En la pantalla inicial se elige la frecuencia: 1, 2 o 5 minutos, o desactivado.
+- **Recuperar**, en la pantalla inicial: los cinco dibujos más recientes cerrados sin guardar, incluso tras un fallo, cada uno con imagen, tamaño y hora.
+- **Perder la conexión con la tarjeta gráfica** ya no detiene Lydia ([decisión 76](docs/decisions.md#76-losing-the-graphics-card)): avisa y vuelve a abrir el dibujo automáticamente desde la memoria.
+
+## [0.15.1] - 2026-10-31
+
+### Fixed
+
+- Las capas y carpetas nuevas ya no siguen contando las eliminadas: cada una recibe el número siguiente al mayor que queda ([decisión 74](docs/decisions.md#74-the-numbers-of-new-layers)).
+
+## [0.15.0] - 2026-10-31
+
+### Added
+
+- **Dedo (U)** y **Desenfocar (J)** ([decisión 71](docs/decisions.md#71-smudge-and-blur)), después del borrador en la columna de herramientas: Dedo arrastra la pintura de la capa activa y Desenfocar la suaviza, usando la punta del pincel elegido. Cada herramienta tiene Tamaño e Intensidad propios, y la presión del lápiz cambia la intensidad.
+- Una **malla** para transformar ([decisión 72](docs/decisions.md#72-the-mesh-of-a-transform)): **Malla**, en la barra de transformación, muestra una cuadrícula con 3, 4, 5 o 6 puntos en cada dirección, que deforman la imagen en curvas suaves al arrastrarlos. Funciona junto con Libre y se guarda en el objeto inteligente y en el archivo del dibujo, para poder modificarla de nuevo.
+- **Deshacer durante una transformación:** mientras se realiza, Ctrl+Z y Ctrl+Mayús+Z recorren cada arrastre de un control o de un punto.
+- **Licuar (Q)** ([decisión 73](docs/decisions.md#73-liquify)), después de Desenfocar en la columna de herramientas: un lápiz que mueve la imagen de la capa activa en lugar de pintar. **Empujar** sigue el trazo, **Inflar** y **Contraer** amplían o reducen la imagen en el centro del pincel, **Torcer** gira la imagen y **Reconstruir** restaura los píxeles originales con el pincel. Cada trazo modifica la capa de inmediato, sin necesidad de aplicar, y varios trazos no reducen la nitidez de la imagen.
+- El botón **Nítido**, junto a Cuadrícula, muestra los píxeles como cuadrados nítidos con cualquier ampliación a partir del 100%, con cualquier pincel ([decisión 68](docs/decisions.md#68-smooth-pixels-when-zoomed-in)).
+
 ## [0.14.0] - 2026-10-30
 
 ### Added
