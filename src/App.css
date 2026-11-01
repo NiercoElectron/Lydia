@@ -504,6 +504,15 @@ fieldset.new-project-row {
   gap: 2px 8px;
 }
 
+/* A list has its name on one line and takes what is left, however long its choices are */
+.color-side .toolbar label:has(select) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.color-side .toolbar label select {
+  width: 100%;
+}
+
 .color-side .toolbar .notice {
   flex-basis: 100%;
 }
@@ -1406,16 +1415,18 @@ button.layer-name {
   border-radius: 2px;
 }
 
-/* The palette (see ColorTray.tsx), under the color panel */
+/* The palette (see ColorTray.tsx), under the color panel, with its two lists side by side to leave room for the tool's
+   settings */
 .color-tray {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
   padding: 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .color-tray h2 {
+  grid-column: 1 / -1;
   margin: 0;
   font-size: 1rem;
 }

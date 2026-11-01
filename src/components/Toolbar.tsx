@@ -313,8 +313,8 @@ export function Toolbar({
           {t('Pixel-perfect')}
         </button>
       )}
-      <SymmetryButtons controls={symmetry} />
       <RulerButtons controls={rulers} />
+      <SymmetryButtons controls={symmetry} />
     </div>
   )
 }
