@@ -2427,6 +2427,61 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   in the test browser on my graphics card, Apply and reading the tiles back took 2.6 to 3.2 seconds, and a slider moving
   fast showed 15 new pictures a second with the hue, and 11 to 13 with a blur, none with tiles of different values.
 
+## 81. Text
+
+- **Date:** 2026-10-31
+- **Status:** adopted
+- **Problem:** the roadmap asked for text. Letters drawn by hand don't stay sharp or change, and a text that turns into
+  pixels at once has its spelling frozen.
+- **Decision:** my choices:
+  - **A layer of its own, typed on the drawing itself.** **Edit text** changes the words, the font, the size and the color,
+    and I added bold, italic and lines on the left, in the center or on the right, the last one for comic balloons.
+  - **Ctrl+T doesn't lose sharpness**, and **Convert to pixels** frees it for painting.
+  - **Nine open fonts come with Lydia**, the same on any computer: Inter, Lora, Roboto Mono, Oswald, Comic Neue, Bangers,
+    Caveat, Pacifico and Press Start 2P, with their licenses in `public/fonts-licenses.txt`. **The computer's own fonts**
+    are also there, with a permission in Chrome. There is no importing of font files.
+  - **A drawing opened where its font is missing keeps its pixels**, and only editing the text changes the font.
+- **How:**
+  - A text is a smart object (decision 42) that also keeps its words, in `src/engine/text.ts`. I chose that over a new kind
+    of layer: the move tool, Ctrl+T, undo, the file, the autosave and duplicating all work with no new code, and older
+    versions of Lydia open it as a smart object instead of pixels.
+  - Keeping a source is also what answers the missing font: the file has the letters as they were, so a text can be moved
+    and transformed where its font isn't, and it is only written again when its words change.
+  - After a transform that changes its size, the source is written again from the font, as big as it will show, and drawn
+    on the paper as any smart object is. So 40 pixels made 5 times bigger gives the same 10034 pixels as a text of 200
+    written directly. Making it smaller writes it smaller too, which avoids the jagged look a smart object gets from
+    shrinking.
+  - Each tile of the source is written on a small canvas of its own, moved to its place. So a text has no size limit but
+    16384 pixels each way, and a text 6790 wide and 2502 high on a paper of 10000×10000 takes 480 ms.
+  - Where a text gets several sizes at once, with perspective or a mesh, its source is as big as the biggest of them. The
+    narrow end of a strong perspective is then shrunk the way a smart object is, and looks a little rough. It is the
+    problem still waiting in the smart objects, and not one of text.
+  - It is typed in a real text box over the drawing, in the same font, following the view, and not in tiles. That gives the
+    caret, selecting with the mouse, accents and every keyboard for free, and the keys show at once at any size of text.
+    The box shows a text with a mesh without it, and shows over the layers above it, until it is done.
+  - The layer's tiles are emptied on the graphics card only while its text is edited, as the filters' preview does (decision
+    80), so a save meanwhile has it, and Esc gives it back as it was.
+  - The letters are placed as CSS places them, so that they come out where the text box had them, within a pixel.
+  - The text box stays until the letters are on the paper, so nothing blinks.
+  - **Enter starts a new line.** Ctrl+Enter or a click outside puts it on the drawing, as one step of undo, and Esc leaves
+    everything as it was. Choosing another tool also finishes it. A text with no words leaves nothing, and a text whose
+    words were all taken away stays as it was.
+  - The color panel chooses the color, while typing too, so there is one way to choose it.
+  - A layer starts with the name of its first line, and follows it while it isn't renamed.
+  - A new text starts at the 16th of the paper's smaller side, so it can be read at any size of paper.
+  - The fonts come in two files each, the second only fetched for a letter from it. Each is a `FontFace` added to the page,
+    since a canvas can only use a font the page knows about. A browser doesn't say whether it has a font, so
+    `isFontHere` compares the width of the same words with and without it.
+  - In the file, a smart object's `text` has the words, the style and its `box`, the rectangle of the text's own space that
+    the corners show. Older versions of Lydia leave it out, and so does a file with one that makes no sense.
+- **Checked:** `tests/app/text.mjs`: the lines on the left, in the center and on the right; typing with accents, and the
+  keys staying in the box; one step of undo; the letters coming out where the box had them; a text with no words; Esc, a
+  click outside and another tool; the box following the zoom, the wheel and a turned view; Edit text, with the picture
+  hiding it and RAM keeping it; the words, the font, the size and the color changing; the nine fonts; a font that isn't
+  here, kept by a transform and told about by Edit text; a transform writing the text again, sharp; the move tool; editing
+  it where the transform took it; painting and filters blocked; a duplicate; Convert to pixels and its undo; a text wider
+  than the paper in a file, opened again and changed; the autosave.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

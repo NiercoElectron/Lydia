@@ -16,6 +16,17 @@ export type StoredTile = {
 }
 
 // How much RAM a stored tile takes
+// A canvas's pixels aren't multiplied by their alpha, as tiles' are. In place
+export function premultiply(pixels: Uint8ClampedArray) {
+  for (let i = 0; i < pixels.length; i += 4) {
+    const alpha = pixels[i + 3]
+    if (alpha === 255) continue
+    pixels[i] = (pixels[i] * alpha) / 255
+    pixels[i + 1] = (pixels[i + 1] * alpha) / 255
+    pixels[i + 2] = (pixels[i + 2] * alpha) / 255
+  }
+}
+
 export function bytesOf(tile: StoredTile) {
   return (tile.pixels?.length ?? 0) + (tile.packed?.length ?? 0) + (tile.color !== undefined ? 4 : 0)
 }

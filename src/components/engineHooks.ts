@@ -7,6 +7,7 @@ import type { StabilizerSettings } from '../engine/stabilizer'
 import { noRulers } from '../engine/rulers'
 import { DEFAULT_SHAPE_STYLE } from '../engine/shapes'
 import { noSymmetry, type SymmetryMode } from '../engine/symmetry'
+import { DEFAULT_TEXT_STYLE } from '../engine/text'
 import type { Tool } from '../engine/tools'
 import { isTyping, type ViewState } from '../engine/view'
 import {
@@ -44,6 +45,9 @@ const startingSnapshot: EngineSnapshot = {
   shapeStyle: DEFAULT_SHAPE_STYLE,
   isShapeLayer: false,
   isEditingShape: false,
+  textStyle: DEFAULT_TEXT_STYLE,
+  isTextLayer: false,
+  typing: null,
   filter: null,
   canFilter: false,
   isUpdating: false,

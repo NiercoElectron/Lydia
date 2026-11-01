@@ -406,9 +406,28 @@ fieldset.new-project-row {
 }
 
 .draw-space {
+  position: relative;
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+/* The text being typed, placed over the drawing by TextBox.tsx */
+.text-box {
+  position: absolute;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  overflow: hidden;
+  resize: none;
+  white-space: pre;
+  text-rendering: geometricPrecision;
+  font-kerning: normal;
+}
+
+.text-font {
+  max-width: 180px;
 }
 
 .tray-panel {

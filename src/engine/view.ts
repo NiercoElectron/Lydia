@@ -13,7 +13,7 @@ import type { Point, SelectionMode } from './selection'
 import { drawRulers, gripAt, movedRuler } from './rulerHandles'
 import { createHold, type Hold, type Ruler, type Rulers } from './rulers'
 import { shapeBox, type ShapeKind } from './shapes'
-import type { Quad } from './smartObject'
+import type { Matrix3, Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
 import { onHalfPixels, type Symmetry } from './symmetry'
@@ -43,6 +43,7 @@ const CURSORS: Record<Tool, string> = {
   liquify: 'crosshair',
   fill: FILL_CURSOR,
   shape: 'crosshair',
+  text: 'text',
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
   lasso: 'crosshair',
@@ -100,12 +101,14 @@ export type ViewActions = {
   isEditingShape: () => boolean
   getLineEnds: () => [Point, Point] | null
   onLineEnds: (ends: [Point, Point]) => void
+  onText: (at: Point) => void // the text tool went down at this point of the paper (see text.ts)
 }
 
 export type ShapeBox = { from: Point; to: Point }
 
 // Inputs where the keyboard is used for typing: shortcuts must leave them alone
 export function isTyping(target: EventTarget | null) {
+  if (target instanceof HTMLTextAreaElement) return true
   return target instanceof HTMLInputElement && (target.type === 'text' || target.type === 'number')
 }
 
@@ -186,6 +189,14 @@ export function createView(
     const height = sin * grid.width + cos * grid.height
     setView(Math.min(app.screen.width / width, app.screen.height / height) * 0.9, world.rotation, isFlipped())
     placeAt({ x: grid.width / 2, y: grid.height / 2 }, middle())
+  }
+
+  // The matrix from the paper to the screen, for what shows over the drawing and has to follow it
+  function screenMatrix(): Matrix3 {
+    const start = world.toGlobal({ x: 0, y: 0 })
+    const across = world.toGlobal({ x: 1, y: 0 })
+    const down = world.toGlobal({ x: 0, y: 1 })
+    return [across.x - start.x, down.x - start.x, start.x, across.y - start.y, down.y - start.y, start.y, 0, 0, 1]
   }
 
   // The view as it is now, to save it with the drawing (see ViewData)
@@ -343,6 +354,12 @@ export function createView(
       },
       cursor: 'move',
     }
+  }
+
+  // The text tool starts a text where it goes down, and ends the one being typed
+  function placeText(e: PointerEvent): Gesture {
+    actions.onText(toPaper(e))
+    return { move() {}, up() {} }
   }
 
   function pick(e: PointerEvent): Gesture {
@@ -665,6 +682,7 @@ export function createView(
     liquify: e => stroke(e, liquify, actions.onMixEnd),
     fill,
     shape: drawShape,
+    text: placeText,
     eyedropper: pick,
     select: selectRectangle,
     lasso,
@@ -1061,6 +1079,7 @@ export function createView(
     setBrushOutline,
     setStabilizer,
     getState: () => state,
+    screenMatrix,
     getSaved,
     showSaved,
     paperAtWindow,

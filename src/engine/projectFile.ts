@@ -3,6 +3,7 @@ import { LAYER_BLEND_MODES, type BlendMode } from './layers'
 import { parseBrushFile } from './brushFile'
 import { isRulers, type Rulers } from './rulers'
 import { MAX_DEPTH, MAX_SIDES, MIN_DEPTH, MIN_SIDES, SHAPE_KINDS, type Shape, type ShapePlacement } from './shapes'
+import { textInProject, type TextData } from './text'
 import { isSymmetry, type Symmetry } from './symmetry'
 import { decompress } from './lz4'
 import type { StoredTile } from './memory'
@@ -35,7 +36,14 @@ export const fitsExport = (width: number, height: number, scale: number) =>
 
 // A smart object as it is opened or saved (see smartObject.ts): its source's tiles, the part of the source with paint,
 // where that part's corners are on the paper, and how its pixels are worked out
-export type SmartData<Tiles> = { tiles: Tiles; bounds: Rect; corners: Quad; smooth: boolean; warp?: Warp }
+export type SmartData<Tiles> = {
+  tiles: Tiles
+  bounds: Rect
+  corners: Quad
+  smooth: boolean
+  warp?: Warp
+  text?: TextData
+}
 
 export type LayerData = {
   name: string
@@ -132,7 +140,9 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // how strokes are mirrored (see symmetry.ts), left out when off, and "rulers" (since 0.17) what strokes follow (see
 // rulers.ts), left out when there are none; older versions of Lydia don't know them. A layer's "shape" (since 0.17) is
 // what it draws (see shapes.ts), with the position of its brush in the header's "brushes", the brushes' files, so shapes
-// with the same brush keep it once. A shape that makes no sense is left out, and its layer stays as its pixels
+// with the same brush keep it once. A shape that makes no sense is left out, and its layer stays as its pixels. A smart
+// object's "text" (since 0.18) is the words it is written from (see text.ts): older versions, or a text that makes no
+// sense, leave them out, and it stays a smart object
 
 const MAGIC = 'LYDIAPRJ'
 const FORMAT = 'lydia'
@@ -378,6 +388,8 @@ export function parseProject(file: ArrayBuffer): ProjectData {
           smooth: smart.smooth,
           ...(smart.warp !== undefined && { warp: smart.warp }),
         }
+        const text = textInProject(smart.text)
+        if (text) data.smart.text = text
       }
       return data
     }),

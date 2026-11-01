@@ -1,5 +1,5 @@
 import { errorMessage } from '../errors'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { createEngine, type Engine } from '../engine/engine'
 import type { ProjectData } from '../engine/projectFile'
 
@@ -7,10 +7,11 @@ type Props = {
   project: ProjectData
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
   onEngineChange: (engine: Engine | null) => void // the engine once it is ready, null when it goes away
+  children?: ReactNode // what shows over the drawing
 }
 
 // The area where the drawing is shown and painted on. The engine draws into it with the graphics card
-export function DrawSpace({ project, gpuMemory, onEngineChange }: Props) {
+export function DrawSpace({ project, gpuMemory, onEngineChange, children }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -42,5 +43,9 @@ export function DrawSpace({ project, gpuMemory, onEngineChange }: Props) {
     }
   }, [project, gpuMemory, onEngineChange])
 
-  return <div ref={hostRef} className="draw-space" />
+  return (
+    <div ref={hostRef} className="draw-space">
+      {children}
+    </div>
+  )
 }

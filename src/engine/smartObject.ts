@@ -11,8 +11,9 @@ import {
 } from 'pixi.js'
 import type { GpuTiles } from './gpuTiles'
 import type { Layer } from './layers'
-import { toStoredTile, type StoredTile, type TileMemory } from './memory'
+import { premultiply, toStoredTile, type StoredTile, type TileMemory } from './memory'
 import type { Point, SelectionTile } from './selection'
+import type { TextData } from './text'
 import { parseTileKey, TILE_SIZE, tileKey, tilesTouching } from './tiles'
 import { warpPoint, type Warp } from './warp'
 
@@ -36,6 +37,7 @@ export type SmartObject = {
   corners: Quad // where the corners of "bounds" are on the paper
   smooth: boolean // how the pixels are worked out: smoothly (bicubic), or as whole pixels (pixel art)
   warp?: Warp // the mesh that bends it inside its corners (see warp.ts), if it is bent
+  text?: TextData // the words its source is written from, if it is a text (see text.ts)
 }
 
 // ----- The maths: a homography maps a rectangle to any four corners -----
@@ -229,13 +231,7 @@ export async function imageTiles(image: ImageBitmap, pace: () => Promise<void>) 
       ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE)
       ctx.drawImage(image, -column * TILE_SIZE, -row * TILE_SIZE)
       const pixels = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data // it rounds and keeps within 0–255
-      for (let i = 0; i < pixels.length; i += 4) {
-        const alpha = pixels[i + 3]
-        if (alpha === 255) continue
-        pixels[i] = (pixels[i] * alpha) / 255
-        pixels[i + 1] = (pixels[i + 1] * alpha) / 255
-        pixels[i + 2] = (pixels[i + 2] * alpha) / 255
-      }
+      premultiply(pixels)
       const tile = toStoredTile(pixels)
       if (tile) tiles.set(tileKey(column, row), tile)
     }

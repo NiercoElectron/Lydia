@@ -12,6 +12,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **Filters** ([decision 80](docs/decisions.md#80-filters)): **Hue and saturation**, **Levels** and **Gaussian blur**, in the
   **Filters** list, on the active layer or what is selected in it. They show live on the drawing, and **Apply** keeps them
   as one step of undo.
+- **Text** ([decision 81](docs/decisions.md#81-text)): the **Text** tool, on **T**, types on the drawing itself, on a layer
+  of its own. **Edit text** changes the words, the font, the size, the color, bold, italic and the side the lines go to.
+  **Transform** keeps it sharp at any size, and a drawing keeps its look on a computer without its font. Nine open fonts
+  come with Lydia, and Chrome can use the computer's own fonts too.
 
 ## [0.17.0] - 2026-10-31
 

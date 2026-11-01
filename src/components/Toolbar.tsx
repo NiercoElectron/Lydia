@@ -1,8 +1,11 @@
+import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useLanguage } from '../i18n'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { WandSettings } from '../engine/selection'
+import { canListFonts, computerFonts, INCLUDED_FONTS } from '../engine/fonts'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import { MAX_BLUR_RADIUS, MAX_MIDDLE, MIN_MIDDLE, type FilterChange, type FilterSettings } from '../engine/filters'
 import type { RulerKind, Rulers } from '../engine/rulers'
@@ -17,6 +20,7 @@ import {
   type ShapeStyle,
 } from '../engine/shapes'
 import { MAX_SECTORS, MIN_SECTORS, SYMMETRY_MODES, type Symmetry, type SymmetryMode } from '../engine/symmetry'
+import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, type TextAlign, type TextStyle } from '../engine/text'
 import {
   hasStrength,
   isPaintTool,
@@ -49,6 +53,7 @@ export type TransformControls = {
   transform: { smooth: boolean; mode: TransformMode; warpSide: number } | null
   isSmartLayer: boolean
   isShapeLayer: boolean
+  isTextLayer: boolean
   onStart: () => void
   onSmoothChange: (smooth: boolean) => void
   onModeChange: (mode: TransformMode) => void
@@ -90,6 +95,17 @@ export type ShapeControls = {
   onTakeBrush: () => void
 }
 
+// How the next text is written (see text.ts), or the one being typed, which changes at once
+export type TextControls = {
+  style: TextStyle
+  isTyping: boolean
+  isFontHere: boolean
+  onChange: (change: Partial<TextStyle>) => void
+  onEdit: () => void
+  onDone: () => void
+  onCancel: () => void
+}
+
 // The filter whose controls are open (see filters.ts), which takes the bar's place
 export type FilterControls = {
   filter: FilterSettings | null
@@ -111,6 +127,7 @@ type Props = {
   symmetry: SymmetryControls
   rulers: RulerControls
   shape: ShapeControls
+  text: TextControls
   filter: FilterControls
   stabilizer: StabilizerSettings
   taper: TaperSettings
@@ -152,6 +169,7 @@ export function Toolbar({
   symmetry,
   rulers,
   shape,
+  text,
   filter,
   stabilizer,
   taper,
@@ -195,13 +213,15 @@ export function Toolbar({
   }
   const paintsLayer = usesTip(tool) || tool === 'fill'
   const isBlocked = (transform.isSmartLayer || transform.isShapeLayer) && paintsLayer
+  const isObjectTool = (tool === 'shape' && transform.isShapeLayer) || (tool === 'text' && transform.isTextLayer)
   return (
     <div className="toolbar">
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
       {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}
       {tool === 'shape' && <ShapeButtons controls={shape} isShapeLayer={transform.isShapeLayer} />}
-      {(isSelecting || isMoving || (tool === 'shape' && transform.isShapeLayer)) && (
+      {tool === 'text' && <TextButtons controls={text} isTextLayer={transform.isTextLayer} />}
+      {(isSelecting || isMoving || (isObjectTool && !text.isTyping)) && (
         <button
           onClick={transform.onStart}
           title={t('Scale, turn, skew or distort what is selected, or the layer (Ctrl+T)')}
@@ -214,7 +234,9 @@ export function Toolbar({
           <span className="notice">
             {transform.isShapeLayer
               ? t("This layer is a shape: it can't be painted on.")
-              : t("This layer is a smart object: it can't be painted on.")}
+              : transform.isTextLayer
+                ? t("This layer is a text: it can't be painted on.")
+                : t("This layer is a smart object: it can't be painted on.")}
           </span>
           <button onClick={transform.onConvertToPixels} title={t('It keeps its pixels, but no longer its original')}>
             {t('Convert to pixels')}
@@ -228,7 +250,7 @@ export function Toolbar({
         <span className="notice">{t("This layer's transparency is locked: the eraser can't take paint away.")}</span>
       )}
       {tool === 'liquify' && <LiquifyModes mode={liquifyMode} onChange={onLiquifyModeChange} />}
-      {tool !== 'fill' && tool !== 'shape' && !isSelecting && !isMoving && (
+      {tool !== 'fill' && tool !== 'shape' && tool !== 'text' && !isSelecting && !isMoving && (
         <label title={t('Brush size ([ and ])')}>
           {t('Size')}
           <input
@@ -254,7 +276,7 @@ export function Toolbar({
           <SliderValue value={strength} min={1} max={100} unit="%" onChange={onStrengthChange} />
         </label>
       )}
-      {!isSelecting && !isMoving && !hasStrength(tool) && tool !== 'shape' && (
+      {!isSelecting && !isMoving && !hasStrength(tool) && tool !== 'shape' && tool !== 'text' && (
         <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
           {t('Opacity')}
           <input
@@ -525,6 +547,109 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
         <button onClick={onTakeBrush} title={t('Outline this shape with the brush chosen now')}>
           {t('Use this brush')}
         </button>
+      )}
+    </>
+  )
+}
+
+// The font and the look of the next text, or of the one being typed, and the button that goes back to typing in one.
+// The computer's fonts need a permission in Chrome, asked for once by a click
+function TextButtons({ controls, isTextLayer }: { controls: TextControls; isTextLayer: boolean }) {
+  const { t } = useLanguage()
+  const { style, isTyping, isFontHere, onChange, onEdit, onDone, onCancel } = controls
+  const { font, size, isBold, isItalic, align } = style
+  const [fonts, setFonts] = useState<string[] | null>(null)
+  useEffect(() => {
+    void computerFonts(false).then(setFonts)
+  }, [])
+  const others = (fonts ?? []).filter(each => !INCLUDED_FONTS.includes(each))
+  const isListed = INCLUDED_FONTS.includes(font) || others.includes(font)
+  const aligns: [TextAlign, typeof AlignLeft, string][] = [
+    ['left', AlignLeft, t('Lines on the left')],
+    ['center', AlignCenter, t('Lines in the center')],
+    ['right', AlignRight, t('Lines on the right')],
+  ]
+  return (
+    <>
+      <label title={t('The font of the text')}>
+        {t('Font')}
+        <select className="text-font" value={font} onChange={e => onChange({ font: e.target.value })}>
+          {!isListed && <option value={font}>{font}</option>}
+          <optgroup label={t('Included')}>
+            {INCLUDED_FONTS.map(each => (
+              <option key={each} value={each} style={{ fontFamily: `"${each}"` }}>
+                {each}
+              </option>
+            ))}
+          </optgroup>
+          {others.length > 0 && (
+            <optgroup label={t('On this computer')}>
+              {others.map(each => (
+                <option key={each} value={each} style={{ fontFamily: `"${each}"` }}>
+                  {each}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </label>
+      {canListFonts() && fonts === null && (
+        <button
+          onClick={() => void computerFonts(true).then(setFonts)}
+          title={t('Show the fonts of this computer too. The browser asks for permission')}
+        >
+          {t('Computer fonts')}
+        </button>
+      )}
+      <label title={t('How big the letters are, in pixels')}>
+        {t('Size')}
+        <input
+          type="range"
+          min={MIN_TEXT_SIZE}
+          max={MAX_TEXT_SIZE}
+          value={size}
+          onChange={e => onChange({ size: Number(e.target.value) })}
+        />
+        <SliderValue
+          value={size}
+          min={MIN_TEXT_SIZE}
+          max={MAX_TEXT_SIZE}
+          onChange={typed => onChange({ size: typed })}
+        />
+      </label>
+      <button aria-pressed={isBold} onClick={() => onChange({ isBold: !isBold })} title={t('Bold letters')}>
+        {t('Bold')}
+      </button>
+      <button aria-pressed={isItalic} onClick={() => onChange({ isItalic: !isItalic })} title={t('Italic letters')}>
+        {t('Italic')}
+      </button>
+      {aligns.map(([each, Icon, title]) => (
+        <button key={each} aria-pressed={align === each} onClick={() => onChange({ align: each })} title={title}>
+          <Icon size={16} aria-label={title} />
+        </button>
+      ))}
+      {isTyping ? (
+        <>
+          <button onClick={onDone} title={t('Put the text on the drawing (Ctrl+Enter, or click outside it)')}>
+            {t('Done')}
+          </button>
+          <button onClick={onCancel} title={t('Leave everything as it was (Esc)')}>
+            {t('Cancel')}
+          </button>
+        </>
+      ) : (
+        <button
+          disabled={!isTextLayer}
+          onClick={onEdit}
+          title={t('Change the words, the font, the size or the color of the text on the active layer')}
+        >
+          {t('Edit text')}
+        </button>
+      )}
+      {!isFontHere && (
+        <span className="notice">
+          {t("The font {font} isn't on this computer: finishing changes it to another one.", { font })}
+        </span>
       )}
     </>
   )

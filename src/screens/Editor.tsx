@@ -27,6 +27,7 @@ import { LayersPanel } from '../components/LayersPanel'
 import { ToolColumn } from '../components/ToolColumn'
 import { Toolbar } from '../components/Toolbar'
 import { TrayPanel } from '../components/TrayPanel'
+import { TextBox } from '../components/TextBox'
 import { ALL_TOOLS } from '../components/toolList'
 import { ViewControls } from '../components/ViewControls'
 import { brushFileName } from '../engine/brushFile'
@@ -432,6 +433,8 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
     onBack()
   }
 
+  const cantExport = !engine || busy !== null || snapshot.filter !== null || snapshot.typing !== null
+
   return (
     <div className="editor">
       <header className="editor-bar">
@@ -455,6 +458,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             transform: snapshot.transform,
             isSmartLayer: snapshot.layers.find(layer => layer.id === snapshot.activeLayerId)?.isSmart ?? false,
             isShapeLayer: snapshot.isShapeLayer,
+            isTextLayer: snapshot.isTextLayer,
             onStart: () => engine?.startTransform(),
             onSmoothChange: smooth => engine?.setTransformSmooth(smooth),
             onModeChange: mode => engine?.setTransformMode(mode),
@@ -484,6 +488,15 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             onCommit: () => engine?.commitShapeStyle(),
             onColor: part => engine?.setShapeColor(part),
             onTakeBrush: () => engine?.takeBrushForShape(),
+          }}
+          text={{
+            style: snapshot.textStyle,
+            isTyping: snapshot.typing !== null,
+            isFontHere: snapshot.typing?.isFontHere ?? true,
+            onChange: change => engine?.setTextStyle(change),
+            onEdit: () => engine?.editText(),
+            onDone: () => engine?.finishText(),
+            onCancel: () => engine?.cancelText(),
           }}
           rulers={{
             rulers: snapshot.rulers,
@@ -535,7 +548,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             value=""
             disabled={!snapshot.canFilter || snapshot.filter !== null}
             title={t(
-              'Change the colors of the active layer or blur it. A smart object or a shape is turned into pixels first',
+              'Change the colors of the active layer or blur it. A smart object, a shape or a text is turned into pixels first',
             )}
             onChange={e => engine?.startFilter(e.target.value as FilterKind)}
           >
@@ -547,10 +560,10 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
             <option value="blur">{t('Gaussian blur')}</option>
           </select>
           <ViewControls engine={engine} />
-          <button onClick={() => handleExport('png')} disabled={!engine || busy !== null || snapshot.filter !== null}>
+          <button onClick={() => handleExport('png')} disabled={cantExport}>
             {t('Export PNG')}
           </button>
-          <button onClick={() => handleExport('jpeg')} disabled={!engine || busy !== null || snapshot.filter !== null}>
+          <button onClick={() => handleExport('jpeg')} disabled={cantExport}>
             {t('Export JPEG')}
           </button>
           <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>
@@ -606,7 +619,9 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
           onDelete={deleteBrush}
         />
         <div className="draw-area">
-          <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine} />
+          <DrawSpace project={project} gpuMemory={gpuMemory} onEngineChange={setEngine}>
+            {snapshot.typing && <TextBox engine={engine} typing={snapshot.typing} />}
+          </DrawSpace>
           {isTrayOpen && <TrayPanel images={tray} onImport={addToTray} onRemove={removeFromTray} />}
           {isColorTrayOpen && (
             <ColorTray

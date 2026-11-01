@@ -5,6 +5,7 @@ import { Application, CanvasSource, Container, RenderTexture, Sprite, Texture, T
 import type { WebGLRenderer } from 'pixi.js'
 import softRound from '../brushes/soft-round.lydbrush?raw'
 import { createLayerBlender } from './blendModes'
+import { isFontHere } from './fonts'
 import { createBrush, type BrushSettings } from './brush'
 import { parseBrushFile, serializeBrushFile, type BrushPreset } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
@@ -82,16 +83,34 @@ import {
 import { createSelectionView } from './selectionView'
 import {
   createSmartView,
+  homography,
   imageTiles,
   isValidQuad,
+  mapPoint,
+  multiply,
   paintBounds,
   rectQuad,
   selectedPart,
+  type Matrix3,
   type Quad,
   type SmartObject,
   type SmartView,
 } from './smartObject'
 import type { StabilizerSettings } from './stabilizer'
+import {
+  cssFont,
+  DEFAULT_TEXT_STYLE,
+  layoutText,
+  lineHeightOf,
+  MAX_TEXT_SIZE,
+  MIN_TEXT_SIZE,
+  nameOfWords,
+  needsNewSource,
+  stretchOf,
+  textTiles,
+  type TextData,
+  type TextStyle,
+} from './text'
 import {
   createGrid,
   forEachTile,
@@ -121,6 +140,7 @@ export type EngineSnapshot = {
     blendMode: BlendMode
     isSmart: boolean
     isShape: boolean
+    isText: boolean
     hasOffPaper: boolean
     showsOffPaper: boolean
     alphaLocked: boolean
@@ -153,9 +173,23 @@ export type EngineSnapshot = {
   shapeStyle: ShapeStyle // of the active layer's shape, or of the next one drawn
   isShapeLayer: boolean
   isEditingShape: boolean // the bar changes the active layer's shape, not the next one
+  textStyle: TextStyle // of the text being typed, or of the next one
+  isTextLayer: boolean
+  typing: TextTyping | null // the text being typed, if any (see text.ts)
   filter: FilterSettings | null // the filter whose controls are open (see filters.ts)
   canFilter: boolean // a filter can be used on the active layer
   trayColors: string[] // the drawing's own colors in the color tray (see ColorTray.tsx)
+}
+
+// A text being typed, for its text box (see TextBox.tsx): "area" is where its lines are in its own space (see text.ts),
+// and "opacity" its layer's
+export type TextTyping = {
+  words: string
+  style: TextStyle
+  area: ReturnType<typeof layoutText>['area']
+  lineHeight: number
+  opacity: number
+  isFontHere: boolean
 }
 
 // Browsers only tell roughly how much RAM the computer has (Chrome says at most 8 GB, others say nothing), so the
@@ -329,6 +363,18 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     if (!isEditingShape()) return undefined
     return shapeEdit?.layer === stack.active ? shapeEdit.shape : stack.active.shape
   }
+  // How the next text is written, big enough to read on this paper, and the text being typed, in a text box over the
+  // drawing: its layer if it has one already, and "place" takes its own space to the paper. A text stays in
+  // "finishedTyping" until its letters are on the paper, so nothing blinks
+  type Typing = { layer: Layer | null; words: string; style: TextStyle; place: Matrix3 }
+  const usualTextSize = Math.round(Math.min(project.width, project.height) / 16)
+  let newTextStyle: TextStyle = {
+    ...DEFAULT_TEXT_STYLE,
+    size: Math.max(MIN_TEXT_SIZE, Math.min(MAX_TEXT_SIZE, usualTextSize)),
+  }
+  let typing: Typing | null = null
+  let finishedTyping: Typing | null = null
+
   const styleOf = ({ kind, sides, depth, fill, outline }: ShapeStyle): ShapeStyle => ({
     kind,
     sides,
@@ -426,11 +472,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       return shape ? lineEnds(shape) : null
     },
     onLineEnds: ([from, to]) => void redrawShape({ ...stack.active.shape!, from, to, placements: [] }),
+    onText: at => void startText(at),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
   if (project.view) view.showSaved(project.view)
   // Painting, filling, undoing, transforming and changing the layers wait for each other
-  const isBusy = () => view.isPainting() || task !== null || transform !== null || filters.isOpen()
+  const isBusy = () => view.isPainting() || task !== null || transform !== null || filters.isOpen() || typing !== null
 
   // ----- Telling React about changes -----
 
@@ -490,6 +537,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         blendMode: layer.blendMode,
         isSmart: layer.smart !== undefined,
         isShape: layer.shape !== undefined,
+        isText: layer.smart?.text !== undefined,
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
         alphaLocked: layer.alphaLocked,
@@ -527,10 +575,21 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       shapeStyle: styleOf(shownShape() ?? newShapeStyle),
       isShapeLayer: stack.active.shape !== undefined,
       isEditingShape: isEditingShape(),
+      textStyle: typing?.style ?? newTextStyle,
+      isTextLayer: stack.active.smart?.text !== undefined,
+      typing: typingNow(),
       filter: filters.settings(),
       canFilter: canFilter(),
       trayColors,
     }
+  }
+
+  function typingNow(): TextTyping | null {
+    const shown = typing ?? finishedTyping
+    if (!shown) return null
+    const { words, style, layer } = shown
+    const { area, lineHeight } = layoutText(words, style)
+    return { words, style, area, lineHeight, opacity: layer?.opacity ?? 1, isFontHere: isFontHere(style.font) }
   }
 
   // Something changed: make a new snapshot and tell whoever is listening. "modified" = the drawing itself changed
@@ -839,6 +898,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       const ownSource = createLayer(source.name, new Map(source.tiles))
       copy.smart = { source: ownSource, bounds: { ...bounds }, corners: corners.map(p => ({ ...p })) as Quad, smooth }
       if (warp) copy.smart.warp = { side: warp.side, points: warp.points.map(p => ({ ...p })) }
+      if (layer.smart.text) copy.smart.text = layer.smart.text // a text never changes: each change makes a new one
     }
     if (layer.shape) copy.shape = layer.shape // a shape never changes: each change makes a new one
     return copy
@@ -1246,6 +1306,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           corners: layer.smart.corners,
           smooth: layer.smart.smooth,
           warp: layer.smart.warp,
+          text: layer.smart.text,
         },
       })),
       thumbnail,
@@ -1301,7 +1362,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     // Every painted tile must be in RAM first
     while (gpu.hasUnsaved()) await nextFrame()
     const allTiles = stack.layers.flatMap(({ tiles, smart }) => (smart ? [tiles, smart.source.tiles] : [tiles]))
-    const wholeTiles = allTiles.some(tiles => [...tiles].some(([key, tile]) => hasPaintOff(key, tile)))
+    // The box of a text can go past the paper with no paint there
+    const isPastPaper = ({ bounds: { x, y, width, height } }: SmartObject) =>
+      x < 0 || y < 0 || x + width > grid.width || y + height > grid.height
+    const wholeTiles =
+      allTiles.some(tiles => [...tiles].some(([key, tile]) => hasPaintOff(key, tile))) ||
+      stack.layers.some(({ smart }) => smart && isPastPaper(smart))
     // A tile as it is saved: whole, or its part on the paper (null: none)
     const savedTile = (key: string, tile: StoredTile) => {
       const { column, row } = parseTileKey(key)
@@ -1333,6 +1399,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           corners: layer.smart.corners,
           smooth: layer.smart.smooth,
           warp: layer.smart.warp,
+          text: layer.smart.text,
         },
       })),
     )
@@ -1347,6 +1414,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // Choose what the left button does on the paper (see tools.ts)
   function setTool(tool: Tool) {
+    if (tool !== 'text') void finishText()
     view.setTool(tool)
     if (isPaintTool(tool)) brush.settings.tool = tool
     if (isMixTool(tool)) mixTools.settings.tool = tool
@@ -1451,6 +1519,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   }
 
   function setBrush(settings: Partial<BrushSettings>) {
+    // The color panel chooses the color of the text being typed too
+    if (typing && settings.color !== undefined && settings.color !== brush.settings.color) {
+      setTextStyle({ color: settings.color })
+    }
     Object.assign(brush.settings, settings)
   }
 
@@ -2039,6 +2111,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
           // Its points go to where the handles took the picture, and it is painted again there, as thick as it was
           const { bounds, corners, warp } = object
           await drawShape(layer, transformedShape(layer.shape, bounds, corners, warp))
+        } else if (object.text && canWriteAgain(object)) {
+          await drawText(layer, object.text, object.corners, object.warp, object.smooth)
         } else {
           await drawObject(target, object, view)
         }
@@ -2101,7 +2175,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // A filter works on the pixels of a layer that shows: a smart object or a shape is turned into a normal layer first
   function canFilter() {
     const active = stack.active
-    return !isFolder(active) && !active.smart && !active.shape && isShown(active)
+    return !isFolder(active) && !active.smart && !active.shape && isShown(active) && typing === null
   }
 
   // Open a filter's controls (see filters.ts)
@@ -2249,6 +2323,146 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     commitShapeStyle()
   }
 
+  // ----- Text -----
+
+  // Show that a font is coming: a browser only fetches a font when it is asked for
+  function loadFont(style: TextStyle, words: string) {
+    return document.fonts.load(cssFont(style), words || 'A')
+  }
+
+  // Start a new text where the pointer went down, with the middle of its first line there, on whole pixels so that its
+  // letters are as sharp as they can be. If one is being typed, the pointer went down outside it, which ends it
+  function startText(at: Point) {
+    if (typing) return finishText()
+    if (isBusy()) return
+    const style = { ...newTextStyle, color: brush.settings.color }
+    const x = Math.round(at.x)
+    const y = Math.round(at.y - lineHeightOf(style.size) / 2)
+    typing = { layer: null, words: '', style, place: [1, 0, x, 0, 1, y, 0, 0, 1] }
+    void loadFont(style, '').then(() => changed(false))
+    changed(false)
+  }
+
+  // Type in the text on the active layer. The picture shows what the text box doesn't: its tiles on the graphics card
+  // are emptied, while the ones in RAM stay as they were, for saving and for leaving it all as it was
+  function editText() {
+    const layer = stack.active
+    const object = layer.smart
+    if (!object?.text || isBusy() || !isShown(layer)) return
+    const { words, box, ...style } = object.text
+    return runTask('Drawing…', async () => {
+      await loadFont(style, words)
+      typing = { layer, words, style, place: homography(box, object.corners) }
+      for (const key of gpu.tilesWithPaint(layer)) {
+        const { column, row } = parseTileKey(key)
+        gpu.clearTexture(gpu.getTextureToReplace(layer, column, row))
+        projection.composeTile(column, row)
+      }
+      return false
+    })
+  }
+
+  function setTypedWords(words: string) {
+    if (!typing) return
+    typing = { ...typing, words }
+    changed(false)
+  }
+
+  // Change the text being typed, or how the next one is written
+  function setTextStyle(change: Partial<TextStyle>) {
+    if (typing) typing = { ...typing, style: { ...typing.style, ...change } }
+    else newTextStyle = { ...newTextStyle, ...change }
+    changed(false)
+    void loadFont(typing?.style ?? newTextStyle, typing?.words ?? '').then(() => changed(false))
+  }
+
+  // Esc: everything stays as it was
+  function cancelText() {
+    const stopped = typing
+    if (!stopped) return
+    typing = null
+    const { layer } = stopped
+    if (layer) {
+      for (const key of gpu.tilesWithPaint(layer)) {
+        gpu.dropTile(layer, key)
+        const { column, row } = parseTileKey(key)
+        projection.composeTile(column, row)
+      }
+    }
+    changed(false)
+  }
+
+  // Put the text being typed on its layer, a new one above the active layer if it has none, as one step of undo. No
+  // words leave nothing, and a text with its words gone stays as it was
+  function finishText() {
+    const done = typing
+    if (!done) return
+    const { layer, words, style, place } = done
+    const old = layer?.smart?.text
+    const isSame =
+      old?.words === words && (Object.keys(style) as (keyof TextStyle)[]).every(key => old?.[key] === style[key])
+    if (isSame || words.trim() === '') {
+      cancelText()
+      return
+    }
+    typing = null
+    finishedTyping = done
+    newTextStyle = style
+    return runTask('Drawing…', async () => {
+      history.startGroup()
+      try {
+        await loadFont(style, words)
+        const { box } = layoutText(words, style)
+        const text: TextData = { ...style, words, box }
+        const corners = rectQuad(box).map(point => mapPoint(place, point)) as Quad
+        if (layer) {
+          if (old && layer.name === nameOfWords(old.words)) {
+            history.recordLayer(layer, propsOf(layer))
+            layer.name = nameOfWords(words)
+          }
+          await drawText(layer, text, corners, layer.smart?.warp, layer.smart?.smooth)
+        } else {
+          addItem(createLayer(nameOfWords(words)))
+          await drawText(stack.active, text, corners)
+        }
+      } finally {
+        history.endGroup()
+      }
+      while (projection.isUpdating()) await nextFrame()
+      finishedTyping = null
+      return true
+    })
+  }
+
+  // Write a text's source and draw it on its layer at these corners (see text.ts), as an undo step
+  async function drawText(layer: Layer, text: TextData, corners: Quad, warp?: Warp, smooth = true) {
+    const pace = createPacer()
+    await loadFont(text, text.words)
+    const { tiles, bounds } = await textTiles(text, stretchOf(text.box, corners, warp), pace)
+    const source = createLayer(`${layer.name} (source)`, tiles)
+    const object: SmartObject = { source, bounds, corners, smooth, text, ...(warp && { warp }) }
+    const view = createSmartView(renderer, gpu, object)
+    try {
+      for (const key of view.blocks) {
+        await pace()
+        view.addBlock(key)
+      }
+      await drawObject(layer, object, view)
+    } finally {
+      view.destroy()
+    }
+  }
+
+  // A text is written again when it changes size, so it stays sharp. Without its font, its source is all it has
+  const canWriteAgain = ({ text, bounds, corners, warp }: SmartObject) =>
+    text !== undefined && isFontHere(text.font) && needsNewSource(text, bounds, corners, warp)
+
+  // The matrix from the space of the text being typed to the screen
+  function textPlace() {
+    const shown = typing ?? finishedTyping
+    return shown ? multiply(view.screenMatrix(), shown.place) : null
+  }
+
   // ----- The color around the paper -----
 
   // It follows the interface's colors (see theme.ts)
@@ -2346,6 +2560,12 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     commitShapeStyle,
     setShapeColor,
     takeBrushForShape,
+    editText,
+    setTypedWords,
+    setTextStyle,
+    finishText,
+    cancelText,
+    textPlace,
     quietSnapshot,
     onGraphicsLost,
     packTile: memory.pack,

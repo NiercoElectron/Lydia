@@ -7,6 +7,7 @@ export type Tool =
   | 'liquify'
   | 'fill'
   | 'shape'
+  | 'text'
   | 'eyedropper'
   | 'select'
   | 'lasso'

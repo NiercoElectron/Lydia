@@ -12,6 +12,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Symmetry](#symmetry)
 - [Rulers](#rulers)
 - [Shapes](#shapes)
+- [Text](#text)
 - [Filters](#filters)
 - [Eyedropper](#eyedropper)
 - [Fill bucket](#fill-bucket)
@@ -250,6 +251,27 @@ Press it again to draw new ones: dragging on the drawing does nothing while it i
 - It can't be painted on: **Convert to pixels** makes it a normal layer, which can't be edited as a shape any more.
 - A drawing keeps its shapes' brushes in its file, so they open the same on any computer.
 
+## Text
+
+The **Text** tool (T) writes on the drawing. Click where the text goes and type: **Enter** starts a new line, **Ctrl+Enter**
+or a click outside it puts it on the drawing, on a new layer of its own named after its first line, and **Esc** leaves
+everything as it was. **Done** and **Cancel** on the bar do the same, and so does choosing another tool for Done. Ctrl and the
+wheel go on zooming while you type.
+
+The bar chooses the **Font**, the **Size**, **Bold** and **Italic**, and whether the lines go to the left, the center or the
+right. It changes the text being typed at once, or else the next one. The color is the one chosen in the color panel, which
+can change while you type.
+
+**Edit text** opens the text on the active layer again, to change any of that. While it is open, it shows over the layers above
+it, without its mesh if it has one. It changes as one step of undo.
+
+Nine fonts come with Lydia, the same on any computer. **Computer fonts** adds the ones of your computer, in Chrome and Edge,
+which ask for permission once. A drawing opened on a computer without its font looks the same, and can be moved and
+transformed: only finishing an edit changes the font, and the bar says so first.
+
+**Transform** keeps a text sharp however big it gets, since it is written again at that size. A text can't be painted on or
+filtered until **Convert to pixels** turns it into a normal layer, which can be undone.
+
 ## Filters
 
 The **Filters** list, next to Clear layer, changes the active layer, or what is selected in it. The bar shows its sliders, and
@@ -265,7 +287,7 @@ layer as it was.
 The transparency of half covered paint stays as it was with the first two. With its transparency locked, a blur only mixes the
 colors inside the paint.
 
-Filters work on pixels: a smart object or a shape needs **Convert to pixels** first, and a folder can't be filtered.
+Filters work on pixels: a smart object, a shape or a text needs **Convert to pixels** first, and a folder can't be filtered.
 
 ## Eyedropper
 
@@ -509,6 +531,8 @@ problem, give the code, and what is in parentheses after the message if there is
 | Y                                              | Symmetry on and off                                |
 | K                                              | Rulers on and off                                  |
 | P                                              | Shape                                              |
+| T                                              | Text                                               |
+| Ctrl + Enter                                   | Finish a text                                      |
 | F / I                                          | Fill bucket / eyedropper                           |
 | S / L / W                                      | Rectangle select / lasso / magic wand              |
 | V                                              | Move                                               |
