@@ -13,6 +13,9 @@ const MAX_NAME_LENGTH = 100
 // How copies of the tip are placed along a stroke (see dabs.ts)
 export type BrushShape = {
   spacing: number // the distance between dabs, as a fraction of the brush size
+  // When not 0, the distance between dabs is this many times the square root of the size in pixels, instead: closer
+  // together in a big brush, as Krita's automatic spacing does (see kritaBrush.ts). Lydia's own brushes don't use it
+  rootSpacing: number
   angle: number // how much the tip is turned, in degrees, clockwise
   followStroke: boolean // the tip also turns with the direction of the stroke
   angleJitter: number // each dab is turned by a random amount: 0 = never, 1 = any angle
@@ -62,6 +65,7 @@ export type BrushCategory = (typeof BRUSH_CATEGORIES)[number]
 
 export const DEFAULT_SHAPE: BrushShape = {
   spacing: 0.1,
+  rootSpacing: 0,
   angle: 0,
   followStroke: false,
   angleJitter: 0,
@@ -85,6 +89,7 @@ export const DEFAULT_SHAPE: BrushShape = {
 // The smallest and biggest values of each number, so a file can't make Lydia place millions of dabs
 const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
   spacing: [0.01, 10],
+  rootSpacing: [0, 10],
   angleJitter: [0, 1],
   scatter: [0, 5],
   flow: [0, 1],

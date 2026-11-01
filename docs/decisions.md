@@ -2566,6 +2566,45 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Checked:** `tests/app/home.mjs` and `tests/app/left-panel.mjs`: the font is in use, in fields too, every name still fits, and
   the drawing starts on a whole pixel in the three languages. `tests/app/tray.mjs` is the one that found the pixel.
 
+## 85. Brushes from other apps
+
+- **Date:** 2026-11-01
+- **Status:** adopted
+- **Problem:** an artist arriving from another app has brushes they know, and Lydia could only read its own.
+- **Decision:** my choices:
+  - **Krita (`.kpp`, `.bundle`), GIMP (`.gbr`, `.gih`) and Photoshop (`.abr`)**. Procreate stays out: it is for iPads.
+  - **A brush with something Lydia doesn't have is added anyway, and the report says what stayed out**, brush by brush. Refusing
+    them would leave out many of Krita's, and saying nothing would look like a brush gone wrong.
+  - **Before 1.0**, as a stage of its own.
+- **How:** a brush from another app becomes a normal `.lydbrush` the moment it is added, so nothing else in Lydia knows where
+  it came from, and it can be changed in the Brush Designer and exported. Each format has its own reader, all of them only
+  data: nothing in those files is ever run.
+  - **GIMP:** the tip, in a small header and pixels. A `.gih` has many pictures and a Lydia brush has one tip, so it takes the
+    first.
+  - **Krita:** a `.kpp` is a PNG image with an XML text in it. Its tip is worked out, or a file that a `.bundle` has next to it and
+    a preset of Krita 5 has inside itself. A `.kpp` of Krita 4 on its own doesn't have it, so it paints with a round tip and says so.
+    Krita's texture becomes the paper grain. They mean opposite things by a dark pixel: Krita's holds the paint
+    back, and Lydia's paints with little pressure. Krita's automatic spacing grows with the square root of the size, not with
+    the size, so a brush keeps its own `rootSpacing` for it: as a fixed percentage, a brush of 235 pixels was stamping 2.45
+    times too far apart. I noticed that painting with them.
+  - **Spacing under Advanced.** Many brushes stamp at big sizes because their file says so: 25% of 235 pixels is almost 60 pixels
+    between copies of a sparse tip. That isn't an error to correct on import, as a brush of leaves is meant to spread out, so it
+    is a choice: my choice was a slider, for any brush. It lasts while the drawing is open, like the brush's blend mode, and the
+    brush file stays as it was.
+  - Photoshop's Count puts many dabs at each step, and a Lydia brush one, so the spacing is divided by it.
+  - **An outline for a tip of small marks.** The brush's outline leaves out specks, so a tip of only specks showed nearly nothing,
+    and I couldn't tell where it would paint. When a tip's loops fill less than a fifth of the space its paint reaches, it shows
+    a line around that space instead.
+  - **Photoshop:** Adobe doesn't describe this format. The pictures are read as GIMP and Krita read them. The names, the spacing and
+    what follows the pressure are in another section that GIMP ignores, in Photoshop's own way of describing things, which is
+    also the only place with the brushes worked out from a diameter and a hardness. Lydia reads it. In versions 1 and 2, of the
+    last century, those worked-out brushes aren't read: no real file was there to check them against.
+- **Checked:** with real files: the 117 presets of Krita 4's own bundle in 3.7 s, the 6 of its RGBA bundle, 36 brushes of a real
+  `.abr` in 1.9 s and two `.gih`, all from Krita's repository, by the Import button. I looked at all their tips together, and painted
+  with five of them under a growing pressure: a pencil, a chalk, a screentone and an ink of Krita's and one of the `.abr`, and
+  they look like themselves, with the grain the right way up. No real `.abr` of versions 1, 2, 7 or 10 was tried.
+  `tests/app/foreign-brushes.mjs` makes its own files, byte by byte, to keep other people's brushes out of the repository.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)

@@ -213,12 +213,12 @@ check(
 )
 await click('Advanced ▾')
 check(
-  '…it opens with the stabilizer and the taper',
+  '…it opens with the spacing, the stabilizer and the taper',
   (await panelShown()) &&
     (await hasStabilizer()) &&
     (await page.evaluate(() =>
       [...document.querySelectorAll('.advanced-panel label')].map(l => l.textContent.split(/\d/)[0].trim()).join(),
-    )) === 'Stabilizer,Taper start,Taper end',
+    )) === 'Spacing,Stabilizer,Taper start,Taper end',
 )
 const heightBefore = await page.evaluate(() => window.lydia.app.canvas.getBoundingClientRect().height)
 await moveTo(500, 700)

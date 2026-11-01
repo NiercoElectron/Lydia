@@ -1,9 +1,18 @@
 import { projectOf } from '../autosave'
 import type { FilterKind } from '../engine/filters'
-import { errorMessage, LydiaError, type ErrorCode } from '../errors'
+import { errorMessage, LydiaError, type ErrorCode, type ImportProblem } from '../errors'
 import { useLanguage } from '../i18n'
 import { useCallback, useEffect, useState } from 'react'
-import { addBrushFiles, DEFAULT_BRUSH_ID, loadBrushes, removeBrush, tipOf, type LibraryBrush } from '../brushLibrary'
+import {
+  addBrushFiles,
+  DEFAULT_BRUSH_ID,
+  loadBrushes,
+  removeBrush,
+  tipOf,
+  type BrushNote,
+  type LibraryBrush,
+} from '../brushLibrary'
+import { BrushImportReport } from '../components/BrushImportReport'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
 import {
@@ -83,6 +92,13 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   const [brushSize, setBrushSize] = useState(20)
   const [opacity, setOpacity] = useState(100) // in percent
   const [brushBlend, setBrushBlend] = useState<BlendMode>('normal')
+  // The spacing chosen for each brush, in percent, while this drawing is open: the brush itself keeps its own
+  const [spacings, setSpacings] = useState<Record<string, number>>({})
+  const [importReport, setImportReport] = useState<{
+    added: number
+    notes: BrushNote[]
+    problems: ImportProblem[]
+  } | null>(null) // what was left out of brushes from other apps, until it has been read
   // Smudge's, blur's and liquify's own size and strength (in percent)
   const [mixSettings, setMixSettings] = useState<Record<StrengthTool, { size: number; strength: number }>>({
     smudge: { size: 40, strength: 50 },
@@ -141,6 +157,18 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   useEffect(() => {
     engine?.setBrush({ color, size, opacity: opacity / 100, blendMode: brushBlend })
   }, [engine, color, size, opacity, brushBlend])
+
+  const chosenSpacing = brush && spacings[brush.id]
+  // What the brush has, worked out for this size when it grows with its square root (see brushFile.ts)
+  const ownSpacing = !brush
+    ? 0
+    : brush.preset.rootSpacing
+      ? brush.preset.rootSpacing / Math.sqrt(size)
+      : brush.preset.spacing
+  const spacingNow = chosenSpacing ?? Math.max(1, Math.round(ownSpacing * 100))
+  useEffect(() => {
+    engine?.setBrush({ spacing: chosenSpacing === undefined ? null : chosenSpacing / 100 })
+  }, [engine, chosenSpacing])
 
   const strength = mixTool ? mixSettings[mixTool].strength : 0
   useEffect(() => {
@@ -235,13 +263,14 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
   const importBrushes = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return
-      const { added, problems } = await addBrushFiles(files, brushes)
+      const { added, problems, notes } = await addBrushFiles(files, brushes)
       if (added.length > 0) {
         setBrushes(list => [...list, ...added])
         setBrushId(added[0].id)
         saveBrushId(added[0].id)
       }
-      if (problems.length > 0) {
+      if (notes.length > 0) setImportReport({ added: added.length, notes, problems })
+      else if (problems.length > 0) {
         const title = added.length === 0 ? 'No brush was added.' : 'Some files were not added.'
         alert(
           `${t(title)}\n\n${problems.map(problem => `${problem.name}: ${errorMessage(problem.error, 'LYD-209')}`).join('\n')}`,
@@ -676,6 +705,8 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
       onSizeChange={setSize}
       onOpacityChange={setOpacity}
       onBrushBlendChange={setBrushBlend}
+      spacing={spacingNow}
+      onSpacingChange={spacing => brush && setSpacings(list => ({ ...list, [brush.id]: spacing }))}
       onStrengthChange={value =>
         mixTool && setMixSettings(settings => ({ ...settings, [mixTool]: { ...settings[mixTool], strength: value } }))
       }
@@ -690,6 +721,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, onBack 
 
   return (
     <div className="editor">
+      {importReport && <BrushImportReport {...importReport} onClose={() => setImportReport(null)} />}
       <header className="editor-bar">
         <MenuBar menus={menus} />
         <div className="top-row">

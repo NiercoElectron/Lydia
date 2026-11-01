@@ -3,10 +3,18 @@ import {
   BRUSH_EXTENSION,
   MAX_BRUSH_FILE_BYTES,
   parseBrushFile,
+  serializeBrushFile,
   type BrushCategory,
   type BrushPreset,
 } from './engine/brushFile'
 import { decodeTip, type BrushTip } from './engine/brushTip'
+import { toPreset, type LeftOut } from './engine/foreignBrush'
+import {
+  FOREIGN_BRUSH_EXTENSIONS,
+  isForeignBrushFile,
+  MAX_FOREIGN_FILE_BYTES,
+  readForeignBrushFile,
+} from './engine/foreignBrushFile'
 
 // The brushes the user can choose from: the ones that come with Lydia (the .lydbrush files in src/brushes) and the
 // ones the user added. A browser can't look into a folder of the computer by itself, so added brushes are kept by
@@ -143,30 +151,62 @@ export async function loadBrushes(): Promise<LibraryBrush[]> {
   return [...builtInBrushes, ...added]
 }
 
-// Add brush files to the library. A file that isn't a brush that works, or that is already in the library, is left
-// out with a message saying why
+// What a brush from another app had that stayed out of it
+export type BrushNote = { name: string; leftOut: LeftOut[] }
+
+export const BRUSH_FILE_TYPES = [BRUSH_EXTENSION, ...FOREIGN_BRUSH_EXTENSIONS]
+
+// Add brush files to the library, Lydia's or another app's, which become Lydia's. A file that isn't a brush that works, or
+// that is already in the library, is left out with a message saying why
 export async function addBrushFiles(files: File[], library: LibraryBrush[]) {
   const added: LibraryBrush[] = []
   const problems: ImportProblem[] = []
+  const notes: BrushNote[] = []
+
+  async function add(text: string, preset: BrushPreset) {
+    if ([...library, ...added].some(brush => brush.file === text)) throw new LydiaError('LYD-208')
+    await decodeTip(preset.tip, preset.grain) // a tip that can't be painted with is found now, not at the first stroke
+    const id = await withStore('readwrite', store => store.add({ file: text }))
+    added.push({ id: `added/${id}`, isBuiltIn: false, preset, file: text })
+  }
+
+  async function addForeign(file: File) {
+    if (file.size > MAX_FOREIGN_FILE_BYTES) throw new LydiaError('LYD-207')
+    const { brushes, problems: unread } = await readForeignBrushFile(
+      file.name,
+      new Uint8Array(await file.arrayBuffer()),
+    )
+    problems.push(...unread)
+    if (brushes.length === 0 && unread.length === 0) throw new LydiaError('LYD-220')
+    for (const brush of brushes) {
+      try {
+        const text = serializeBrushFile(await toPreset(brush))
+        // Read back as any brush file is, which keeps its numbers within Lydia's limits
+        await add(text, parseBrushFile(text, brush.name))
+        if (brush.leftOut.length > 0) notes.push({ name: brush.name, leftOut: brush.leftOut })
+      } catch (error) {
+        problems.push({ name: brush.name, error })
+      }
+    }
+  }
+
   for (const file of files) {
     try {
+      if (isForeignBrushFile(file.name)) {
+        await addForeign(file)
+        continue
+      }
       if (!file.name.toLowerCase().endsWith(BRUSH_EXTENSION)) {
-        throw new LydiaError('LYD-206', { extension: BRUSH_EXTENSION })
+        throw new LydiaError('LYD-206', { extension: BRUSH_FILE_TYPES.join(', ') })
       }
       if (file.size > MAX_BRUSH_FILE_BYTES) throw new LydiaError('LYD-207')
       const text = await file.text()
-      if ([...library, ...added].some(brush => brush.file === text)) {
-        throw new LydiaError('LYD-208')
-      }
-      const preset = parseBrushFile(text, file.name.slice(0, -BRUSH_EXTENSION.length))
-      await decodeTip(preset.tip, preset.grain) // a tip that can't be painted with is found now, not at the first stroke
-      const id = await withStore('readwrite', store => store.add({ file: text }))
-      added.push({ id: `added/${id}`, isBuiltIn: false, preset, file: text })
+      await add(text, parseBrushFile(text, file.name.slice(0, -BRUSH_EXTENSION.length)))
     } catch (error) {
       problems.push({ name: file.name, error })
     }
   }
-  return { added, problems }
+  return { added, problems, notes }
 }
 
 export async function removeBrush(brush: LibraryBrush) {

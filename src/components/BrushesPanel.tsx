@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n'
 import { Search, Star, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { categoryOf, tipOf, type LibraryBrush } from '../brushLibrary'
+import { BRUSH_FILE_TYPES, categoryOf, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BRUSH_CATEGORIES, BRUSH_EXTENSION, type BrushCategory } from '../engine/brushFile'
 import {
   loadFavoriteBrushes,
@@ -127,7 +127,12 @@ export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport
         <ul className="brushes-list">
           {listed.map(brush => (
             <li key={brush.id} hidden={!isShown(brush)}>
-              <button className="brush" aria-pressed={brush.id === selectedId} onClick={() => onSelect(brush)}>
+              <button
+                className="brush"
+                aria-pressed={brush.id === selectedId}
+                title={nameOf(brush)}
+                onClick={() => onSelect(brush)}
+              >
                 <BrushPreview tip={tipOf(brush)} shape={brush.preset} />
                 <span className="brush-name">{nameOf(brush)}</span>
               </button>
@@ -148,7 +153,7 @@ export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport
         <button
           onClick={() => fileInputRef.current?.click()}
           title={t('Add brushes from {extension} files (or drop the files on the window)', {
-            extension: BRUSH_EXTENSION,
+            extension: BRUSH_FILE_TYPES.join(', '),
           })}
         >
           {t('Import…')}
@@ -168,7 +173,14 @@ export function BrushesPanel({ brushes, selectedId, onSelect, onImport, onExport
           {t('Delete')}
         </button>
       </div>
-      <input ref={fileInputRef} type="file" accept={BRUSH_EXTENSION} multiple hidden onChange={handleFilesChosen} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={BRUSH_FILE_TYPES.join(',')}
+        multiple
+        hidden
+        onChange={handleFilesChosen}
+      />
     </aside>
   )
 }

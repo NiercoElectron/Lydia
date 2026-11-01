@@ -31,6 +31,7 @@ export type BrushSettings = {
   size: number // the tip's longer side, in pixels of the paper, at full pressure
   opacity: number // how much the whole stroke covers, from 0 to 1
   blendMode: BlendMode // how a stroke mixes with the paint on the layer
+  spacing: number | null // the distance between dabs chosen for now, as a fraction of the size. null: the brush's own
   taper: TaperSettings // how the stroke's ends thin out (see dabs.ts)
   pixelPerfect: boolean // whether a pixel brush leaves out the doubled corners of its lines (see dabs.ts)
 }
@@ -65,6 +66,7 @@ export function createBrush(
     size: 20,
     opacity: 1,
     blendMode: 'normal',
+    spacing: null,
     taper: NO_TAPER,
     pixelPerfect: false,
   }
@@ -193,6 +195,10 @@ export function createBrush(
     shape = newShape
     painter.setTip(tip, shape)
   }
+
+  // The brush's shape with the spacing chosen for now, if one was, which isn't kept in the brush
+  const spacedShape = () =>
+    settings.spacing === null ? shape : { ...shape, spacing: settings.spacing, rootSpacing: 0 }
 
   // Which dabs touch each tile ("column,row" -> its dabs, in the order they were placed), with their copies (see
   // symmetry.ts)
@@ -376,7 +382,7 @@ export function createBrush(
     }
     strokePoints = [{ x, y, pressure }]
     strokeDabs = []
-    path = createDabPath(shape, strokeStart.size, { ...strokeStart, tip: tip.image })
+    path = createDabPath(spacedShape(), strokeStart.size, { ...strokeStart, tip: tip.image })
     paintDabs(path.start({ x, y, pressure }))
   }
 
@@ -403,7 +409,7 @@ export function createBrush(
   function taperEnd(length: number) {
     const { taper } = strokeStart
     if (taper.start === 0 && taper.end === 0) return
-    const again = createDabPath(shape, strokeStart.size, { ...strokeStart, length, tip: tip.image })
+    const again = createDabPath(spacedShape(), strokeStart.size, { ...strokeStart, length, tip: tip.image })
     const dabs = [...again.start(strokePoints[0]), ...again.moveTo(strokePoints.slice(1)), ...again.end()]
     const tapered = strokeStart.pixelPerfect ? withoutCorners(dabs) : dabs
     let first = 0

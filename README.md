@@ -52,6 +52,8 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   like a pencil on real paper (Pencil), from the four that come with Lydia or any image
 - Brushes are `.lydbrush` files: ten come with Lydia, and more can be added (Import…, or drop the files on the
   window), exported to share them, and deleted
+- Brushes from other apps: Krita (`.kpp`, `.bundle`), GIMP (`.gbr`, `.gih`) and Photoshop (`.abr`), with a list of what each
+  one left out
 - A Pixel brush for pixel art: whole pixels with hard edges, from 1 pixel up, with round tips drawn pixel by pixel
 - Pixel-perfect strokes: pixel brushes can leave out the doubled corners of lines drawn by hand
 - Straight lines with Shift + click, kept to the angles of pixel art (or every 15°) with Ctrl

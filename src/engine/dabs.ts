@@ -183,7 +183,11 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
         waitingDab = null
       }
 
-      const spacing = Math.max(1, sizeAt(point.pressure, taperAt(travelled)) * shape.spacing)
+      const sizeHere = sizeAt(point.pressure, taperAt(travelled))
+      const spacing = Math.max(
+        1,
+        shape.rootSpacing ? shape.rootSpacing * Math.sqrt(sizeHere) : sizeHere * shape.spacing,
+      )
       // A pixel brush starts counting from the edge of the pixel the stroke started in, along the longer side of its
       // first move
       if (isPixel && isFirstMove) {

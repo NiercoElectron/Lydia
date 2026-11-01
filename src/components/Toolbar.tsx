@@ -38,6 +38,8 @@ import { SliderValue } from './SliderValue'
 
 export const MIN_BRUSH_SIZE = 1
 export const MAX_BRUSH_SIZE = 500
+const MIN_SPACING = 1
+const MAX_SPACING = 100 // a brush that comes with more keeps what it has, and the Brush Designer goes further
 
 // The selection's settings and commands, shown with the selection tools
 export type SelectionControls = {
@@ -121,6 +123,7 @@ type Props = {
   size: number
   opacity: number // in percent
   brushBlend: BlendMode
+  spacing: number // the distance between copies of the tip, in percent of the size
   strength: number // of smudge, blur or liquify, in percent
   liquifyMode: LiquifyMode
   fill: FillSettings
@@ -141,6 +144,7 @@ type Props = {
   onSizeChange: (size: number) => void
   onOpacityChange: (opacity: number) => void
   onBrushBlendChange: (mode: BlendMode) => void
+  onSpacingChange: (spacing: number) => void
   onStrengthChange: (strength: number) => void
   onLiquifyModeChange: (mode: LiquifyMode) => void
   onFillChange: (change: Partial<FillSettings>) => void
@@ -159,6 +163,7 @@ export function Toolbar({
   size,
   opacity,
   brushBlend,
+  spacing,
   strength,
   liquifyMode,
   fill,
@@ -179,6 +184,7 @@ export function Toolbar({
   onSizeChange,
   onOpacityChange,
   onBrushBlendChange,
+  onSpacingChange,
   onStrengthChange,
   onLiquifyModeChange,
   onFillChange,
@@ -300,6 +306,25 @@ export function Toolbar({
       )}
       {usesTip(tool) && (
         <AdvancedMenu>
+          {isPaintTool(tool) && !isPixelBrush && (
+            <label title={t('The distance between copies of the tip, compared with the brush size')}>
+              {t('Spacing')}
+              <input
+                type="range"
+                min={MIN_SPACING}
+                max={Math.max(MAX_SPACING, spacing)}
+                value={spacing}
+                onChange={e => onSpacingChange(Number(e.target.value))}
+              />
+              <SliderValue
+                value={spacing}
+                min={MIN_SPACING}
+                max={Math.max(MAX_SPACING, spacing)}
+                unit="%"
+                onChange={onSpacingChange}
+              />
+            </label>
+          )}
           <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
           {isPaintTool(tool) && <TaperControls taper={taper} onChange={onTaperChange} />}
         </AdvancedMenu>

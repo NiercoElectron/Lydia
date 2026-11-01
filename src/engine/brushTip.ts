@@ -33,7 +33,7 @@ async function pngCanvas(png: Uint8Array, code: ErrorCode) {
 }
 
 // How much a pixel of a picture paints, from 0 to 255: black fully, white or transparent not at all
-function paintOf(data: Uint8ClampedArray, i: number) {
+export function paintOf(data: Uint8ClampedArray, i: number) {
   const lightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
   return Math.round(((255 - lightness) * data[i + 3]) / 255)
 }

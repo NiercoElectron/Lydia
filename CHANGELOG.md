@@ -7,6 +7,19 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Brushes from other apps** ([decision 85](docs/decisions.md#85-brushes-from-other-apps)): **Import…** also opens Krita's
+  `.kpp` and `.bundle`, GIMP's `.gbr` and `.gih` and Photoshop's `.abr`. Each becomes a Lydia brush, with its tip, spacing,
+  angle, scatter, what follows the pressure and Krita's texture as a paper grain, and a window lists what each one left out.
+- **Spacing** under **Advanced** brings the copies of any brush's tip closer together or further apart, for as long as the
+  drawing is open, without changing the brush.
+
+### Fixed
+
+- A brush tip made of small marks shows a line around where it paints, instead of almost no outline.
+- A long brush name no longer moves the list of brushes sideways: it is cut, and shows whole under the pointer.
+
 ## [0.19.2] - 2026-11-01
 
 ### Changed

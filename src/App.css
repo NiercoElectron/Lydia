@@ -305,6 +305,21 @@ label.theme-choice {
   font-size: 1.2rem;
 }
 
+.brush-report {
+  width: min(560px, 100vw - 32px);
+}
+
+.brush-report ul {
+  max-height: 50vh;
+  margin: 0;
+  padding-left: 20px;
+  overflow-y: auto;
+}
+
+.brush-report p {
+  margin: 8px 0;
+}
+
 .settings-window .theme-choice {
   display: flex;
   align-items: center;
@@ -1106,10 +1121,11 @@ button.brush-favorite[aria-pressed='true'] {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   min-height: 0;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
+  overflow: hidden auto;
   list-style: none;
 }
 
@@ -1138,9 +1154,13 @@ button.brush[aria-pressed='true'] {
   image-rendering: pixelated;
 }
 
+/* A name that doesn't fit is cut, and shows whole under the pointer */
 .brush-name {
+  overflow: hidden;
   font-size: 0.85rem;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The Brush Designer: the same bar and drawing area as the editor, with the brush's settings on the right */

@@ -61,7 +61,7 @@ export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Pr
         max={300}
         value={percent(shape.spacing)}
         unit="%"
-        onChange={value => change({ spacing: value / 100 })}
+        onChange={value => change({ spacing: value / 100, rootSpacing: 0 })}
       />
       {!isPixel && (
         <>

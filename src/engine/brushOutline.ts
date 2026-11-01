@@ -15,6 +15,11 @@ const PAINT_EDGE = 0.05
 const SMALLEST_LOOP = 0.002
 // How far, in squares, the outline may stray from its exact path, to keep fewer points
 const SIMPLIFY = 0.3
+// A tip whose loops fill less than this part of the space its paint reaches is many small marks, like a spray: loops around
+// them would say nothing about where it paints, so it shows that space instead
+const SPARSE_TIP = 0.2
+// A square with less paint than this, the alpha of its pixels added up, is a stray speck and doesn't count for that space
+const LEAST_PAINT = 32
 
 // Each tip's outline, worked out once
 const outlines = new WeakMap<BrushTip, Point[][]>()
@@ -118,8 +123,10 @@ function traceTip(tip: BrushTip): Point[][] {
   }
 
   // Follow the joined pieces round into loops, then measure them from the tip's center in sizes of the brush
+  const toBrush = (p: Point) => ({ x: (p.x - width / 2) / side, y: (p.y - height / 2) / side })
   const loops: Point[][] = []
   const done = new Set<string>()
+  let filled = 0
   for (const start of joined.keys()) {
     if (done.has(start)) continue
     const loop: Point[] = []
@@ -134,11 +141,44 @@ function traceTip(tip: BrushTip): Point[][] {
       key = next
     }
     if (Math.abs(area(loop)) < SMALLEST_LOOP * side * side) continue
-    loops.push(
-      simplify(loop, SIMPLIFY * cell).map(p => ({ x: (p.x - width / 2) / side, y: (p.y - height / 2) / side })),
-    )
+    filled += Math.abs(area(loop))
+    loops.push(simplify(loop, SIMPLIFY * cell).map(toBrush))
   }
-  return loops
+
+  // The corners of every square with paint, in pixels of the tip
+  const corners: Point[] = []
+  for (let y = 1; y <= rows; y++) {
+    for (let x = 1; x <= columns; x++) {
+      if (paint[y * across + x] < LEAST_PAINT) continue
+      for (const [right, below] of [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ]) {
+        corners.push({ x: (x - 1 + right) * cell, y: (y - 1 + below) * cell })
+      }
+    }
+  }
+  const reached = hullOf(corners)
+  if (filled >= SPARSE_TIP * Math.abs(area(reached))) return loops
+  return [simplify(reached, SIMPLIFY * cell).map(toBrush)]
+}
+
+// The smallest loop with no dents around all these points, like a rubber band around them (Andrew's monotone chain): the
+// points in order from left to right, turning always the same way, along the top and back along the bottom
+function hullOf(points: Point[]) {
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y)
+  const turn = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const half = (list: Point[]) => {
+    const kept: Point[] = []
+    for (const point of list) {
+      while (kept.length >= 2 && turn(kept[kept.length - 2], kept[kept.length - 1], point) <= 0) kept.pop()
+      kept.push(point)
+    }
+    return kept.slice(0, -1)
+  }
+  return [...half(sorted), ...half([...sorted].reverse())]
 }
 
 // The area inside a loop (negative when it goes round the other way)
