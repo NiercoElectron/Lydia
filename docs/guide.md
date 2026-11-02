@@ -3,6 +3,7 @@
 What each part of Lydia does, and its shortcuts. Every shortcut is also in the [table at the end](#all-shortcuts).
 On a Mac, Cmd works wherever Ctrl is written.
 
+- [Installing the desktop app](#installing-the-desktop-app)
 - [The start screen](#the-start-screen)
 - [The editor](#the-editor)
 - [Colors](#colors)
@@ -27,6 +28,14 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [The Brush Designer](#the-brush-designer)
 - [When something goes wrong](#when-something-goes-wrong)
 - [All shortcuts](#all-shortcuts)
+
+## Installing the desktop app
+
+The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest). Lydia isn't signed yet, so each system warns the first time:
+
+- **Windows:** run `Lydia-Setup`, and in the blue window choose **More info**, then **Run anyway**.
+- **macOS:** open the `.dmg` and drag Lydia to Applications. If the Mac refuses to open it, go to System Settings > Privacy &
+  Security and choose **Open Anyway**.
 
 ## The start screen
 

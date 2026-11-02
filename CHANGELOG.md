@@ -7,15 +7,21 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+The desktop app for Windows and macOS: Lydia in a window of its own, with real folders, the computer's own memory and new
+versions that arrive by themselves.
+
 ### Added
 
-- **The desktop app** ([decision 87](docs/decisions.md#87-the-desktop-app)): Lydia in a window of its own, for now from the code
-  (`npm run desktop`), with **Interface size** in its settings. Projects go to `Documents\Lydia\Projects`, where **Ctrl+S**
+- **The desktop app** ([decision 87](docs/decisions.md#87-the-desktop-app)): Lydia in a window of its own, for Windows and macOS, with
+  its [installers on GitHub](https://github.com/NiercoElectron/Lydia/releases/latest) and **Interface size** in its settings. Projects go to `Documents\Lydia\Projects`, where **Ctrl+S**
   saves over the same file after the first time, with **Save as…** for another, exported images go straight to
   `Documents\Lydia\Exports`, and a `.lyd` opens with a double click. Added brushes and the tray are files in
   `Documents\Lydia\Brushes` and `Documents\Lydia\Tray`, so the tray stays between sessions, and what is copied there
   shows up in Lydia. It reads the computer's memory: the RAM budget follows the real RAM, and the graphics card's setting
-  starts at **Automatic**. New versions download in the background and install when Lydia closes.
+  starts at **Automatic**. New versions download in the background and install when Lydia closes; on macOS a
+  note leads to the download.
 - **Ctrl+S** saves in the browser too.
 
 ### Changed
@@ -627,7 +633,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/NiercoElectron/Lydia/compare/v0.20.0...v1.0.0
 [0.20.0]: https://github.com/NiercoElectron/Lydia/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/NiercoElectron/Lydia/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/NiercoElectron/Lydia/compare/v0.19.0...v0.19.1

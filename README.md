@@ -1,8 +1,11 @@
 # Lydia
 
-An open source drawing app built with React, TypeScript and PixiJS (WebGL). It aims to feel like Photoshop or Krita, on canvases up to 10000×10000 pixels with 20 or more layers. It runs in the browser, and a desktop version is planned.
+An open source drawing app built with React, TypeScript and PixiJS (WebGL). It aims to feel like Photoshop or Krita, on canvases up to 10000×10000 pixels with 20 or more layers. It runs as a desktop app for Windows and macOS, and in the browser.
 
-> **Work in progress:** Lydia is in early development. Many features are still missing, and things may change or break.
+## Download
+
+The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest): `Lydia-Setup` for Windows and the `.dmg` for macOS. Lydia isn't
+signed yet, so each system warns the first time: how to get past it is in [the guide](docs/guide.md#installing-the-desktop-app).
 
 ## Features
 
@@ -72,6 +75,9 @@ An open source drawing app built with React, TypeScript and PixiJS (WebGL). It a
   bar; zoomed in, the pixels are smoothed, or sharp squares for pixel art (View > Sharp)
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
+- The desktop app: projects, exports, brushes and the tray as files in `Documents\Lydia`, a `.lyd` opened with a double
+  click, memory limits read from the computer, the size of the interface, and new versions that arrive by themselves (on
+  macOS a note leads to the download)
 - Autosave in the browser, with a Recover list after a crash, and the drawing reopened by itself when the browser loses
   the graphics card
 - Choose how much of the graphics card's memory Lydia may use (the gear on the start screen)
@@ -111,13 +117,12 @@ interface in English, Brazilian Portuguese and Spanish, error codes, a color pan
 color tray, a paper grain for brushes, changing any brush in the Brush Designer, from images too, smudge and blur,
 a mesh for transforming, liquify, autosave and recovery, surviving a lost graphics card, symmetry, rulers, shapes that stay
 editable, filters, editable text, a new interface with menus, named tools, brush categories, a blend mode for the brush and
-pictures of the layers, and brushes opened from Krita, GIMP and Photoshop.
+pictures of the layers, brushes opened from Krita, GIMP and Photoshop, and the desktop app for Windows and macOS, with real
+folders for brushes and the tray, memory limits read from the computer and updates that arrive by themselves.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:
 
-- [ ] 1.0: the desktop app for Windows and macOS (Electron), with real folders for brushes and the tray, and memory
-      limits read from the computer
 - [ ] 1.x: Linux, opening and pasting images
 
 Later, once there is a pen with tilt to try it on:
