@@ -621,4 +621,29 @@ export const es: Record<string, string> = {
   'These may paint differently from their original. Left out:':
     'Estos pinceles pueden pintar de forma diferente a los originales. No se incluyeron:',
   'Not added:': 'No se añadieron:',
+  'There are changes that are not saved.': 'Hay cambios sin guardar.',
+  'Close without saving': 'Cerrar sin guardar',
+  '1 brush added.': '1 pincel añadido.',
+  'Drag to move with all that is in it': 'Arrastra para mover con todo su contenido',
+  'Drag to move (onto a folder to put it in)': 'Arrastra para mover (sobre una carpeta para colocarla dentro)',
+  'Double-click to rename': 'Haz doble clic para cambiar el nombre',
+  'How big Lydia\u0027s buttons and panels are. The drawing never changes':
+    'Tamaño de los botones y paneles de Lydia. El dibujo no cambia',
+  'Interface size': 'Tamaño de la interfaz',
+  'Automatic ({amount} GB)': 'Automático ({amount} GB)',
+  'This computer has {ram} GB of RAM.': 'Este equipo tiene {ram} GB de RAM.',
+  'This computer has {card} GB on its graphics card and {ram} GB of RAM.':
+    'Este equipo tiene {card} GB en la tarjeta gráfica y {ram} GB de RAM.',
+  'If you are unsure, keep Automatic.': 'Si tienes dudas, deja Automático.',
+  'Import images, then drag them onto the drawing as often as you like. They stay here, in the Tray folder of Lydia.':
+    'Importa imágenes y arrástralas al dibujo tantas veces como quieras. Se quedan aquí, en la carpeta Tray de Lydia.',
+  'Lydia {version} is ready. It installs when you close Lydia.':
+    'Lydia {version} está listo. Se instalará al cerrar Lydia.',
+  'Lydia {version} is out.': 'Lydia {version} ya está disponible.',
+  'Restart now': 'Reiniciar ahora',
+  Download: 'Descargar',
+  Untitled: 'Sin título',
+  'Save as…': 'Guardar como…',
+  'Open Lydia folder': 'Abrir carpeta de Lydia',
+  'Exported: {name}': 'Exportado: {name}',
 }
