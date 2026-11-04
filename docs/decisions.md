@@ -2619,7 +2619,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Problem:** the brush's outline (decision 45) was a black line inside a white one, 3 pixels wide. It showed on any color, but
   it was heavy for something that is always on the screen, next to the line being drawn.
 - **Decision:**
-  - My idea: the same logic as the pixel grid (decision 34). The outline is one line, 1 pixel of the screen wide, whose color
+  - My idea, which came from Minecraft's crosshair: a cross that inverts the colors behind it, so it shows on anything. It is
+    also the same logic as the pixel grid (decision 34). The outline is one line, 1 pixel of the screen wide, whose color
     comes from what is under it.
   - Each of red, green and blue goes to the far end from where it is, all or nothing: white becomes black, black white, red
     cyan, blue yellow. Claude compared it on the screen with the grid's own color, which is gray on white and black alike and
