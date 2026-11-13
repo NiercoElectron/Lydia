@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -228,6 +228,7 @@ await page.evaluate(() => {
   window.confirm = () => true
   ;[...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click()
 })
+await discardIfAsked(page)
 await sleep(300)
 await page.evaluate(() => delete window.lydia)
 const [chooser] = await Promise.all([page.waitForFileChooser(), click('Open project')])

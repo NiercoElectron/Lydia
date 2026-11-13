@@ -4,7 +4,7 @@
 // lose; a copy left half written; a damaged copy; never more than five; Delete; painting never waiting
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -297,6 +297,7 @@ await autosaveNow()
 await click('Save')
 await sleep(800)
 await click('Back')
+await discardIfAsked(page)
 await sleep(500)
 await goToStart()
 const closed = await stored()

@@ -1,17 +1,17 @@
 import { deleteAutosaved, listAutosaved, loadAutosaved, type AutosavedDrawing } from '../autosave'
-import { desktop, readFile } from '../desktop'
 import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
 import { FilePlus, FolderOpen, Paintbrush, Settings } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
 import type { LibraryBrush } from '../brushLibrary'
 import { DesignerWindow } from '../components/DesignerWindow'
 import { NewProjectDialog } from '../components/NewProjectDialog'
+import { useProjectOpening } from '../components/projectOpening'
 import { SettingsWindow } from '../components/SettingsWindow'
 import { WhatsNew } from '../components/WhatsNew'
-import { parseProject, PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
+import type { ProjectData } from '../engine/projectFile'
 
 type Props = {
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
@@ -63,9 +63,10 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isDesignerOpen, setIsDesignerOpen] = useState(false)
-  const [isOpening, setIsOpening] = useState(false)
+  const [isRecovering, setIsRecovering] = useState(false)
   const [autosaved, setAutosaved] = useState<AutosavedDrawing[]>([]) // the drawings that can be recovered
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const opening = useProjectOpening(onOpenProject)
+  const isOpening = opening.isOpening || isRecovering
 
   useEffect(() => {
     let cancelled = false
@@ -81,13 +82,13 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   }, [])
 
   async function handleRecover(id: string) {
-    setIsOpening(true)
+    setIsRecovering(true)
     try {
       onOpenProject(await loadAutosaved(id))
     } catch (error) {
       alert(errorMessage(error, 'LYD-109'))
     } finally {
-      setIsOpening(false)
+      setIsRecovering(false)
     }
   }
 
@@ -98,38 +99,6 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
       setAutosaved(drawings => drawings.filter(drawing => drawing.id !== id))
     } catch (error) {
       alert(errorMessage(error, 'LYD-109'))
-    }
-  }
-
-  // In the desktop app the system's window opens in Lydia's own folder
-  async function handleOpen() {
-    if (!desktop) {
-      fileInputRef.current?.click()
-      return
-    }
-    setIsOpening(true)
-    try {
-      const file = await desktop.chooseToOpen()
-      if (file) onOpenProject({ ...parseProject(await readFile(file)), file })
-    } catch (error) {
-      alert(errorMessage(error, 'LYD-105'))
-    } finally {
-      setIsOpening(false)
-    }
-  }
-
-  async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = '' // reset the input so choosing the same file again still triggers onChange
-    if (!file) return
-
-    setIsOpening(true)
-    try {
-      onOpenProject(parseProject(await file.arrayBuffer()))
-    } catch (error) {
-      alert(errorMessage(error, 'LYD-105'))
-    } finally {
-      setIsOpening(false)
     }
   }
 
@@ -155,7 +124,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
               <FilePlus size={20} aria-hidden />
               {t('New project…')}
             </button>
-            <button onClick={handleOpen} disabled={isOpening}>
+            <button onClick={opening.open} disabled={isOpening}>
               <FolderOpen size={20} aria-hidden />
               {isOpening ? t('Opening…') : t('Open project')}
             </button>
@@ -164,7 +133,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
               {t('Brush Designer')}
             </button>
           </div>
-          <input ref={fileInputRef} type="file" accept={PROJECT_EXTENSION} hidden onChange={handleFileChosen} />
+          {opening.input}
           {autosaved.length > 0 && (
             <section className="recover">
               <h2>{t('Recover')}</h2>

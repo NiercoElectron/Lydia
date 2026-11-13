@@ -322,6 +322,14 @@ label.theme-choice {
   margin: 8px 0;
 }
 
+.unsaved {
+  width: min(440px, 100vw - 32px);
+}
+
+.unsaved p {
+  margin: 8px 0;
+}
+
 .settings-window .theme-choice {
   display: flex;
   align-items: center;

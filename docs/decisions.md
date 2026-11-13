@@ -2712,7 +2712,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 88. Requests from a pen user
 
 - **Date:** 2026-11-13
-- **Status:** planned; Ctrl + Space is adopted
+- **Status:** planned; Ctrl + Space and File > New and Open are adopted
 - **Problem:** after 1.0, a friend who draws with a pen tried Lydia and asked for what he missed in it.
 - **Decision**, from his requests and my choices, for 1.1.0:
   - **Ctrl + Space** and a drag up or down zooms around where the drag starts, with any tool, as in Krita. It joins Space
@@ -2726,7 +2726,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
     when it is built.
 - **Checked:** `tests/app/view-tools.mjs`: Ctrl + Space shows the zoom cursor, a drag up of 100 pixels zooms in e times
-  around where it started, a drag down zooms back out, and nothing is painted.
+  around where it started, a drag down zooms back out, and nothing is painted. `tests/app/file-menu.mjs`: Ctrl+N and the
+  menu's New ask once the new drawing is created, Cancel keeps the drawing with its changes, Discard opens the new one, a
+  drawing without changes asks nothing, Ctrl+O asks once the file is chosen and Save saves before opening it, and Back asks
+  too, with Esc as Cancel. Every test that goes Back answers Discard.
 
 ## Open questions
 

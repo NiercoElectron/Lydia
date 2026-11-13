@@ -2,7 +2,7 @@
 // clipping and folders: the whole drawing on the screen during the drag against the drawing afterwards
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -190,6 +190,7 @@ async function paintLayers(transparent) {
       window.confirm = () => true
     })
     await click('Back')
+    await discardIfAsked(page)
     await sleep(300)
     await page.evaluate(() => delete window.lydia)
   }

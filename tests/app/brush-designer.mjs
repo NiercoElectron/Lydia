@@ -3,7 +3,7 @@
 // brush in a drawing
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 
 const server = await createServer({
   root: ROOT,
@@ -302,6 +302,7 @@ await page.evaluate(() => {
   }
 })
 await click('Back')
+await discardIfAsked(page)
 await sleep(200)
 check(
   'leaving with unsaved changes asks first (and staying keeps the Designer)',
@@ -313,6 +314,7 @@ await page.evaluate(() => {
   window.lastConfirm = null
 })
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 check(
   "leaving after saving doesn't ask",
@@ -364,6 +366,7 @@ await page.evaluate(() => {
   window.confirm = () => true
 })
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
 await sleep(300)
 await page.click('.home-actions button:nth-child(3)')
 await click('Open Brush Designer')

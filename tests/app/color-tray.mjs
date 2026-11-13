@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -126,6 +126,7 @@ fs.writeFileSync(OUT + '/color-tray.lyd', Buffer.from(saved, 'base64'))
 page.removeAllListeners('dialog')
 page.on('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await page.evaluate(() => delete window.lydia)
 await page.reload({ waitUntil: 'networkidle0' })
@@ -137,6 +138,7 @@ check(
   `${await listColors(0)} | ${await listColors(1)}`,
 )
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await page.evaluate(() => delete window.lydia)
 const [chooser] = await Promise.all([page.waitForFileChooser(), click('Open project')])

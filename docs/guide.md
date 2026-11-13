@@ -503,6 +503,11 @@ forgotten.
 
 ## Saving and exporting
 
+- **New project…** (Ctrl+N) and **Open project** (Ctrl+O), in the File menu, put another drawing in this one's place
+  without going back to the start screen. In a browser Ctrl+N opens a window of the browser instead: use the menu there.
+  If the drawing has changes that aren't saved, Lydia asks first, once the other drawing is chosen: **Save** saves them
+  and goes on, **Discard** leaves them (the last autosaved copy stays in **Recover**), and **Cancel** or Esc stays.
+  **Back** asks the same.
 - **Save** (Ctrl+S) keeps the drawing as a `.lyd` file, with its layers and smart objects, to open it again later. In the
   desktop app it asks for a name once, in `Documents\Lydia\Projects`, and then goes over the same file, with **Save as…** for
   another; **Export** goes straight to `Documents\Lydia\Exports`, and **Open Lydia folder**, in the File menu, shows them. In a
@@ -593,6 +598,7 @@ problem, give the code, and what is in parentheses after the message if there is
 | Shift + click, with the brush or eraser        | Straight line from the end of the last stroke      |
 | Shift + Ctrl + click, with the brush or eraser | The same, keeping to a few angles                  |
 | G                                              | Pixel grid on / off                                |
+| Ctrl + S / Ctrl + N / Ctrl + O                 | Save / new drawing / open a drawing                |
 | Ctrl + Z                                       | Undo                                               |
 | Ctrl + Shift + Z, Ctrl + Y                     | Redo                                               |
 | Shift / Alt + drag or click, with S, L or W    | Add to / take away from the selection              |

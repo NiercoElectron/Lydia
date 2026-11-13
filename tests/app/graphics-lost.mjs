@@ -3,7 +3,7 @@
 // strokes not yet in RAM are the only thing gone; the Brush Designer says so too
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -220,6 +220,7 @@ check(
 
 // Going back: the copy stays, since the drawing isn't saved anywhere
 await click('Back')
+await discardIfAsked(page)
 await sleep(800)
 check('back on the start screen, it can be recovered', (await page.$$eval('.recover li', rows => rows.length)) === 1)
 

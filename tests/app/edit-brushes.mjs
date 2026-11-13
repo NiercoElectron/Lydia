@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -104,6 +104,7 @@ async function open(name) {
 }
 async function back() {
   await click('Back')
+  await discardIfAsked(page)
   await page.waitForSelector('.designer-start')
   await sleep(300)
 }

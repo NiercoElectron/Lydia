@@ -2,7 +2,7 @@
 // release PixiJS's global resources, which broke the next preview (the Designer's test area fell on its first stroke)
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -74,6 +74,7 @@ const back = async () => {
     window.confirm = () => true
     ;[...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click()
   })
+  await discardIfAsked(page)
   await sleep(500)
 }
 check('a preview, at the start', (await tryPreview('start')).endsWith('works'))

@@ -3,7 +3,7 @@
 // buttons of the panel; and a full layer of 10000×10000 going through its picture without stopping the screen
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -181,6 +181,7 @@ check('and it comes back', (await shownAt(500, 500)) === '#ffffff', await shownA
 // ----- A big drawing -----
 page.on('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(500)
 await newDrawing(10000, 10000)
 await page.evaluate(() => {

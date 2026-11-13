@@ -2,7 +2,7 @@
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import fs from 'fs'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 
 const server = await createServer({
   root: ROOT,
@@ -454,6 +454,7 @@ const saved = await page.evaluate(async () => {
 })
 fs.writeFileSync(OUT + '/layers.lyd', Buffer.from(saved, 'base64'))
 await clickButton('Back')
+await discardIfAsked(page)
 await sleep(300)
 const [chooser] = await Promise.all([page.waitForFileChooser(), clickButton('Open project')])
 await chooser.accept([OUT + '/layers.lyd'])

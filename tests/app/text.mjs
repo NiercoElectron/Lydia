@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -639,6 +639,7 @@ check('and so does its autosave', recovered.includes('muito longe'), JSON.string
 const picture = await pixelsOf()
 page.on('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 const [chooser] = await Promise.all([page.waitForFileChooser(), click('Open project')])
 await chooser.accept([OUT + '/text.lyd'])

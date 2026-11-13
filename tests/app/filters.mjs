@@ -3,7 +3,7 @@
 // step of undo; a saved drawing during the preview
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -431,6 +431,7 @@ await waitIdle()
 // With many tiles on the screen, and a slider moving fast, no frame may show some with the old value and some with the new
 page.on('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(400)
 await click('New project…')
 await page.waitForSelector('dialog.new-project[open]')

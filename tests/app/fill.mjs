@@ -3,7 +3,7 @@
 // 10000×10000, with the screen still drawing frames meanwhile
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -66,6 +66,7 @@ async function back() {
     window.confirm = () => true
   })
   await click('Back')
+  await discardIfAsked(page)
   await sleep(300)
 }
 

@@ -35,3 +35,12 @@ if (!CHROME) throw new Error('Google Chrome was not found: set CHROME_PATH to th
 // How the tests start Chrome: in English whatever the computer's language, since Lydia follows the browser's language
 // (see src/i18n.ts) and the tests find buttons and read texts by their English words
 export const LAUNCH = { executablePath: CHROME, headless: true, args: ['--lang=en-US'] }
+
+// After Back (or New and Open) in the editor, a drawing with changes asks first whether to save them (see
+// UnsavedDialog.tsx): this answers Discard, as a test leaving a drawing means to. With no question, it does nothing
+export const discardIfAsked = page =>
+  page.evaluate(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => resolve()))
+    const buttons = [...document.querySelectorAll('dialog.unsaved button')]
+    buttons.find(button => button.textContent === 'Discard')?.click()
+  })

@@ -11,6 +11,13 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 - **Ctrl + Space** and a drag up or down zooms in or out, with any tool, like in Krita. On a Mac it is the Ctrl key, as
   Cmd + Space opens the Mac's search.
+- **File > New project…** (Ctrl+N) and **Open project** (Ctrl+O) in the editor, in place of the drawing that is open,
+  without going back to the start screen. Ctrl+N is for the desktop app: a browser keeps it for itself.
+
+### Changed
+
+- With changes not saved, opening another drawing or going **Back** asks **Save**, **Discard** or **Cancel**, in a window
+  of Lydia's own, instead of the browser's question with two answers.
 
 ## [1.0.1] - 2026-11-13
 

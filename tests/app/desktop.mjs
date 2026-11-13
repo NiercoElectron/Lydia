@@ -14,7 +14,7 @@ import { createRequire } from 'node:module'
 import { tmpdir, totalmem } from 'node:os'
 import path from 'node:path'
 import puppeteer from 'puppeteer-core'
-import { PORT, ROOT } from './setup.mjs'
+import { PORT, ROOT, discardIfAsked } from './setup.mjs'
 
 const electron = createRequire(import.meta.url)('electron')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -312,6 +312,7 @@ check('it says so', shownName.includes(images[0]), shownName)
 
 // Open it again, from the start screen and by the system
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Open project'))
 await startButton('Open project')
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
@@ -323,16 +324,19 @@ await sleep(800)
 check('saving goes to the file it came from', readdirSync(projects).length === 1, readdirSync(projects).join())
 
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Open project'))
 const second = spawn(electron, ['.', `--user-data-dir=${userData}`, projectFile], { cwd: ROOT, env, stdio: 'ignore' })
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
 check('a file opened with a second Lydia opens in the first', true)
 await new Promise(resolve => second.once('close', resolve))
 
-// While a drawing with changes is open, it asks first, and the file opens after that (the dialog is accepted above)
+// While a drawing with changes is open, it asks first (see UnsavedDialog.tsx), and the file opens after that
 await sleep(800)
 await stroke(-40)
 const other = spawn(electron, ['.', `--user-data-dir=${userData}`, projectFile], { cwd: ROOT, env, stdio: 'ignore' })
+await page.waitForSelector('dialog.unsaved', { timeout: 20000 })
+await discardIfAsked(page)
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
 check('and over a drawing with changes, after asking', true)
 await new Promise(resolve => other.once('close', resolve))
@@ -412,6 +416,7 @@ await until(
 
 // The Brush Designer saves into the folder too: a new file for a copy, and the same file for its changes
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Brush Designer'))
 await startButton('Brush Designer')
 await page.waitForSelector('.designer-start select.start-brush')
@@ -438,6 +443,7 @@ await until(
 check('with no new file', readdirSync(brushesFolder).length === 4, brushNames())
 rmSync(path.join(brushesFolder, 'broken.lydbrush'))
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'New project…'))
 
 // ----- Closing all of a sudden -----

@@ -2,7 +2,7 @@ import { projectOf } from '../autosave'
 import type { FilterKind } from '../engine/filters'
 import { errorMessage, LydiaError, type ErrorCode, type ImportProblem } from '../errors'
 import { useLanguage } from '../i18n'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   addBrushFiles,
   DEFAULT_BRUSH_ID,
@@ -13,6 +13,9 @@ import {
   type LibraryBrush,
 } from '../brushLibrary'
 import { BrushImportReport } from '../components/BrushImportReport'
+import { NewProjectDialog } from '../components/NewProjectDialog'
+import { useProjectOpening } from '../components/projectOpening'
+import { UnsavedDialog, type UnsavedAnswer } from '../components/UnsavedDialog'
 import { BrushesPanel } from '../components/BrushesPanel'
 import { DrawSpace } from '../components/DrawSpace'
 import {
@@ -89,9 +92,19 @@ type Props = {
   wantsToLeave: boolean // another project is waiting to open: leave this one, asking first if it has changes
   onStay: () => void // this drawing stays open after that
   onBack: () => void
+  onOpenProject: (project: ProjectData) => void // another drawing takes this one's place
 }
 
-export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsToLeave, onStay, onBack }: Props) {
+export function Editor({
+  project: opened,
+  gpuMemory,
+  tray,
+  onTrayChange,
+  wantsToLeave,
+  onStay,
+  onBack,
+  onOpenProject,
+}: Props) {
   const { t, locale } = useLanguage()
   const [filePath, setFilePath] = useState(opened.file ?? null) // where it is saved, in the desktop app
   const [exported, setExported] = useState<string | null>(null) // the image just exported, shown for a moment
@@ -497,10 +510,12 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
     })
   }
 
-  // Ctrl+S: in the desktop app, over the drawing's own file, once it has one. "asNew" always asks where
-  function handleSave(asNew = false) {
-    if (!engine || busy !== null) return
-    runTask('Saving…', 'LYD-106', async () => {
+  // Ctrl+S: in the desktop app, over the drawing's own file, once it has one. "asNew" always asks where. Whether it was
+  // saved: not when the system's window was closed, or saving failed
+  async function handleSave(asNew = false) {
+    if (!engine || busy !== null) return false
+    let isSaved = false
+    await runTask('Saving…', 'LYD-106', async () => {
       if (desktop) {
         const target = (!asNew && filePath) || (await desktop.chooseToSave(drawingName ?? t('Untitled')))
         if (!target) return
@@ -515,34 +530,65 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
         downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
       }
       await autosave.saver.current?.markSaved()
+      isSaved = true
     })
+    return isSaved
   }
 
-  function handleBack() {
-    if (
-      snapshot.isModified &&
-      !window.confirm(t('Discard the changes to this drawing and go back to the start screen?'))
-    ) {
-      if (wantsToLeave) onStay()
+  // Another drawing, or the start screen, takes this one's place: File > New and Open, Back, and a project the system
+  // opens. With changes not saved, it asks first whether to save them (see UnsavedDialog.tsx); "stay" is for when the
+  // drawing stays open after all
+  const [question, setQuestion] = useState<{ next: () => void; stay?: () => void } | null>(null)
+  const isLeaving = useRef(false) // asking, or saving before leaving: another request to leave waits for the answer
+  const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
+  const opening = useProjectOpening(chosen => leave(() => onOpenProject(chosen)))
+
+  function leave(next: () => void, stay?: () => void) {
+    if (isLeaving.current) return
+    isLeaving.current = true
+    if (snapshot.isModified) {
+      setQuestion({ next, stay })
+      return
+    }
+    void autosave.saver.current?.close()
+    next()
+  }
+
+  async function answer(choice: UnsavedAnswer) {
+    const { next, stay } = question!
+    setQuestion(null)
+    const isSaved = choice === 'save' && (await handleSave())
+    if (choice === 'cancel' || (choice === 'save' && !isSaved)) {
+      isLeaving.current = false
+      stay?.()
       return
     }
     // After "Discard", the last copy stays in the Recover list, in case it was a mistake
-    if (!snapshot.isModified) void autosave.saver.current?.close()
-    onBack()
+    if (isSaved) await autosave.saver.current?.close()
+    next()
   }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return
-      e.preventDefault()
-      handleSave(e.shiftKey && desktop !== undefined)
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key === 's') {
+        e.preventDefault()
+        void handleSave(e.shiftKey && desktop !== undefined)
+      } else if ((key === 'n' || key === 'o') && !e.shiftKey && !isTyping(e.target)) {
+        // A browser keeps Ctrl+N for itself, and opens a window of its own: only the desktop app gets it
+        e.preventDefault()
+        if (busy !== null || question !== null || isChoosingNew) return
+        if (key === 'n') setIsChoosingNew(true)
+        else opening.open()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   })
 
   useEffect(() => {
-    if (wantsToLeave) handleBack()
+    if (wantsToLeave) leave(onBack, onStay)
   })
 
   useEffect(() => {
@@ -566,6 +612,14 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
     {
       title: t('File'),
       items: [
+        { label: t('New project…'), keys: 'Ctrl+N', onClick: () => setIsChoosingNew(true), disabled: busy !== null },
+        {
+          label: t('Open project'),
+          keys: 'Ctrl+O',
+          onClick: opening.open,
+          disabled: busy !== null || opening.isOpening,
+        },
+        null,
         {
           label: t('Save'),
           keys: 'Ctrl+S',
@@ -591,7 +645,7 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
         { label: t('Export JPEG'), onClick: () => handleExport('jpeg'), disabled: cantExport },
         ...(desktop ? [{ label: t('Open Lydia folder'), onClick: () => void desktop?.openFolder() }] : []),
         null,
-        { label: t('Back'), onClick: handleBack },
+        { label: t('Back'), onClick: () => leave(onBack) },
       ],
       extra: (
         <label title={t('How many times bigger images are exported, each pixel a square of pixels (for pixel art)')}>
@@ -811,6 +865,17 @@ export function Editor({ project: opened, gpuMemory, tray, onTrayChange, wantsTo
   return (
     <div className="editor">
       {importReport && <BrushImportReport {...importReport} onClose={() => setImportReport(null)} />}
+      {opening.input}
+      {isChoosingNew && (
+        <NewProjectDialog
+          onCreate={created => {
+            setIsChoosingNew(false)
+            leave(() => onOpenProject(created))
+          }}
+          onCancel={() => setIsChoosingNew(false)}
+        />
+      )}
+      {question && <UnsavedDialog name={drawingName} onAnswer={choice => void answer(choice)} />}
       <header className="editor-bar">
         <MenuBar menus={menus} />
         <div className="top-row">

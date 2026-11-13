@@ -3,7 +3,7 @@
 // dragged; Shift keeping it straight; paint moved off the paper; a click doing nothing; and a whole 10000² layer
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -432,6 +432,7 @@ await page.evaluate(() => {
   window.confirm = () => true
 })
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await newDrawing(10000, 10000)
 await page.keyboard.press('f')

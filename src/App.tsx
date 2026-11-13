@@ -15,8 +15,11 @@ import './App.css'
 // brush or a pixel brush, and the brush it starts from, if any
 type Screen =
   | { name: 'home' }
-  | { name: 'editor'; project: ProjectData }
+  | { name: 'editor'; project: ProjectData; id: number } // a new id for each drawing, also in place of another
   | { name: 'designer'; tipSize: number; pixel: boolean; brush?: LibraryBrush }
+
+let editors = 0
+const nextEditor = () => ++editors
 
 function App() {
   const { t } = useLanguage()
@@ -32,7 +35,7 @@ function App() {
     saveGpuMemory(gigabytes)
   }
 
-  const openProject = (project: ProjectData) => setScreen({ name: 'editor', project })
+  const openProject = (project: ProjectData) => setScreen({ name: 'editor', project, id: nextEditor() })
   const goHome = () => setScreen({ name: 'home' })
 
   useEffect(() => {
@@ -68,7 +71,7 @@ function App() {
     readFile(fileToOpen).then(
       bytes => {
         setFileToOpen(null)
-        setScreen({ name: 'editor', project: { ...parseProject(bytes), file: fileToOpen } })
+        setScreen({ name: 'editor', project: { ...parseProject(bytes), file: fileToOpen }, id: nextEditor() })
       },
       error => {
         setFileToOpen(null)
@@ -80,6 +83,7 @@ function App() {
   if (screen.name === 'editor') {
     return (
       <Editor
+        key={screen.id}
         project={screen.project}
         gpuMemory={gpuMemoryInUse(gpuMemory)}
         tray={tray}
@@ -87,6 +91,7 @@ function App() {
         wantsToLeave={fileToOpen !== null}
         onStay={() => setFileToOpen(null)}
         onBack={goHome}
+        onOpenProject={openProject}
       />
     )
   }

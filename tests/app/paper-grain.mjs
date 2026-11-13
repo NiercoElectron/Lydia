@@ -4,7 +4,7 @@
 // the brush file keeps the grain, and the Brush Designer's grain controls (screenshots to look at)
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -224,6 +224,7 @@ await page.evaluate(() => {
   window.confirm = () => true
 })
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await page.select('.designer-start .tip-paper', '256')
 await click('Open Brush Designer')

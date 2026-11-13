@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -202,6 +202,7 @@ check("the brushes' sample strokes show white on their dark cards", previewFilte
 // Switching while a drawing is open (from the start screen and back)
 page.once('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await choose('Light')
 await page.evaluate(() => delete window.lydia)
@@ -212,6 +213,7 @@ await page.screenshot({ path: OUT + '/light-editor.png' })
 // The Brush Designer too
 page.once('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await choose('Dark')
 await page.evaluate(() => delete window.lydia)

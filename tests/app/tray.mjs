@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -455,6 +455,7 @@ check("a file that isn't an image says so", alerted.includes('notes.png') && (aw
 // The tray stays from one drawing to the next
 page.once('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await page.evaluate(() => delete window.lydia)
 await newDrawing(400, 300)
@@ -465,6 +466,7 @@ check('the tray is the same in the next drawing', (await trayCount()) === 1)
 // A big one: a 6000×6000 photo-like image on a 10000² paper
 page.once('dialog', d => d.accept())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await page.evaluate(() => delete window.lydia)
 await newDrawing(10000, 10000)

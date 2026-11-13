@@ -2,7 +2,7 @@
 // favorites and the brushes used last, which stay for the next visit, and a category from a brush file
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
-import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
+import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT, discardIfAsked } from './setup.mjs'
 const server = await createServer({
   root: ROOT,
   configFile: ROOT + '/vite.config.ts',
@@ -114,6 +114,7 @@ await page.screenshot({ path: OUT + '/brushes-panel.png' })
 page.on('dialog', d => d.accept())
 await page.evaluate(() => window.lydia.engine.getSnapshot())
 await click('Back')
+await discardIfAsked(page)
 await sleep(300)
 await openDrawing()
 await inPanel('.brush-tabs button', 'Favorites')
