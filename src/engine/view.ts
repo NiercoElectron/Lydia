@@ -32,6 +32,7 @@ const CLICK_DISTANCE = 4 // pixels of the screen a click may move before it coun
 const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of this many degrees
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
 const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen shows the cursor's cross, not its outline
+const CENTER_DOT = 24 // a brush at least this many pixels of the screen across has a dot in its middle, to aim with
 const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
 const LINE_END_REACH = 12 // how close to the end of a line shape the pointer has to go, in pixels of the screen
 const LINE_END_RADIUS = 6
@@ -744,7 +745,8 @@ export function createView(
   // With the brush or the eraser, the outline of the brush's tip follows the pointer, over everything, as big as the
   // brush paints and turned as its tip is, so the size and the shape of the brush show before painting. It takes the
   // cursor's place, unless it would be too small to see. It is one thin line that takes its color from what is under
-  // it (see contrastLines.ts), and it is drawn again only when what it shows changes.
+  // it (see contrastLines.ts), and it is drawn again only when what it shows changes. A big brush's outline is far from
+  // the pointer, so a dot shows the middle, where the brush is.
   //
   // With the mouse, it is as big as the brush paints at full pressure. With a pen and a brush whose size follows the
   // pressure, it is as big as the pen paints now: while painting, at the pen's pressure, and while the pen is in the
@@ -830,6 +832,15 @@ export function createView(
     const pieces = onScreenLoops.flatMap(loop => loop.map((p, i): [Point, Point] => [p, loop[(i + 1) % loop.length]]))
     if (hasLine) pieces.push([brushOnScreen, at])
     if (line) pieces.push([toScreen(line.from), brushOnScreen])
+    // The dot: three lines of the outline's width, one under the other, 3 pixels of the screen square
+    if (isShown && size * currentZoom() >= CENTER_DOT) {
+      for (const down of [-1, 0, 1]) {
+        pieces.push([
+          { x: brushOnScreen.x - 1, y: brushOnScreen.y + down },
+          { x: brushOnScreen.x + 1, y: brushOnScreen.y + down },
+        ])
+      }
+    }
     brushOutline.draw(pieces)
   }
 

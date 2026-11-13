@@ -2627,6 +2627,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     looked faint in a line this thin. Plain inverted colors disappear on middle gray; these never do.
   - It goes for all the outline shows: the circle of liquify, a pixel brush's outline, the line to the pen with the stabilizer and
     the straight line with Shift. A selection's outline and the shapes' stay white and black.
+  - From 1.0.1, a brush of 24 pixels or more on the screen has a dot of 3 × 3 pixels in its middle, in the outline's colors (my
+    idea): a big brush's outline is far from where it paints, and gave nothing to aim with.
 - **How:**
   - While the grid shows, the screen is already a picture of the drawing, drawn through a shader. That picture now stays on
     while the outline shows, at any zoom, and the outline reads its colors from it: the drawing is still drawn once, with one

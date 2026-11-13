@@ -136,7 +136,8 @@ they stay until taken out.
   and turned as it paints (brushes like Dashes turn it with the stroke). It is one thin line that takes its color from
   what is under it, so it shows on any color. With the mouse, that is its size at full
   pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with. The Pixel brush's outline
-  goes along the pixels it will paint. A brush smaller than 8 pixels on the screen shows a cross instead. The
+  goes along the pixels it will paint. A brush of 24 pixels or more on the screen has a dot in its middle, to aim
+  with. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.
 - **Advanced**, in the bar, opens a panel over the drawing with the settings changed less often: the stabilizer and
   the taper, below. Clicking elsewhere (which doesn't paint) or Esc closes it. Its **pin** keeps it open, also the

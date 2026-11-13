@@ -120,6 +120,25 @@ check(
 const center = await pageOf(500, 400)
 const box = await page.evaluate(() => window.lydia.app.canvas.getBoundingClientRect().toJSON())
 check('…centered on the pointer', near(o.x + box.left, center.x, 1.5) && near(o.y + box.top, center.y, 1.5))
+// A dot in the middle of a big brush, to aim with: some of the outline's boxes are around the pointer
+const hasDot = () =>
+  page.evaluate(
+    (x, y) => {
+      const positions = window.lydia.app.stage.children.at(-1).geometry.positions
+      for (let i = 0; i < positions.length; i += 2) {
+        if (Math.hypot(positions[i] - x, positions[i + 1] - y) < 4) return true
+      }
+      return false
+    },
+    center.x - box.left,
+    center.y - box.top,
+  )
+check('a big brush has a dot in its middle', await hasDot())
+await setSize(Math.round(16 / o.zoom)) // 16 pixels of the screen
+const small = await outline()
+check('a small one has only its outline', small.visible && !(await hasDot()), JSON.stringify(small))
+await setSize(100)
+await outline()
 await page.screenshot({
   path: OUT + '/outline-soft.png',
   clip: { x: center.x - 80, y: center.y - 80, width: 160, height: 160 },

@@ -7,6 +7,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- A big brush's outline has a dot in its middle, so that you can aim with it. It shows from 24 pixels on the screen.
+
 ## [1.0.0] - 2026-11-01
 
 The desktop app for Windows and macOS: Lydia in a window of its own, with real folders, the computer's own memory and new
