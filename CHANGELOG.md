@@ -7,6 +7,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-13
+
 ### Added
 
 - A big brush's outline has a dot in its middle, so that you can aim with it. It shows from 24 pixels on the screen.
@@ -637,7 +639,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/NiercoElectron/Lydia/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/NiercoElectron/Lydia/compare/v0.20.0...v1.0.0
 [0.20.0]: https://github.com/NiercoElectron/Lydia/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/NiercoElectron/Lydia/compare/v0.19.1...v0.19.2
