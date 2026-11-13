@@ -10,6 +10,9 @@ import type { Point } from './selection'
 // - "radial": turned around the center, in "sectors" equal parts
 //
 // A mirrored dab has its tip mirrored too ("flipped" in dabs.ts), or a brush that isn't round would lean the wrong way.
+//
+// The lines can be turned around the center by "angle" (decision 88): the mirrors are then across the turned lines. The
+// copies of a radial symmetry are the same at any angle: only its lines turn.
 
 export const SYMMETRY_MODES = ['off', 'vertical', 'horizontal', 'both', 'radial'] as const
 export type SymmetryMode = (typeof SYMMETRY_MODES)[number]
@@ -18,7 +21,13 @@ export const MIN_SECTORS = 2
 export const MAX_SECTORS = 12
 const DEFAULT_SECTORS = 6
 
-export type Symmetry = { mode: SymmetryMode; sectors: number; center: Point }
+export const SYMMETRY_ANGLE_STEP = 15 // degrees, with Shift on the handle that turns it
+// The angle in hundredths of a degree: far from the center, a whole degree moves a line too far (35 pixels at 2000)
+export const SYMMETRY_ANGLE_PRECISION = 0.01
+export const roundAngle = (degrees: number) => Math.round(degrees * 100) / 100
+
+// "angle": in degrees, clockwise, from -180 to 180
+export type Symmetry = { mode: SymmetryMode; sectors: number; center: Point; angle: number }
 
 // On whole or half pixels: so a mirrored pixel falls exactly on a pixel, and both sides are the same to the pixel
 export const onHalfPixels = ({ x, y }: Point) => ({ x: Math.round(x * 2) / 2, y: Math.round(y * 2) / 2 })
@@ -27,11 +36,13 @@ export const noSymmetry = (width: number, height: number): Symmetry => ({
   mode: 'off',
   sectors: DEFAULT_SECTORS,
   center: onHalfPixels({ x: width / 2, y: height / 2 }),
+  angle: 0,
 })
 
+// A symmetry read from a file or an autosave: without an angle (before 1.1), it isn't turned
 export function isSymmetry(value: unknown, width: number, height: number): value is Symmetry {
   if (typeof value !== 'object' || value === null) return false
-  const { mode, sectors, center } = value as Partial<Symmetry>
+  const { mode, sectors, center, angle } = value as Partial<Symmetry>
   return (
     SYMMETRY_MODES.includes(mode as SymmetryMode) &&
     Number.isInteger(sectors) &&
@@ -42,7 +53,8 @@ export function isSymmetry(value: unknown, width: number, height: number): value
     center.x >= 0 &&
     center.x <= width &&
     center.y >= 0 &&
-    center.y <= height
+    center.y <= height &&
+    (angle === undefined || (typeof angle === 'number' && Math.abs(angle) <= 180))
   )
 }
 
@@ -58,6 +70,20 @@ export function copiesOf({ mode, sectors }: Symmetry) {
 export function symmetricDabs(symmetry: Symmetry, dab: Dab, isPixel: boolean): Dab[] {
   const { mode, sectors, center } = symmetry
   if (mode === 'off') return [dab]
+  // Turned around the center by "turn" (in radians), its tip too, except a pixel brush's
+  const turned = (from: Dab, turn: number): Dab => {
+    if (turn === 0) return from
+    const cos = Math.cos(turn)
+    const sin = Math.sin(turn)
+    const dx = from.x - center.x
+    const dy = from.y - center.y
+    return {
+      ...from,
+      x: center.x + dx * cos - dy * sin,
+      y: center.y + dx * sin + dy * cos,
+      angle: isPixel ? from.angle : from.angle + turn,
+    }
+  }
   const across = (from: Dab): Dab => ({
     ...from,
     x: 2 * center.x - from.x,
@@ -75,22 +101,15 @@ export function symmetricDabs(symmetry: Symmetry, dab: Dab, isPixel: boolean): D
     const half = copy.size / 2
     return { ...copy, x: Math.round(copy.x - half) + half, y: Math.round(copy.y - half) + half }
   }
-  if (mode === 'vertical') return [dab, onPixels(across(dab))]
-  if (mode === 'horizontal') return [dab, onPixels(down(dab))]
-  if (mode === 'both') return [dab, onPixels(across(dab)), onPixels(down(dab)), onPixels(down(across(dab)))]
-  const dx = dab.x - center.x
-  const dy = dab.y - center.y
-  const turned = (sector: number): Dab => {
-    if (sector === 0) return dab
-    const turn = (sector * 2 * Math.PI) / sectors
-    const cos = Math.cos(turn)
-    const sin = Math.sin(turn)
-    return onPixels({
-      ...dab,
-      x: center.x + dx * cos - dy * sin,
-      y: center.y + dx * sin + dy * cos,
-      angle: isPixel ? dab.angle : dab.angle + turn,
-    })
+  if (mode === 'radial') {
+    return Array.from({ length: sectors }, (_, sector) =>
+      sector === 0 ? dab : onPixels(turned(dab, (sector * 2 * Math.PI) / sectors)),
+    )
   }
-  return Array.from({ length: sectors }, (_, sector) => turned(sector))
+  // Turned lines mirror as if the drawing were turned back by their angle: turned, mirrored, and turned again
+  const by = (symmetry.angle * Math.PI) / 180
+  const mirrored = (mirror: (from: Dab) => Dab) => onPixels(turned(mirror(turned(dab, -by)), by))
+  if (mode === 'vertical') return [dab, mirrored(across)]
+  if (mode === 'horizontal') return [dab, mirrored(down)]
+  return [dab, mirrored(across), mirrored(down), mirrored(from => down(across(from)))]
 }

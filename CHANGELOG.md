@@ -13,6 +13,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   Cmd + Space opens the Mac's search.
 - **File > New project…** (Ctrl+N) and **Open project** (Ctrl+O) in the editor, in place of the drawing that is open,
   without going back to the start screen. Ctrl+N is for the desktop app: a browser keeps it for itself.
+- **Angle** for the symmetry turns its lines around the center, to mirror across a slanted line. **Move center** also shows a
+  round handle that turns them on the drawing, with **Shift** in steps of 15°.
 
 ### Changed
 

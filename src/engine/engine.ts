@@ -361,7 +361,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   const selectionView = createSelectionView(renderer, app.ticker, app.stage, world, grid, app.screen, () => selection)
 
   // How strokes are mirrored (see symmetry.ts), and whether the left button moves its center for now
-  let symmetry: Symmetry = project.symmetry ?? noSymmetry(grid.width, grid.height)
+  // A drawing autosaved before 1.1 has no angle in it
+  let symmetry: Symmetry = { ...noSymmetry(grid.width, grid.height), ...project.symmetry }
   let isMovingSymmetry = false
   const getSymmetry = () => symmetry
 
@@ -478,6 +479,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     getSymmetry,
     isMovingSymmetry: () => isMovingSymmetry,
     onSymmetryCenter: center => setSymmetry({ center }),
+    onSymmetryAngle: angle => setSymmetry({ angle }),
     getRulers: () => rulers,
     isEditingRulers: () => isEditingRulers,
     getChosenRuler: () => chosenRuler,

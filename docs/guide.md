@@ -234,13 +234,18 @@ More about it:
 - **Left and right**, **Up and down** and **Four parts** are mirrors. **Radial** goes around the center, in as many
   **Parts** as you choose, from 2 to 12.
 - Blue lines show where it is. They aren't part of the drawing: they never come out in an exported image.
-- **Move center**: click or drag on the drawing to put the center anywhere on the paper, then press it again to go back to
-  the tool. **Center** puts it back in the middle.
+- **Angle** turns the lines around the center, clockwise, from -180° to 180°, to a hundredth of a degree: a symmetry across a slanted line, for a face
+  turned to one side. A radial symmetry paints the same at any angle: only its lines turn.
+- **Move center**: click or drag on the drawing to put the center anywhere on the paper, or drag the round handle on the
+  first line to turn the lines (**Shift**: in steps of 15°), then press it again to go back to the tool. The handle stays
+  where you let it go along its line: zoomed in, bring it onto the screen, or further from the center to turn finely. **Center** puts
+  the center back in the middle.
 - The brush, the eraser, straight lines, Smudge, Blur and Liquify follow it. A stroke and its copies are one step of undo,
   and no darker where they cross.
 - Smudge and Liquify work with the paint on the layer, so where a stroke meets its copy they move each other's paint.
 - A brush with a paper grain falls on different grooves on each side, like real paper. A pixel brush stays on the pixels,
-  and its tip doesn't turn in a radial symmetry.
+  and its tip doesn't turn in a radial symmetry. Across lines turned to an angle that isn't a multiple of 90°, a pixel
+  brush's copy can't be its exact mirror: its pixels are the nearest ones.
 - Each drawing keeps its own, in its file.
 
 ## Rulers

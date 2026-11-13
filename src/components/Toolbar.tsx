@@ -19,7 +19,15 @@ import {
   type ShapeKind,
   type ShapeStyle,
 } from '../engine/shapes'
-import { MAX_SECTORS, MIN_SECTORS, SYMMETRY_MODES, type Symmetry, type SymmetryMode } from '../engine/symmetry'
+import {
+  MAX_SECTORS,
+  MIN_SECTORS,
+  roundAngle,
+  SYMMETRY_ANGLE_PRECISION,
+  SYMMETRY_MODES,
+  type Symmetry,
+  type SymmetryMode,
+} from '../engine/symmetry'
 import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, type TextAlign, type TextStyle } from '../engine/text'
 import {
   hasStrength,
@@ -391,10 +399,31 @@ function SymmetryButtons({ controls }: { controls: SymmetryControls }) {
       )}
       {symmetry.mode !== 'off' && (
         <>
+          <label title={t('How far its lines are turned, clockwise')}>
+            {t('Angle')}
+            <input
+              type="range"
+              min={-180}
+              max={180}
+              step={SYMMETRY_ANGLE_PRECISION}
+              value={symmetry.angle}
+              onChange={e => onChange({ angle: roundAngle(Number(e.target.value)) })}
+            />
+            <SliderValue
+              value={symmetry.angle}
+              min={-180}
+              max={180}
+              step={SYMMETRY_ANGLE_PRECISION}
+              unit="°"
+              onChange={angle => onChange({ angle: roundAngle(angle) })}
+            />
+          </label>
           <button
             aria-pressed={isMoving}
             onClick={() => onMovingChange(!isMoving)}
-            title={t('Click or drag on the drawing to move the center. Press it again to go back to the tool')}
+            title={t(
+              'Drag on the drawing to move the center, or the round handle to turn the lines (Shift: in steps of 15°). Press it again to go back to the tool',
+            )}
           >
             {t('Move center')}
           </button>

@@ -1,7 +1,7 @@
 // Symmetry (decision 77): the copies of a dab; the bar and the Y key; left and right, up and down, four parts and radial,
 // to the pixel where a mirror can be; one step of undo, and no darker where a stroke meets its copy; tips that aren't
 // round, noise, the paper's grain, a pixel brush and pixel-perfect strokes; the eraser, smudge, blur and liquify; moving
-// the center; the saved drawing and its autosave
+// the center; turning its lines; the saved drawing and its autosave
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
@@ -150,7 +150,7 @@ const copies = await page.evaluate(async () => {
   const { symmetricDabs, copiesOf } = await import('/src/engine/symmetry.ts')
   const center = { x: 100, y: 100 }
   const dab = { x: 130, y: 90, size: 10, angle: 0.5, alpha: 1, seed: 7, pressure: 1 }
-  const of = (mode, sectors = 6) => symmetricDabs({ mode, sectors, center }, dab, false)
+  const of = (mode, sectors = 6, angle = 0) => symmetricDabs({ mode, sectors, center, angle }, dab, false)
   return {
     off: of('off').length,
     vertical: of('vertical').map(d => [d.x, d.y, !!d.flipped]),
@@ -160,6 +160,10 @@ const copies = await page.evaluate(async () => {
     radial: of('radial', 6).length,
     radialAngle: of('radial', 4)[1].angle,
     radialFar: of('radial', 4)[1],
+    turned90: of('vertical', 6, 90)[1],
+    turned45: of('vertical', 6, 45)[1],
+    radialTurned: of('radial', 4, 30).map(d => [d.x, d.y]),
+    radialStraight: of('radial', 4).map(d => [d.x, d.y]),
     counts: ['off', 'vertical', 'both'].map(mode => copiesOf({ mode, sectors: 6, center })),
     sectors: copiesOf({ mode: 'radial', sectors: 9, center }),
     pixel: symmetricDabs({ mode: 'radial', sectors: 3, center }, { ...dab, size: 3, x: 130.5, y: 90.5 }, true).map(
@@ -190,6 +194,22 @@ check(
     Math.abs(copies.radialAngle - (0.5 + Math.PI / 2)) < 1e-9,
 )
 check(
+  'turned 90°, left and right mirrors up and down',
+  Math.abs(copies.turned90.x - 130) < 1e-9 && Math.abs(copies.turned90.y - 110) < 1e-9 && copies.turned90.flipped,
+  JSON.stringify(copies.turned90),
+)
+check(
+  'turned 45°, across the turned line, its tip too',
+  Math.abs(copies.turned45.x - 110) < 1e-9 &&
+    Math.abs(copies.turned45.y - 70) < 1e-9 &&
+    Math.abs(copies.turned45.angle - (Math.PI / 2 - 0.5)) < 1e-9,
+  JSON.stringify(copies.turned45),
+)
+check(
+  'the copies of a radial symmetry are the same at any angle',
+  JSON.stringify(copies.radialTurned) === JSON.stringify(copies.radialStraight),
+)
+check(
   'a pixel brush stays on the pixels, its tip not turned',
   copies.pixel.every(([part, angle]) => part === 0.5 && angle === 0.5),
   JSON.stringify(copies.pixel),
@@ -204,6 +224,16 @@ check('without its center buttons', !(await hasButton('Move center')))
 await press('y')
 check('Y turns it on', (await modeOf()) === 'vertical')
 check('with them', (await hasButton('Move center')) && (await hasButton('Center')))
+const angleOf = () => page.evaluate(() => window.lydia.engine.getSnapshot().symmetry.angle)
+await barSlider('Angle', 12.34)
+await sleep(100)
+check(
+  'Angle in the bar turns its lines, to a hundredth of a degree',
+  (await angleOf()) === 12.34,
+  String(await angleOf()),
+)
+await barSlider('Angle', 0)
+await sleep(100)
 await page.select('.symmetry-mode', 'radial')
 await sleep(150)
 check('the list chooses it', (await modeOf()) === 'radial')
@@ -251,6 +281,32 @@ check(
 )
 await click('Undo')
 await sleep(300)
+
+// Turned lines: a quarter turn makes left and right up and down, and 45° mirrors across the diagonal
+await setSymmetry({ mode: 'vertical', angle: 90 })
+await drag([150, 120], [420, 330])
+list = await alphas()
+check(
+  'turned 90°, it paints up and down',
+  differences(list, upDown, ROUNDING) === 0,
+  `${differences(list, upDown, ROUNDING)} differ`,
+)
+await click('Undo')
+await sleep(300)
+await setSymmetry({ angle: 45 })
+await drag([150, 300], [300, 120])
+list = await alphas()
+// The copy's tip is turned, and the graphics card samples a turned tip a little differently, as in a radial symmetry
+const diagonal = (x, y) => [SIDE - 1 - y, SIDE - 1 - x]
+const acrossOff = differences(list, diagonal, 40)
+check(
+  'turned 45°, across the diagonal',
+  painted(list) > 2000 && acrossOff < painted(list) * 0.01,
+  `${acrossOff} of ${painted(list)} differ`,
+)
+await click('Undo')
+await sleep(300)
+await setSymmetry({ angle: 0 })
 
 await setSymmetry({ mode: 'radial', sectors: 4 })
 await drag([130, 110], [350, 300])
@@ -525,8 +581,56 @@ await click('Move center')
 await click('Center')
 await sleep(150)
 
+// ----- Turning its lines with the handle -----
+await click('Move center')
+await sleep(150)
+const middle = await pageOf(400, 400)
+await page.mouse.move(middle.x, middle.y - 60) // the handle, on the first line, straight up
+await page.mouse.down()
+const right = await pageOf(600, 400)
+await page.mouse.move(right.x, right.y, { steps: 8 })
+await page.mouse.up()
+await sleep(150)
+const centerAfter = await page.evaluate(() => window.lydia.engine.getSnapshot().symmetry.center)
+check(
+  'the round handle turns its lines, not the center',
+  Math.abs((await angleOf()) - 90) < 0.3 && centerAfter.x === 400 && centerAfter.y === 400,
+  `${await angleOf()} ${JSON.stringify(centerAfter)}`,
+)
+await page.keyboard.down('Shift')
+await page.mouse.move(right.x, right.y) // the handle, where it was let go
+await page.mouse.down()
+const almost45 = (52 * Math.PI) / 180
+const towards = await pageOf(400 + 200 * Math.sin(almost45), 400 - 200 * Math.cos(almost45))
+await page.mouse.move(towards.x, towards.y, { steps: 8 })
+await page.mouse.up()
+await page.keyboard.up('Shift')
+await sleep(150)
+check(
+  'the handle stays where it was let go, along its line, and with Shift turns in steps of 15° (52° → 45°)',
+  (await angleOf()) === 45,
+  String(await angleOf()),
+)
+const handleNow = await pageOf(400 + 200 * Math.sin((45 * Math.PI) / 180), 400 - 200 * Math.cos((45 * Math.PI) / 180))
+await page.mouse.move(handleNow.x, handleNow.y)
+await page.mouse.down()
+const almost30 = (30.5 * Math.PI) / 180
+const near30 = await pageOf(400 + 200 * Math.sin(almost30), 400 - 200 * Math.cos(almost30))
+await page.mouse.move(near30.x, near30.y, { steps: 8 })
+await page.mouse.up()
+await sleep(150)
+const fine = await angleOf()
+check(
+  'without Shift, to a hundredth of a degree',
+  Math.abs(fine - 30.5) < 0.3 && !Number.isInteger(fine) && Math.round(fine * 100) / 100 === fine,
+  String(fine),
+)
+check('and paints nothing', painted(await alphas()) === 0)
+await click('Move center')
+await setSymmetry({ angle: 0 })
+
 // ----- The saved drawing, and its autosave -----
-await setSymmetry({ mode: 'radial', sectors: 5, center: { x: 250.5, y: 300 } })
+await setSymmetry({ mode: 'radial', sectors: 5, center: { x: 250.5, y: 300 }, angle: -30 })
 const inFile = () =>
   page.evaluate(async () => {
     const { parseProject } = await import('/src/engine/projectFile.ts')
@@ -536,7 +640,7 @@ const inFile = () =>
 const kept = await inFile()
 check(
   'the file keeps it',
-  JSON.stringify(kept) === '{"mode":"radial","sectors":5,"center":{"x":250.5,"y":300}}',
+  JSON.stringify(kept) === '{"mode":"radial","sectors":5,"center":{"x":250.5,"y":300},"angle":-30}',
   JSON.stringify(kept),
 )
 await page.evaluate(() => window.lydia.autosaveNow())
@@ -546,7 +650,7 @@ const recovered = await page.evaluate(async () => {
   const [drawing] = await listAutosaved()
   return drawing ? (await loadAutosaved(drawing.id)).symmetry : 'no copy'
 })
-check('and so does its autosave', recovered?.sectors === 5, JSON.stringify(recovered))
+check('and so does its autosave', recovered?.sectors === 5 && recovered?.angle === -30, JSON.stringify(recovered))
 await setSymmetry({ mode: 'off' })
 check('off, the file has none', (await inFile()) === null)
 const damaged = await page.evaluate(async () => {
@@ -557,8 +661,14 @@ const damaged = await page.evaluate(async () => {
     isSymmetry({ mode: 'spiral', sectors: 4, center }, 100, 100),
     isSymmetry({ mode: 'radial', sectors: 4, center: { x: 900, y: 1 } }, 100, 100),
     isSymmetry(null, 100, 100),
+    isSymmetry({ mode: 'vertical', sectors: 4, center, angle: 400 }, 100, 100),
   ]
 })
+const beforeAngles = await page.evaluate(async () => {
+  const { isSymmetry } = await import('/src/engine/symmetry.ts')
+  return isSymmetry({ mode: 'vertical', sectors: 6, center: { x: 10, y: 10 } }, 100, 100)
+})
+check('a file from before 1.1, with no angle, still opens', beforeAngles)
 check(
   'nonsense in a file is left out',
   damaged.every(ok => !ok),

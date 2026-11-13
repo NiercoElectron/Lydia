@@ -18,7 +18,7 @@ import { shapeBox, type ShapeKind } from './shapes'
 import type { Matrix3, Quad } from './smartObject'
 import { createStabilizer, DEFAULT_STABILIZER, type Stabilizer, type StabilizerSettings } from './stabilizer'
 import { straightLineEnd } from './straightLine'
-import { onHalfPixels, type Symmetry } from './symmetry'
+import { onHalfPixels, roundAngle, SYMMETRY_ANGLE_STEP, type Symmetry } from './symmetry'
 import { tilesInRect, type Grid } from './tiles'
 import { hasStrength, isPaintTool, usesTip, type Tool } from './tools'
 import { cursorFor, drawHandles, handleAt, movedWarp, transformed, type TransformTarget } from './transformHandles'
@@ -36,6 +36,9 @@ const CENTER_DOT = 24 // a brush at least this many pixels of the screen across 
 const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
 const LINE_END_REACH = 12 // how close to the end of a line shape the pointer has to go, in pixels of the screen
 const LINE_END_RADIUS = 6
+const SYMMETRY_HANDLE = 60 // how far from the symmetry's center the handle that turns it starts, in pixels of the screen
+const SYMMETRY_HANDLE_NEAREST = 20 // and how close to the center it can be brought
+const SYMMETRY_HANDLE_REACH = 10 // how close to it the pointer has to go to take it
 
 // The cursor of each tool over the drawing
 const CURSORS: Record<Tool, string> = {
@@ -90,6 +93,7 @@ export type ViewActions = {
   getSymmetry: () => Symmetry
   isMovingSymmetry: () => boolean
   onSymmetryCenter: (center: Point) => void
+  onSymmetryAngle: (angle: number) => void // in degrees
   // What strokes follow (see rulers.ts), and whether the left button edits the rulers now
   getRulers: () => Rulers
   isEditingRulers: () => boolean
@@ -408,6 +412,9 @@ export function createView(
   const symmetryLines = new Graphics()
   app.stage.addChild(symmetryLines)
   let symmetryKey = ''
+  // How far from the center the handle that turns the lines was left, in pixels of the paper: dragged along its line, it
+  // stays there at any zoom, so that zoomed in it can be brought onto the screen. Null until it is first dragged
+  let symmetryHandleReach: number | null = null
 
   // How far a line from the center goes, in this direction, before it leaves the paper
   function toPaperEdge({ x, y }: Point, dx: number, dy: number) {
@@ -416,18 +423,9 @@ export function createView(
     return Math.min(across, down)
   }
 
-  function showSymmetry() {
-    const symmetry = actions.getSymmetry()
-    const { mode, sectors, center } = symmetry
-    const isShown = mode !== 'off'
-    symmetryLines.visible = isShown
-    if (!isShown) return
-    const isMoving = actions.isMovingSymmetry()
-    const { position, scale, rotation } = world
-    const key = [mode, sectors, center.x, center.y, isMoving, position.x, position.y, scale.x, scale.y, rotation].join()
-    if (key === symmetryKey) return
-    symmetryKey = key
-
+  // The directions of the symmetry's lines from its center, on the paper, turned by its angle. The first one has the
+  // handle that turns them
+  function symmetryRays({ mode, sectors, angle }: Symmetry): Point[] {
     const rays: [number, number][] = []
     if (mode === 'vertical' || mode === 'both') rays.push([0, -1], [0, 1])
     if (mode === 'horizontal' || mode === 'both') rays.push([-1, 0], [1, 0])
@@ -437,21 +435,87 @@ export function createView(
         rays.push([Math.cos(turn), Math.sin(turn)])
       }
     }
+    const by = (angle * Math.PI) / 180
+    const cos = Math.cos(by)
+    const sin = Math.sin(by)
+    return rays.map(([dx, dy]) => ({ x: dx * cos - dy * sin, y: dx * sin + dy * cos }))
+  }
+
+  // Where the handle that turns the symmetry is on the screen: on its first line, where it was left, or at first as far
+  // from the center at any zoom
+  function symmetryHandle(symmetry: Symmetry) {
+    const { center } = symmetry
+    const [ray] = symmetryRays(symmetry)
+    if (symmetryHandleReach !== null) {
+      return toScreen({ x: center.x + ray.x * symmetryHandleReach, y: center.y + ray.y * symmetryHandleReach })
+    }
+    const middle = toScreen(center)
+    const along = toScreen({ x: symmetry.center.x + ray.x, y: symmetry.center.y + ray.y })
+    const length = Math.hypot(along.x - middle.x, along.y - middle.y)
+    return {
+      x: middle.x + ((along.x - middle.x) / length) * SYMMETRY_HANDLE,
+      y: middle.y + ((along.y - middle.y) / length) * SYMMETRY_HANDLE,
+    }
+  }
+
+  function showSymmetry() {
+    const symmetry = actions.getSymmetry()
+    const { mode, sectors, center, angle } = symmetry
+    const isShown = mode !== 'off'
+    symmetryLines.visible = isShown
+    if (!isShown) return
+    const isMoving = actions.isMovingSymmetry()
+    const { position, scale, rotation } = world
+    const key = [
+      mode,
+      sectors,
+      center.x,
+      center.y,
+      angle,
+      isMoving,
+      symmetryHandleReach,
+      position.x,
+      position.y,
+    ].concat([scale.x, scale.y, rotation])
+    if (key.join() === symmetryKey) return
+    symmetryKey = key.join()
+
     const middle = toScreen(center)
     symmetryLines.clear()
-    for (const [dx, dy] of rays) {
-      const reach = toPaperEdge(center, dx, dy)
-      const end = toScreen({ x: center.x + dx * reach, y: center.y + dy * reach })
+    for (const ray of symmetryRays(symmetry)) {
+      const reach = toPaperEdge(center, ray.x, ray.y)
+      const end = toScreen({ x: center.x + ray.x * reach, y: center.y + ray.y * reach })
       symmetryLines.moveTo(middle.x, middle.y).lineTo(end.x, end.y)
     }
     symmetryLines.stroke({ width: 1, color: 0x2e9bff })
     if (isMoving) {
+      const handle = symmetryHandle(symmetry)
+      symmetryLines.moveTo(middle.x, middle.y).lineTo(handle.x, handle.y).stroke({ width: 1, color: 0x2e9bff })
       symmetryLines.circle(middle.x, middle.y, 7).fill({ color: 0xffffff }).stroke({ width: 2, color: 0x2e9bff })
+      symmetryLines.circle(handle.x, handle.y, 5).fill({ color: 0x2e9bff }).stroke({ width: 2, color: 0xffffff })
     }
   }
 
-  // While "Move center" is on, the left button puts the center of the symmetry where it is, inside the paper
+  // While "Move center" is on, the left button puts the center of the symmetry where it is, inside the paper. The round
+  // handle follows the pointer instead: around the center it turns the lines, the first one toward the pointer, with
+  // Shift in steps of 15°, and along its line it goes nearer to the center or further
   function moveSymmetry(e: PointerEvent): Gesture {
+    const symmetry = actions.getSymmetry()
+    const handle = symmetryHandle(symmetry)
+    const at = onScreen(e)
+    if (Math.hypot(at.x - handle.x, at.y - handle.y) <= SYMMETRY_HANDLE_REACH) {
+      const [first] = symmetryRays({ ...symmetry, angle: 0 })
+      const start = Math.atan2(first.y, first.x)
+      const turn = (e: PointerEvent) => {
+        const { x, y } = toPaper(e)
+        const reach = Math.hypot(x - symmetry.center.x, y - symmetry.center.y)
+        symmetryHandleReach = Math.max(reach, SYMMETRY_HANDLE_NEAREST / currentZoom())
+        let degrees = ((Math.atan2(y - symmetry.center.y, x - symmetry.center.x) - start) * 180) / Math.PI
+        if (e.shiftKey) degrees = Math.round(degrees / SYMMETRY_ANGLE_STEP) * SYMMETRY_ANGLE_STEP
+        actions.onSymmetryAngle(roundAngle(((((degrees + 180) % 360) + 360) % 360) - 180)) // from -180 to 180
+      }
+      return { move: turn, up() {}, cursor: ROTATE_CURSOR }
+    }
     const put = (e: PointerEvent) => {
       const { x, y } = toPaper(e)
       const inside = { x: Math.max(0, Math.min(grid.width, x)), y: Math.max(0, Math.min(grid.height, y)) }

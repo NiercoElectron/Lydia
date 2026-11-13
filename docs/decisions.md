@@ -2712,7 +2712,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 88. Requests from a pen user
 
 - **Date:** 2026-11-13
-- **Status:** planned; Ctrl + Space and File > New and Open are adopted
+- **Status:** planned; Ctrl + Space, File > New and Open, and the turned symmetry are adopted
 - **Problem:** after 1.0, a friend who draws with a pen tried Lydia and asked for what he missed in it.
 - **Decision**, from his requests and my choices, for 1.1.0:
   - **Ctrl + Space** and a drag up or down zooms around where the drag starts, with any tool, as in Krita. It joins Space
@@ -2721,6 +2721,13 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **File > New and File > Open** in the editor, with Ctrl+N and Ctrl+O. With changes not saved, Lydia's own window asks
     Save, Discard or Cancel, as Photoshop does, and Back uses it too (my choice). A browser keeps Ctrl+N for itself.
   - **The symmetry turns**: an angle in the symmetry's panel and a handle on the drawing, Shift in steps of 15° (my choice).
+    The handle is on the first line while **Move center** is on, so moving and turning are one mode. It follows the pointer
+    along its line too, and stays where it is let go on the paper (my request): zoomed in, the center can be off the screen.
+    The angle goes to a hundredth of a degree (my request): a whole degree moves a line 35 pixels at 2000 pixels from the
+    center, a hundredth less than half a pixel. The angle is kept in the
+    file; a file from before 1.1 has none, and opens at 0°. Across lines turned 0° the copies are worked out exactly as
+    before. A radial symmetry paints the same at any angle, as its parts are equal turns: only its lines turn, to line them
+    up with the drawing. A pixel brush's copy across a slanted line goes to the nearest pixels: it can't be an exact mirror.
   - **Smudge and Liquify become modes of the Brush**: Paint, Smudge and Liquify in its bar, with U and Q still going
     straight to each (my choice). "Special pen" leaves the tool column.
   - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
@@ -2729,7 +2736,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   around where it started, a drag down zooms back out, and nothing is painted. `tests/app/file-menu.mjs`: Ctrl+N and the
   menu's New ask once the new drawing is created, Cancel keeps the drawing with its changes, Discard opens the new one, a
   drawing without changes asks nothing, Ctrl+O asks once the file is chosen and Save saves before opening it, and Back asks
-  too, with Esc as Cancel. Every test that goes Back answers Discard.
+  too, with Esc as Cancel. Every test that goes Back answers Discard. `tests/app/symmetry.mjs`: a dab's copy across lines
+  turned 90° and 45°, the radial copies the same at any angle, painting turned 90° (the same as up and down, to the pixel)
+  and 45° (across the diagonal), Angle in the bar, the handle turning the lines and not the center, Shift's steps, and the
+  angle kept in the file and its autosave, with a file without one still opening.
 
 ## Open questions
 

@@ -23,8 +23,8 @@ signed yet, so each system warns the first time: how to get past it is in [the g
   any color (View > Brush outline)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
 - Tapered stroke ends, thinner, fainter or both, even with the mouse
-- Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with every tool
-  that paints
+- Symmetry: left and right, up and down, in four parts or radial, around a center that can be moved, with lines that
+  can be turned, with every tool that paints
 - Rulers: strokes follow lines, ellipses and vanishing points, with every tool that follows a stroke
 - Shapes: rectangles, ellipses, lines, polygons and stars that stay editable, outlined with a brush's own tip or filled
 - Filters: hue and saturation, levels and a Gaussian blur, with a live preview

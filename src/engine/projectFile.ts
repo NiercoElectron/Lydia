@@ -401,7 +401,7 @@ export function parseProject(file: ArrayBuffer): ProjectData {
     project.activeLayer = activeLayer
   }
   if (isView(view)) project.view = view
-  if (isSymmetry(symmetry, grid.width, grid.height)) project.symmetry = symmetry
+  if (isSymmetry(symmetry, grid.width, grid.height)) project.symmetry = { ...symmetry, angle: symmetry.angle ?? 0 }
   if (isRulers(rulers)) project.rulers = rulers
   if (EXPORT_SCALES.includes(exportScale as number)) project.exportScale = exportScale as number
   if (Array.isArray(colors)) {
