@@ -41,7 +41,12 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
     also: 'the whole layer when nothing is selected; Shift keeps it straight',
   },
   hand: { Icon: Hand, name: 'Hand', key: 'h', also: 'or hold Space' },
-  zoom: { Icon: ZoomIn, name: 'Zoom', key: 'z', also: 'Alt + click zooms out, dragging zooms smoothly' },
+  zoom: {
+    Icon: ZoomIn,
+    name: 'Zoom',
+    key: 'z',
+    also: 'Alt + click zooms out, dragging zooms smoothly; or hold Ctrl + Space',
+  },
   rotate: {
     Icon: RotateCw,
     name: 'Rotate view',

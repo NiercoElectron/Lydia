@@ -637,8 +637,9 @@ export function createView(
   }
 
   // A click zooms in around the point clicked (out with Alt). Dragging zooms smoothly around the point where it
-  // started, in to the right and out to the left, like Photoshop's "scrubby zoom"
-  function zoom(e: PointerEvent): Gesture {
+  // started, in to the right and out to the left, like Photoshop's "scrubby zoom". With Ctrl + Space it is up and down
+  // instead, like in Krita
+  function zoom(e: PointerEvent, isUpward: boolean): Gesture {
     const start = onScreen(e)
     const startZoom = currentZoom()
     let isDragging = false
@@ -646,7 +647,8 @@ export function createView(
       move(e) {
         const now = onScreen(e)
         isDragging ||= Math.hypot(now.x - start.x, now.y - start.y) >= CLICK_DISTANCE
-        if (isDragging) zoomAt(start, startZoom * Math.exp((now.x - start.x) * SCRUB_ZOOM))
+        const moved = isUpward ? start.y - now.y : now.x - start.x
+        if (isDragging) zoomAt(start, startZoom * Math.exp(moved * SCRUB_ZOOM))
       },
       up(e) {
         if (!isDragging && e.type === 'pointerup')
@@ -693,7 +695,7 @@ export function createView(
     wand,
     move: movePaint,
     hand: pan,
-    zoom,
+    zoom: e => zoom(e, isSpaceDown),
     rotate: e => rotate(e, !isSpaceDown),
   }
 
@@ -710,10 +712,10 @@ export function createView(
   let rulerCursor = 'default' // and over the rulers, while they are edited
   let shownCursor = ''
 
-  // The tool the left button uses right now. Space moves the view and Shift + Space turns it, like in Krita; Alt picks
-  // colors with the brush, the eraser or the fill bucket, like in Photoshop
+  // The tool the left button uses right now. Space moves the view, Shift + Space turns it and Ctrl + Space zooms, like
+  // in Krita; Alt picks colors with the brush, the eraser or the fill bucket, like in Photoshop
   function currentTool(): Tool {
-    if (isSpaceDown) return isShiftDown ? 'rotate' : 'hand'
+    if (isSpaceDown) return isCtrlDown ? 'zoom' : isShiftDown ? 'rotate' : 'hand'
     if (isAltDown && (isPaintTool(tool) || tool === 'fill') && actions.canPickColors()) return 'eyedropper'
     return tool
   }

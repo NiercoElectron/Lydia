@@ -7,6 +7,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **Ctrl + Space** and a drag up or down zooms in or out, with any tool, like in Krita. On a Mac it is the Ctrl key, as
+  Cmd + Space opens the Mac's search.
+
 ## [1.0.1] - 2026-11-13
 
 ### Added

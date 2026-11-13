@@ -485,7 +485,8 @@ Changing the view never changes the drawing.
 - **Move around:** the **Hand (H)**, or hold **Space** and drag, or drag with the middle mouse button, or the mouse
   wheel (two fingers on a trackpad).
 - **Zoom**, from 1% to 3200%: **Ctrl** + mouse wheel (or pinch on a trackpad), or the **Zoom (Z)** tool: click to zoom
-  in, **Alt** + click to zoom out, and drag right or left to zoom smoothly.
+  in, **Alt** + click to zoom out, and drag right or left to zoom smoothly. Or hold **Ctrl + Space** and drag up to zoom
+  in and down to zoom out, with any tool. On a Mac it is the Ctrl key: Cmd + Space opens the Mac's search.
 - **Turn:** the **Rotate view (R)** tool (**Shift**: in steps of 15°), or hold **Shift + Space** and drag with any
   tool. **Straighten** turns it back.
 - **Flip** like in a mirror, to check a drawing with fresh eyes: **M**, or the Flip button.
@@ -610,5 +611,6 @@ problem, give the code, and what is in parentheses after the message if there is
 | Ctrl + mouse wheel, or pinch on a trackpad     | Zoom                                               |
 | Alt + click, with Z                            | Zoom out                                           |
 | Shift + Space + drag                           | Turn the view                                      |
+| Ctrl + Space + drag up / down                  | Zoom in / out                                      |
 | M                                              | Flip the view                                      |
 | Ctrl + 0                                       | Show the whole drawing                             |

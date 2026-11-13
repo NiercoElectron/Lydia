@@ -1,4 +1,4 @@
-// The hand, zoom and rotate tools, flipping the view, Shift + Space, the view in the bar, Fit when turned, painting and
+// The hand, zoom and rotate tools, flipping the view, Shift + Space, Ctrl + Space, the view in the bar, Fit when turned, painting and
 // picking on a turned and flipped view (checked against PixiJS's own transform), the pixel grid and the transparent
 // paper's squares on a turned view
 import { createServer } from 'vite'
@@ -259,6 +259,34 @@ check(
   'Space + drag moves the view',
   same({ x: after.x - before.x, y: after.y - before.y }, { x: -40, y: 30 }, 0.01) && !(await canUndo()),
 )
+// Ctrl + Space zooms, like in Krita: up in, down out, around where the drag starts
+await page.keyboard.down('Control')
+await page.keyboard.down('Space')
+await page.mouse.move(c.x, c.y)
+check('Ctrl + Space shows "zoom-in"', (await cursor()) === 'zoom-in', await cursor())
+const zc = (await view()).zoom
+under = await paperUnder(c)
+await page.mouse.down()
+await page.mouse.move(c.x + 3, c.y - 100, { steps: 10 })
+await page.mouse.up()
+const zoomedIn = (await view()).zoom
+await page.mouse.move(c.x, c.y)
+await page.mouse.down()
+await page.mouse.move(c.x, c.y + 100, { steps: 10 })
+await page.mouse.up()
+await page.keyboard.up('Space')
+await page.keyboard.up('Control')
+check(
+  'Ctrl + Space + drag up 100 px zooms in (×e)',
+  Math.abs(zoomedIn / zc - Math.E) < 0.01,
+  (zoomedIn / zc).toFixed(3),
+)
+check(
+  '…around where the drag started, and down zooms back out',
+  Math.abs((await view()).zoom / zc - 1) < 1e-9 && same(await paperUnder(c), under),
+  `${(await view()).zoom} vs ${zc}, ${fmt(await paperUnder(c))}`,
+)
+check('…and paints nothing', !(await canUndo()))
 await page.mouse.move(c.x + 5, c.y)
 await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
 check("letting Space go, the brush's outline instead of the cursor", (await cursor()) === 'none', await cursor())

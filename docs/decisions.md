@@ -2709,6 +2709,25 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Designer, and kills the app to find the drawing in Recover, with the brushes and the tray still there. The double click
   itself, on the installed app, and macOS were not checked by a test.
 
+## 88. Requests from a pen user
+
+- **Date:** 2026-11-13
+- **Status:** planned; Ctrl + Space is adopted
+- **Problem:** after 1.0, a friend who draws with a pen tried Lydia and asked for what he missed in it.
+- **Decision**, from his requests and my choices, for 1.1.0:
+  - **Ctrl + Space** and a drag up or down zooms around where the drag starts, with any tool, as in Krita. It joins Space
+    (move) and Shift + Space (turn). A click zooms in 2×, as with the Zoom tool, whose drag stays right and left. On a Mac it
+    is the Ctrl key: Cmd + Space is the Mac's search. A screen to change the shortcuts was left out (my choice).
+  - **File > New and File > Open** in the editor, with Ctrl+N and Ctrl+O. With changes not saved, Lydia's own window asks
+    Save, Discard or Cancel, as Photoshop does, and Back uses it too (my choice). A browser keeps Ctrl+N for itself.
+  - **The symmetry turns**: an angle in the symmetry's panel and a handle on the drawing, Shift in steps of 15° (my choice).
+  - **Smudge and Liquify become modes of the Brush**: Paint, Smudge and Liquify in its bar, with U and Q still going
+    straight to each (my choice). "Special pen" leaves the tool column.
+  - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
+    when it is built.
+- **Checked:** `tests/app/view-tools.mjs`: Ctrl + Space shows the zoom cursor, a drag up of 100 pixels zooms in e times
+  around where it started, a drag down zooms back out, and nothing is painted.
+
 ## Open questions
 
 ### Thin diagonal lines (seen once)
