@@ -29,6 +29,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - With changes not saved, opening another drawing or going **Back** asks **Save**, **Discard** or **Cancel**, in a window
   of Lydia's own, instead of the browser's question with two answers.
 
+### Fixed
+
+- The installed desktop app always shows its own pages. Before, a setting meant for development could make it open
+  another address.
+
 ## [1.0.1] - 2026-11-13
 
 ### Added

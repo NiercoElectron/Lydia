@@ -2683,6 +2683,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - The page has no access to the computer: `electron/preload.cjs` is the only door, and what the page can run is kept to what
     comes with Lydia. PixiJS writes code as it runs by default, which that doesn't allow, so `pixi.js/unsafe-eval` does the same
     without it, in the browser too.
+  - In development the window shows Vite's server, whose address comes in `LYDIA_DEV_URL`. Since 1.1.0 the installed app
+    leaves that out and always shows its own pages: until then, anything that could set the variable before opening
+    Lydia could make it show another address, with the page's door to the files. A review of the app's safety found it.
   - A page that asks before closing gets no answer in Electron by itself, and the window would just refuse to close, so the
     window asks, with the words of the page, in its language.
   - A project is written beside its file, with `.saving` in its name, and takes the file's place only when complete, so a full

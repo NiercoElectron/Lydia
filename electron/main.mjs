@@ -10,8 +10,9 @@ import { installIfWanted, setUpUpdates } from './updates.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const BUILT_APP = path.join(HERE, '..', 'dist')
-// In development, the page comes from Vite's server (see scripts/desktop.mjs)
-const DEV_URL = process.env.LYDIA_DEV_URL
+// In development, the page comes from Vite's server (see scripts/desktop.mjs). The installed app always shows its own
+// pages: otherwise anything that could set this variable could make it show any address, with its access to the files
+const DEV_URL = app.isPackaged ? undefined : process.env.LYDIA_DEV_URL
 // Lydia's own address. With one, the pages find their files as they do on a web server, and what the browser keeps
 // (settings, brushes, autosaves) belongs to one place that doesn't change between versions
 const SCHEME = 'app'
