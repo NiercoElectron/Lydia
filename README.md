@@ -1,11 +1,40 @@
 # Lydia
 
-An open source drawing app built with React, TypeScript and PixiJS (WebGL). It aims to feel like Photoshop or Krita, on canvases up to 10000×10000 pixels with 20 or more layers. It runs as a desktop app for Windows and macOS, and in the browser.
+**A free, open source drawing app that feels like Photoshop and Krita**, for Windows and macOS.
+
+[![Latest version](https://img.shields.io/github/v/release/NiercoElectron/Lydia?label=version)](https://github.com/NiercoElectron/Lydia/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/NiercoElectron/Lydia)](LICENSE)
+![Windows and macOS](https://img.shields.io/badge/for-Windows%20%7C%20macOS-blue)
+
+### [Download Lydia](https://github.com/NiercoElectron/Lydia/releases/latest)
+
+<!-- SCREENSHOT -->
+
+- **Brushes that feel like ink and pencil**: pressure, tapered ends, paper grain, a stabilizer, pixel-art brushes, and
+  brushes opened from Krita, GIMP and Photoshop
+- **Layers like in Photoshop**: blend modes, folders, clipping masks, smart objects
+- **Curves like Photoshop's pen**, editable shapes and text, symmetry and perspective rulers
+- **Liquify, smudge and filters**, and transforms with a mesh
+- **Big drawings**: up to 10000×10000 pixels, drawn by the graphics card
+- **Safe**: autosave, and a drawing that survives a crash
+- In English, Brazilian Portuguese and Spanish, with updates that arrive by themselves
 
 ## Download
 
-The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest): `Lydia-Setup` for Windows and the `.dmg` for macOS. Lydia isn't
-signed yet, so each system warns the first time: how to get past it is in [the guide](docs/guide.md#installing-the-desktop-app).
+The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest): `Lydia-Setup` for Windows
+and the `.dmg` for macOS.
+
+**Windows will say "Windows protected your PC".** That is normal for a free app like Lydia, and it doesn't mean
+something is wrong: Windows shows it for any program that isn't signed with a paid certificate, which Lydia doesn't have
+yet. Click **More info**, then **Run anyway** (in Portuguese, **Mais informações** and **Executar assim mesmo**; in
+Spanish, **Más información** and **Ejecutar de todas formas**). It asks only when installing: once installed, Lydia opens
+and updates itself without it. On a Mac, the first time, go to System Settings > Privacy & Security and choose **Open
+Anyway**. Step by step: [the guide](docs/guide.md#installing-the-desktop-app).
+
+How to use every tool is in [the guide](docs/guide.md) too.
+
+Lydia also runs in a browser, from its code (see [Getting started](#getting-started)). It is built with React, TypeScript
+and PixiJS (WebGL 2).
 
 ## Features
 
@@ -186,8 +215,9 @@ tested the engine: [docs/spike-notes.md](docs/spike-notes.md). What changed in e
 
 ## Contributing
 
-Contributions are welcome! Feel free to open an issue to report a bug or suggest a feature.
-For larger changes, please open an issue first so we can discuss the idea before you start working on it.
+Contributions are welcome: bugs, ideas, code and translations. How to run Lydia, test it and send a change is in
+[CONTRIBUTING.md](CONTRIBUTING.md). For a bigger change, please open an issue first, so we can talk about the idea before
+you start.
 
 ## License
 

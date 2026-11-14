@@ -1,0 +1,16 @@
+name: Idea
+description: Something you'd like Lydia to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to do
+      description: What you want to draw or do, and what gets in the way now.
+    validations:
+      required: true
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: In other apps
+      description: How you do it in Photoshop, Krita, Clip Studio or another app, if you know. Lydia aims to feel like them.

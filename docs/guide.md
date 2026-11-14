@@ -32,11 +32,45 @@ On a Mac, Cmd works wherever Ctrl is written.
 
 ## Installing the desktop app
 
-The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest). Lydia isn't signed yet, so each system warns the first time:
+The installers are on [GitHub's releases](https://github.com/NiercoElectron/Lydia/releases/latest), under **Assets**:
+`Lydia-Setup-…exe` for Windows and `Lydia-….dmg` for macOS.
 
-- **Windows:** run `Lydia-Setup`, and in the blue window choose **More info**, then **Run anyway**.
-- **macOS:** open the `.dmg` and drag Lydia to Applications. If the Mac refuses to open it, go to System Settings > Privacy &
-  Security and choose **Open Anyway**.
+Windows and macOS warn about any app that isn't signed with a certificate, which costs a yearly fee that Lydia doesn't
+pay yet. The warning doesn't mean the app is harmful: Lydia's code is all public, here, and the installers are built
+from it. Each system warns only when installing; once Lydia is installed, it opens and updates itself without warnings.
+
+### Windows
+
+1. Run `Lydia-Setup`. A blue window says **Windows protected your PC** (in Portuguese, "O Windows protegeu o computador";
+   in Spanish, "Windows protegió su PC"), with only a **Don't run** button.
+
+   <!-- SMARTSCREEN-1 -->
+
+2. Click **More info**, the small link under the text (**Mais informações**, **Más información**). A **Run anyway**
+   button appears next to the other (**Executar assim mesmo**, **Ejecutar de todas formas**): click it.
+
+   <!-- SMARTSCREEN-2 -->
+
+3. Choose where to install Lydia, or leave it as it is, and finish.
+
+Before that, the browser may warn too:
+
+- **Microsoft Edge** may say that `Lydia-Setup` "isn't commonly downloaded". Click the three dots next to it, then
+  **Keep**, then **Show more** and **Keep anyway**.
+- **Google Chrome** may ask whether to keep it: choose **Keep**.
+- Some antivirus programs check a new program before letting it run, which can take a minute. If one stops the installer,
+  it can be allowed in its settings.
+
+### macOS
+
+1. Open the `.dmg` and drag Lydia to **Applications**.
+2. Open Lydia. The first time, the Mac says it can't check the app, and offers only **Done** (or **OK**) and **Move to Trash**:
+   choose **Done**.
+3. Go to **System Settings** > **Privacy & Security**, scroll down to the message about Lydia, and choose **Open
+   Anyway**. Then confirm with your password.
+
+On a Mac, new versions aren't installed by themselves yet: Lydia tells when there is one, and its button opens the page
+to download it.
 
 ## The start screen
 

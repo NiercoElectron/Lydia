@@ -1,0 +1,44 @@
+name: Bug
+description: Something in Lydia doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, step by step, and what happened instead of what you expected.
+      placeholder: |
+        1. Opened a new drawing of 2000×2000
+        2. Chose the Curves tool and clicked three points
+        3. Pressed Enter: nothing was painted
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Error code
+      description: If Lydia showed a message starting with LYD-, its code and what is in parentheses after it.
+      placeholder: LYD-201 (…)
+  - type: input
+    id: version
+    attributes:
+      label: Lydia's version
+      description: Next to its name, at the top of the start screen.
+      placeholder: v1.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Desktop app on Windows
+        - Desktop app on macOS
+        - In a browser
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: A screenshot, or a drawing (.lyd) that shows the problem, helps a lot. The pen or tablet, if it matters.

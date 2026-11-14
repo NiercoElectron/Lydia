@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The guide
+    url: https://github.com/NiercoElectron/Lydia/blob/main/docs/guide.md
+    about: How to use every tool, and the shortcuts
+  - name: Error codes
+    url: https://github.com/NiercoElectron/Lydia/blob/main/docs/errors.md
+    about: What each LYD- code means
