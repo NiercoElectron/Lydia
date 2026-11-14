@@ -114,7 +114,7 @@ export function createPixelGrid(
   const mesh = new Mesh({ geometry, shader })
 
   let isOn = true // chosen by the user
-  let isKept = false // whether something else needs the picture now
+  const keepers = new Set<object>() // what else needs the picture now: the lines of contrastLines.ts
   let isShown = false
 
   // The picture of the drawing, as big as the screen, edges smoothed like the screen's own
@@ -131,7 +131,7 @@ export function createPixelGrid(
   // is the world's scale down; across, it is negative when the view is flipped)
   function update() {
     const isGrid = isOn && world.scale.y >= PIXEL_GRID_ZOOM
-    const show = isGrid || isKept
+    const show = isGrid || keepers.size > 0
     if (show !== isShown) {
       const index = stage.getChildIndex(show ? scene : mesh)
       stage.removeChildAt(index)
@@ -164,9 +164,10 @@ export function createPixelGrid(
     isOn = on
   }
 
-  // Keep the picture on or not, whatever the zoom
-  function keepPicture(on: boolean) {
-    isKept = on
+  // Keep the picture on or not, whatever the zoom, for "who"; it stays while anything keeps it
+  function keepPicture(who: object, on: boolean) {
+    if (on) keepers.add(who)
+    else keepers.delete(who)
   }
 
   // Give this shader the picture, now and whenever it is made again

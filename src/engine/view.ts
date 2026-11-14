@@ -12,7 +12,7 @@ import type { PixelGrid } from './pixelGrid'
 import type { ViewData } from './projectFile'
 import type { Projection } from './projection'
 import type { Point, SelectionMode } from './selection'
-import { drawRulers, gripAt, movedRuler } from './rulerHandles'
+import { drawRulers, gripAt, movedRuler, RAY_ALPHA } from './rulerHandles'
 import { createHold, type Hold, type Ruler, type Rulers } from './rulers'
 import { shapeBox, type ShapeKind } from './shapes'
 import type { Matrix3, Quad } from './smartObject'
@@ -408,9 +408,11 @@ export function createView(
 
   // ----- The lines of the symmetry -----
 
-  // Over everything, and as thin at any zoom. Drawn again only when what they show changes
-  const symmetryLines = new Graphics()
-  app.stage.addChild(symmetryLines)
+  // Over everything, and as thin at any zoom, in a color that shows on the drawing (see contrastLines.ts), with their
+  // handles over them. Drawn again only when what they show changes
+  const symmetryLines = createContrastLines(app.stage, pixelGrid)
+  const symmetryHandles = new Graphics()
+  app.stage.addChild(symmetryHandles)
   let symmetryKey = ''
   // How far from the center the handle that turns the lines was left, in pixels of the paper: dragged along its line, it
   // stays there at any zoom, so that zoomed in it can be brought onto the screen. Null until it is first dragged
@@ -462,7 +464,8 @@ export function createView(
     const symmetry = actions.getSymmetry()
     const { mode, sectors, center, angle } = symmetry
     const isShown = mode !== 'off'
-    symmetryLines.visible = isShown
+    symmetryLines.show(isShown)
+    symmetryHandles.visible = isShown
     if (!isShown) return
     const isMoving = actions.isMovingSymmetry()
     const { position, scale, rotation } = world
@@ -481,19 +484,18 @@ export function createView(
     symmetryKey = key.join()
 
     const middle = toScreen(center)
-    symmetryLines.clear()
-    for (const ray of symmetryRays(symmetry)) {
+    const pieces = symmetryRays(symmetry).map((ray): [Point, Point] => {
       const reach = toPaperEdge(center, ray.x, ray.y)
-      const end = toScreen({ x: center.x + ray.x * reach, y: center.y + ray.y * reach })
-      symmetryLines.moveTo(middle.x, middle.y).lineTo(end.x, end.y)
-    }
-    symmetryLines.stroke({ width: 1, color: 0x2e9bff })
+      return [middle, toScreen({ x: center.x + ray.x * reach, y: center.y + ray.y * reach })]
+    })
+    symmetryHandles.clear()
     if (isMoving) {
       const handle = symmetryHandle(symmetry)
-      symmetryLines.moveTo(middle.x, middle.y).lineTo(handle.x, handle.y).stroke({ width: 1, color: 0x2e9bff })
-      symmetryLines.circle(middle.x, middle.y, 7).fill({ color: 0xffffff }).stroke({ width: 2, color: 0x2e9bff })
-      symmetryLines.circle(handle.x, handle.y, 5).fill({ color: 0x2e9bff }).stroke({ width: 2, color: 0xffffff })
+      pieces.push([middle, handle])
+      symmetryHandles.circle(middle.x, middle.y, 7).fill({ color: 0xffffff }).stroke({ width: 2, color: 0x2e9bff })
+      symmetryHandles.circle(handle.x, handle.y, 5).fill({ color: 0x2e9bff }).stroke({ width: 2, color: 0xffffff })
     }
+    symmetryLines.draw(pieces)
   }
 
   // While "Move center" is on, the left button puts the center of the symmetry where it is, inside the paper. The round
@@ -528,14 +530,20 @@ export function createView(
   // ----- The rulers -----
 
   // Over everything, like the lines of the symmetry, and drawn again only when what they show changes
-  const rulerLines = new Graphics()
-  app.stage.addChild(rulerLines)
+  const rulerLines = {
+    lines: createContrastLines(app.stage, pixelGrid),
+    chosen: createContrastLines(app.stage, pixelGrid, { width: 2 }),
+    hints: createContrastLines(app.stage, pixelGrid, { alpha: RAY_ALPHA }),
+  }
+  const rulerHandles = new Graphics()
+  app.stage.addChild(rulerHandles)
   let shownRulers: Rulers | null = null
   let rulersKey = ''
 
   function showRulers() {
     const rulers = actions.getRulers()
-    rulerLines.visible = rulers.isOn
+    for (const lines of Object.values(rulerLines)) lines.show(rulers.isOn)
+    rulerHandles.visible = rulers.isOn
     if (!rulers.isOn) return
     const chosen = actions.getChosenRuler()
     const isEditing = actions.isEditingRulers()
@@ -544,7 +552,10 @@ export function createView(
     if (rulers === shownRulers && key === rulersKey) return
     shownRulers = rulers
     rulersKey = key
-    drawRulers(rulerLines, { rulers: rulers.list, chosen, isEditing, ...grid, toScreen })
+    const pieces = drawRulers(rulerHandles, { rulers: rulers.list, chosen, isEditing, ...grid, toScreen })
+    rulerLines.lines.draw(pieces.lines)
+    rulerLines.chosen.draw(pieces.chosen)
+    rulerLines.hints.draw(pieces.hints)
   }
 
   // The handles on the ends of the active line, with the shape tool
@@ -1138,7 +1149,9 @@ export function createView(
     handles.destroy()
     brushOutline.destroy()
     symmetryLines.destroy()
-    rulerLines.destroy()
+    symmetryHandles.destroy()
+    for (const lines of Object.values(rulerLines)) lines.destroy()
+    rulerHandles.destroy()
     lineEnds.destroy()
     listeners.clear()
   }

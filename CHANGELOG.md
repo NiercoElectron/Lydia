@@ -18,6 +18,8 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ### Changed
 
+- The lines of the symmetry and of the rulers take their color from the drawing under them, like the brush's outline:
+  blue lines disappeared over blue paint. Their handles stay blue and white.
 - With changes not saved, opening another drawing or going **Back** asks **Save**, **Discard** or **Cancel**, in a window
   of Lydia's own, instead of the browser's question with two answers.
 

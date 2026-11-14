@@ -233,7 +233,8 @@ More about it:
 
 - **Left and right**, **Up and down** and **Four parts** are mirrors. **Radial** goes around the center, in as many
   **Parts** as you choose, from 2 to 12.
-- Blue lines show where it is. They aren't part of the drawing: they never come out in an exported image.
+- Thin lines show where it is, in a color that shows over the paint under them, like the brush's outline. They aren't
+  part of the drawing: they never come out in an exported image.
 - **Angle** turns the lines around the center, clockwise, from -180° to 180°, to a hundredth of a degree: a symmetry across a slanted line, for a face
   turned to one side. A radial symmetry paints the same at any angle: only its lines turn.
 - **Move center**: click or drag on the drawing to put the center anywhere on the paper, or drag the round handle on the
@@ -264,7 +265,8 @@ stay where they are while off.
   **Delete** takes it away. Press **Edit rulers** again to go back to the tool.
 - The brush, the eraser, Smudge, Blur and Liquify follow them, and the symmetry goes on working with them. Shift's
   straight line doesn't: it goes where you click.
-- Blue lines show them. They aren't part of the drawing: they never come out in an exported image.
+- Thin lines show them, in a color that shows over the paint under them, like the brush's outline; the one being edited
+  is thicker. They aren't part of the drawing: they never come out in an exported image.
 - Each drawing keeps its own, in its file.
 
 ## Shapes

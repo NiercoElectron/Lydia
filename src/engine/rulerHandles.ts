@@ -2,16 +2,18 @@ import type { Graphics } from 'pixi.js'
 import { ellipseAxes, type Ruler } from './rulers'
 import type { Point } from './selection'
 
-// How the rulers look on the screen, and how they are moved. The lines are over everything and as thin at any zoom, and
-// they aren't part of the drawing: they never come out in an exported image.
+// How the rulers look on the screen, and how they are moved. The lines are over everything and as thin at any zoom, in a
+// color that shows on the drawing (see contrastLines.ts), and they aren't part of the drawing: they never come out in an
+// exported image.
 
 const COLOR = 0x2e9bff
-const RAY_ALPHA = 0.3 // the lines around a vanishing point are only a hint
+export const RAY_ALPHA = 0.3 // the lines around a vanishing point are only a hint
 const POINT_RADIUS = 4
 const HANDLE_RADIUS = 6
 const HANDLE_REACH = 12 // how close to a handle the pointer has to go, in pixels of the screen
 const LINE_REACH = 6 // and to a ruler's line, to move all of it
 const ELLIPSE_PIECES = 128 // the straight pieces an ellipse is drawn with
+const CIRCLE_PIECES = 16 // and the mark of a vanishing point
 const RAYS = 24 // how many lines go out from a vanishing point on the paper
 const FAR_RAYS = 12 // from one off the paper, across it
 const MIN_AXIS = 1 // an ellipse's axes can't get shorter than this, in pixels of the paper
@@ -153,29 +155,43 @@ type RulersShown = {
   toScreen: (paper: Point) => Point
 }
 
-export function drawRulers(graphics: Graphics, { rulers, chosen, isEditing, width, height, toScreen }: RulersShown) {
+// The rulers' lines on the screen, from point to point: "chosen", the one being edited, is drawn thicker, and "hints",
+// the lines around vanishing points, fainter
+export type RulerPieces = { lines: [Point, Point][]; chosen: [Point, Point][]; hints: [Point, Point][] }
+
+// Draw the handles while the rulers are edited, and give the lines to draw
+export function drawRulers(
+  graphics: Graphics,
+  { rulers, chosen, isEditing, width, height, toScreen }: RulersShown,
+): RulerPieces {
   graphics.clear()
+  const pieces: RulerPieces = { lines: [], chosen: [], hints: [] }
+  const along = (points: Point[], isClosed: boolean, index: number) => {
+    const list = index === chosen ? pieces.chosen : pieces.lines
+    const count = isClosed ? points.length : points.length - 1
+    for (let i = 0; i < count; i++) list.push([points[i], points[(i + 1) % points.length]])
+  }
   rulers.forEach((ruler, index) => {
     if (ruler.kind === 'point') {
-      for (const [from, to] of raysOf(ruler.at, width, height)) {
-        const start = toScreen(from)
-        const end = toScreen(to)
-        graphics.moveTo(start.x, start.y).lineTo(end.x, end.y)
-      }
-      graphics.stroke({ width: 1, color: COLOR, alpha: RAY_ALPHA })
+      for (const [from, to] of raysOf(ruler.at, width, height)) pieces.hints.push([toScreen(from), toScreen(to)])
       const { x, y } = toScreen(ruler.at)
-      graphics.circle(x, y, POINT_RADIUS).stroke({ width: index === chosen ? 2 : 1, color: COLOR })
+      const mark = Array.from({ length: CIRCLE_PIECES }, (_, piece) => {
+        const turn = (piece * 2 * Math.PI) / CIRCLE_PIECES
+        return { x: x + POINT_RADIUS * Math.cos(turn), y: y + POINT_RADIUS * Math.sin(turn) }
+      })
+      along(mark, true, index)
       return
     }
     const isClosed = ruler.kind === 'ellipse'
-    const outline = (isClosed ? ellipseOutline(ruler) : [ruler.from, ruler.to]).map(toScreen)
-    graphics.poly(outline, isClosed).stroke({ width: index === chosen ? 2 : 1, color: COLOR })
+    along((isClosed ? ellipseOutline(ruler) : [ruler.from, ruler.to]).map(toScreen), isClosed, index)
   })
-  if (!isEditing) return
-  for (const ruler of rulers) {
-    for (const { point } of handlesOf(ruler)) {
-      const { x, y } = toScreen(point)
-      graphics.circle(x, y, HANDLE_RADIUS).fill({ color: 0xffffff }).stroke({ width: 2, color: COLOR })
+  if (isEditing) {
+    for (const ruler of rulers) {
+      for (const { point } of handlesOf(ruler)) {
+        const { x, y } = toScreen(point)
+        graphics.circle(x, y, HANDLE_RADIUS).fill({ color: 0xffffff }).stroke({ width: 2, color: COLOR })
+      }
     }
   }
+  return pieces
 }

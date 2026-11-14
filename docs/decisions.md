@@ -2728,6 +2728,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     file; a file from before 1.1 has none, and opens at 0°. Across lines turned 0° the copies are worked out exactly as
     before. A radial symmetry paints the same at any angle, as its parts are equal turns: only its lines turn, to line them
     up with the drawing. A pixel brush's copy across a slanted line goes to the nearest pixels: it can't be an exact mirror.
+  - **The lines of the symmetry and of the rulers take their color from the drawing** (my choice), as the brush's outline
+    does (decision 86): drawn in blue, they disappeared over blue paint. The ruler being edited is 2 pixels wide, and the lines
+    around a vanishing point are faint, as before. The handles stay blue and white: the white shows on any color. The picture
+    of the screen they read is kept while anything needs it, the grid, the outline or these lines.
   - **Smudge and Liquify become modes of the Brush**: Paint, Smudge and Liquify in its bar, with U and Q still going
     straight to each (my choice). "Special pen" leaves the tool column.
   - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
@@ -2739,7 +2743,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   too, with Esc as Cancel. Every test that goes Back answers Discard. `tests/app/symmetry.mjs`: a dab's copy across lines
   turned 90° and 45°, the radial copies the same at any angle, painting turned 90° (the same as up and down, to the pixel)
   and 45° (across the diagonal), Angle in the bar, the handle turning the lines and not the center, Shift's steps, and the
-  angle kept in the file and its autosave, with a file without one still opening.
+  angle kept in the file and its autosave, with a file without one still opening; over sky blue paint its line is red. On
+  the screen: the symmetry's lines over blue, black, gray and the paper.
 
 ## Open questions
 

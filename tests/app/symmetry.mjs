@@ -629,6 +629,35 @@ check('and paints nothing', painted(await alphas()) === 0)
 await click('Move center')
 await setSymmetry({ angle: 0 })
 
+// ----- Its lines show over any paint (see contrastLines.ts) -----
+await setSymmetry({ mode: 'off' })
+await brushAs({ size: 200, color: '#00b2ff', tool: 'brush', opacity: 1 })
+await drag([250, 400], [550, 400])
+await setSymmetry({ mode: 'vertical' })
+await page.mouse.move(10, 10) // the brush's outline away
+await sleep(300)
+const lineAt = await pageOf(400, 400)
+const strip = await page.screenshot({ clip: { x: lineAt.x - 4, y: lineAt.y, width: 9, height: 1 }, encoding: 'base64' })
+const stripColors = await page.evaluate(async data => {
+  const image = new Image()
+  image.src = 'data:image/png;base64,' + data
+  await image.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d')
+  context.drawImage(image, 0, 0)
+  const pixels = context.getImageData(0, 0, image.width, 1).data
+  return Array.from({ length: image.width }, (_, i) => [pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]])
+}, strip)
+check(
+  'over sky blue paint its line is red, not blue',
+  stripColors.some(([r, , b]) => r > 150 && b < 100),
+  JSON.stringify(stripColors),
+)
+await click('Undo')
+await sleep(300)
+
 // ----- The saved drawing, and its autosave -----
 await setSymmetry({ mode: 'radial', sectors: 5, center: { x: 250.5, y: 300 }, angle: -30 })
 const inFile = () =>
