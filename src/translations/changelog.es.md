@@ -1,5 +1,26 @@
 # Historial de cambios
 
+## [1.1.0] - 2026-11-13
+
+Lo que pidió una amiga que dibuja con lápiz: curvas como las de la pluma de Photoshop, simetría que gira, Dedo y Licuar dentro del Pincel y formas más rápidas de ajustar el zoom y abrir dibujos.
+
+### Added
+
+- **Ctrl + Espacio** y un arrastre hacia arriba o abajo acercan o alejan el dibujo, con cualquier herramienta, como en Krita. En Mac se usa la tecla Ctrl, ya que Cmd + Espacio abre la búsqueda del Mac.
+- **Archivo > Nuevo proyecto…** (Ctrl+N) y **Abrir proyecto** (Ctrl+O) en el editor sustituyen el dibujo abierto, sin volver a la pantalla inicial. Ctrl+N funciona en la aplicación de escritorio: el navegador reserva ese atajo para sí mismo.
+- **Curvas (C)**, como la pluma de Photoshop: un clic crea una esquina, un arrastre crea un punto suave con sus controles y hacer clic en el primer punto cierra la curva (Enter termina la curva abierta). Se convierte en una forma en una capa nueva, delineada con el pincel o rellena, con extremos que pueden afinarse, y sigue siendo editable con **Editar forma**. **Crear Selección** crea una selección en lugar de la forma, sustituyendo la selección existente, añadiendo a ella o quitando de ella.
+- **Ángulo** de la simetría gira las líneas alrededor del centro para reflejar sobre una línea inclinada. **Mover centro** también muestra un control redondo para girarlas en el dibujo, con **Shift** en pasos de 15°.
+
+### Changed
+
+- **Dedo** y **Licuar** son modos del Pincel: su barra tiene **Pintar**, **Dedo** y **Licuar**, y “Pluma especial” ya no está en la columna de herramientas. U y Q siguen seleccionando esos modos, y cada uno conserva sus ajustes.
+- Las líneas de la simetría y de las reglas usan un color que depende del dibujo que hay debajo, como el contorno del pincel: las líneas azules desaparecían sobre pintura azul. Sus controles siguen siendo azules y blancos.
+- Con cambios sin guardar, abrir otro dibujo o usar **Volver** ofrece **Guardar**, **Descartar** o **Cancelar**, en una ventana propia de Lydia, en lugar de la pregunta del navegador con dos respuestas.
+
+### Fixed
+
+- La aplicación de escritorio instalada siempre muestra sus propias páginas. Antes, una configuración de desarrollo podía hacer que abriera otra dirección.
+
 ## [1.0.1] - 2026-11-13
 
 ### Added

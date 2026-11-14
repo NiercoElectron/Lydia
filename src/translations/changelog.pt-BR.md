@@ -1,5 +1,26 @@
 # Histórico de alterações
 
+## [1.1.0] - 2026-11-13
+
+O que uma amiga que desenha com caneta pediu: curvas como as da caneta do Photoshop, simetria que gira, Borrar e Dissolver dentro do Pincel e formas mais rápidas de ajustar o zoom e abrir desenhos.
+
+### Added
+
+- **Ctrl + Espaço** e um arraste para cima ou para baixo ampliam ou reduzem o zoom, com qualquer ferramenta, como no Krita. No Mac, usa-se a tecla Ctrl, pois Cmd + Espaço abre a busca do Mac.
+- **Arquivo > Novo projeto…** (Ctrl+N) e **Abrir projeto** (Ctrl+O) no editor substituem o desenho aberto, sem voltar à tela inicial. Ctrl+N funciona no aplicativo para computador: no navegador, o atalho fica reservado para ele.
+- **Curvas (C)**, como a caneta do Photoshop: um clique cria um canto, um arraste cria um ponto suave com suas alças e clicar no primeiro ponto fecha a curva (Enter termina a curva aberta). Ela vira uma forma em uma nova camada, contornada com o pincel ou preenchida, com extremidades que podem afinar, e continua editável com **Editar forma**. **Criar Seleção** cria uma seleção no lugar da forma, substituindo a seleção existente, adicionando a ela ou removendo dela.
+- **Ângulo** da simetria gira as linhas ao redor do centro para espelhar sobre uma linha inclinada. **Mover centro** também mostra uma alça redonda para girá-las no desenho, com **Shift** em passos de 15°.
+
+### Changed
+
+- **Borrar** e **Dissolver** são modos do Pincel: sua barra tem **Pintar**, **Borrar** e **Dissolver**, e “Caneta especial” saiu da coluna de ferramentas. U e Q continuam selecionando esses modos, e cada um mantém suas configurações.
+- As linhas da simetria e das réguas usam uma cor que depende do desenho por baixo, como o contorno do pincel: linhas azuis desapareciam sobre tinta azul. As alças continuam azuis e brancas.
+- Com alterações não salvas, abrir outro desenho ou usar **Voltar** oferece **Salvar**, **Descartar** ou **Cancelar**, em uma janela do próprio Lydia, em vez da pergunta do navegador com duas respostas.
+
+### Fixed
+
+- O aplicativo instalado sempre mostra suas próprias páginas. Antes, uma configuração de desenvolvimento podia fazê-lo abrir outro endereço.
+
 ## [1.0.1] - 2026-11-13
 
 ### Added
