@@ -120,7 +120,9 @@ color tray, a paper grain for brushes, changing any brush in the Brush Designer,
 a mesh for transforming, liquify, autosave and recovery, surviving a lost graphics card, symmetry, rulers, shapes that stay
 editable, filters, editable text, a new interface with menus, named tools, brush categories, a blend mode for the brush and
 pictures of the layers, brushes opened from Krita, GIMP and Photoshop, and the desktop app for Windows and macOS, with real
-folders for brushes and the tray, memory limits read from the computer and updates that arrive by themselves.
+folders for brushes and the tray, memory limits read from the computer and updates that arrive by themselves. Then, from a
+pen user's requests: curves like the pen in Photoshop, a symmetry that turns, Smudge and Liquify as modes of the Brush,
+zooming with Ctrl + Space, and New and Open in the editor.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 Next, roughly in this order:

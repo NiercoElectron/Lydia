@@ -7,6 +7,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-13
+
+What a friend who draws with a pen asked for: curves like the pen in Photoshop, a symmetry that turns, Smudge and Liquify
+inside the Brush, and quicker ways to zoom and to open drawings.
+
 ### Added
 
 - **Ctrl + Space** and a drag up or down zooms in or out, with any tool, like in Krita. On a Mac it is the Ctrl key, as
@@ -666,7 +671,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/NiercoElectron/Lydia/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/NiercoElectron/Lydia/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/NiercoElectron/Lydia/compare/v0.20.0...v1.0.0
 [0.20.0]: https://github.com/NiercoElectron/Lydia/compare/v0.19.2...v0.20.0
