@@ -13,8 +13,8 @@ signed yet, so each system warns the first time: how to get past it is in [the g
   choose from
 - A background color for each drawing, or a transparent background (exported as a transparent PNG)
 - A resolution (DPI) for each drawing, written into exported images, so paper sizes print at their size
-- Tools in a column at the left, like in Photoshop and Krita: brush, eraser, smudge, blur, liquify, fill bucket, eyedropper,
-  rectangle select, lasso, magic wand, move, hand, zoom and rotate view
+- Tools in a column at the left, like in Photoshop and Krita: brush (with smudge and liquify as its modes), eraser, blur,
+  fill bucket, eyedropper, rectangle select, lasso, magic wand, move, hand, zoom and rotate view
 - A color panel: a ring of hues around a triangle of shades that turns with it, a background color swapped with X, the
   color's code, H/S/V sliders and the colors painted with lately; and a palette of colors kept on purpose, for all
   drawings or saved with one

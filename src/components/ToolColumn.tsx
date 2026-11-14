@@ -1,8 +1,8 @@
 import { useLanguage } from '../i18n'
-import { Blend, Contrast, Droplet, Images, PenTool, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { Blend, Contrast, Droplet, Images, Sparkles } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { FilterKind } from '../engine/filters'
-import type { Tool } from '../engine/tools'
+import { isBrushMode, type BrushMode, type Tool } from '../engine/tools'
 import { TOOL_ROWS, TOOLS } from './toolList'
 
 type Props = {
@@ -20,23 +20,29 @@ const FILTERS: [FilterKind, string, typeof Blend][] = [
   ['blur', 'Gaussian blur', Droplet],
 ]
 
-// The tools, each with its name, in a column at the left edge. "Filter" opens the filters and "Special pen" gathers the
-// tools that move paint around, in a list beside them. At its foot, the button that opens and closes the tray (see
-// TrayPanel)
+// The tools, each with its name, in a column at the left edge. "Filter" opens the filters in a list beside them. The
+// Brush stays chosen in all of its modes (see BRUSH_MODES in tools.ts), and goes back to the last one used. At its foot,
+// the button that opens and closes the tray (see TrayPanel)
 export function ToolColumn({ tool, onToolChange, canFilter, onFilter, isTrayOpen, onTrayToggle }: Props) {
   const { t } = useLanguage()
-  const [openList, setOpenList] = useState<'filter' | 'special' | null>(null)
+  const [openList, setOpenList] = useState<'filter' | null>(null)
+  const lastBrushMode = useRef<BrushMode>('brush')
+
+  useEffect(() => {
+    if (isBrushMode(tool)) lastBrushMode.current = tool
+  }, [tool])
 
   const toolButton = (each: Tool) => {
     const { Icon, name, key, also } = TOOLS[each]
+    const isBrush = each === 'brush'
     return (
       <button
         key={each}
-        aria-pressed={tool === each}
+        aria-pressed={isBrush ? isBrushMode(tool) : tool === each}
         aria-label={t(name)}
         title={`${t(name)} (${key.toUpperCase()}${also ? `, ${t(also)}` : ''})`}
         onClick={() => {
-          onToolChange(each)
+          onToolChange(isBrush && !isBrushMode(tool) ? lastBrushMode.current : isBrush ? tool : each)
           setOpenList(null)
         }}
       >
@@ -79,23 +85,6 @@ export function ToolColumn({ tool, onToolChange, canFilter, onFilter, isTrayOpen
                   </button>
                 ))}
               </div>
-            </div>
-          )
-        }
-        if (Array.isArray(row)) {
-          return (
-            <div key="special" className="tool-group">
-              <button
-                className={row.includes(tool) ? 'chosen' : undefined}
-                aria-expanded={openList === 'special'}
-                aria-label={t('Special pen')}
-                title={t('Tools that move the paint already on the layer')}
-                onClick={() => setOpenList(open => (open === 'special' ? null : 'special'))}
-              >
-                <PenTool size={20} aria-hidden />
-                <span>{t('Special pen')}</span>
-              </button>
-              <div className={openList === 'special' ? 'tool-list open' : 'tool-list'}>{row.map(toolButton)}</div>
             </div>
           )
         }

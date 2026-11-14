@@ -2712,7 +2712,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 88. Requests from a pen user
 
 - **Date:** 2026-11-13
-- **Status:** planned; Ctrl + Space, File > New and Open, and the turned symmetry are adopted
+- **Status:** planned; all but the curves tool are adopted
 - **Problem:** after 1.0, a friend who draws with a pen tried Lydia and asked for what he missed in it.
 - **Decision**, from his requests and my choices, for 1.1.0:
   - **Ctrl + Space** and a drag up or down zooms around where the drag starts, with any tool, as in Krita. It joins Space
@@ -2733,7 +2733,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     around a vanishing point are faint, as before. The handles stay blue and white: the white shows on any color. The picture
     of the screen they read is kept while anything needs it, the grid, the outline or these lines.
   - **Smudge and Liquify become modes of the Brush**: Paint, Smudge and Liquify in its bar, with U and Q still going
-    straight to each (my choice). "Special pen" leaves the tool column.
+    straight to each (my choice). "Special pen" leaves the tool column. The Brush's button stays chosen in all three, and goes
+    back to the last one used; each mode keeps its own size and strength. Blur stays a tool of its own: it was not asked for.
   - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
     when it is built.
 - **Checked:** `tests/app/view-tools.mjs`: Ctrl + Space shows the zoom cursor, a drag up of 100 pixels zooms in e times
@@ -2744,7 +2745,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   turned 90° and 45°, the radial copies the same at any angle, painting turned 90° (the same as up and down, to the pixel)
   and 45° (across the diagonal), Angle in the bar, the handle turning the lines and not the center, Shift's steps, and the
   angle kept in the file and its autosave, with a file without one still opening; over sky blue paint its line is red. On
-  the screen: the symmetry's lines over blue, black, gray and the paper.
+  the screen: the symmetry's lines over blue, black, gray and the paper. `tests/app/tool-column.mjs`: the Brush's bar has
+  its three modes, choosing one keeps the Brush chosen in the column, and the Brush's button goes back to the last mode.
 
 ## Open questions
 

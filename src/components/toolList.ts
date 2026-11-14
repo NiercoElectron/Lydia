@@ -57,8 +57,9 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
 
 export const ALL_TOOLS = Object.keys(TOOLS) as Tool[]
 
-// The rows of the tool column, from the top. "filter" opens the filters, and a list of tools shares one row
-export const TOOL_ROWS: (Tool | 'filter' | Tool[])[] = [
+// The rows of the tool column, from the top. "filter" opens the filters. Smudge and Liquify are modes of the Brush, in
+// its bar (see BRUSH_MODES in tools.ts), so they have no row of their own
+export const TOOL_ROWS: (Tool | 'filter')[] = [
   'move',
   'select',
   'lasso',
@@ -72,7 +73,6 @@ export const TOOL_ROWS: (Tool | 'filter' | Tool[])[] = [
   'blur',
   'text',
   'shape',
-  ['smudge', 'liquify'],
   'hand',
   'rotate',
 ]

@@ -31,6 +31,8 @@ import {
 import { MAX_TEXT_SIZE, MIN_TEXT_SIZE, type TextAlign, type TextStyle } from '../engine/text'
 import {
   hasStrength,
+  BRUSH_MODES,
+  isBrushMode,
   isPaintTool,
   LIQUIFY_MODES,
   usesTip,
@@ -41,6 +43,7 @@ import {
 import { WARP_SIDES } from '../engine/warp'
 import type { BlendMode } from '../engine/layers'
 import { AdvancedMenu } from './AdvancedMenu'
+import { TOOLS } from './toolList'
 import { BLEND_MODE_GROUPS } from './blendModeList'
 import { SliderValue } from './SliderValue'
 
@@ -160,6 +163,7 @@ type Props = {
   onStabilizerChange: (change: Partial<StabilizerSettings>) => void
   onTaperChange: (change: Partial<TaperSettings>) => void
   onPixelPerfectToggle: () => void
+  onToolChange: (tool: Tool) => void // between the brush's modes
 }
 
 // The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity, with its stabilizer and taper under
@@ -200,6 +204,7 @@ export function Toolbar({
   onStabilizerChange,
   onTaperChange,
   onPixelPerfectToggle,
+  onToolChange,
 }: Props) {
   const { t } = useLanguage()
   const isSelecting = tool === 'select' || tool === 'lasso' || tool === 'wand'
@@ -223,6 +228,7 @@ export function Toolbar({
   const isObjectTool = (tool === 'shape' && transform.isShapeLayer) || (tool === 'text' && transform.isTextLayer)
   return (
     <div className="toolbar">
+      {isBrushMode(tool) && <BrushModes tool={tool} onChange={onToolChange} />}
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
       {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}
@@ -755,6 +761,33 @@ function RulerButtons({ controls }: { controls: RulerControls }) {
         </button>
       )}
     </>
+  )
+}
+
+// What the brush does: paint, smudge or liquify (see BRUSH_MODES in tools.ts), each with its key
+function BrushModes({ tool, onChange }: { tool: Tool; onChange: (tool: Tool) => void }) {
+  const { t } = useLanguage()
+  const names: Record<(typeof BRUSH_MODES)[number], string> = {
+    brush: t('Paint'),
+    smudge: t('Smudge'),
+    liquify: t('Liquify'),
+  }
+  return (
+    <span className="button-group brush-modes">
+      {BRUSH_MODES.map(each => {
+        const { key, also } = TOOLS[each]
+        return (
+          <button
+            key={each}
+            aria-pressed={tool === each}
+            onClick={() => onChange(each)}
+            title={`${names[each]} (${key.toUpperCase()}${also ? `, ${t(also)}` : ''})`}
+          >
+            {names[each]}
+          </button>
+        )
+      })}
+    </span>
   )
 }
 

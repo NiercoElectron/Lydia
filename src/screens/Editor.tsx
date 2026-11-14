@@ -771,6 +771,7 @@ export function Editor({
   const toolOptions = (
     <Toolbar
       tool={tool}
+      onToolChange={setTool}
       size={size}
       opacity={opacity}
       brushBlend={brushBlend}

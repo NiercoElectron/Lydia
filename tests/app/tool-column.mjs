@@ -113,6 +113,28 @@ check(
   JSON.stringify(labels),
 )
 check('Brush is chosen at first', JSON.stringify(await pressed()) === '["Brush"]')
+// Smudge and Liquify are modes of the Brush, in its bar (decision 88)
+const brushModes = () =>
+  page.$$eval('.toolbar .brush-modes button', buttons => buttons.map(b => [b.textContent, b.ariaPressed === 'true']))
+check(
+  "the Brush's bar has Paint, Smudge and Liquify, on Paint",
+  JSON.stringify(await brushModes()) === '[["Paint",true],["Smudge",false],["Liquify",false]]',
+  JSON.stringify(await brushModes()),
+)
+await page.click('.toolbar .brush-modes button:nth-child(2)')
+await sleep(100)
+check(
+  'Smudge, with the Brush still chosen in the column',
+  JSON.stringify(await pressed()) === '["Brush"]' && (await brushModes())[1][1],
+)
+await page.click('.tool-column button[aria-label=Eraser]')
+await sleep(100)
+check('another tool has no modes', (await page.$('.toolbar .brush-modes')) === null)
+await page.click('.tool-column button[aria-label=Brush]')
+await sleep(100)
+check("the Brush's button goes back to the last mode", (await brushModes())[1][1], JSON.stringify(await brushModes()))
+await page.click('.toolbar .brush-modes button:nth-child(1)')
+await sleep(100)
 check(
   'the bar on top no longer has Brush and Eraser buttons',
   await page.$$eval('.toolbar button', bs => !bs.some(b => b.textContent === 'Brush' || b.textContent === 'Eraser')),

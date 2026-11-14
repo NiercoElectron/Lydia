@@ -193,7 +193,8 @@ they stay until taken out.
 ## Smudge and blur
 
 **Smudge (U)** drags the paint along, like a finger. **Blur (J)** softens the paint it goes over, more each time it
-passes.
+passes. Smudge is a mode of the Brush: with the Brush chosen, its bar has **Paint**, **Smudge** and **Liquify**. The
+Brush's button in the tool column goes back to the mode used last.
 
 - Both work with the tip of the chosen brush, so a textured brush smudges with its texture.
 - **Size** and **Strength** are in the bar, and each tool keeps its own. With Smudge, the Strength is how far the paint
@@ -206,7 +207,8 @@ passes.
 
 ## Liquify
 
-**Liquify (Q)** moves the picture on the active layer instead of painting on it. Choose what it does in the bar:
+**Liquify (Q)** moves the picture on the active layer instead of painting on it. It is a mode of the Brush, like Smudge.
+Choose what it does in the bar:
 
 - **Push** moves the picture along the stroke. At 100% it follows the pen.
 - **Bloat** makes the middle of the brush bigger, and **Pucker** smaller, pulling in what is around it.

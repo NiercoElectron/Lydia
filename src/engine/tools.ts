@@ -30,6 +30,13 @@ export type MixTool = 'smudge' | 'blur'
 
 export const isMixTool = (tool: Tool): tool is MixTool => tool === 'smudge' || tool === 'blur'
 
+// The brush's modes (decision 88): painting, smudging and liquifying are one button of the tool column, and its bar
+// chooses between them. Each keeps its own key, B, U and Q, and its own settings
+export const BRUSH_MODES = ['brush', 'smudge', 'liquify'] as const
+export type BrushMode = (typeof BRUSH_MODES)[number]
+
+export const isBrushMode = (tool: Tool): tool is BrushMode => (BRUSH_MODES as readonly Tool[]).includes(tool)
+
 // How liquify moves the picture (see liquify.ts): along the stroke, out from the middle of the dab or in toward it,
 // round it, or back to how it was
 export type LiquifyMode = 'push' | 'bloat' | 'pucker' | 'twirl' | 'reconstruct'

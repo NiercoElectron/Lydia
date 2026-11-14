@@ -162,12 +162,15 @@ await chooseBrush('Hard round')
 // ----- The buttons, keys and settings -----
 const tools = await page.$$eval('.tool-column button', buttons => buttons.map(b => b.ariaLabel))
 check(
-  'Blur is on the list, and Smudge under Special pen',
-  tools.includes('Blur') && tools.join().includes('Special pen,Smudge'),
+  'Blur is on the list, and Smudge is a mode of the Brush',
+  tools.includes('Blur') && !tools.includes('Smudge') && !tools.includes('Special pen'),
   tools.join(),
 )
 await press('u')
-check('U chooses Smudge', await page.$eval('.tool-column button[aria-label=Smudge]', b => b.ariaPressed === 'true'))
+check(
+  "U chooses Smudge, in the Brush's bar",
+  (await page.$eval('.toolbar .brush-modes button[aria-pressed=true]', b => b.textContent)) === 'Smudge',
+)
 check('it has Strength, not Opacity', (await hasBarSlider('Strength')) && !(await hasBarSlider('Opacity')))
 await barSlider('Size', 60)
 await barSlider('Strength', 80)

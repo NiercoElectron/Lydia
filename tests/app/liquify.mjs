@@ -177,9 +177,17 @@ await sleep(300)
 
 // ----- The button, key, modes and settings -----
 const tools = await page.$$eval('.tool-column button', buttons => buttons.map(b => b.ariaLabel))
-check('Liquify is under Special pen', tools.join().includes('Special pen,Smudge,Liquify'), tools.join())
+check(
+  'Liquify is a mode of the Brush, not a row of the column',
+  !tools.includes('Liquify') && !tools.includes('Special pen'),
+  tools.join(),
+)
 await press('q')
-check('Q chooses Liquify', await page.$eval('.tool-column button[aria-label=Liquify]', b => b.ariaPressed === 'true'))
+check(
+  "Q chooses Liquify, in the Brush's bar, with the Brush still chosen",
+  (await page.$eval('.toolbar .brush-modes button[aria-pressed=true]', b => b.textContent)) === 'Liquify' &&
+    (await page.$eval('.tool-column button[aria-label=Brush]', b => b.ariaPressed === 'true')),
+)
 check('it has Strength, not Opacity', (await hasBarSlider('Strength')) && !(await hasBarSlider('Opacity')))
 const modes = await page.$$eval('.toolbar .button-group button', buttons => buttons.map(b => b.textContent))
 check(
