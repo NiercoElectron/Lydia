@@ -646,4 +646,32 @@ export const es: Record<string, string> = {
   'Save as…': 'Guardar como…',
   'Open Lydia folder': 'Abrir carpeta de Lydia',
   'Exported: {name}': 'Exportado: {name}',
+  Curve: 'Curva',
+  'How far its lines are turned, clockwise': 'Rotación de las líneas en sentido horario',
+  'Drag on the drawing to move the center, or the round handle to turn the lines (Shift: in steps of 15°). Press it again to go back to the tool':
+    'Arrastra en el dibujo para mover el centro o arrastra el control redondo para girar las líneas (Shift: pasos de 15°). Pulsa de nuevo para volver a la herramienta',
+  Replace: 'Sustituir',
+  Add: 'Añadir',
+  'Take away': 'Quitar',
+  'What a curve makes when it ends': 'Qué crea la curva al terminar',
+  Make: 'Crear',
+  'A shape on a new layer, outlined with the brush or filled':
+    'Una forma en una capa nueva, delineada con el pincel o rellena',
+  'A selection inside the curve, closed if it is open': 'Una selección dentro de la curva, cerrándola si está abierta',
+  Selection: 'Selección',
+  'How the curve changes the selection there is': 'Cómo modifica la curva la selección existente',
+  'Click the first point to close the curve. Enter ends it open, and Esc throws it away.':
+    'Haz clic en el primer punto para cerrar la curva. Enter termina la curva abierta y Esc la descarta.',
+  Paint: 'Pintar',
+  Curves: 'Curvas',
+  'a click puts a corner, a drag a curve; click the first point to close it':
+    'haz clic para crear una esquina, arrastra para crear una curva; haz clic en el primer punto para cerrar',
+  'Alt + click zooms out, dragging zooms smoothly; or hold Ctrl + Space':
+    'Alt + clic aleja, arrastrar ajusta el zoom suavemente; o mantén Ctrl + Espacio',
+  'Changes not saved': 'Cambios sin guardar',
+  'Save the changes to this drawing?': '¿Guardar los cambios de este dibujo?',
+  'Save the changes to "{name}"?': '¿Guardar los cambios de "{name}"?',
+  'If you discard them, the last autosaved copy stays in Recover, on the start screen.':
+    'Si los descartas, la última copia guardada automáticamente sigue en Recuperar, en la pantalla inicial.',
+  Discard: 'Descartar',
 }

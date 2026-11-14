@@ -1,5 +1,30 @@
 # Historial de cambios
 
+## [1.0.1] - 2026-11-13
+
+### Added
+
+- El contorno de los pinceles grandes tiene un punto en el centro para ayudar a posicionar el trazo. Aparece a partir de 24 píxeles en pantalla.
+
+## [1.0.0] - 2026-11-01
+
+La aplicación para Windows y macOS: Lydia en una ventana propia, con carpetas reales, la memoria del equipo y nuevas versiones que llegan automáticamente.
+
+### Added
+
+- **La aplicación de escritorio** ([decisión 87](docs/decisions.md#87-the-desktop-app)): Lydia en una ventana propia, para Windows y macOS, con [instaladores en GitHub](https://github.com/NiercoElectron/Lydia/releases/latest) y **Tamaño de la interfaz** en la configuración. Los proyectos se guardan en `Documents\Lydia\Projects`, donde **Ctrl+S** guarda en el mismo archivo tras la primera vez, y **Guardar como…** crea otro. Las imágenes exportadas van directamente a `Documents\Lydia\Exports`, y un `.lyd` se abre con doble clic. Los pinceles añadidos y la bandeja son archivos en `Documents\Lydia\Brushes` y `Documents\Lydia\Tray`, para que la bandeja permanezca entre sesiones y los archivos copiados a esas carpetas aparezcan en Lydia. La aplicación lee la memoria del equipo: el límite de RAM sigue la RAM real, y la configuración de la tarjeta gráfica empieza en **Automático**. Las nuevas versiones se descargan en segundo plano y se instalan al cerrar Lydia; en macOS, un aviso lleva a la descarga.
+- **Ctrl+S** también guarda en el navegador.
+
+### Changed
+
+- Las capas y carpetas se arrastran desde los puntos a la izquierda de su fila, que muestran una mano. La fila sigue a la mano y las demás le abren espacio. El nombre solo sirve para seleccionar y cambiar el nombre.
+
+### Fixed
+
+- Al añadir un solo pincel con funciones no incluidas, el mensaje usaba el plural: “1 pinceles añadidos”.
+- El contorno del pincel leía la imagen equivocada en la aplicación de escritorio y permanecía oscuro sobre pintura oscura.
+- En pantallas pequeñas, las categorías de pinceles se superponían a **Importar…**, **Exportar** y **Eliminar**, y la barra inferior sobrepasaba su espacio. El tamaño mínimo de la ventana de la aplicación es 1024×600.
+
 ## [0.20.0] - 2026-11-01
 
 ### Added

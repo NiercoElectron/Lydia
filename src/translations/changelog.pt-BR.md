@@ -1,5 +1,30 @@
 # Histórico de alterações
 
+## [1.0.1] - 2026-11-13
+
+### Added
+
+- O contorno de pincéis grandes tem um ponto no centro para ajudar a posicionar o traço. Ele aparece a partir de 24 pixels na tela.
+
+## [1.0.0] - 2026-11-01
+
+O aplicativo para Windows e macOS: Lydia em uma janela própria, com pastas reais, a memória do computador e novas versões que chegam automaticamente.
+
+### Added
+
+- **O aplicativo para computador** ([decisão 87](docs/decisions.md#87-the-desktop-app)): Lydia em uma janela própria, para Windows e macOS, com [instaladores no GitHub](https://github.com/NiercoElectron/Lydia/releases/latest) e **Tamanho da interface** nas configurações. Os projetos ficam em `Documents\Lydia\Projects`, onde **Ctrl+S** salva no mesmo arquivo após a primeira vez, e **Salvar como…** cria outro. As imagens exportadas vão direto para `Documents\Lydia\Exports`, e um `.lyd` abre com clique duplo. Os pincéis adicionados e a bandeja são arquivos em `Documents\Lydia\Brushes` e `Documents\Lydia\Tray`, para que a bandeja permaneça entre sessões e os arquivos copiados para essas pastas apareçam no Lydia. O aplicativo lê a memória do computador: o limite de RAM acompanha a RAM real, e a configuração da placa de vídeo começa em **Automático**. Novas versões são baixadas em segundo plano e instaladas ao fechar o Lydia; no macOS, um aviso leva ao download.
+- **Ctrl+S** também salva no navegador.
+
+### Changed
+
+- Camadas e pastas são arrastadas pelos pontos à esquerda de sua linha, que mostram uma mão. A linha acompanha a mão, e as outras abrem espaço para ela. O nome serve apenas para selecionar e renomear.
+
+### Fixed
+
+- Ao adicionar um único pincel com recursos não incluídos, a mensagem usava o plural: “1 pincéis adicionados”.
+- O contorno do pincel lia a imagem errada no aplicativo para computador e permanecia escuro sobre tinta escura.
+- Em telas pequenas, as categorias de pincéis ficavam sobre **Importar…**, **Exportar** e **Excluir**, e a barra inferior ultrapassava seu espaço. O tamanho mínimo da janela do aplicativo é 1024×600.
+
 ## [0.20.0] - 2026-11-01
 
 ### Added

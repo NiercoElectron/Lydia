@@ -643,4 +643,32 @@ export const ptBR: Record<string, string> = {
   'Save as…': 'Salvar como…',
   'Open Lydia folder': 'Abrir pasta do Lydia',
   'Exported: {name}': 'Exportado: {name}',
+  Curve: 'Curva',
+  'How far its lines are turned, clockwise': 'Rotação das linhas no sentido horário',
+  'Drag on the drawing to move the center, or the round handle to turn the lines (Shift: in steps of 15°). Press it again to go back to the tool':
+    'Arraste no desenho para mover o centro ou arraste a alça redonda para girar as linhas (Shift: passos de 15°). Pressione de novo para voltar à ferramenta',
+  Replace: 'Substituir',
+  Add: 'Adicionar',
+  'Take away': 'Remover',
+  'What a curve makes when it ends': 'O que a curva cria ao terminar',
+  Make: 'Criar',
+  'A shape on a new layer, outlined with the brush or filled':
+    'Uma forma em uma nova camada, contornada com o pincel ou preenchida',
+  'A selection inside the curve, closed if it is open': 'Uma seleção dentro da curva, fechando-a se estiver aberta',
+  Selection: 'Seleção',
+  'How the curve changes the selection there is': 'Como a curva altera a seleção existente',
+  'Click the first point to close the curve. Enter ends it open, and Esc throws it away.':
+    'Clique no primeiro ponto para fechar a curva. Enter termina a curva aberta e Esc a descarta.',
+  Paint: 'Pintar',
+  Curves: 'Curvas',
+  'a click puts a corner, a drag a curve; click the first point to close it':
+    'clique para criar um canto, arraste para criar uma curva; clique no primeiro ponto para fechar',
+  'Alt + click zooms out, dragging zooms smoothly; or hold Ctrl + Space':
+    'Alt + clique reduz o zoom, arrastar ajusta o zoom suavemente; ou segure Ctrl + Espaço',
+  'Changes not saved': 'Alterações não salvas',
+  'Save the changes to this drawing?': 'Salvar as alterações deste desenho?',
+  'Save the changes to "{name}"?': 'Salvar as alterações de "{name}"?',
+  'If you discard them, the last autosaved copy stays in Recover, on the start screen.':
+    'Se descartar, a última cópia salva automaticamente continua em Recuperar, na tela inicial.',
+  Discard: 'Descartar',
 }
