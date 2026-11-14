@@ -7,6 +7,7 @@ import {
   Lasso,
   Move,
   PaintBucket,
+  PenTool,
   Pipette,
   RotateCw,
   Shapes,
@@ -29,6 +30,12 @@ export const TOOLS: Record<Tool, { Icon: LucideIcon; name: string; key: string; 
   liquify: { Icon: Waves, name: 'Liquify', key: 'q', also: 'moves and bends the picture on the layer' },
   fill: { Icon: PaintBucket, name: 'Fill', key: 'f', also: 'Alt picks a color' },
   shape: { Icon: Shapes, name: 'Shape', key: 'p', also: 'Shift keeps it even, Alt draws it from its middle' },
+  curve: {
+    Icon: PenTool,
+    name: 'Curves',
+    key: 'c',
+    also: 'a click puts a corner, a drag a curve; click the first point to close it',
+  },
   text: { Icon: Type, name: 'Text', key: 't', also: 'click on the drawing and type; Ctrl+Enter confirms' },
   eyedropper: { Icon: Pipette, name: 'Eyedropper', key: 'i', also: 'or hold Alt while painting' },
   select: { Icon: SquareDashed, name: 'Rectangle select', key: 's', also: 'Shift adds, Alt takes away' },
@@ -73,6 +80,7 @@ export const TOOL_ROWS: (Tool | 'filter')[] = [
   'blur',
   'text',
   'shape',
+  'curve',
   'hand',
   'rotate',
 ]

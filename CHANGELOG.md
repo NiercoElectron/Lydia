@@ -13,6 +13,10 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
   Cmd + Space opens the Mac's search.
 - **File > New project…** (Ctrl+N) and **Open project** (Ctrl+O) in the editor, in place of the drawing that is open,
   without going back to the start screen. Ctrl+N is for the desktop app: a browser keeps it for itself.
+- **Curves (C)**, like Photoshop's pen: a click puts down a corner, a drag a smooth point with its handles, and clicking
+  the first point closes the curve (Enter ends it open). It is a shape on a new layer, outlined with the brush or filled,
+  with ends that can thin out, and it stays editable with **Edit shape**. **Make Selection** makes it a selection instead,
+  in place of the one there is, added to it or taken away from it.
 - **Angle** for the symmetry turns its lines around the center, to mirror across a slanted line. **Move center** also shows a
   round handle that turns them on the drawing, with **Shift** in steps of 15°.
 

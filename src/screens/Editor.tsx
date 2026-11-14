@@ -821,6 +821,12 @@ export function Editor({
         onCommit: () => engine?.commitShapeStyle(),
         onColor: part => engine?.setShapeColor(part),
         onTakeBrush: () => engine?.takeBrushForShape(),
+        isCurveLayer: snapshot.isCurveLayer,
+        isDrawingCurve: snapshot.isDrawingCurve,
+        curveMakes: snapshot.curveMakes,
+        onCurveMakesChange: makes => engine?.setCurveMakes(makes),
+        curveSelects: snapshot.curveSelects,
+        onCurveSelectsChange: mode => engine?.setCurveSelects(mode),
       }}
       text={{
         style: snapshot.textStyle,

@@ -209,7 +209,7 @@ const math = await page.evaluate(async () => {
   const twice = transformedShape(moved, { x: 150, y: 100, width: 200, height: 200 }, quadOf(150, 100, 400, 200))
   const line = shape('line')
   const flatFile = { ...shape('star'), outline: { ...shape('star').outline, brush: 0 } }
-  const goodBrush = JSON.stringify({ name: 'x' })
+  const goodBrush = (await import('/src/brushes/soft-round.lydbrush?raw')).default
   return {
     rectangle: shapePath(shape('rectangle')),
     ellipse: shapePath(shape('ellipse')),
@@ -224,6 +224,7 @@ const math = await page.evaluate(async () => {
     even: shapeBox('rectangle', { x: 0, y: 0 }, { x: 100, y: -40 }, true, false),
     middle: shapeBox('ellipse', { x: 50, y: 50 }, { x: 80, y: 90 }, false, true),
     level: shapeBox('line', { x: 0, y: 0 }, { x: 100, y: 3 }, true, false),
+    good: shapeInProject(flatFile, [goodBrush]) !== null,
     damaged: [
       shapeInProject(null, []),
       shapeInProject(flatFile, null),
@@ -279,6 +280,7 @@ check(
   'nonsense in a file is left out',
   math.damaged.every(shape => shape === null),
 )
+check('and a shape that makes sense is kept', math.good)
 
 // ----- Drawing -----
 await press('p')

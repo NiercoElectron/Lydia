@@ -45,11 +45,14 @@ import { createOutsideView } from './outsideView'
 import { createLiquify } from './liquify'
 import { newRuler, noRulers, type Ruler, type RulerKind, type Rulers } from './rulers'
 import { createFilters, type FilterChange, type FilterKind, type FilterSettings } from './filters'
+import { curveBox, curveLine, type Curve, type CurveMakes } from './curves'
 import { createShapePainter } from './shapePainter'
 import {
   canFill,
+  DEFAULT_CURVE_STYLE,
   DEFAULT_SHAPE_STYLE,
   lineEnds,
+  shapeCurve,
   shapePath,
   transformedShape,
   type Shape,
@@ -144,6 +147,7 @@ export type EngineSnapshot = {
     blendMode: BlendMode
     isSmart: boolean
     isShape: boolean
+    isCurve: boolean // a shape drawn with the curves tool
     isText: boolean
     hasOffPaper: boolean
     showsOffPaper: boolean
@@ -176,7 +180,11 @@ export type EngineSnapshot = {
   chosenRuler: number | null // the one being edited
   shapeStyle: ShapeStyle // of the active layer's shape, or of the next one drawn
   isShapeLayer: boolean
+  isCurveLayer: boolean // a shape drawn with the curves tool
   isEditingShape: boolean // the bar changes the active layer's shape, not the next one
+  isDrawingCurve: boolean // a curve is being drawn with the curves tool, and hasn't ended
+  curveMakes: CurveMakes
+  curveSelects: SelectionMode // how a curve that makes a selection changes the one there is
   textStyle: TextStyle // of the text being typed, or of the next one
   isTextLayer: boolean
   typing: TextTyping | null // the text being typed, if any (see text.ts)
@@ -371,13 +379,20 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let isEditingRulers = false
   let chosenRuler: number | null = null
 
-  // How the next shape is drawn, so several can be drawn in a row. With "Edit shape" on and a shape's layer active, the
+  // How the next shape is drawn, so several can be drawn in a row, and the next curve, by the curves tool, which has a
+  // look of its own; "shapeTool" is the one of the two chosen last. With "Edit shape" on and a layer of its active, the
   // bar shows and changes that shape instead. A change to it waits in "shapeEdit" while a slider moves, and is painted
   // when it is let go, as one step of undo
-  let newShapeStyle = DEFAULT_SHAPE_STYLE
+  const newStyles = { shape: DEFAULT_SHAPE_STYLE, curve: DEFAULT_CURVE_STYLE }
+  let shapeTool: 'shape' | 'curve' = 'shape'
+  let curveMakes: CurveMakes = 'shape'
+  let curveSelects: SelectionMode = 'replace'
+  let isDrawingCurve = false
   let wantsShapeEdit = false
   let shapeEdit: { layer: Layer; shape: Shape } | null = null
-  const isEditingShape = () => wantsShapeEdit && stack.active.shape !== undefined
+  const isCurveLayer = () => stack.active.shape?.kind === 'curve'
+  const isEditingShape = () =>
+    wantsShapeEdit && stack.active.shape !== undefined && isCurveLayer() === (shapeTool === 'curve')
   const shownShape = () => {
     if (!isEditingShape()) return undefined
     return shapeEdit?.layer === stack.active ? shapeEdit.shape : stack.active.shape
@@ -396,12 +411,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   let typing: Typing | null = null
   let finishedTyping: Typing | null = null
 
-  const styleOf = ({ kind, sides, depth, fill, outline }: ShapeStyle): ShapeStyle => ({
+  const styleOf = ({ kind, sides, depth, fill, outline, taper }: ShapeStyle): ShapeStyle => ({
     kind,
     sides,
     depth,
     fill,
     outline,
+    taper,
   })
 
   // The brush starts as the Soft round brush, until the screen chooses one
@@ -485,8 +501,8 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     getChosenRuler: () => chosenRuler,
     onRulerChosen: index => chooseRuler(index),
     onRulerChange: (index, ruler) => changeRuler(index, ruler),
-    getShapeKind: () => newShapeStyle.kind,
-    shapeOutline: box => shapePath({ ...newShapeStyle, ...box, placements: [] }),
+    getShapeKind: () => newStyles.shape.kind,
+    shapeOutline: box => shapePath({ ...newStyles.shape, ...box, placements: [] }),
     onShape: box => void addShape(box),
     isEditingShape,
     getLineEnds: () => {
@@ -494,6 +510,16 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       return shape ? lineEnds(shape) : null
     },
     onLineEnds: ([from, to]) => void redrawShape({ ...stack.active.shape!, from, to, placements: [] }),
+    onCurve: curve => void addCurve(curve),
+    onCurveDrawing: isDrawing => {
+      isDrawingCurve = isDrawing
+      changed(false)
+    },
+    getEditedCurve: () => {
+      const shape = shownShape()
+      return shape ? shapeCurve(shape) : null
+    },
+    onCurveEdit: curve => void redrawShape({ ...stack.active.shape!, ...curveBox(curve), curve, placements: [] }),
     onText: at => void startText(at),
   })
   // A saved drawing opens as it was shown when it was saved; a new one shows the whole paper
@@ -559,6 +585,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
         blendMode: layer.blendMode,
         isSmart: layer.smart !== undefined,
         isShape: layer.shape !== undefined,
+        isCurve: layer.shape?.kind === 'curve',
         isText: layer.smart?.text !== undefined,
         hasOffPaper: hasPaintOffPaper(layer),
         showsOffPaper: layer.showOffPaper,
@@ -594,9 +621,13 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       rulers,
       isEditingRulers,
       chosenRuler,
-      shapeStyle: styleOf(shownShape() ?? newShapeStyle),
+      shapeStyle: styleOf(shownShape() ?? newStyles[shapeTool]),
       isShapeLayer: stack.active.shape !== undefined,
+      isCurveLayer: isCurveLayer(),
       isEditingShape: isEditingShape(),
+      isDrawingCurve,
+      curveMakes,
+      curveSelects,
       textStyle: typing?.style ?? newTextStyle,
       isTextLayer: stack.active.smart?.text !== undefined,
       typing: typingNow(),
@@ -1193,6 +1224,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
       showTransformStep(transform.step - 1)
       return
     }
+    if (view.removeCurvePoint()) return // a curve being drawn takes back its last point, like in Photoshop
     if (isBusy()) return
     finishLayerOpacity() // an opacity change still on its way (Ctrl+Z while dragging) becomes a step first
     if (!history.canUndo()) return
@@ -1450,6 +1482,10 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     view.setTool(tool)
     if (isPaintTool(tool)) brush.settings.tool = tool
     if (isMixTool(tool)) mixTools.settings.tool = tool
+    if ((tool === 'shape' || tool === 'curve') && tool !== shapeTool) {
+      shapeTool = tool // the bar shows its look
+      changed(false)
+    }
   }
 
   // How strongly smudge, blur or liquify work, from 0 to 1 (see mixTools.ts and liquify.ts). Each has its own: this is
@@ -2290,9 +2326,23 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Draw a new shape on a new layer above the active one, as one step of undo
   function addShape({ from, to }: { from: Shape['from']; to: Shape['to'] }) {
     const isFlat = Math.abs(to.x - from.x) < 1 || Math.abs(to.y - from.y) < 1
-    if (isFlat && newShapeStyle.kind !== 'line') return
-    const style = shownStyle(newShapeStyle)
-    const shape = { ...style, from, to, placements: [], outline: { ...style.outline, brush: brushFileNow() } }
+    if (isFlat && newStyles.shape.kind !== 'line') return
+    return addShapeLayer(newStyles.shape, { from, to, placements: [] })
+  }
+
+  // A curve drawn with the curves tool (see curves.ts) ends: on a new layer, as a shape, or as a selection, in place
+  // of the one there is, added to it or taken away from it
+  function addCurve(curve: Curve) {
+    if (curveMakes === 'selection') {
+      selectPolygon(curveLine({ ...curve, isClosed: true }), curveSelects)
+      return
+    }
+    return addShapeLayer(newStyles.curve, { ...curveBox(curve), curve, placements: [] })
+  }
+
+  function addShapeLayer(look: ShapeStyle, where: Omit<Shape, keyof ShapeStyle>) {
+    const style = shownStyle(look)
+    const shape: Shape = { ...style, ...where, outline: { ...style.outline, brush: brushFileNow() } }
     wantsShapeEdit = false
     return runTask('Drawing…', async () => {
       history.startGroup()
@@ -2324,9 +2374,21 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
   // Change how the next shape is drawn, or the shape being edited: "commitShapeStyle" paints that one
   function setShapeStyle(change: Partial<ShapeStyle>) {
     const shape = shownShape()
-    const style = shownStyle({ ...styleOf(shape ?? newShapeStyle), ...change })
+    const style = shownStyle({ ...styleOf(shape ?? newStyles[shapeTool]), ...change })
     if (shape) shapeEdit = { layer: stack.active, shape: { ...shape, ...style } }
-    else newShapeStyle = style
+    else newStyles[shapeTool] = style
+    changed(false)
+  }
+
+  // What the curves tool makes: shapes or selections
+  function setCurveMakes(makes: CurveMakes) {
+    curveMakes = makes
+    changed(false)
+  }
+
+  // How its selections change the one there is
+  function setCurveSelects(mode: SelectionMode) {
+    curveSelects = mode
     changed(false)
   }
 
@@ -2342,7 +2404,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
 
   // The fill or the outline takes the color chosen now
   function setShapeColor(part: 'fill' | 'outline') {
-    const style = styleOf(shownShape() ?? newShapeStyle)
+    const style = styleOf(shownShape() ?? newStyles[shapeTool])
     setShapeStyle({ [part]: { ...style[part], color: brush.settings.color } })
     commitShapeStyle()
   }
@@ -2608,6 +2670,11 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     commitShapeStyle,
     setShapeColor,
     takeBrushForShape,
+    setCurveMakes,
+    setCurveSelects,
+    finishCurve: () => view.finishCurve(),
+    cancelCurve: () => view.cancelCurve(),
+    removeCurvePoint: () => view.removeCurvePoint(),
     setPaperShown,
     layerThumbnail,
     editText,

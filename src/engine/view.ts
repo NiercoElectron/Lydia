@@ -5,6 +5,8 @@ import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
 import { createContrastLines } from './contrastLines'
+import { createCurveTool } from './curveTool'
+import type { Curve } from './curves'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
 import type { GpuTiles } from './gpuTiles'
 import { MIN_LIQUIFY_SIZE, type Liquify } from './liquify'
@@ -49,6 +51,7 @@ const CURSORS: Record<Tool, string> = {
   liquify: 'crosshair',
   fill: FILL_CURSOR,
   shape: 'crosshair',
+  curve: 'crosshair',
   text: 'text',
   eyedropper: EYEDROPPER_CURSOR,
   select: 'crosshair',
@@ -108,6 +111,12 @@ export type ViewActions = {
   isEditingShape: () => boolean
   getLineEnds: () => [Point, Point] | null
   onLineEnds: (ends: [Point, Point]) => void
+  // The curves tool (see curveTool.ts): a curve that ended, whether one is being drawn, and the active layer's curve on
+  // the paper while it is edited, changed
+  onCurve: (curve: Curve) => void
+  onCurveDrawing: (isDrawing: boolean) => void
+  getEditedCurve: () => Curve | null
+  onCurveEdit: (curve: Curve) => void
   onText: (at: Point) => void // the text tool went down at this point of the paper (see text.ts)
 }
 
@@ -577,6 +586,19 @@ export function createView(
     }
   }
 
+  // The curve being drawn with the curves tool, and the handles of the one edited
+  const curveTool = createCurveTool(app.stage, {
+    onScreen,
+    paperAt,
+    toScreen,
+    drawOutline,
+    onCurve: curve => actions.onCurve(curve),
+    onDrawing: isDrawing => actions.onCurveDrawing(isDrawing),
+    getEdited: () => actions.getEditedCurve(),
+    onEdit: curve => actions.onCurveEdit(curve),
+  })
+  const showCurve = () => curveTool.show(pointer, tool === 'curve', gesture !== null)
+
   // While the rulers are edited, the left button chooses one and drags its handles, or all of it by its line
   function editRuler(e: PointerEvent): Gesture {
     const { list } = actions.getRulers()
@@ -763,6 +785,7 @@ export function createView(
     liquify: e => stroke(e, liquify, actions.onMixEnd),
     fill,
     shape: drawShape,
+    curve: e => curveTool.start(e),
     text: placeText,
     eyedropper: pick,
     select: selectRectangle,
@@ -797,6 +820,7 @@ export function createView(
 
   // Choose what the left button does from now on
   function setTool(newTool: Tool) {
+    if (newTool !== 'curve') curveTool.finish() // a curve being drawn ends as it is
     tool = newTool
     showCursor()
   }
@@ -1125,6 +1149,7 @@ export function createView(
   app.ticker.add(showSymmetry)
   app.ticker.add(showRulers)
   app.ticker.add(showLineEnds)
+  app.ticker.add(showCurve)
   showCursor()
   fitToScreen()
 
@@ -1145,6 +1170,7 @@ export function createView(
     app.ticker.remove(showSymmetry)
     app.ticker.remove(showRulers)
     app.ticker.remove(showLineEnds)
+    app.ticker.remove(showCurve)
     outline.destroy()
     handles.destroy()
     brushOutline.destroy()
@@ -1153,6 +1179,7 @@ export function createView(
     for (const lines of Object.values(rulerLines)) lines.destroy()
     rulerHandles.destroy()
     lineEnds.destroy()
+    curveTool.destroy()
     listeners.clear()
   }
 
@@ -1196,6 +1223,10 @@ export function createView(
     },
     isPainting: () => gesture !== null && usesTip(gesture.tool),
     isDragging: () => gesture !== null,
+    // The curve being drawn: ended open, thrown away, or its last point taken back (false when there is none)
+    finishCurve: () => curveTool.finish(),
+    cancelCurve: () => curveTool.cancel(),
+    removeCurvePoint: () => curveTool.removeLast(),
     destroy,
   }
 }

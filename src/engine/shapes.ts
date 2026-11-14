@@ -1,3 +1,5 @@
+import { curveLine, placedCurve, type Curve } from './curves'
+import { NO_TAPER, type TaperSettings } from './dabs'
 import { homography, multiply, placed, type Matrix3, type Quad, type Rect } from './smartObject'
 import type { Point } from './selection'
 import { straightLineEnd } from './straightLine'
@@ -10,9 +12,13 @@ import type { Warp } from './warp'
 // A shape is two points, where the pointer went down and came up, which make the box it is drawn in, and its
 // "placements": where transforms took it. A transform moves the points of its outline, and the outline is painted again
 // with the same tip along them, so it stays as thick as it was, and how many sides it has can still change.
+//
+// A curve, drawn with the curves tool, is a shape too, which keeps its points and their handles (see curves.ts). Its
+// box is the rectangle around its points.
 
+// The shape tool's kinds; a curve is the curves tool's
 export const SHAPE_KINDS = ['rectangle', 'ellipse', 'line', 'polygon', 'star'] as const
-export type ShapeKind = (typeof SHAPE_KINDS)[number]
+export type ShapeKind = (typeof SHAPE_KINDS)[number] | 'curve'
 
 export const MIN_SIDES = 3
 export const MAX_SIDES = 12
@@ -30,9 +36,10 @@ export type ShapeStyle = {
   depth: number // of a star
   fill: { isOn: boolean; color: string }
   outline: { isOn: boolean; color: string; size: number; brush: string }
+  taper: TaperSettings // how an open curve's outline thins out toward its ends, like a stroke's (see dabs.ts)
 }
 
-export type Shape = ShapeStyle & { from: Point; to: Point; placements: ShapePlacement[] }
+export type Shape = ShapeStyle & { from: Point; to: Point; placements: ShapePlacement[]; curve?: Curve }
 
 export const DEFAULT_SHAPE_STYLE: ShapeStyle = {
   kind: 'rectangle',
@@ -40,6 +47,15 @@ export const DEFAULT_SHAPE_STYLE: ShapeStyle = {
   depth: 50,
   fill: { isOn: true, color: '#000000' },
   outline: { isOn: false, color: '#000000', size: 20, brush: '' },
+  taper: NO_TAPER,
+}
+
+// A curve is a line of the brush at first, with nothing filled
+export const DEFAULT_CURVE_STYLE: ShapeStyle = {
+  ...DEFAULT_SHAPE_STYLE,
+  kind: 'curve',
+  fill: { isOn: false, color: '#000000' },
+  outline: { isOn: true, color: '#000000', size: 20, brush: '' },
 }
 
 const STEP = 4 // along a curve or a bent side, a point every this many pixels of the paper
@@ -71,6 +87,12 @@ export function transformedShape(shape: Shape, bounds: Rect, corners: Quad, warp
 export function lineEnds(shape: Shape): [Point, Point] | null {
   if (shape.kind !== 'line' || shape.placements.some(placement => placement.warp)) return null
   return [placedPoint(shape, shape.from), placedPoint(shape, shape.to)]
+}
+
+// A curve's points and handles on the paper, to drag them. A curve bent by a mesh has none, as a line has no ends
+export function shapeCurve(shape: Shape): Curve | null {
+  if (shape.kind !== 'curve' || !shape.curve || shape.placements.some(placement => placement.warp)) return null
+  return placedCurve(shape.curve, point => placedPoint(shape, point))
 }
 
 // The corners of the shape in its box, going around it; for an ellipse, none: it has its own points
@@ -113,6 +135,11 @@ function ellipsePoints(shape: Shape) {
 // The outline of a shape on the paper, for the brush to go along and to fill. Straight sides stay straight, unless a
 // mesh bends them
 export function shapePath(shape: Shape): { points: Point[]; isClosed: boolean } {
+  if (shape.kind === 'curve' && shape.curve) {
+    const isBent = shape.placements.some(placement => placement.warp)
+    const points = curveLine(shape.curve, point => placedPoint(shape, point), isBent)
+    return { points, isClosed: shape.curve.isClosed }
+  }
   if (shape.kind === 'ellipse') return { points: ellipsePoints(shape), isClosed: true }
   const isClosed = shape.kind !== 'line'
   const corners = cornersOf(shape)

@@ -2712,7 +2712,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 88. Requests from a pen user
 
 - **Date:** 2026-11-13
-- **Status:** planned; all but the curves tool are adopted
+- **Status:** adopted
 - **Problem:** after 1.0, a friend who draws with a pen tried Lydia and asked for what he missed in it.
 - **Decision**, from his requests and my choices, for 1.1.0:
   - **Ctrl + Space** and a drag up or down zooms around where the drag starts, with any tool, as in Krita. It joins Space
@@ -2735,8 +2735,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **Smudge and Liquify become modes of the Brush**: Paint, Smudge and Liquify in its bar, with U and Q still going
     straight to each (my choice). "Special pen" leaves the tool column. The Brush's button stays chosen in all three, and goes
     back to the last one used; each mode keeps its own size and strength. Blur stays a tool of its own: it was not asked for.
-  - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. Its details come
-    when it is built.
+  - **A curves tool**, like Photoshop's Pen and Krita's curves: points with handles, painted with the brush. It has a
+    decision of its own (89).
 - **Checked:** `tests/app/view-tools.mjs`: Ctrl + Space shows the zoom cursor, a drag up of 100 pixels zooms in e times
   around where it started, a drag down zooms back out, and nothing is painted. `tests/app/file-menu.mjs`: Ctrl+N and the
   menu's New ask once the new drawing is created, Cancel keeps the drawing with its changes, Discard opens the new one, a
@@ -2747,6 +2747,59 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   angle kept in the file and its autosave, with a file without one still opening; over sky blue paint its line is red. On
   the screen: the symmetry's lines over blue, black, gray and the paper. `tests/app/tool-column.mjs`: the Brush's bar has
   its three modes, choosing one keeps the Brush chosen in the column, and the Brush's button goes back to the last mode.
+
+## 89. Curves
+
+- **Date:** 2026-11-13
+- **Status:** adopted
+- **Problem:** the pen user of decision 88 asked for a pen like Krita's: a curve put down point by point, with handles
+  that bend it, and painted with the brush. Lydia's strokes follow the hand, and its shapes (decision 79) can't bend.
+- **Decision:** my choices:
+  - **A tool of its own, Curves (C)**, under Shape in the tool column. Each curve is a shape (decision 79), on a new
+    layer: outlined with the brush's own tip or filled, with **Edit shape**, Transform and Convert to pixels as shapes
+    have. A curve has a look of its own, apart from the next shape's: outlined, with nothing filled, at first.
+  - **Points as in Photoshop**: a click puts down a corner, and a click and a drag puts down a smooth point, pulling out
+    its two handles. Alt on the last point pulls the handle after it alone, a corner. Shift keeps a new point, or a
+    handle, to steps of 45°.
+  - **Clicking the first point closes the curve**, and **Enter**, or clicking the last point again (a double click),
+    ends it open. **Esc** throws it away. Backspace and Ctrl + Z take back its last point while it is drawn, as in
+    Photoshop.
+  - **It can make a selection**: **Make** in the bar chooses **Shape** or **Selection**. A selection is inside the curve,
+    closed if it ended open. **Replace**, **Add** and **Take away** in the bar choose how it changes the one there is, as
+    in Photoshop's bar (my choice). Shift and Alt, which the lasso uses for that, already keep the angle and turn one
+    handle while a curve is drawn, and pressed as the curve ends they would be easy to press by mistake.
+  - **The ends can thin out**: I chose the pen's pressure along the stroke, as Krita has. A curve isn't drawn with
+    pressure, so it is the brush's taper (decision 47): **Taper start**, **Taper end** and **Thins** in the curve's bar,
+    kept with each curve. A closed curve has no ends, so it doesn't thin.
+  - **It stays editable**, as shapes do (my choice): with **Edit shape** on, the curve's points and handles show, and
+    dragging them changes it, one step of undo each. A smooth point turns its other handle with the one dragged, and Alt
+    turns it alone.
+- **How:**
+  - `src/engine/curves.ts` has the curve: its points, each with its two handles and whether it is smooth, and the line
+    through them, a cubic Bézier curve from each point to the next, as points 4 pixels apart for the brush to go along
+    and to fill. A straight part has only its two ends, so a pixel brush paints it as a line.
+  - `src/engine/curveTool.ts` draws the curve while it is drawn, with the part from its last point to the pointer, as
+    a thin line on the screen: it is painted once it ends. The points are white squares and the handles blue dots.
+  - In `src/engine/shapes.ts`, a shape's kind can be `curve`, with its `curve` and its `taper`. Its box is the
+    rectangle around its points, and a transform goes into its placements as for the other shapes. Editing a transformed
+    curve takes the transform into its points. A curve bent by a mesh shows no handles, as a bent line has no ends.
+  - The file keeps a curve's points and its taper (a shape from before has none, and is whole). Older versions of Lydia
+    don't know the kind, so they open a curve as its pixels.
+  - Choosing another tool ends a curve being drawn as it is. Moving the view with Space, the middle button or the wheel
+    leaves it waiting.
+  - **Edit shape** of the Shape tool is for its own kinds, and a curve is edited with the Curves tool, so the bar never
+    shows a kind a curve can't be.
+  - A curve ended open can be filled: its fill goes straight from its last point to its first, as in Photoshop.
+  - Left for later: adding a point to a curve already drawn, or taking one out.
+- **Checked:** `tests/app/curves.mjs`: the line through corners and through handles, a smooth point turning its other
+  handle and Alt leaving it; C and the bar; Esc; three corners ended with Enter, on a new layer and painted as wide as the
+  brush; one step of undo; Backspace and Ctrl + Z while drawing, and a double click; a smooth point pulled out, and Alt on
+  the last point; closed on the first point and filled; thin ends; Make Selection with no new layer, replacing at first,
+  then Add, Take away and Replace; Edit shape only with
+  the Curves tool, a point dragged and painted again, and its undo; another tool ending a curve; the file and the
+  autosave; nonsense in a file. On the screen: a curve being drawn, and the points of one edited.
+  `tests/app/shapes.mjs` now also checks a shape that makes sense in a file, with a real brush: its file brush wasn't
+  one, so only the broken shapes were checked.
 
 ## Open questions
 

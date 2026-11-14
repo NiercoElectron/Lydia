@@ -13,6 +13,7 @@ On a Mac, Cmd works wherever Ctrl is written.
 - [Symmetry](#symmetry)
 - [Rulers](#rulers)
 - [Shapes](#shapes)
+- [Curves](#curves)
 - [Text](#text)
 - [Filters](#filters)
 - [Eyedropper](#eyedropper)
@@ -295,6 +296,32 @@ Press it again to draw new ones: dragging on the drawing does nothing while it i
 - It is a layer like any other: opacity, blend modes, folders and clipping all work.
 - It can't be painted on: **Convert to pixels** makes it a normal layer, which can't be edited as a shape any more.
 - A drawing keeps its shapes' brushes in its file, so they open the same on any computer.
+
+## Curves
+
+The **Curves** tool (C) draws curves point by point, like the pen in Photoshop:
+
+- **A click** puts down a corner. **A click and a drag** puts down a smooth point, and pulls out its two handles, which
+  bend the curve on both sides of it.
+- **Alt** on the last point pulls only the handle after it, to turn a corner after a curve.
+- **Shift** keeps a new point, or a handle, to steps of 45°.
+- **Clicking the first point** closes the curve. **Enter**, or clicking the last point again (a double click), ends it
+  open. **Esc** throws it away, and **Backspace** or **Ctrl + Z** takes back its last point.
+
+Until it ends, the curve is a thin line on the screen, with a line to the pointer to show where the next part goes.
+Choosing another tool ends it as it is.
+
+**Make** in the bar chooses what a curve becomes:
+
+- **Shape**: a shape on a new layer (see [Shapes](#shapes)), with its **Fill**, its **Outline** and their colors, and
+  the size of the outline. **Taper start**, **Taper end** and **Thins** make the ends of an open curve thinner or
+  fainter, like a stroke of ink. A fill closes an open curve with a straight line.
+- **Selection**: a selection inside the curve. An open curve is closed for it. **Replace**, **Add** and **Take away**
+  choose whether it takes the place of the selection there is, adds to it or makes a hole in it.
+
+A curve stays editable: with its layer active, press **Edit shape**, and its points and handles show. Drag a point to
+move it, or a handle to bend the curve; a smooth point turns its other handle too, unless Alt is held. The bar changes
+its look, as with shapes.
 
 ## Text
 
@@ -595,6 +622,8 @@ problem, give the code, and what is in parentheses after the message if there is
 | Y                                              | Symmetry on and off                                |
 | K                                              | Rulers on and off                                  |
 | P                                              | Shape                                              |
+| C                                              | Curves                                             |
+| Enter / Esc / Backspace, while drawing a curve | End it open / throw it away / take back a point    |
 | T                                              | Text                                               |
 | Ctrl + Enter                                   | Finish a text                                      |
 | F / I                                          | Fill bucket / eyedropper                           |

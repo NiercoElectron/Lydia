@@ -2,7 +2,7 @@ import { BufferImageSource, Container, RenderTexture, Sprite, Texture, type WebG
 import { parseBrushFile, type BrushPreset } from './brushFile'
 import { decodeTip, type BrushTip } from './brushTip'
 import { createDabPainter } from './dabPainter'
-import { createDabPath, withoutCorners, type Dab } from './dabs'
+import { createDabPath, NO_TAPER, withoutCorners, type Dab } from './dabs'
 import { createGrainPass, grainOf } from './grain'
 import { noiseReach } from './noiseDabs'
 import { polygonTiles, type Selection } from './selection'
@@ -76,8 +76,14 @@ export function createShapePainter(renderer: WebGLRenderer, grid: Grid) {
     const fill: Selection | null = shape.fill.isOn && canFill(shape.kind) ? polygonTiles(grid, points, isPixel) : null
     const byTile = new Map<string, Dab[]>()
     if (shape.outline.isOn) {
-      const path = createDabPath(preset, shape.outline.size, { seed: OUTLINE_SEED, tip: tip.image })
       const along = (isClosed ? [...points, points[0]] : points).map(point => ({ ...point, pressure: 1 }))
+      // An open curve's ends can thin out, as a stroke's do; a closed one has no ends
+      let length = 0
+      for (let i = 1; i < along.length; i++) {
+        length += Math.hypot(along[i].x - along[i - 1].x, along[i].y - along[i - 1].y)
+      }
+      const taper = isClosed ? NO_TAPER : shape.taper
+      const path = createDabPath(preset, shape.outline.size, { seed: OUTLINE_SEED, tip: tip.image, taper, length })
       const placedDabs = [...path.start(along[0]), ...path.moveTo(along.slice(1)), ...path.end()]
       const dabs = isPixel ? withoutCorners(placedDabs) : placedDabs
       for (const dab of dabs) {

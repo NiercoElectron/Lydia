@@ -1,6 +1,8 @@
 import { LydiaError } from '../errors'
 import { LAYER_BLEND_MODES, type BlendMode } from './layers'
 import { parseBrushFile } from './brushFile'
+import { isCurve } from './curves'
+import { MAX_TAPER, NO_TAPER, TAPER_THINS, type TaperSettings } from './dabs'
 import { isRulers, type Rulers } from './rulers'
 import { MAX_DEPTH, MAX_SIDES, MIN_DEPTH, MIN_SIDES, SHAPE_KINDS, type Shape, type ShapePlacement } from './shapes'
 import { textInProject, type TextData } from './text'
@@ -141,7 +143,9 @@ export type LayerToSave = Omit<LayerData, 'tiles' | 'smart'> & { tiles: TileToSa
 // how strokes are mirrored (see symmetry.ts), left out when off, and "rulers" (since 0.17) what strokes follow (see
 // rulers.ts), left out when there are none; older versions of Lydia don't know them. A layer's "shape" (since 0.17) is
 // what it draws (see shapes.ts), with the position of its brush in the header's "brushes", the brushes' files, so shapes
-// with the same brush keep it once. A shape that makes no sense is left out, and its layer stays as its pixels. A smart
+// with the same brush keep it once. A shape that makes no sense is left out, and its layer stays as its pixels. A curve
+// (since 1.1) keeps its points in "curve", and how its ends thin out in "taper" (none when missing): older versions
+// don't know its kind, so for them it stays as its pixels. A smart
 // object's "text" (since 0.18) is the words it is written from (see text.ts): older versions, or a text that makes no
 // sense, leave them out, and it stays a smart object
 
@@ -485,6 +489,13 @@ function isPlacement(value: unknown) {
   )
 }
 
+function isTaper(value: unknown) {
+  const { start, end, thins } = (value ?? {}) as Partial<TaperSettings>
+  const isLength = (length: unknown) =>
+    Number.isFinite(length) && (length as number) >= 0 && (length as number) <= MAX_TAPER
+  return isLength(start) && isLength(end) && TAPER_THINS.includes(thins as TaperSettings['thins'])
+}
+
 function isBrush(file: unknown) {
   if (typeof file !== 'string') return false
   try {
@@ -498,10 +509,10 @@ function isBrush(file: unknown) {
 // A shape from a file, with its brush in place, or null when it isn't one that makes sense
 export function shapeInProject(value: unknown, brushes: unknown): Shape | null {
   if (!isObject(value) || !Array.isArray(brushes)) return null
-  const { kind, from, to, sides, depth, fill, outline, placements } = value as Partial<FileShape>
+  const { kind, from, to, sides, depth, fill, outline, placements, curve, taper } = value as Partial<FileShape>
   const brush = brushes[outline?.brush as number]
   const isGood =
-    SHAPE_KINDS.includes(kind as Shape['kind']) &&
+    ((SHAPE_KINDS as readonly unknown[]).includes(kind) || (kind === 'curve' && isCurve(curve))) &&
     isPoint(from) &&
     isPoint(to) &&
     isCount(sides, MIN_SIDES, MAX_SIDES) &&
@@ -514,8 +525,9 @@ export function shapeInProject(value: unknown, brushes: unknown): Shape | null {
     outline.size > 0 &&
     Array.isArray(placements) &&
     placements.every(isPlacement) &&
+    (taper === undefined || isTaper(taper)) &&
     isBrush(brush)
-  return isGood ? ({ ...value, outline: { ...outline, brush } } as Shape) : null
+  return isGood ? ({ ...value, taper: taper ?? NO_TAPER, outline: { ...outline, brush } } as Shape) : null
 }
 
 // A mesh a smart object can have (see warp.ts)

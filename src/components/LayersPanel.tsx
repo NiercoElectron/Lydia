@@ -14,6 +14,7 @@ import {
   Lock,
   LockOpen,
   Paperclip,
+  PenTool,
   Plus,
   ScanEye,
   Shapes,
@@ -384,7 +385,10 @@ export function LayersPanel({
                     <Box className="smart-icon" size={14} aria-label={t('Smart object')} />
                   )}
                   {layer.isText && <Type className="smart-icon" size={14} aria-label={t('Text')} />}
-                  {layer.isShape && <Shapes className="smart-icon" size={14} aria-label={t('Shape')} />}
+                  {layer.isShape && !layer.isCurve && (
+                    <Shapes className="smart-icon" size={14} aria-label={t('Shape')} />
+                  )}
+                  {layer.isCurve && <PenTool className="smart-icon" size={14} aria-label={t('Curve')} />}
                   {layer.name}
                 </button>
               )}

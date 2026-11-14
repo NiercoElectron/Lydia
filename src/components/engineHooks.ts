@@ -44,7 +44,11 @@ const startingSnapshot: EngineSnapshot = {
   chosenRuler: null,
   shapeStyle: DEFAULT_SHAPE_STYLE,
   isShapeLayer: false,
+  isCurveLayer: false,
   isEditingShape: false,
+  isDrawingCurve: false,
+  curveMakes: 'shape',
+  curveSelects: 'replace',
   textStyle: DEFAULT_TEXT_STYLE,
   isTextLayer: false,
   typing: null,
@@ -220,7 +224,7 @@ export function useTaper(engine: Engine | null) {
 
 // The selection's shortcuts, as in Photoshop: Ctrl/Cmd + A selects everything, Ctrl/Cmd + D nothing, and
 // Ctrl/Cmd + Shift + I what isn't selected; Delete (or Backspace) takes the paint out of what is selected, or, while
-// the rulers are edited, removes the chosen one
+// the rulers are edited, removes the chosen one, or takes back the last point of a curve being drawn
 export function useSelectionShortcuts(engine: Engine | null) {
   useEffect(() => {
     if (!engine) return
@@ -237,6 +241,7 @@ export function useSelectionShortcuts(engine: Engine | null) {
       }
       if (key === 'delete' || key === 'backspace') {
         e.preventDefault()
+        if (engine.removeCurvePoint()) return
         if (engine.getSnapshot().isEditingRulers) engine.removeRuler()
         else engine.deleteSelected()
       }
@@ -247,7 +252,7 @@ export function useSelectionShortcuts(engine: Engine | null) {
 }
 
 // Transforms, as in Photoshop: Ctrl/Cmd + T starts one, Enter applies it, and Escape leaves everything as it was. The
-// same two keys apply and cancel a filter.
+// same two keys apply and cancel a filter, and end a curve being drawn open or throw it away (see curveTool.ts).
 // Browsers keep Ctrl+T for a new tab, so there the bar's Transform button starts one (the desktop app will have the
 // key)
 export function useTransformShortcuts(engine: Engine | null) {
@@ -264,9 +269,13 @@ export function useTransformShortcuts(engine: Engine | null) {
       } else if (e.key === 'Enter' && engine.getSnapshot().filter) {
         e.preventDefault()
         engine.applyFilter()
+      } else if (e.key === 'Enter' && engine.getSnapshot().isDrawingCurve) {
+        e.preventDefault()
+        engine.finishCurve()
       } else if (e.key === 'Escape') {
         engine.cancelTransform()
         engine.cancelFilter()
+        engine.cancelCurve()
       }
     }
     window.addEventListener('keydown', handleKeyDown)

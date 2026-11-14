@@ -27,6 +27,8 @@ signed yet, so each system warns the first time: how to get past it is in [the g
   can be turned, with every tool that paints
 - Rulers: strokes follow lines, ellipses and vanishing points, with every tool that follows a stroke
 - Shapes: rectangles, ellipses, lines, polygons and stars that stay editable, outlined with a brush's own tip or filled
+- Curves, like Photoshop's pen: points with handles, painted with a brush's own tip or filled, or made a selection, and
+  editable afterwards
 - Filters: hue and saturation, levels and a Gaussian blur, with a live preview
 - Text typed on the drawing that stays editable and sharp at any size, with nine open fonts and the computer's own
 - A blend mode for the brush, each stroke mixing with the paint on its layer

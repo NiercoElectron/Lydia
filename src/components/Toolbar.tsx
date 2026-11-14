@@ -1,10 +1,11 @@
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../i18n'
+import type { CurveMakes } from '../engine/curves'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
-import type { WandSettings } from '../engine/selection'
+import type { SelectionMode, WandSettings } from '../engine/selection'
 import { canListFonts, computerFonts, INCLUDED_FONTS } from '../engine/fonts'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
 import { MAX_BLUR_RADIUS, MAX_MIDDLE, MIN_MIDDLE, type FilterChange, type FilterSettings } from '../engine/filters'
@@ -108,6 +109,14 @@ export type ShapeControls = {
   onCommit: () => void
   onColor: (part: 'fill' | 'outline') => void
   onTakeBrush: () => void
+  // The curves tool's (see curveTool.ts): the active layer is a curve, which it edits; a curve is being drawn; what a
+  // curve makes when it ends; and how a selection it makes changes the one there is
+  isCurveLayer: boolean
+  isDrawingCurve: boolean
+  curveMakes: CurveMakes
+  onCurveMakesChange: (makes: CurveMakes) => void
+  curveSelects: SelectionMode
+  onCurveSelectsChange: (mode: SelectionMode) => void
 }
 
 // How the next text is written (see text.ts), or the one being typed, which changes at once
@@ -224,15 +233,18 @@ export function Toolbar({
     )
   }
   const paintsLayer = usesTip(tool) || tool === 'fill'
+  const hasOwnLook = tool === 'shape' || tool === 'curve' || tool === 'text' // its own size and colors
   const isBlocked = (transform.isSmartLayer || transform.isShapeLayer) && paintsLayer
-  const isObjectTool = (tool === 'shape' && transform.isShapeLayer) || (tool === 'text' && transform.isTextLayer)
+  const isObjectTool =
+    ((tool === 'shape' || tool === 'curve') && transform.isShapeLayer) || (tool === 'text' && transform.isTextLayer)
   return (
     <div className="toolbar">
       {isBrushMode(tool) && <BrushModes tool={tool} onChange={onToolChange} />}
       {tool === 'fill' && <FillControls fill={fill} onFillChange={onFillChange} />}
       {tool === 'wand' && <WandControls wand={wand} onWandChange={onWandChange} />}
       {isSelecting && <SelectionButtons selection={selection} hasEdges={tool !== 'wand'} />}
-      {tool === 'shape' && <ShapeButtons controls={shape} isShapeLayer={transform.isShapeLayer} />}
+      {tool === 'shape' && <ShapeButtons controls={shape} canEdit={transform.isShapeLayer && !shape.isCurveLayer} />}
+      {tool === 'curve' && <ShapeButtons controls={shape} canEdit={shape.isCurveLayer} isCurve />}
       {tool === 'text' && <TextButtons controls={text} isTextLayer={transform.isTextLayer} />}
       {(isSelecting || isMoving || (isObjectTool && !text.isTyping)) && (
         <button
@@ -263,7 +275,7 @@ export function Toolbar({
         <span className="notice">{t("This layer's transparency is locked: the eraser can't take paint away.")}</span>
       )}
       {tool === 'liquify' && <LiquifyModes mode={liquifyMode} onChange={onLiquifyModeChange} />}
-      {tool !== 'fill' && tool !== 'shape' && tool !== 'text' && !isSelecting && !isMoving && (
+      {tool !== 'fill' && !hasOwnLook && !isSelecting && !isMoving && (
         <label title={t('Brush size ([ and ])')}>
           {t('Size')}
           <input
@@ -289,7 +301,7 @@ export function Toolbar({
           <SliderValue value={strength} min={1} max={100} unit="%" onChange={onStrengthChange} />
         </label>
       )}
-      {!isSelecting && !isMoving && !hasStrength(tool) && tool !== 'shape' && tool !== 'text' && (
+      {!isSelecting && !isMoving && !hasStrength(tool) && !hasOwnLook && (
         <label title={t('How much a stroke or a fill covers, however many times a stroke passes over a place')}>
           {t('Opacity')}
           <input
@@ -495,12 +507,21 @@ function FilterSliders({ controls, settings }: { controls: FilterControls; setti
   )
 }
 
-// What the shape tool draws and how, or, while editing, how the active layer's shape is drawn, which changes at once
-function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isShapeLayer: boolean }) {
+// What the shape tool draws and how, or, while editing, how the active layer's shape is drawn, which changes at once.
+// The curves tool's are the same, with no kind, and with what its curves make and how their ends thin out
+function ShapeButtons({
+  controls,
+  canEdit,
+  isCurve = false,
+}: {
+  controls: ShapeControls
+  canEdit: boolean // the active layer is one this tool edits
+  isCurve?: boolean
+}) {
   const { t } = useLanguage()
-  const { style, isEditing, onEditingChange, onChange, onCommit, onColor, onTakeBrush } = controls
-  const { kind, sides, depth, fill, outline } = style
-  const names: Record<ShapeKind, string> = {
+  const { style, isEditing, onEditingChange, onChange, onCommit, onColor, onTakeBrush, curveMakes } = controls
+  const { kind, sides, depth, fill, outline, taper } = style
+  const names: Record<(typeof SHAPE_KINDS)[number], string> = {
     rectangle: t('Rectangle'),
     ellipse: t('Ellipse'),
     line: t('Line'),
@@ -508,6 +529,12 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
     star: t('Star'),
   }
   const hasFill = canFill(kind)
+  const makesSelection = isCurve && curveMakes === 'selection' && !isEditing
+  const selects: { mode: SelectionMode; label: string }[] = [
+    { mode: 'replace', label: t('Replace') },
+    { mode: 'add', label: t('Add') },
+    { mode: 'subtract', label: t('Take away') },
+  ]
   const changeNow = (change: Partial<ShapeStyle>) => {
     onChange(change)
     onCommit()
@@ -545,16 +572,50 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
   )
   return (
     <>
-      <label title={t('Which shape it draws. Shift keeps it even, and Alt draws it from its middle')}>
-        {t('Shape')}
-        <select className="shape-kind" value={kind} onChange={e => changeNow({ kind: e.target.value as ShapeKind })}>
-          {SHAPE_KINDS.map(each => (
-            <option key={each} value={each}>
-              {names[each]}
-            </option>
+      {isCurve && (
+        <span className="button-group curve-makes" title={t('What a curve makes when it ends')}>
+          {t('Make')}
+          <button
+            aria-pressed={curveMakes === 'shape'}
+            onClick={() => controls.onCurveMakesChange('shape')}
+            title={t('A shape on a new layer, outlined with the brush or filled')}
+          >
+            {t('Shape')}
+          </button>
+          <button
+            aria-pressed={curveMakes === 'selection'}
+            onClick={() => controls.onCurveMakesChange('selection')}
+            title={t('A selection inside the curve, closed if it is open')}
+          >
+            {t('Selection')}
+          </button>
+        </span>
+      )}
+      {makesSelection && (
+        <span className="button-group curve-selects" title={t('How the curve changes the selection there is')}>
+          {selects.map(({ mode, label }) => (
+            <button
+              key={mode}
+              aria-pressed={controls.curveSelects === mode}
+              onClick={() => controls.onCurveSelectsChange(mode)}
+            >
+              {label}
+            </button>
           ))}
-        </select>
-      </label>
+        </span>
+      )}
+      {!isCurve && (
+        <label title={t('Which shape it draws. Shift keeps it even, and Alt draws it from its middle')}>
+          {t('Shape')}
+          <select className="shape-kind" value={kind} onChange={e => changeNow({ kind: e.target.value as ShapeKind })}>
+            {SHAPE_KINDS.map(each => (
+              <option key={each} value={each}>
+                {names[each]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {(kind === 'polygon' || kind === 'star') &&
         slider(t('Sides'), t('How many sides a polygon has, or points a star'), MIN_SIDES, MAX_SIDES, sides, value =>
           onChange({ sides: value }),
@@ -563,7 +624,7 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
         slider(t('Depth'), t('How far out the inside of a star is'), MIN_DEPTH, MAX_DEPTH, depth, value =>
           onChange({ depth: value }),
         )}
-      {hasFill && (
+      {hasFill && !makesSelection && (
         <>
           <button
             aria-pressed={fill.isOn}
@@ -582,28 +643,40 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
           />
         </>
       )}
-      <button
-        aria-pressed={outline.isOn}
-        disabled={outline.isOn && (!hasFill || !fill.isOn)}
-        onClick={() => changeNow({ outline: { ...outline, isOn: !outline.isOn } })}
-        title={t('Outline the shape with the tip of the brush')}
-      >
-        {t('Outline')}
-      </button>
-      <button
-        className="shape-color"
-        aria-label={t('Outline color')}
-        style={{ background: outline.color }}
-        onClick={() => onColor('outline')}
-        title={t('Use the color chosen now for the outline')}
-      />
+      {!makesSelection && (
+        <>
+          <button
+            aria-pressed={outline.isOn}
+            disabled={outline.isOn && (!hasFill || !fill.isOn)}
+            onClick={() => changeNow({ outline: { ...outline, isOn: !outline.isOn } })}
+            title={t('Outline the shape with the tip of the brush')}
+          >
+            {t('Outline')}
+          </button>
+          <button
+            className="shape-color"
+            aria-label={t('Outline color')}
+            style={{ background: outline.color }}
+            onClick={() => onColor('outline')}
+            title={t('Use the color chosen now for the outline')}
+          />
+        </>
+      )}
       {outline.isOn &&
+        !makesSelection &&
         slider(t('Size'), t('How wide the brush outlines it'), MIN_BRUSH_SIZE, MAX_BRUSH_SIZE, outline.size, size =>
           onChange({ outline: { ...outline, size } }),
         )}
+      {isCurve && outline.isOn && !makesSelection && (
+        <TaperControls
+          taper={taper}
+          onChange={change => onChange({ taper: { ...taper, ...change } })}
+          onCommit={onCommit}
+        />
+      )}
       <button
         aria-pressed={isEditing}
-        disabled={!isShapeLayer}
+        disabled={!canEdit}
         onClick={() => onEditingChange(!isEditing)}
         title={t('Change the shape on the active layer. Press it again to draw new ones')}
       >
@@ -613,6 +686,11 @@ function ShapeButtons({ controls, isShapeLayer }: { controls: ShapeControls; isS
         <button onClick={onTakeBrush} title={t('Outline this shape with the brush chosen now')}>
           {t('Use this brush')}
         </button>
+      )}
+      {isCurve && controls.isDrawingCurve && (
+        <span className="notice">
+          {t('Click the first point to close the curve. Enter ends it open, and Esc throws it away.')}
+        </span>
       )}
     </>
   )
@@ -1071,14 +1149,21 @@ const THINS: { value: TaperThins; label: string }[] = [
 ]
 
 // How long the stroke's ends thin out (0 is not at all), and what thins (see dabs.ts). Also used by the Brush Designer
+// and the curves tool, which paints a curve again with "onCommit" once a slider is let go
 export function TaperControls({
   taper,
   onChange,
+  onCommit,
 }: {
   taper: TaperSettings
   onChange: (change: Partial<TaperSettings>) => void
+  onCommit?: () => void
 }) {
   const { t } = useLanguage()
+  const changeNow = (change: Partial<TaperSettings>) => {
+    onChange(change)
+    onCommit?.()
+  }
   return (
     <>
       <label title={t("Over how many pixels of the paper the stroke's start thins out. 0 is not at all")}>
@@ -1089,8 +1174,10 @@ export function TaperControls({
           max={MAX_TAPER}
           value={taper.start}
           onChange={e => onChange({ start: Number(e.target.value) })}
+          onPointerUp={onCommit}
+          onKeyUp={onCommit}
         />
-        <SliderValue value={taper.start} min={0} max={MAX_TAPER} unit=" px" onChange={start => onChange({ start })} />
+        <SliderValue value={taper.start} min={0} max={MAX_TAPER} unit=" px" onChange={start => changeNow({ start })} />
       </label>
       <label
         title={t(
@@ -1104,13 +1191,15 @@ export function TaperControls({
           max={MAX_TAPER}
           value={taper.end}
           onChange={e => onChange({ end: Number(e.target.value) })}
+          onPointerUp={onCommit}
+          onKeyUp={onCommit}
         />
-        <SliderValue value={taper.end} min={0} max={MAX_TAPER} unit=" px" onChange={end => onChange({ end })} />
+        <SliderValue value={taper.end} min={0} max={MAX_TAPER} unit=" px" onChange={end => changeNow({ end })} />
       </label>
       <span className="button-group" title={t("What thins out toward the stroke's ends")}>
         {t('Thins')}
         {THINS.map(({ value, label }) => (
-          <button key={value} aria-pressed={taper.thins === value} onClick={() => onChange({ thins: value })}>
+          <button key={value} aria-pressed={taper.thins === value} onClick={() => changeNow({ thins: value })}>
             {t(label)}
           </button>
         ))}
