@@ -2,7 +2,7 @@
 
 ## [1.1.0] - 2026-11-13
 
-O que uma amiga que desenha com caneta pediu: curvas como as da caneta do Photoshop, simetria que gira, Borrar e Dissolver dentro do Pincel e formas mais rápidas de ajustar o zoom e abrir desenhos.
+O que um amigo que desenha com caneta pediu: curvas como as da caneta do Photoshop, simetria que gira, Borrar e Dissolver dentro do Pincel e formas mais rápidas de ajustar o zoom e abrir desenhos.
 
 ### Added
 

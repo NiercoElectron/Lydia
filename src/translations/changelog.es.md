@@ -2,7 +2,7 @@
 
 ## [1.1.0] - 2026-11-13
 
-Lo que pidió una amiga que dibuja con lápiz: curvas como las de la pluma de Photoshop, simetría que gira, Dedo y Licuar dentro del Pincel y formas más rápidas de ajustar el zoom y abrir dibujos.
+Lo que pidió un amigo que dibuja con lápiz: curvas como las de la pluma de Photoshop, simetría que gira, Dedo y Licuar dentro del Pincel y formas más rápidas de ajustar el zoom y abrir dibujos.
 
 ### Added
 
