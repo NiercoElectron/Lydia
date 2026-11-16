@@ -2,6 +2,8 @@
 
 Thank you for wanting to help. Bugs, ideas, code and translations are all welcome.
 
+Using an AI agent to write code? Point it at [AGENTS.md](AGENTS.md): it has the rules it must follow here.
+
 ## Reporting a bug
 
 Open an issue with **Bug** and say:
