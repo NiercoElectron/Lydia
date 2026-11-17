@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## [1.1.1] - 2026-11-16
+
+### Fixed
+
+- O ponto no centro de pincéis grandes está menor e nítido: um quadrado de 2 pixels, sem borda desfocada, inclusive em telas com escala de 125% ou 150%.
+
 ## [1.1.0] - 2026-11-13
 
 O que um amigo que desenha com caneta pediu: curvas como as da caneta do Photoshop, simetria que gira, Borrar e Dissolver dentro do Pincel e formas mais rápidas de ajustar o zoom e abrir desenhos.

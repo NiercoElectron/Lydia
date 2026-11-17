@@ -1,5 +1,11 @@
 # Historial de cambios
 
+## [1.1.1] - 2026-11-16
+
+### Fixed
+
+- El punto en el centro de los pinceles grandes es más pequeño y nítido: un cuadrado de 2 píxeles, sin borde borroso, incluso en pantallas con escala del 125% o 150%.
+
 ## [1.1.0] - 2026-11-13
 
 Lo que pidió un amigo que dibuja con lápiz: curvas como las de la pluma de Photoshop, simetría que gira, Dedo y Licuar dentro del Pincel y formas más rápidas de ajustar el zoom y abrir dibujos.
