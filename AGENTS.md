@@ -99,6 +99,7 @@ A feature isn't finished until these are updated:
 - **[CHANGELOG.md](CHANGELOG.md)**, under `## [Unreleased]`, in Added, Changed or Fixed, written for people who draw.
 - **[docs/guide.md](docs/guide.md)**: how to use it, and the shortcuts table if it has a key.
 - **[README.md](README.md)**: the features list, if it is a new feature.
+- **[ROADMAP.md](ROADMAP.md)**: take the feature out once it is done, and add what was left for later.
 - **[docs/decisions.md](docs/decisions.md)**: a new numbered decision (or an addition to the one it belongs to), with
   Date, Status, Problem, Decision, How and Checked. It is written in the **maintainer's first person** ("my choice",
   "I chose"), and only says he chose what he really chose; credit the agent where it is true ("Claude found…"). The
@@ -123,11 +124,12 @@ Format docs and tests with `npx prettier --write <files>`.
 ## Versions and releases
 
 Only when the maintainer asks. Versions follow [decision 20](docs/decisions.md#20-version-numbers): the middle number for
-a finished stage or group of features, the last one only for fixes to a version already out. Preparing a release:
+a group of features, gathered so that a version is worth an update and the number doesn't grow for little (no very
+small ones), and the last one only for fixes to a version already out. Preparing a release:
 
 1. CHANGELOG: `## [Unreleased]` becomes `## [x.y.z] - date`, with one summary sentence under it (What's New shows it),
    and the compare links at the bottom.
-2. README: the roadmap's done paragraph, if the version brings something new.
+2. README: the roadmap's done paragraph, if the version brings something new; ROADMAP.md without what it brings.
 3. decisions.md: the sentence listing the versions, near the top (search for the previous version number).
 4. `package.json` and the two `"name": "lydia"` entries at the top of `package-lock.json`.
 5. Run `tests/app/whats-new.mjs`.

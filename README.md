@@ -154,9 +154,8 @@ pen user's requests: curves like the pen in Photoshop, a symmetry that turns, Sm
 zooming with Ctrl + Space, and New and Open in the editor.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
-Next, roughly in this order:
-
-- [ ] 1.x: Linux, opening and pasting images
+What comes next, and the ideas waiting their turn, are in [ROADMAP.md](ROADMAP.md): Linux, and opening and pasting
+images, first.
 
 Later, once there is a pen with tilt to try it on:
 

@@ -224,6 +224,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Changed (2026-10-25):** from 0.8.5 on, a version comes out only when a whole stage of the roadmap is finished
   (my choice): its changes gather under "Unreleased" as they are made, and come out together as the next middle
   number. The Painting stage will be 0.9.0. The last number is left for fixes to a version already out.
+- **Changed (2026-11-17):** after 1.0 there are no more stages, so a middle number comes out for a group of features
+  (my choice): they are gathered, so that a version is worth an update and the number doesn't grow for little. Very
+  small ones are avoided, without a fixed count of features. Fixes still come out at any time, as the last number.
 - **Versions:** 0.1.0 was the first usable version, still with strokes stored as data (decision 3); 0.2.0 brought the
   tile engine from the spike into the main app; 0.3.0 completed the layers (delete, move, rename, undo of every layer
   change); 0.4.0 made brushes files that can be shared and added (decision 29); 0.5.0 brought the Brush Designer
