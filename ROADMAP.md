@@ -4,16 +4,19 @@ What is planned for Lydia, roughly in order. There are no dates: Lydia is made i
 when people who draw with it ask for something. What is already done, version by version, is in
 [CHANGELOG.md](CHANGELOG.md), and why each part is the way it is, in [docs/decisions.md](docs/decisions.md).
 
-Want something that isn't here? Open an issue with **Idea**, and say how you do it in another app if you know.
+The next ones each have an issue, labeled [planned](https://github.com/NiercoElectron/Lydia/labels/planned), where
+you can say what you need from them. Want something that isn't here? Open an issue with **Idea**, and say how you do it
+in another app if you know.
 
 ## Next
 
-- **Lydia for Linux.** An AppImage that opens with a double click, with Lydia in the menu of apps and updates that arrive
-  by themselves. A first build already ran on Linux, with the pen's pressure working.
-- **Open an image to edit it.** A PNG or JPEG opened in Lydia becomes a new drawing. Today an image only gets in by
-  being placed in a drawing already open.
-- **Paste an image.** Ctrl+V puts an image copied elsewhere (a screenshot, a picture from a browser) straight into the
-  drawing, and into the tray.
+- **[Lydia for Linux](https://github.com/NiercoElectron/Lydia/issues/2).** An AppImage that opens with a double click,
+  with Lydia in the menu of apps and updates that arrive by themselves. A first build already ran on Linux, with the
+  pen's pressure working.
+- **[Open an image to edit it](https://github.com/NiercoElectron/Lydia/issues/3).** A PNG or JPEG opened in Lydia
+  becomes a new drawing. Today an image only gets in by being placed in a drawing already open.
+- **[Paste an image](https://github.com/NiercoElectron/Lydia/issues/4).** Ctrl+V puts an image copied elsewhere (a
+  screenshot, a picture from a browser) straight into the drawing, and into the tray.
 
 ## Ideas we'd like to do
 
