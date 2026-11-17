@@ -4,7 +4,7 @@ import type { StrokePoint } from './dabs'
 import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
-import { createContrastLines } from './contrastLines'
+import { createContrastLines, type ContrastPiece } from './contrastLines'
 import { createCurveTool } from './curveTool'
 import type { Curve } from './curves'
 import { EYEDROPPER_CURSOR, FILL_CURSOR, ROTATE_CURSOR, WAND_CURSOR } from './cursors'
@@ -35,6 +35,8 @@ const ROTATE_STEP = 15 // with the rotate tool, Shift turns the view in steps of
 const PREPARE_BUDGET_MS = 3 // at most this much of each frame is spent getting tiles ready under the brush
 const MIN_OUTLINE = 8 // a brush smaller than this many pixels of the screen shows the cursor's cross, not its outline
 const CENTER_DOT = 24 // a brush at least this many pixels of the screen across has a dot in its middle, to aim with
+const DOT_SIDE = 2 // the dot's side, in pixels of the screen, made whole pixels of the display
+const DOT_LENGTH = 0.01 // the dot is a piece of line this long and as wide as its side: a square, and a hair more
 const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
 const LINE_END_REACH = 12 // how close to the end of a line shape the pointer has to go, in pixels of the screen
 const LINE_END_RADIUS = 6
@@ -903,7 +905,7 @@ export function createView(
     const angle = brush.tipAngle()
     const { position, scale, rotation } = world
     const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle, line?.from.x, line?.from.y]
-      .concat([position.x, position.y, scale.x, scale.y, rotation, isCircle])
+      .concat([position.x, position.y, scale.x, scale.y, rotation, isCircle, app.renderer.resolution])
       .join()
     if (key === outlineKey && tip === outlineTip) return
     outlineKey = key
@@ -930,17 +932,21 @@ export function createView(
     const onScreenLoops = loops.map(loop => loop.map(toScreen))
     const brushOnScreen = toScreen(center)
     const hasLine = isLagging && Math.hypot(brushOnScreen.x - at.x, brushOnScreen.y - at.y) >= 1
-    const pieces = onScreenLoops.flatMap(loop => loop.map((p, i): [Point, Point] => [p, loop[(i + 1) % loop.length]]))
+    const pieces: ContrastPiece[] = onScreenLoops.flatMap(loop =>
+      loop.map((p, i): ContrastPiece => [p, loop[(i + 1) % loop.length]]),
+    )
     if (hasLine) pieces.push([brushOnScreen, at])
     if (line) pieces.push([toScreen(line.from), brushOnScreen])
-    // The dot: three lines of the outline's width, one under the other, 3 pixels of the screen square
+    // The dot: a square of whole pixels of the display, with its sides on the display's pixels, so it is sharp at any
+    // scale of the screen (at 125%, a pixel of the screen is a pixel and a quarter of the display). Its middle goes to
+    // the nearest corner of a pixel when its side is even, and to the nearest middle of one when it is odd
     if (isShown && size * currentZoom() >= CENTER_DOT) {
-      for (const down of [-1, 0, 1]) {
-        pieces.push([
-          { x: brushOnScreen.x - 1, y: brushOnScreen.y + down },
-          { x: brushOnScreen.x + 1, y: brushOnScreen.y + down },
-        ])
-      }
+      const ratio = app.renderer.resolution
+      const side = Math.max(2, Math.round(DOT_SIDE * ratio)) // in pixels of the display
+      const onPixels = (at: number) => (side % 2 === 0 ? Math.round(at * ratio) : Math.floor(at * ratio) + 0.5) / ratio
+      const x = onPixels(brushOnScreen.x)
+      const y = onPixels(brushOnScreen.y)
+      pieces.push([{ x: x - DOT_LENGTH / 2, y }, { x: x + DOT_LENGTH / 2, y }, side / ratio])
     }
     brushOutline.draw(pieces)
   }

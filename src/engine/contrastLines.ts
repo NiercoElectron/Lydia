@@ -9,14 +9,16 @@ import type { Point } from './selection'
 // them (decisions 86 and 88)
 //
 // Each piece of a line is a long box, and the shader paints the middle of the box, with an edge one pixel of the
-// display wide so the line doesn't show steps. The color comes from the pixel grid's picture of the screen (see
-// pixelGrid.ts), which stays on while these lines show
+// display wide so the line doesn't show steps. A piece can have a width of its own: one whose edges are on the
+// display's pixels comes out sharp, with no edge, as the brush's dot does. The color comes from the pixel grid's picture
+// of the screen (see pixelGrid.ts), which stays on while these lines show
 
 const vertex = `#version 300 es
 in vec2 aPosition;
 in vec2 aUV;
 out vec2 vUV;
 out float vAcross;
+out float vHalfWidth;
 
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
@@ -27,32 +29,36 @@ void main(void) {
   gl_Position = vec4(place.xy, 0.0, 1.0);
   vUV = vec2(place.x + 1.0, 1.0 - place.y) / 2.0;
   vAcross = aUV.x;
+  vHalfWidth = aUV.y;
 }
 `
 
-// "width" in pixels of the screen; "alpha" how strong the lines are, 1 for all of it
-const fragmentOf = (width: number, alpha: number) => `#version 300 es
+// "alpha" is how strong the lines are, 1 for all of it. Each piece brings half its width, in pixels of the screen
+const fragmentOf = (alpha: number) => `#version 300 es
 in vec2 vUV;
 in float vAcross;
+in float vHalfWidth;
 out vec4 finalColor;
 
 uniform sampler2D uTexture;
 
-const float HALF_WIDTH = ${(width / 2).toFixed(3)};
 const float ALPHA = ${alpha.toFixed(3)};
 
 void main(void) {
   vec3 under = texture(uTexture, vUV).rgb;
   vec3 color = 1.0 - round(under);
-  float covered = clamp((HALF_WIDTH - abs(vAcross)) / fwidth(vAcross) + 0.5, 0.0, 1.0);
+  float covered = clamp((vHalfWidth - abs(vAcross)) / fwidth(vAcross) + 0.5, 0.0, 1.0);
   finalColor = vec4(color, 1.0) * covered * ALPHA;
 }
 `
 
+// A piece of a line, from its first point to its second, on the screen, and its own width, if not the lines' one
+export type ContrastPiece = [Point, Point] | [Point, Point, number]
+
+// "width" is the lines' width, in pixels of the screen
 export function createContrastLines(stage: Container, pixelGrid: PixelGrid, { width = 1, alpha = 1 } = {}) {
-  const reach = width / 2 + 1 // how far the box goes from the middle of the line, with room for the edge
   const shader = new Shader({
-    glProgram: GlProgram.from({ vertex, fragment: fragmentOf(width, alpha), name: `contrast-lines-${width}-${alpha}` }),
+    glProgram: GlProgram.from({ vertex, fragment: fragmentOf(alpha), name: `contrast-lines-${alpha}` }),
     // PixiJS only binds a texture the shader starts with: one set later would be silently left out, and the shader would
     // read whatever texture was bound last
     resources: { uTexture: Texture.WHITE.source },
@@ -67,19 +73,20 @@ export function createContrastLines(stage: Container, pixelGrid: PixelGrid, { wi
   mesh.visible = false
   stage.addChild(mesh)
 
-  // Each piece, from its first point to its second, on the screen
-  function draw(pieces: [Point, Point][]) {
+  function draw(pieces: ContrastPiece[]) {
     const shown = pieces.filter(([from, to]) => from.x !== to.x || from.y !== to.y)
     const positions = new Float32Array(shown.length * 8)
     const uvs = new Float32Array(shown.length * 8)
     const indices = new Uint32Array(shown.length * 6)
-    shown.forEach(([from, to], i) => {
+    shown.forEach(([from, to, ownWidth], i) => {
+      const pieceWidth = ownWidth ?? width
+      const reach = pieceWidth / 2 + 1 // how far the box goes from the middle of the line, with room for the edge
       const length = Math.hypot(to.x - from.x, to.y - from.y)
       const x = (to.x - from.x) / length
       const y = (to.y - from.y) / length
-      // A little past both ends, so that two pieces meet without a gap at a corner
-      const start = { x: from.x - (x * width) / 2, y: from.y - (y * width) / 2 }
-      const end = { x: to.x + (x * width) / 2, y: to.y + (y * width) / 2 }
+      // Half its width past both ends, so that two pieces meet without a gap at a corner
+      const start = { x: from.x - (x * pieceWidth) / 2, y: from.y - (y * pieceWidth) / 2 }
+      const end = { x: to.x + (x * pieceWidth) / 2, y: to.y + (y * pieceWidth) / 2 }
       positions.set(
         [
           start.x - y * reach,
@@ -93,7 +100,8 @@ export function createContrastLines(stage: Container, pixelGrid: PixelGrid, { wi
         ],
         i * 8,
       )
-      uvs.set([reach, 0, -reach, 0, -reach, 0, reach, 0], i * 8)
+      const half = pieceWidth / 2
+      uvs.set([reach, half, -reach, half, -reach, half, reach, half], i * 8)
       const first = i * 4
       indices.set([first, first + 1, first + 2, first, first + 2, first + 3], i * 6)
     })

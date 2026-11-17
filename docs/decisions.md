@@ -244,7 +244,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   liquify (decisions 71 to 73), with a Sharp button for the pixels, and 0.15.1 fixed the numbers of new layers (decision
   74). 0.16.0 brought the Safety stage: autosave with a Recover list, and surviving a lost graphics card (decisions 75
   and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), 0.18.0 filters and text (decisions 80 and 81), and 0.19.0 the new interface (decision 82), with 0.19.1 keeping every button and name inside its column and 0.19.2 bringing a new start screen and the interface's own font (decisions 83 and 84). 0.20.0 opens brushes from Krita, GIMP and Photoshop, with a thin outline that takes its color from the drawing (decisions 85 and 86). 1.0.0 is the desktop app, packaged with Electron (decision 87), and 1.0.1 puts a dot in the middle of a big brush
-  (decision 86). 1.1.0 brings what a pen user asked for, with a curves tool (decisions 88 and 89). The full list is in [CHANGELOG.md](../CHANGELOG.md).
+  (decision 86). 1.1.0 brings what a pen user asked for, with a curves tool (decisions 88 and 89), and 1.1.1 makes the
+  dot sharp. The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
   worth trying, and its changelog tells what the stage brought.
@@ -2630,6 +2631,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     the straight line with Shift. A selection's outline and the shapes' stay white and black.
   - From 1.0.1, a brush of 24 pixels or more on the screen has a dot of 3 × 3 pixels in its middle, in the outline's colors (my
     idea): a big brush's outline is far from where it paints, and gave nothing to aim with.
+  - From 1.1.1 the dot is smaller and sharp (my request): 2 × 2 pixels of the screen, one square whose sides are on the
+    display's own pixels, so at Windows' 125% or 150% it is 3 × 3 of them. Before, it was three lines of 1 pixel wherever
+    the pointer was, with soft edges, which came out as a blurred spot of 4 or 5 pixels.
 - **How:**
   - While the grid shows, the screen is already a picture of the drawing, drawn through a shader. That picture now stays on
     while the outline shows, at any zoom, and the outline reads its colors from it: the drawing is still drawn once, with one
@@ -2641,7 +2645,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Checked:** `tests/app/brush-outline.mjs`: the line's color on white, on black and on middle gray, and the drawing the same
   with the outline and without it. On the screen, at Chrome's scale of 1.5: over black, white, two middle grays, red, blue and
   a skin tone, half off the paper, and the outlines of the 168 smooth brushes of Lydia and the real Krita and Photoshop files
-  against the old ones: the same size, 18 of them with a few parts more or less.
+  against the old ones: the same size, 18 of them with a few parts more or less. Since 1.1.1, the dot read from the
+  canvas's own pixels with the pointer between pixels: 2 × 2 of them at 100%, 3 × 3 at 125% and 150%, with no pixel
+  between its color and the paper's. Headless Chrome then blurs the whole canvas a little as it puts it on a screen scaled
+  that way, so a screenshot can't show it.
 
 ## 87. The desktop app
 

@@ -134,6 +134,55 @@ const hasDot = () =>
     center.y - box.top,
   )
 check('a big brush has a dot in its middle', await hasDot())
+// Sharp, and small: around the pointer, each pixel the canvas draws is the dot's color or the paper's, nothing between,
+// and the dot is 2 × 2 of them. The pointer is between pixels on purpose. The canvas's own pixels are read: headless
+// Chrome blurs the canvas a little when it puts it on a screen scaled by 125% or 150%, which says nothing of Lydia
+const dotPixels = async () => {
+  const pointer = await pageOf(500.3, 400.3)
+  await page.mouse.move(pointer.x, pointer.y, { steps: 2 })
+  await sleep(100)
+  return page.evaluate(pointer => {
+    const { app } = window.lydia
+    const box = app.canvas.getBoundingClientRect()
+    const ratio = app.renderer.resolution
+    app.render() // the drawing buffer is only readable in the same task as it is drawn
+    const { gl } = app.renderer
+    const x = Math.round((pointer.x - box.left) * ratio) - 5
+    const y = app.canvas.height - Math.round((pointer.y - box.top) * ratio) - 5
+    const pixels = new Uint8Array(10 * 10 * 4)
+    gl.readPixels(x, y, 10, 10, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+    let dark = 0
+    let between = 0
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i] < 40) dark++
+      else if (pixels[i] < 215) between++
+    }
+    return { dark, between }
+  }, pointer)
+}
+const dot = await dotPixels()
+check(
+  'the dot is sharp and small: 2 × 2 pixels, nothing blurred',
+  dot.dark === 4 && dot.between === 0,
+  JSON.stringify(dot),
+)
+// At the scales Windows often uses, where a pixel of the screen isn't a whole pixel of the display: 3 × 3 of them
+for (const scale of [1.25, 1.5]) {
+  // Lydia looks at the scale when the drawing's area changes size, so it changes size too, and back
+  await page.setViewport({ width: 1599, height: 900, deviceScaleFactor: scale })
+  await sleep(200)
+  await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: scale })
+  await sleep(300)
+  const scaled = await dotPixels()
+  check(
+    `…and at ${scale * 100}%, 3 × 3 pixels of the display, nothing blurred`,
+    scaled.dark === 9 && scaled.between === 0,
+    JSON.stringify(scaled),
+  )
+}
+await page.setViewport({ width: 1600, height: 900 })
+await sleep(300)
+await moveTo(500, 400)
 await setSize(Math.round(16 / o.zoom)) // 16 pixels of the screen
 const small = await outline()
 check('a small one has only its outline', small.visible && !(await hasDot()), JSON.stringify(small))
