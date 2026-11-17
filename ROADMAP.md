@@ -17,8 +17,9 @@ in another app if you know.
   becomes a new drawing. Today an image only gets in by being placed in a drawing already open.
 - **[Paste an image](https://github.com/NiercoElectron/Lydia/issues/4).** Ctrl+V puts an image copied elsewhere (a
   screenshot, a picture from a browser) straight into the drawing, and into the tray.
-- **Open and save Photoshop, Krita and OpenRaster files.** `.psd`, `.kra` and `.ora` drawings open in Lydia with
-  their layers, and a drawing can be saved as any of them, so work can come from those apps and go back to them.
+- **[Open and save Photoshop, Krita and OpenRaster files](https://github.com/NiercoElectron/Lydia/issues/5).**
+  `.psd`, `.kra` and `.ora` drawings open in Lydia with their layers, and a drawing can be saved as any of them, so
+  work can come from those apps and go back to them.
 
 ## Ideas we'd like to do
 
