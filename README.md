@@ -190,6 +190,8 @@ Then open the address shown in the terminal (usually http://localhost:5173).
 
 ## Project structure
 
+For a map of the engine, from a pen stroke to a saved file, read [the architecture guide](docs/architecture.md).
+
 ```
 src/
 ├── engine/          The drawing engine (tiles, layers, brush, undo, project and brush files), no React

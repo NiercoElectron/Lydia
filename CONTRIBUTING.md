@@ -22,6 +22,8 @@ Clip Studio…) if you know. Lydia aims to feel like those, so "like X in Krita"
 
 ## Working on the code
 
+Start with [the architecture guide](docs/architecture.md) for a map of the engine and the files behind each part.
+
 You need [Node.js](https://nodejs.org) 20.19+ or 22.12+, and Google Chrome for the tests.
 
 ```bash
