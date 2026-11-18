@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('lydiaDesktop', {
   abortWriting: id => ipcRenderer.invoke('abort-writing', id),
   sizeOf: file => ipcRenderer.invoke('size-of', file),
   readChunk: (file, offset, length) => ipcRenderer.invoke('read-chunk', file, offset, length),
+  // The drawings opened or saved lately (see recent.mjs): a list of them, opening one, and taking one out of the list
+  listRecent: () => ipcRenderer.invoke('list-recent'),
+  openRecent: file => ipcRenderer.invoke('open-recent', file),
+  forgetRecent: file => ipcRenderer.invoke('forget-recent', file),
   openFolder: () => ipcRenderer.invoke('open-folder'),
   takeUpdate: () => ipcRenderer.invoke('take-update'),
   onUpdate: listener => ipcRenderer.on('update', (_event, update) => listener(update)),

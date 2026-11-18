@@ -8,10 +8,11 @@ import { TOOL_ROWS, TOOLS } from './toolList'
 type Props = {
   tool: Tool
   onToolChange: (tool: Tool) => void
-  canFilter: boolean
-  onFilter: (kind: FilterKind) => void
-  isTrayOpen: boolean
-  onTrayToggle: () => void
+  only?: readonly Tool[] // just these tools, with no filters nor tray (the Brush Designer's)
+  canFilter?: boolean
+  onFilter?: (kind: FilterKind) => void
+  isTrayOpen?: boolean
+  onTrayToggle?: () => void
 }
 
 const FILTERS: [FilterKind, string, typeof Blend][] = [
@@ -22,8 +23,8 @@ const FILTERS: [FilterKind, string, typeof Blend][] = [
 
 // The tools, each with its name, in a column at the left edge. "Filter" opens the filters in a list beside them. The
 // Brush stays chosen in all of its modes (see BRUSH_MODES in tools.ts), and goes back to the last one used. At its foot,
-// the button that opens and closes the tray (see TrayPanel)
-export function ToolColumn({ tool, onToolChange, canFilter, onFilter, isTrayOpen, onTrayToggle }: Props) {
+// the button that opens and closes the tray (see TrayPanel). With "only", just those tools
+export function ToolColumn({ tool, onToolChange, only, canFilter, onFilter, isTrayOpen, onTrayToggle }: Props) {
   const { t } = useLanguage()
   const [openList, setOpenList] = useState<'filter' | null>(null)
   const lastBrushMode = useRef<BrushMode>('brush')
@@ -52,6 +53,13 @@ export function ToolColumn({ tool, onToolChange, canFilter, onFilter, isTrayOpen
     )
   }
 
+  if (only) {
+    return (
+      <nav className="tool-column" aria-label={t('Tools')}>
+        {only.map(toolButton)}
+      </nav>
+    )
+  }
   return (
     <nav className="tool-column" aria-label={t('Tools')}>
       {TOOL_ROWS.map(row => {
@@ -76,7 +84,7 @@ export function ToolColumn({ tool, onToolChange, canFilter, onFilter, isTrayOpen
                     aria-label={t(name)}
                     disabled={!canFilter}
                     onClick={() => {
-                      onFilter(kind)
+                      onFilter?.(kind)
                       setOpenList(null)
                     }}
                   >

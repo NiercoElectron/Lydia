@@ -1,7 +1,7 @@
 import { deleteAutosaved, listAutosaved, loadAutosaved, type AutosavedDrawing } from '../autosave'
 import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
-import { FilePlus, FolderOpen, Paintbrush, Settings } from 'lucide-react'
+import { BookOpen, Bug, Code, FileImage, FilePlus, FolderOpen, Paintbrush, Settings, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 // Only the version is taken from package.json (Vite leaves the rest out), so it is always the one npm version set
 import { version } from '../../package.json'
@@ -11,7 +11,10 @@ import { NewProjectDialog } from '../components/NewProjectDialog'
 import { useProjectOpening } from '../components/projectOpening'
 import { SettingsWindow } from '../components/SettingsWindow'
 import { WhatsNew } from '../components/WhatsNew'
+import { desktop, nameOfFile } from '../desktop'
 import type { ProjectData } from '../engine/projectFile'
+import { BUG_URL, GITHUB_URL, GUIDE_URL } from '../links'
+import { forgetRecentDrawing, listRecentDrawings, openRecentDrawing, type RecentDrawing } from '../recentDrawings'
 
 type Props = {
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
@@ -56,8 +59,46 @@ function RecoverRow({
   )
 }
 
-// The start screen: what to do first in the middle, with the drawings to recover under it, what's new at the right, and
-// the settings and the Brush Designer's choices in windows of their own
+// One drawing of the Recent list (desktop app only): its picture, its name and when it was last opened, which opens it,
+// and a button that takes it out of the list (its file stays)
+function RecentCard({
+  drawing,
+  disabled,
+  onOpen,
+  onForget,
+}: {
+  drawing: RecentDrawing
+  disabled: boolean
+  onOpen: () => void
+  onForget: () => void
+}) {
+  const { t, locale } = useLanguage()
+  const { file, time, width, height, picture } = drawing
+  return (
+    <li className="recent-drawing">
+      <button className="recent-open" onClick={onOpen} disabled={disabled} title={file}>
+        {picture ? <img src={picture} alt="" /> : <FileImage className="recent-blank" size={40} aria-hidden />}
+        <span className="recent-name">{nameOfFile(file)}</span>
+        <span className="hint">
+          {width && height ? `${width}×${height} · ` : ''}
+          {new Date(time).toLocaleDateString(locale)}
+        </span>
+      </button>
+      <button
+        className="icon-button recent-forget"
+        onClick={onForget}
+        aria-label={t('Take out of the list')}
+        title={t('Take it out of the list. The file stays where it is')}
+      >
+        <X size={14} aria-hidden />
+      </button>
+    </li>
+  )
+}
+
+// The start screen, in three columns as in Krita (decision 92): at the left what to do first and Lydia's pages, in the
+// middle the drawings opened lately (in the desktop app) and those to recover, and at the right what's new. The
+// settings and the Brush Designer's choices are in windows of their own
 export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject, onOpenDesigner }: Props) {
   const { t } = useLanguage()
   const [isChoosingNew, setIsChoosingNew] = useState(false) // the window for a new drawing is open
@@ -65,8 +106,31 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
   const [isDesignerOpen, setIsDesignerOpen] = useState(false)
   const [isRecovering, setIsRecovering] = useState(false)
   const [autosaved, setAutosaved] = useState<AutosavedDrawing[]>([]) // the drawings that can be recovered
+  const [recent, setRecent] = useState<RecentDrawing[]>([]) // the drawings opened lately, in the desktop app
   const opening = useProjectOpening(onOpenProject)
   const isOpening = opening.isOpening || isRecovering
+
+  function showRecent() {
+    listRecentDrawings().then(setRecent, error => console.warn('Could not read the recent drawings:', error))
+  }
+  useEffect(showRecent, [])
+
+  async function handleOpenRecent(file: string) {
+    setIsRecovering(true)
+    try {
+      onOpenProject(await openRecentDrawing(file))
+    } catch (error) {
+      alert(errorMessage(error, 'LYD-105'))
+      showRecent() // one that is gone has left the list
+    } finally {
+      setIsRecovering(false)
+    }
+  }
+
+  async function handleForgetRecent(file: string) {
+    await forgetRecentDrawing(file)
+    showRecent()
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -119,6 +183,7 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
       </header>
       <div className="home-body">
         <div className="home-start">
+          <h2>{t('Start')}</h2>
           <div className="home-actions">
             <button onClick={() => setIsChoosingNew(true)}>
               <FilePlus size={20} aria-hidden />
@@ -134,6 +199,49 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
             </button>
           </div>
           {opening.input}
+          <h2>{t('Links')}</h2>
+          <ul className="home-links">
+            <li>
+              <a href={GUIDE_URL} target="_blank" rel="noreferrer">
+                <BookOpen size={18} aria-hidden />
+                {t('Guide')}
+              </a>
+            </li>
+            <li>
+              <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+                <Code size={18} aria-hidden />
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href={BUG_URL} target="_blank" rel="noreferrer">
+                <Bug size={18} aria-hidden />
+                {t('Report a bug')}
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div className="home-files">
+          {desktop && (
+            <section className="recent">
+              <h2>{t('Recent')}</h2>
+              {recent.length > 0 ? (
+                <ul>
+                  {recent.map(drawing => (
+                    <RecentCard
+                      key={drawing.file}
+                      drawing={drawing}
+                      disabled={isOpening}
+                      onOpen={() => void handleOpenRecent(drawing.file)}
+                      onForget={() => void handleForgetRecent(drawing.file)}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="hint">{t('The drawings you open or save show here.')}</p>
+              )}
+            </section>
+          )}
           {autosaved.length > 0 && (
             <section className="recover">
               <h2>{t('Recover')}</h2>
@@ -151,6 +259,9 @@ export function Home({ gpuMemory, onGpuMemoryChange, onNewProject, onOpenProject
                 ))}
               </ul>
             </section>
+          )}
+          {!desktop && autosaved.length === 0 && (
+            <p className="hint">{t('Drawings closed with changes that were not saved show here, to recover them.')}</p>
           )}
         </div>
         <WhatsNew />

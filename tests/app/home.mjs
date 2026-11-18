@@ -1,6 +1,7 @@
-// The start screen (decision 83): what to do first is all there is to see, it needs no scrolling at a screen of 2560×1440 at
-// 150%, Settings has the interface, the autosave and the memory with its warning, and the Brush Designer's choices have a
-// window of their own, which goes on to the Brush Designer
+// The start screen (decisions 83 and 92): three columns as in Krita, what to do first with Lydia's pages, the drawings,
+// and what's new; it needs no scrolling at a screen of 2560×1440 at 150%; the New project window with its list of
+// sizes; Settings has the interface, the autosave and the memory with its warning, and the Brush Designer's choices have
+// a window of their own, which goes on to the Brush Designer. The Recent list is the desktop app's (see desktop.mjs)
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import { CACHE_DIR, LAUNCH, PORT, ROOT } from './setup.mjs'
@@ -50,6 +51,26 @@ check('and so do the settings', !(await isShown('.theme-choice')))
 check('and the choices of the Brush Designer', !(await isShown('.start-brush')))
 const page_ = await page.evaluate(() => [document.documentElement.scrollHeight, document.documentElement.clientHeight])
 check('the page needs no scrolling', page_[0] <= page_[1], page_.join(' of '))
+const columns = await page.evaluate(() =>
+  ['.home-start', '.home-files', '.whats-new'].map(each =>
+    Math.round(document.querySelector(each).getBoundingClientRect().left),
+  ),
+)
+check(
+  'three columns, as in Krita: what to do first, the drawings, what is new',
+  columns[0] < columns[1] && columns[1] < columns[2],
+  columns.join(),
+)
+const links = await page.$$eval('.home-links a', list => list.map(each => `${each.textContent} ${each.href}`))
+check(
+  'with the guide, GitHub and the form for a bug',
+  links.length === 3 &&
+    links[0].includes('docs/guide.md') &&
+    links[1].endsWith('github.com/NiercoElectron/Lydia') &&
+    links[2].includes('issues/new?template=bug.yml'),
+  links.join(' | '),
+)
+check('no Recent list in a browser', !(await page.$('.recent')))
 
 // ----- A new drawing -----
 await pressAction(1)
@@ -94,14 +115,144 @@ check('the size on paper looks like the line above it', looks.isHintLook)
 await typeIn(0, '')
 await sleep(50)
 sizes.push(await windowSize())
-await page.select('dialog.new-project select', 'A3')
+const chooseInList = name =>
+  page.evaluate(
+    name =>
+      [...document.querySelectorAll('.new-project-sizes button')]
+        .find(each => each.firstChild.textContent === name)
+        .click(),
+    name,
+  )
+await chooseInList('A3')
 await sleep(50)
 sizes.push(await windowSize())
+const typed = () =>
+  page.$$eval('dialog.new-project input[type=number]', inputs => inputs.map(each => each.value).join())
+const chosenInList = () => page.$eval('.new-project-sizes [aria-selected="true"]', each => each.firstChild.textContent)
+check(
+  'the list of sizes, as in Krita: A3 at the resolution typed (1 DPI)',
+  (await typed()) === '12,17,1' && (await chosenInList()) === 'A3',
+  await typed(),
+)
+await chooseInList('64×64')
+await sleep(50)
+check('a pixel art size', (await typed()) === '64,64,1' && (await chosenInList()) === '64×64', await typed())
+await typeIn(0, '65')
+await sleep(50)
+check('a size typed in is Custom', (await chosenInList()) === 'Custom', await chosenInList())
 check(
   'the window of a new drawing keeps its size',
   sizes.every(size => size === first),
   [first, ...sizes].join(', '),
 )
+const rows = await page.evaluate(() => {
+  const top = element => Math.round(element.getBoundingClientRect().top)
+  const [width, height, dpi] = document.querySelectorAll('dialog.new-project input[type=number]')
+  const button72 = [...document.querySelectorAll('dialog.new-project button')].find(b => b.textContent === '72')
+  const lefts = [width, height, dpi].map(each => Math.round(each.getBoundingClientRect().left))
+  return { tops: [top(width), top(height), top(dpi)], dpiButton: top(button72), lefts }
+})
+check(
+  'each choice on a row of its own, with the fields lined up',
+  rows.tops[0] < rows.tops[1] && rows.tops[1] < rows.tops[2] && new Set(rows.lefts).size === 1,
+  JSON.stringify(rows),
+)
+check('the resolution and its buttons share a row', Math.abs(rows.dpiButton - rows.tops[2]) <= 4, JSON.stringify(rows))
+
+// ----- Presets of one's own -----
+const clickText = text =>
+  page.evaluate(
+    text => [...document.querySelectorAll('dialog.new-project button')].find(b => b.textContent === text).click(),
+    text,
+  )
+const presetNames = () => page.$$eval('.size-preset .size-name', list => list.map(each => each.textContent))
+const groups = () => page.$$eval('.new-project-sizes h3', list => list.map(each => each.textContent))
+check('no presets of my own at first', (await presetNames()).length === 0 && !(await groups()).includes('My presets'))
+await typeIn(0, '2000')
+await typeIn(1, '3000')
+await clickText('600')
+await clickText('Transparent')
+const beforeName = await windowSize()
+await clickText('Save as preset…')
+await sleep(50)
+const nameField = '.save-preset input[type=text]'
+check(
+  'Save as preset asks for a name, with the size to start from',
+  (await page.$eval(nameField, field => [field.value, document.activeElement === field].join())) === '2000×3000,true',
+)
+check('the window keeps its size while the name is typed', (await windowSize()) === beforeName, await windowSize())
+await page.keyboard.press('Escape')
+await sleep(100)
+check('Escape in the name leaves the name, not the window', await isOpen('dialog.new-project'))
+check('and no preset is saved', !(await page.$(nameField)) && (await presetNames()).length === 0)
+await clickText('Save as preset…')
+await sleep(50)
+await page.keyboard.type('Comic page')
+await page.keyboard.press('Enter')
+await sleep(100)
+check('Enter saves the preset without making the drawing', await isOpen('dialog.new-project'))
+check(
+  'in a group of its own, under Custom',
+  (await presetNames()).join() === 'Comic page' && (await groups())[0] === 'My presets',
+  (await groups()).join(),
+)
+check('the preset saved is the one chosen', (await chosenInList()) === 'Comic page', await chosenInList())
+const forgetLook = () => page.$eval('.preset-forget', button => getComputedStyle(button).opacity)
+await page.mouse.move(5, 5)
+await sleep(300)
+const hidden = await forgetLook()
+await page.hover('.size-preset')
+await sleep(300)
+check('its × shows under the pointer only', hidden === '0' && (await forgetLook()) === '1', hidden)
+await chooseInList('64×64')
+await sleep(50)
+await clickText('Transparent')
+await chooseInList('Comic page')
+await sleep(50)
+const transparent = () =>
+  page.evaluate(
+    () =>
+      [...document.querySelectorAll('dialog.new-project button')]
+        .find(b => b.textContent === 'Transparent')
+        .getAttribute('aria-pressed') === 'true',
+  )
+check(
+  'choosing it brings back its size, resolution and background',
+  (await typed()) === '2000,3000,600' && (await transparent()),
+  await typed(),
+)
+await typeIn(1, '3100')
+await sleep(50)
+check('a size changed leaves the preset', (await chosenInList()) === 'Custom', await chosenInList())
+await clickText('Save as preset…')
+await sleep(50)
+await page.keyboard.type('Comic page')
+await page.keyboard.press('Enter')
+await sleep(100)
+await chooseInList('64×64')
+await chooseInList('Comic page')
+await sleep(50)
+check(
+  'a preset saved with the same name takes its place',
+  (await presetNames()).length === 1 && (await typed()) === '2000,3100,600',
+  (await presetNames()).join() + ' ' + (await typed()),
+)
+await page.keyboard.press('Escape')
+await sleep(100)
+await pressAction(1)
+await page.waitForSelector('dialog.new-project[open]')
+check('the presets are still there the next time', (await presetNames()).join() === 'Comic page')
+await page.click('.preset-forget')
+await sleep(100)
+check(
+  '× deletes it, and its group goes with it',
+  (await presetNames()).length === 0 && !(await groups()).includes('My presets'),
+)
+await page.keyboard.press('Escape')
+await sleep(100)
+await pressAction(1)
+await page.waitForSelector('dialog.new-project[open]')
+check('for good', (await presetNames()).length === 0)
 await page.keyboard.press('Escape')
 await sleep(100)
 

@@ -314,6 +314,49 @@ check('it says so', shownName.includes(images[0]), shownName)
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
 await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Open project'))
+
+// The drawings opened lately (decision 92): the one saved is there, with its picture, and opens with a click
+const recentCards = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.recent-drawing')].map(card => ({
+      name: card.querySelector('.recent-name').textContent,
+      hasPicture: card.querySelector('img')?.src.startsWith('data:image/') ?? false,
+    })),
+  )
+await page.waitForFunction(() => document.querySelector('.recent-drawing img'), { timeout: 10000 }).catch(() => {})
+const cards = await recentCards()
+check(
+  'the start screen lists the drawing saved, with its picture',
+  cards.length === 1 && cards[0].name === 'Untitled' && cards[0].hasPicture,
+  JSON.stringify(cards),
+)
+await page.click('.recent-open')
+await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
+await page.waitForSelector('.draw-space canvas', { timeout: 20000 })
+check('a click on it opens it', true)
+await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
+await discardIfAsked(page)
+await page.waitForSelector('.recent-drawing', { timeout: 10000 })
+
+// A drawing whose file went away says so, and leaves the list; its file put back, it comes back when opened again
+const alerts = []
+const onDialog = dialog => {
+  alerts.push(dialog.message())
+  void dialog.accept()
+}
+page.on('dialog', onDialog)
+const savedBytes = readFileSync(projectFile)
+rmSync(projectFile)
+await page.click('.recent-open')
+await page.waitForFunction(() => !document.querySelector('.recent-drawing'), { timeout: 10000 }).catch(() => {})
+check(
+  'a drawing moved away says so, and leaves the list',
+  alerts[0]?.includes('LYD-110') && (await recentCards()).length === 0,
+  alerts.join(' | '),
+)
+page.off('dialog', onDialog)
+writeFileSync(projectFile, savedBytes)
+
 await startButton('Open project')
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
 await page.waitForSelector('.draw-space canvas', { timeout: 20000 })
@@ -326,6 +369,14 @@ check('saving goes to the file it came from', readdirSync(projects).length === 1
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Back').click())
 await discardIfAsked(page)
 await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent === 'Open project'))
+await page.waitForSelector('.recent-drawing', { timeout: 10000 }).catch(() => {})
+check('opened with Open project, it is back in the list', (await recentCards()).length === 1)
+await page.click('.recent-forget')
+await page.waitForFunction(() => !document.querySelector('.recent-drawing'), { timeout: 10000 }).catch(() => {})
+check(
+  'its × takes it out of the list, and the file stays',
+  (await recentCards()).length === 0 && existsSync(projectFile),
+)
 const second = spawn(electron, ['.', `--user-data-dir=${userData}`, projectFile], { cwd: ROOT, env, stdio: 'ignore' })
 await page.waitForFunction(() => document.title === 'Untitled - Lydia', { timeout: 20000 })
 check('a file opened with a second Lydia opens in the first', true)

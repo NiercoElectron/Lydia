@@ -1218,7 +1218,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     that opens a panel over the drawing. Clicking elsewhere or Esc closes it, and a click on the drawing then only
     closes it, without painting. Its pin keeps it open, also the next time (my idea). With the taper, the brush's
     settings no longer fitted in the bar's first row: at 1600 pixels across, and less on a 1366 laptop, it would have
-    taken a second row again, and the drawing would jump when changing tools (decision 46).
+    taken a second row again, and the drawing would jump when changing tools (decision 46). (Since the new interface
+    the settings are in a panel at the left, with room for them: decision 91 took them out of the menu.)
 - **Why:**
   - Tapered ends give lines the look of ink, and are what a pen's pressure gives for free; with a mouse, or a light
     hand, they are the only way to get it. ibisPaint and Clip Studio have them.
@@ -2547,7 +2548,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 83. The start screen
 
 - **Date:** 2026-11-01
-- **Status:** adopted
+- **Status:** adopted; laid out again in three columns in decision 92
 - **Problem:** the start screen was one long column: the buttons, the settings, the Brush Designer's choices and a big red
   warning about the graphics card's memory, always there and taking half of the screen. What most people come to do was the
   smallest thing on it. Claude proposed the options, and my choices were:
@@ -2874,6 +2875,110 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   Krita's tilt by names Krita doesn't use (`tiltdirection`, `tiltelevation`), in the test too. Read with the real
   names, all six brushes of that bundle that follow the tilt turn with it, and the tilted pencil and the chisel marker
   grow lying down.
+
+## 91. The stroke's settings in sight, and the Brush Designer like the editor
+
+- **Date:** 2026-11-18
+- **Status:** adopted
+- **Problem:** the Advanced menu (decision 47) was made for a bar on top, with no room for more. In the new interface
+  (decision 82) the tools' settings are in a panel at the left, with room, and opening a menu over the drawing for the
+  spacing, the stabilizer or the taper was a click too many. The Brush Designer still had the old bar on top, with its
+  buttons in two rows, and one long column of settings at the right, with the area to try the brush at its bottom,
+  out of sight.
+- **Decision:** my choices:
+  - **The spacing, the stabilizer and the taper are in the panel**, under **Stroke**, after the size, the opacity and
+    the brush's blend mode, for the tools that have them. The Advanced menu and its pin are gone.
+  - **Stroke opens and closes**, and Lydia remembers how it was left (my choice). At first I chose it always open, but
+    the panel then needed 1047 pixels on my screen, 2560×1440 at 150%, where it has 712 and must fit with no scrolling
+    (decision 82). Its button sits beside Rulers, taking no row of its own, so the panel fits as before. Open, the
+    settings show under that row and the panel scrolls; the button stays where it was and as it was (my choice: at
+    first it turned into a heading of its own, moving and changing its look), only lit, like Rulers when it is on.
+  - **The Brush Designer is laid out like the editor**: its menus (File, Edit, View) and the buttons that save the
+    brush on top; Brush and Eraser in a column at the left, with their settings beside them (Edge, Strength, Size and
+    Stroke); the paper in the middle, with the view's controls under it; and the brush at the right. What was in its bar
+    went where the editor has it: Undo and Redo on top, Clear paper in Edit, Fit, Grid, Sharp and the brush outline in
+    View, Back in File.
+  - **The brush's settings are in groups, as in Krita's brush editor**: Shape, Pressure, Pen tilt, Noise and Paper
+    grain in a list, and the settings of the one chosen beside it. A pixel brush has no Noise nor Paper grain.
+  - **The area to try the brush is always in sight**, under the settings, which scroll on their own when they don't
+    fit.
+- **How:**
+  - `StrokeButton` in `src/components/Toolbar.tsx` is the button, a toggle like Rulers, before Rulers in the panel, and
+    the settings go after Rulers, in `stroke-settings`, between thin lines, one under the other like the panel's other
+    settings. Whether they are open is kept in the browser (`lydia.strokeOpen`, `useStrokeOpen` in `engineHooks.ts`),
+    for every tool and the Brush Designer alike; closed at first. The setting that kept Advanced pinned is no longer
+    read.
+  - A group of buttons with a name in the panel, like Thins, has its name on a line of its own and its buttons together
+    under it.
+  - The Designer uses the editor's pieces: `MenuBar`, `ToolColumn` with only the brush and the eraser (`only`), the
+    panel of settings at the left, and `ViewControls` under the paper.
+  - `BrushShapeControls` keeps every group on the page and hides the ones not chosen, so a setting is always found in
+    the same place.
+  - The area to try the brush is kept at most 28% of the window's height, at its own shape, so the settings keep
+    room on a laptop's screen.
+- **Checked:** `tests/app/stroke-settings.mjs` (it was the Advanced menu's) checks Stroke closed at first, its button beside
+  Rulers and staying where it was when it opens them, with the spacing, the stabilizer and the taper for the brush and the eraser, under the size and the
+  opacity, none with a tool without a tip, closing again, remembered open, a click on the drawing painting, and the
+  taper as before. `tests/app/left-panel.mjs` still finds the panel fitting with no scrolling on my screen, in each
+  language. `tests/app/stabilizer.mjs` and `tests/app/foreign-brushes.mjs` open Stroke to find their settings,
+  `tests/app/pen-tilt.mjs` the Pen tilt group, and `tests/app/tool-column.mjs` the Designer's column with only Brush and
+  Eraser. The Designer's tests use it as before, through its menus. On the screen: the editor's panel with Stroke
+  closed and open, and the Designer at 1600×900 and 1280×720.
+
+## 92. The start screen like Krita's, with recent drawings
+
+- **Date:** 2026-11-18
+- **Status:** adopted
+- **Problem:** the start screen (decision 83) had its three buttons alone in the middle of a wide, empty page, the
+  drawings to recover under them, and nothing to reach Lydia's pages. The New project window chose its size from a
+  long list in a menu. Krita's start screen and its window for a new document are what people coming from it know.
+- **Decision:** my choices:
+  - **Three columns, as Krita's**: at the left **Start** (New project, Open project, Brush Designer) and **Links**; in
+    the middle the drawings, recent ones and those to recover; at the right what's new.
+  - **Links**: the guide, Lydia on GitHub, and **Report a bug**, which opens GitHub's form with the Bug template.
+  - **Recent drawings, in the desktop app**: the drawings opened or saved lately, with a picture each, opened with a
+    click. In a browser there is no such list: a page can't open a file again without it being chosen again.
+  - **The New project window as Krita's**: a list of sizes at the left, in groups (screens, papers at the resolution
+    chosen, pixel art), and the size, resolution and background at the right.
+  - Claude chose the rest:
+    - The list keeps the 12 latest drawings, newest first. A drawing goes first when it is chosen in the system's
+      window to open or to save, or opened with Lydia from the system; opening it from the list puts it first again.
+    - Its picture is how the drawing was when last saved or closed with nothing left unsaved, 160 pixels on its longer
+      side. A drawing opened elsewhere and never saved or closed in Lydia has a blank picture.
+    - **×** takes a drawing out of the list; its file stays. One whose file was moved, renamed or deleted says so, with
+      a new error, LYD-110, and leaves the list.
+    - Pixel art sizes: 64×64, 128×128 and 256×256. A size typed in shows **Custom** chosen in the list.
+  - Then, looking at the window, I asked for **each choice on a row of its own** (Width, Height, Resolution), with only
+    the resolution's buttons beside it, and for **presets of my own**:
+    - **Save as preset…** under the choices asks for a name; Enter saves it.
+    - A preset keeps the **size, the resolution and the background**, and choosing it brings all three back, as
+      Krita's templates do.
+    - They are in a group of their own, **My presets**, at the top of the list under Custom, only when there is one.
+    - A **×** that shows under the pointer deletes one.
+  - Claude chose the rest of the presets: the name starts as the size (`2000×3000`), and a name already used replaces
+    that preset. Escape in the name leaves the name, not the window. A preset is shown chosen until anything it set is
+    changed, and its size and resolution go under its name, since a name can be long. They are kept in the browser's
+    storage, like the last choice, so they are there in a browser too.
+- **How:**
+  - The desktop app keeps the list (`electron/recent.mjs`, in a file of its own folder), not the page. The page may only
+    read the files the person chose (`allowFile` in `electron/files.mjs`), and the list only gets files chosen in the
+    system's window or opened with Lydia, so a page can't make Lydia read any other file by putting it in the list.
+    Opening a drawing of the list lets the page read that file, and only one in the list.
+  - The page keeps the pictures and sizes beside it (`src/recentDrawings.ts`, in the browser's storage), made by the
+    engine (`drawingThumbnail`, the Recover list's picture) and made smaller.
+  - The editor notes a drawing's size when it opens it, and its picture when it saves it and when it leaves it with
+    nothing unsaved; the picture is made at once, before the drawing closes.
+  - Lydia's pages on GitHub are in `src/links.ts`, shared with the editor's Help menu.
+- **Checked:** `tests/app/home.mjs`: the three columns, the links and where they go, no Recent list in a browser, the
+  page with no scrolling on my screen, the New project window's list (A3 at the resolution typed, a pixel art size, a
+  size typed in as Custom) and its size staying the same, its rows (one field under the other, lined up, the
+  resolution's buttons on its row), and the presets: the name asked for, Escape and Enter in it, the group under
+  Custom, the size, resolution and background brought back, a changed size leaving the preset, the same name
+  replacing it, still there when the window opens again, and the × showing under the pointer and deleting it.
+  `tests/app/desktop.mjs`, in the real desktop app: the drawing
+  saved listed with its picture, opened with a click, the message when its file went away and the list without it,
+  back in the list when opened with Open project, and its × taking it out with the file staying. On the screen: the
+  start screen and the New project window in Portuguese, at 2560×1440 at 150%.
 
 ## Open questions
 

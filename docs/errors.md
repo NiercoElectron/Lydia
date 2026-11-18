@@ -27,6 +27,7 @@ longer used. The list in the code is in `src/errors.ts`.
 | LYD-107 | This autosaved drawing is damaged.                                                     | Part of a copy kept in the browser is missing.                                                                                   |
 | LYD-108 | Could not autosave the drawing.                                                        | The copy couldn't be written, for example the disk is full: the cause is in parentheses. The drawing itself is fine, so save it. |
 | LYD-109 | Could not recover the drawing.                                                         | Something else went wrong with a copy kept in the browser: the cause is in parentheses.                                          |
+| LYD-110 | This drawing is no longer at {file}. It may have been moved, renamed or deleted.       | A drawing in the start screen's Recent list was opened, but its file isn't where it was. It leaves the list.                     |
 
 ## 2: brushes
 

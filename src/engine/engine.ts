@@ -1331,7 +1331,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     shape: layer.shape,
   })
 
-  // A small picture of the drawing, for the Recover list, from the tiles the screen shows
+  // A small picture of the drawing, for the Recover and Recent lists, from the tiles the screen shows
   const THUMBNAIL_SIDE = 240
   function thumbnail() {
     const scale = Math.min(THUMBNAIL_SIDE / grid.width, THUMBNAIL_SIDE / grid.height, 1)
@@ -2684,6 +2684,7 @@ export async function createEngine(host: HTMLElement, project: ProjectData, gpuM
     cancelText,
     textPlace,
     quietSnapshot,
+    drawingThumbnail: thumbnail,
     onGraphicsLost,
     packTile: memory.pack,
     changesCount: () => changes,

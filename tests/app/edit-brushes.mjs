@@ -77,7 +77,7 @@ const stored = () =>
       }),
   )
 const waitForSaved = () =>
-  page.waitForFunction(() => document.querySelector('.designer-panel').textContent.includes('Saved to your brushes'), {
+  page.waitForFunction(() => document.querySelector('.top-row').textContent.includes('Saved to your brushes'), {
     timeout: 5000,
   })
 const startOptions = () => page.$$eval('.start-brush option', options => options.map(o => o.textContent))

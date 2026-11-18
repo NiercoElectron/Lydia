@@ -1,10 +1,12 @@
 import { errorMessage, LydiaError } from '../errors'
 import { useLanguage } from '../i18n'
+import { Redo2, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushShapeControls, type GrainChoice } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
+import { MenuBar, type Menu } from '../components/MenuBar'
 import { SliderValue } from '../components/SliderValue'
 import {
   useBackdrop,
@@ -14,18 +16,12 @@ import {
   usePixelGrid,
   useSharpPixels,
   useStabilizer,
+  useStrokeOpen,
   useTaper,
 } from '../components/engineHooks'
-import { AdvancedMenu } from '../components/AdvancedMenu'
-import {
-  GridButton,
-  MAX_BRUSH_SIZE,
-  MIN_BRUSH_SIZE,
-  OutlineButton,
-  SharpButton,
-  StabilizerControls,
-  TaperControls,
-} from '../components/Toolbar'
+import { ToolColumn } from '../components/ToolColumn'
+import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE, StabilizerControls, StrokeButton, TaperControls } from '../components/Toolbar'
+import { ViewControls } from '../components/ViewControls'
 import {
   brushFileName,
   DEFAULT_SHAPE,
@@ -35,6 +31,7 @@ import {
 } from '../engine/brushFile'
 import { decodeTip, invertedPaper, paperOfImage, paperOfTip, tipFromPicture, type BrushTip } from '../engine/brushTip'
 import type { Engine } from '../engine/engine'
+import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { newProject } from '../engine/projectFile'
 import type { PaintTool } from '../engine/tools'
 import { downloadBlob } from '../files'
@@ -86,7 +83,9 @@ type Props = {
 }
 
 // The Brush Designer: draw the tip of a new brush on a small paper, or change a brush, choose how the tip is placed
-// along a stroke, try it, and keep it in the brushes or as a file (decisions 30 and 70). A pixel brush's tip paints
+// along a stroke, try it, and keep it in the brushes or as a file (decisions 30 and 70). It is laid out like the editor
+// (decision 91): menus and saving on top, the brush and the eraser with their settings at the left, the paper, and the
+// brush at the right, with the area to try it always in sight. A pixel brush's tip paints
 // fully or not at all: it is drawn in black only, and its edges, strength and the settings that turn the tip are left
 // out
 export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Props) {
@@ -152,6 +151,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
   const [isSharpOn, toggleSharp] = useSharpPixels(engine)
   const [stabilizer, changeStabilizer] = useStabilizer(engine)
   const [taper, changeTaper] = useTaper(engine)
+  const [isStrokeOpen, toggleStroke] = useStrokeOpen()
   useDrawingShortcuts(engine, DESIGNER_TOOLS, setTool, setSize, toggleGrid)
   useEffect(() => engine?.onGraphicsLost(() => alert(new LydiaError('LYD-404').message)), [engine])
   useBackdrop(engine)
@@ -258,127 +258,89 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
     onBack()
   }
 
+  const saveLabel = brush && !brush.isBuiltIn ? t('Save changes') : t('Save to my brushes')
+  const canCopy = savedId !== undefined && brush !== undefined
+  const menus: Menu[] = [
+    {
+      title: t('File'),
+      items: [
+        { label: saveLabel, onClick: () => void handleSave(), disabled: !isUnsaved },
+        ...(canCopy
+          ? [{ label: t('Save copy'), hint: t('Keep it as a new brush'), onClick: () => void handleSaveCopy() }]
+          : []),
+        { label: t('Export file'), onClick: handleExport, disabled: !file },
+        null,
+        { label: t('Back'), onClick: handleBack },
+      ],
+    },
+    {
+      title: t('Edit'),
+      items: [
+        { label: t('Undo'), keys: 'Ctrl+Z', onClick: () => engine?.undo(), disabled: !snapshot.canUndo },
+        { label: t('Redo'), keys: 'Ctrl+Shift+Z', onClick: () => engine?.redo(), disabled: !snapshot.canRedo },
+        null,
+        { label: t('Clear paper'), onClick: () => engine?.clearLayer(), disabled: !engine },
+      ],
+    },
+    {
+      title: t('View'),
+      items: [
+        { label: t('Fit'), keys: 'Ctrl+0', onClick: () => engine?.fitToScreen(), disabled: !engine },
+        { label: t('Flip'), keys: 'M', onClick: () => engine?.flipView(), disabled: !engine },
+        null,
+        {
+          label: t('Grid'),
+          keys: 'G',
+          hint: t('Pixel grid, shown from {zoom}% zoom (G)', { zoom: PIXEL_GRID_ZOOM * 100 }),
+          onClick: toggleGrid,
+          isOn: isGridOn,
+        },
+        {
+          label: t('Sharp'),
+          hint: t('Show the pixels as sharp squares when zoomed in, instead of smoothing them'),
+          onClick: toggleSharp,
+          isOn: isSharpOn,
+        },
+        {
+          label: t('Brush outline'),
+          hint: t('The outline of the brush under the pointer'),
+          onClick: toggleOutline,
+          isOn: isOutlineOn,
+        },
+      ],
+    },
+  ]
+
   return (
     <div className="editor">
       <header className="editor-bar">
-        <div className="toolbar">
-          <button aria-pressed={tool === 'brush'} onClick={() => setTool('brush')} title={t('Brush (B)')}>
-            {t('Brush')}
+        <MenuBar menus={menus} />
+        <div className="top-row">
+          <button
+            className="top-icon"
+            aria-label={t('Undo')}
+            title={t('Undo (Ctrl+Z)')}
+            onClick={() => engine?.undo()}
+            disabled={!snapshot.canUndo}
+          >
+            <Undo2 size={20} aria-hidden />
           </button>
-          <button aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title={t('Eraser (E)')}>
-            {t('Eraser')}
+          <button
+            className="top-icon"
+            aria-label={t('Redo')}
+            title={t('Redo (Ctrl+Shift+Z)')}
+            onClick={() => engine?.redo()}
+            disabled={!snapshot.canRedo}
+          >
+            <Redo2 size={20} aria-hidden />
           </button>
-          {!pixel && (
-            <>
-              <span className="button-group">
-                {t('Edge')}
-                <button aria-pressed={edge === 'soft'} onClick={() => setEdge('soft')}>
-                  {t('Soft', {}, 'brushEdge')}
-                </button>
-                <button aria-pressed={edge === 'hard'} onClick={() => setEdge('hard')}>
-                  {t('Hard', {}, 'brushEdge')}
-                </button>
-              </span>
-              <label title={t('How much the brush paints: black paints fully, gray paints lightly')}>
-                {t('Strength')}
-                <input
-                  type="range"
-                  min={1}
-                  max={100}
-                  value={strength}
-                  disabled={tool === 'eraser'}
-                  onChange={e => setStrength(Number(e.target.value))}
-                />
-                <SliderValue
-                  value={strength}
-                  min={1}
-                  max={100}
-                  unit="%"
-                  disabled={tool === 'eraser'}
-                  onChange={setStrength}
-                />
-              </label>
-            </>
-          )}
-          <label title={t('Brush size ([ and ])')}>
-            {t('Size')}
-            <input
-              type="range"
-              min={MIN_BRUSH_SIZE}
-              max={MAX_BRUSH_SIZE}
-              value={size}
-              onChange={e => setSize(Number(e.target.value))}
-            />
-            <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={setSize} />
-          </label>
-          <AdvancedMenu>
-            <StabilizerControls stabilizer={stabilizer} onChange={changeStabilizer} />
-            <TaperControls taper={taper} onChange={changeTaper} />
-          </AdvancedMenu>
-          <GridButton isOn={isGridOn} onToggle={toggleGrid} />
-          <SharpButton isOn={isSharpOn} onToggle={toggleSharp} />
-          <OutlineButton isOn={isOutlineOn} onToggle={toggleOutline} />
-        </div>
-        <div className="actions">
-          <button onClick={() => engine?.undo()} disabled={!snapshot.canUndo} title={t('Undo (Ctrl+Z)')}>
-            {t('Undo')}
-          </button>
-          <button onClick={() => engine?.redo()} disabled={!snapshot.canRedo} title={t('Redo (Ctrl+Shift+Z)')}>
-            {t('Redo')}
-          </button>
-          <button onClick={() => engine?.clearLayer()} disabled={!engine}>
-            {t('Clear paper')}
-          </button>
-          <button onClick={() => engine?.fitToScreen()} disabled={!engine} title={t('Show the whole paper (Ctrl+0)')}>
-            {t('Fit')}
-          </button>
-          <button onClick={handleBack}>{t('Back')}</button>
-        </div>
-      </header>
-      <div className="editor-main">
-        <DrawSpace project={paper} gpuMemory={gpuMemory} onEngineChange={setEngine} />
-        <aside className="designer-panel">
-          <h2>{t('Brush Designer')}</h2>
-          <label className="name-row">
-            {t('Name')}
-            <input type="text" value={name} maxLength={MAX_NAME_LENGTH} onChange={e => setName(e.target.value)} />
-          </label>
-          <p className="hint">
-            {tip
-              ? t('Tip: {width}×{height} pixels, the painted part of the paper.', {
-                  width: tip.image.width,
-                  height: tip.image.height,
-                }) + (pixel ? t(' It paints at 1×, 2×, 3×… this size, as the brush size comes nearest.') : '')
-              : pixel
-                ? t('Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.')
-                : t('Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.')}
-          </p>
-          <div className="designer-actions">
-            <button
-              onClick={() => imageInput.current?.click()}
-              disabled={!engine}
-              title={t('Put an image on the paper: dark places paint, light ones don’t')}
-            >
-              {t('Use image…')}
+          {isSaved && <span className="notice">{t('Saved to your brushes. Open a drawing to paint with it.')}</span>}
+          <div className="designer-save">
+            <button onClick={() => void handleSave()} disabled={!isUnsaved}>
+              {saveLabel}
             </button>
-            <button
-              onClick={() => void handleInvert()}
-              disabled={!tip}
-              title={t('What paints stops painting, and the other way round')}
-            >
-              {t('Invert')}
-            </button>
-            <input ref={imageInput} type="file" accept="image/*" hidden onChange={handleImageChosen} />
-          </div>
-          <BrushShapeControls shape={shape} onChange={setShape} grain={grain} onGrainChange={setGrain} />
-          <h2>{t('Try it')}</h2>
-          <BrushTestArea tip={tip} shape={shape} />
-          <div className="designer-actions">
-            <button onClick={handleSave} disabled={!isUnsaved}>
-              {brush && !brush.isBuiltIn ? t('Save changes') : t('Save to my brushes')}
-            </button>
-            {savedId && brush && (
-              <button onClick={handleSaveCopy} disabled={!file} title={t('Keep it as a new brush')}>
+            {canCopy && (
+              <button onClick={() => void handleSaveCopy()} disabled={!file} title={t('Keep it as a new brush')}>
                 {t('Save copy')}
               </button>
             )}
@@ -386,7 +348,119 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
               {t('Export file')}
             </button>
           </div>
-          {isSaved && <p className="hint">{t('Saved to your brushes. Open a drawing to paint with it.')}</p>}
+        </div>
+      </header>
+      <div className="editor-main">
+        <div className="editor-work">
+          <div className="editor-row">
+            <div className="left-panels">
+              <ToolColumn tool={tool} onToolChange={each => setTool(each as PaintTool)} only={DESIGNER_TOOLS} />
+              <div className="options-side">
+                <div className="toolbar">
+                  {!pixel && (
+                    <>
+                      <span className="button-group">
+                        {t('Edge')}
+                        <button aria-pressed={edge === 'soft'} onClick={() => setEdge('soft')}>
+                          {t('Soft', {}, 'brushEdge')}
+                        </button>
+                        <button aria-pressed={edge === 'hard'} onClick={() => setEdge('hard')}>
+                          {t('Hard', {}, 'brushEdge')}
+                        </button>
+                      </span>
+                      <label title={t('How much the brush paints: black paints fully, gray paints lightly')}>
+                        {t('Strength')}
+                        <input
+                          type="range"
+                          min={1}
+                          max={100}
+                          value={strength}
+                          disabled={tool === 'eraser'}
+                          onChange={e => setStrength(Number(e.target.value))}
+                        />
+                        <SliderValue
+                          value={strength}
+                          min={1}
+                          max={100}
+                          unit="%"
+                          disabled={tool === 'eraser'}
+                          onChange={setStrength}
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label title={t('Brush size ([ and ])')}>
+                    {t('Size')}
+                    <input
+                      type="range"
+                      min={MIN_BRUSH_SIZE}
+                      max={MAX_BRUSH_SIZE}
+                      value={size}
+                      onChange={e => setSize(Number(e.target.value))}
+                    />
+                    <SliderValue value={size} min={MIN_BRUSH_SIZE} max={MAX_BRUSH_SIZE} onChange={setSize} />
+                  </label>
+                  <StrokeButton isOpen={isStrokeOpen} onToggle={toggleStroke} />
+                  {isStrokeOpen && (
+                    <div className="stroke-settings">
+                      <StabilizerControls stabilizer={stabilizer} onChange={changeStabilizer} />
+                      <TaperControls taper={taper} onChange={changeTaper} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="draw-area">
+              <DrawSpace project={paper} gpuMemory={gpuMemory} onEngineChange={setEngine} />
+            </div>
+          </div>
+          <footer className="draw-footer">
+            <span className="paper-size">
+              {tipSize} × {tipSize} px
+            </span>
+            <ViewControls engine={engine} />
+          </footer>
+        </div>
+        <aside className="designer-panel">
+          <div className="designer-brush">
+            <h2>{t('Brush Designer')}</h2>
+            <label className="name-row">
+              {t('Name')}
+              <input type="text" value={name} maxLength={MAX_NAME_LENGTH} onChange={e => setName(e.target.value)} />
+            </label>
+            <p className="hint">
+              {tip
+                ? t('Tip: {width}×{height} pixels, the painted part of the paper.', {
+                    width: tip.image.width,
+                    height: tip.image.height,
+                  }) + (pixel ? t(' It paints at 1×, 2×, 3×… this size, as the brush size comes nearest.') : '')
+                : pixel
+                  ? t('Paint the tip on the paper, pixel by pixel: black paints, white doesn’t paint.')
+                  : t('Paint the tip on the paper: black paints, gray paints lightly, white doesn’t paint.')}
+            </p>
+            <div className="designer-actions">
+              <button
+                onClick={() => imageInput.current?.click()}
+                disabled={!engine}
+                title={t('Put an image on the paper: dark places paint, light ones don’t')}
+              >
+                {t('Use image…')}
+              </button>
+              <button
+                onClick={() => void handleInvert()}
+                disabled={!tip}
+                title={t('What paints stops painting, and the other way round')}
+              >
+                {t('Invert')}
+              </button>
+              <input ref={imageInput} type="file" accept="image/*" hidden onChange={handleImageChosen} />
+            </div>
+            <BrushShapeControls shape={shape} onChange={setShape} grain={grain} onGrainChange={setGrain} />
+          </div>
+          <div className="designer-try">
+            <h2>{t('Try it')}</h2>
+            <BrushTestArea tip={tip} shape={shape} />
+          </div>
         </aside>
       </div>
     </div>

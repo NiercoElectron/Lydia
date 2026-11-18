@@ -326,7 +326,12 @@ await sleep(300)
 await click('Open Brush Designer')
 await page.waitForFunction(() => window.lydia?.engine && window.lydia.app.renderer, { timeout: 60000 })
 await sleep(500)
-check('the Designer has no tool column', (await page.$('.tool-column')) === null)
+const designerTools = await page.$$eval('.tool-column button', bs => bs.map(b => b.getAttribute('aria-label')).join())
+check(
+  'the Designer has a tool column with only the brush and the eraser',
+  designerTools === 'Brush,Eraser',
+  designerTools,
+)
 await hover(128, 128)
 await page.keyboard.down('Alt')
 await sleep(50)
@@ -337,8 +342,8 @@ await sleep(50)
 check(
   'in the Designer, I does nothing (the brush stays)',
   await page.$$eval(
-    '.toolbar button',
-    bs => bs.find(b => b.textContent === 'Brush').getAttribute('aria-pressed') === 'true',
+    '.tool-column button',
+    bs => bs.find(b => b.getAttribute('aria-label') === 'Brush').getAttribute('aria-pressed') === 'true',
   ),
 )
 

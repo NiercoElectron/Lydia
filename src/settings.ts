@@ -120,16 +120,21 @@ export function saveAutosaveMinutes(minutes: number) {
 export type NewProjectChoice = { width: number; height: number; background: string | null; dpi: number }
 const NEW_PROJECT_KEY = 'lydia.newProject'
 
-export function loadNewProjectChoice(): NewProjectChoice | null {
+// A choice read back from the browser's storage, or null when it isn't one: storage can hold anything
+function choiceOf(saved: unknown): NewProjectChoice | null {
   const isSize = (n: unknown) => Number.isInteger(n) && (n as number) >= MIN_SIZE && (n as number) <= MAX_SIZE
+  const choice = saved as Partial<NewProjectChoice> | null
+  const isValid =
+    isSize(choice?.width) && isSize(choice?.height) && (choice!.background === null || isColor(choice!.background))
+  if (!isValid) return null
+  // A choice remembered before resolutions could be chosen has none
+  const dpi = isDpi(choice!.dpi) ? choice!.dpi! : DEFAULT_DPI
+  return { width: choice!.width!, height: choice!.height!, background: choice!.background!, dpi }
+}
+
+export function loadNewProjectChoice(): NewProjectChoice | null {
   try {
-    const saved = JSON.parse(localStorage.getItem(NEW_PROJECT_KEY) ?? 'null')
-    const isValid =
-      isSize(saved?.width) && isSize(saved?.height) && (saved.background === null || isColor(saved.background))
-    if (!isValid) return null
-    // A choice remembered before resolutions could be chosen has none
-    const dpi = isDpi(saved.dpi) ? saved.dpi : DEFAULT_DPI
-    return { width: saved.width, height: saved.height, background: saved.background, dpi }
+    return choiceOf(JSON.parse(localStorage.getItem(NEW_PROJECT_KEY) ?? 'null'))
   } catch {
     return null // nothing remembered, or the browser doesn't let this page keep anything
   }
@@ -140,6 +145,33 @@ export function saveNewProjectChoice(choice: NewProjectChoice) {
     localStorage.setItem(NEW_PROJECT_KEY, JSON.stringify(choice))
   } catch {
     // not remembered next time, but used now
+  }
+}
+
+// The sizes a person saved in the New project window, with a name each, in the order they were saved
+export type SizePreset = NewProjectChoice & { name: string }
+export const MAX_PRESET_NAME = 40
+const SIZE_PRESETS_KEY = 'lydia.sizePresets'
+
+export function loadSizePresets(): SizePreset[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_PRESETS_KEY) ?? '[]')
+    if (!Array.isArray(saved)) return []
+    return saved.flatMap(each => {
+      const choice = choiceOf(each)
+      const name = typeof each?.name === 'string' ? each.name.trim().slice(0, MAX_PRESET_NAME) : ''
+      return choice && name ? [{ ...choice, name }] : []
+    })
+  } catch {
+    return [] // none saved, or the browser doesn't let this page keep anything
+  }
+}
+
+export function saveSizePresets(presets: SizePreset[]) {
+  try {
+    localStorage.setItem(SIZE_PRESETS_KEY, JSON.stringify(presets))
+  } catch {
+    // kept until the page closes, but not next time
   }
 }
 
@@ -287,20 +319,21 @@ export function saveTaper(taper: TaperSettings) {
   }
 }
 
-// Whether the bar's Advanced panel stays open (see AdvancedMenu). It doesn't at first
-const ADVANCED_PINNED_KEY = 'lydia.advancedPinned'
+// Whether the Stroke section of the tools' panel is open (see StrokeSection in Toolbar.tsx). It is closed at first, so
+// the panel fits with no scrolling on a screen of 810 pixels (decision 91)
+const STROKE_OPEN_KEY = 'lydia.strokeOpen'
 
-export function loadAdvancedPinned() {
+export function loadStrokeOpen() {
   try {
-    return localStorage.getItem(ADVANCED_PINNED_KEY) === 'on'
+    return localStorage.getItem(STROKE_OPEN_KEY) === 'on'
   } catch {
     return false
   }
 }
 
-export function saveAdvancedPinned(pinned: boolean) {
+export function saveStrokeOpen(open: boolean) {
   try {
-    localStorage.setItem(ADVANCED_PINNED_KEY, pinned ? 'on' : 'off')
+    localStorage.setItem(STROKE_OPEN_KEY, open ? 'on' : 'off')
   } catch {
     // not remembered next time, but used now
   }

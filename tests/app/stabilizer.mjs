@@ -137,11 +137,13 @@ const spread = (x0, x1, y0, y1) =>
     y0,
     y1,
   )
-// The stabilizer is in the Advanced panel: opened to change it, and closed again with Esc
-const openAdvanced = () =>
-  page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Advanced ▾')?.click())
+// The stabilizer is under Stroke in the panel, opened when it is closed
+const openStroke = async () => {
+  await page.evaluate(() => document.querySelector('.stroke-button[aria-expanded="false"]')?.click())
+  await sleep(50)
+}
 const setStabilizer = async (strength, mode) => {
-  await openAdvanced()
+  await openStroke()
   await page.evaluate(
     (strength, mode) => {
       const input = [...document.querySelectorAll('label')]
@@ -154,17 +156,11 @@ const setStabilizer = async (strength, mode) => {
     strength,
     mode,
   )
-  await page.keyboard.press('Escape')
   await sleep(50)
 }
 const hasStabilizer = async () => {
-  await openAdvanced()
-  const has = await page.evaluate(() =>
-    [...document.querySelectorAll('label')].some(l => l.textContent.startsWith('Stabilizer')),
-  )
-  await page.keyboard.press('Escape')
-  await sleep(50)
-  return has
+  await openStroke()
+  return page.evaluate(() => [...document.querySelectorAll('label')].some(l => l.textContent.startsWith('Stabilizer')))
 }
 // A shaky horizontal line: up and down by "wobble" every 6 pixels, at y, from x0 to x1
 async function shaky(x0, x1, y, wobble) {

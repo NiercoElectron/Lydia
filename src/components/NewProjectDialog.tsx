@@ -1,5 +1,6 @@
 import { useLanguage } from '../i18n'
-import { useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_DPI,
@@ -11,7 +12,14 @@ import {
   newProject,
   type ProjectData,
 } from '../engine/projectFile'
-import { loadNewProjectChoice, saveNewProjectChoice } from '../settings'
+import {
+  loadNewProjectChoice,
+  loadSizePresets,
+  MAX_PRESET_NAME,
+  saveNewProjectChoice,
+  saveSizePresets,
+  type SizePreset,
+} from '../settings'
 
 type Size = { name: string; width: number; height: number }
 
@@ -33,8 +41,13 @@ const SCREENS: Size[] = [
   { name: '4K UHD', width: 3840, height: 2160 },
   { name: 'Square', width: 2048, height: 2048 },
 ]
+// Small papers for pixel art, in pixels
+const PIXEL_ART: Size[] = [
+  { name: 'Pixel art 64', width: 64, height: 64 },
+  { name: 'Pixel art 128', width: 128, height: 128 },
+  { name: 'Pixel art 256', width: 256, height: 256 },
+]
 const COMMON_DPIS = [72, 150, 300, 600] // a button for each; any other resolution can be typed in
-const CUSTOM = 'custom'
 const PREVIEW_SIZE = 72 // the longer side of the small picture of the paper, in pixels of the screen
 
 // A paper size in pixels at a resolution
@@ -54,10 +67,13 @@ type Props = {
   onCancel: () => void
 }
 
-// The window for a new drawing: its size, from a list of common sizes or typed in, its resolution on paper, and its
-// background, a color or transparent. It opens with the choices made the last time
+// The window for a new drawing, laid out like Krita's (decision 92): at the left a list of common sizes, in groups
+// (the person's own presets, screens, papers at the resolution chosen, pixel art), and at the right its size, which
+// can be typed in, its resolution on paper, and its background, a color or transparent, each on a row of its own.
+// What is chosen can be saved as a preset with a name. It opens with the choices made the last time
 export function NewProjectDialog({ onCreate, onCancel }: Props) {
   const { t, locale } = useLanguage()
+  const id = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [last] = useState(loadNewProjectChoice)
   const [width, setWidth] = useState(String(last?.width ?? 800))
@@ -73,6 +89,11 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
     )
     return paper?.name ?? null
   })
+  const [presets, setPresets] = useState(loadSizePresets)
+  // The preset chosen from the list, until anything it set is changed
+  const [presetName, setPresetName] = useState<string | null>(null)
+  // The name being typed for a new preset, or null when no preset is being saved
+  const [newPresetName, setNewPresetName] = useState<string | null>(null)
 
   // Open as a modal window: the page behind it can't be used until it closes, and Escape closes it. Taking it out of
   // the page closes it too, so there is nothing to undo here
@@ -84,29 +105,86 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
   const dpiValue = isDpi(Number(dpi)) ? Number(dpi) : null
   const isValid = isValidSize(width) && isValidSize(height) && dpiValue !== null
   const papers = PAPERS.map(p => paperInPixels(p.name, dpiValue ?? DEFAULT_DPI))
-  const chosen =
-    paperName ?? [...papers, ...SCREENS].find(s => s.width === Number(width) && s.height === Number(height))?.name
+  const chosen = presetName
+    ? null
+    : (paperName ??
+      [...papers, ...SCREENS, ...PIXEL_ART].find(s => s.width === Number(width) && s.height === Number(height))?.name)
 
   function chooseSize(name: string) {
-    const size = papers.find(p => p.name === name) ?? SCREENS.find(s => s.name === name)
-    if (!size) return // "Custom": the size stays as it is, to be typed in
+    const size = [...papers, ...SCREENS, ...PIXEL_ART].find(s => s.name === name)
+    if (!size) return
+    setPresetName(null)
     setPaperName(PAPERS.some(p => p.name === name) ? name : null)
     setWidth(String(size.width))
     setHeight(String(size.height))
   }
 
-  // Typing a size leaves the paper chosen from the list
+  // A preset sets everything the window chooses, as it was when saved
+  function choosePreset(preset: SizePreset) {
+    setPresetName(preset.name)
+    setPaperName(null)
+    setWidth(String(preset.width))
+    setHeight(String(preset.height))
+    setDpi(String(preset.dpi))
+    setIsTransparent(preset.background === null)
+    if (preset.background) setColor(preset.background)
+  }
+
+  // Typing a size leaves the paper or preset chosen from the list
   function typeSize(setter: (value: string) => void, value: string) {
+    setPresetName(null)
     setPaperName(null)
     setter(value)
   }
 
   function changeDpi(value: string) {
+    setPresetName(null)
     setDpi(value)
     if (!paperName || !isDpi(Number(value))) return
     const paper = paperInPixels(paperName, Number(value))
     setWidth(String(paper.width))
     setHeight(String(paper.height))
+  }
+
+  function changePresets(next: SizePreset[]) {
+    setPresets(next)
+    saveSizePresets(next)
+  }
+
+  // A preset with the name of one already saved takes its place in the list
+  function savePreset() {
+    const name = newPresetName?.trim().slice(0, MAX_PRESET_NAME)
+    if (!name || !isValid) return
+    const preset = {
+      name,
+      width: Number(width),
+      height: Number(height),
+      dpi: dpiValue,
+      background: isTransparent ? null : color,
+    }
+    const at = presets.findIndex(p => p.name === name)
+    changePresets(at < 0 ? [...presets, preset] : presets.map((p, i) => (i === at ? preset : p)))
+    setNewPresetName(null)
+    setPaperName(null)
+    setPresetName(name)
+  }
+
+  function deletePreset(name: string) {
+    changePresets(presets.filter(p => p.name !== name))
+    if (presetName === name) setPresetName(null)
+  }
+
+  // In the name's field, Enter saves the preset instead of creating the drawing, and Escape leaves the name instead of
+  // closing the window
+  function handleNameKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      savePreset()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setNewPresetName(null)
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -141,89 +219,186 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
     <dialog ref={dialogRef} className="new-project" onClose={onCancel}>
       <form onSubmit={handleSubmit}>
         <h2>{t('New project')}</h2>
-        <label className="new-project-row">
-          {t('Size')}
-          <select value={chosen ?? CUSTOM} onChange={e => chooseSize(e.target.value)}>
-            <option value={CUSTOM}>{t('Custom')}</option>
-            <optgroup label={`${t('Paper, at')} ${dpiValue ?? DEFAULT_DPI} DPI`}>
-              {papers.map(p => {
-                const fits = p.width <= MAX_SIZE && p.height <= MAX_SIZE
-                return (
-                  <option key={p.name} value={p.name} disabled={!fits}>
-                    {t(p.name)} ({p.width}×{p.height}){fits ? '' : t(', too big at this resolution')}
-                  </option>
-                )
-              })}
-            </optgroup>
-            <optgroup label={t('Screen')}>
-              {SCREENS.map(s => (
-                <option key={s.name} value={s.name}>
-                  {t(s.name)} ({s.width}×{s.height})
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
-        <div className="new-project-row">
-          <label>
-            {t('Width')}
-            <input
-              type="number"
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              value={width}
-              onChange={e => typeSize(setWidth, e.target.value)}
+        <div className="new-project-body">
+          <div className="new-project-sizes" role="listbox" aria-label={t('Size')}>
+            <SizeOption
+              name={t('Custom')}
+              isChosen={chosen === undefined}
+              onChoose={() => {
+                // its size is typed in: the width is ready for it
+                setPresetName(null)
+                setPaperName(null)
+                dialogRef.current?.querySelector<HTMLInputElement>('input[type=number]')?.select()
+              }}
             />
-          </label>
-          <label>
-            {t('Height')}
-            <input
-              type="number"
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              value={height}
-              onChange={e => typeSize(setHeight, e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="new-project-row">
-          <label title={t('How many pixels make an inch on paper. It matters for printing; the screen ignores it')}>
-            {t('Resolution')}
-            <input type="number" min={MIN_DPI} max={MAX_DPI} value={dpi} onChange={e => changeDpi(e.target.value)} />
-            DPI
-          </label>
-          {COMMON_DPIS.map(common => (
-            <button
-              key={common}
-              type="button"
-              aria-pressed={dpiValue === common}
-              onClick={() => changeDpi(String(common))}
-            >
-              {common}
-            </button>
-          ))}
-        </div>
-        <p className="hint">
-          {t('From')} {MIN_SIZE} {t('to')} {MAX_SIZE} {t('pixels on each side.')}
-          <span className="size-on-paper">{paperSize}</span>
-        </p>
-        <fieldset className="new-project-row">
-          <legend>{t('Background')}</legend>
-          <input
-            type="color"
-            aria-label={t('Background color')}
-            value={color}
-            disabled={isTransparent}
-            onChange={e => setColor(e.target.value)}
-          />
-          <button type="button" aria-pressed={isTransparent} onClick={() => setIsTransparent(t => !t)}>
-            {t('Transparent')}
-          </button>
-        </fieldset>
-        <div className="paper-preview-box">
-          {isValid && (
-            <div className={isTransparent ? 'paper-preview transparent' : 'paper-preview'} style={previewStyle} />
-          )}
+            {presets.length > 0 && <h3>{t('My presets')}</h3>}
+            {presets.map(p => (
+              <div key={p.name} className="size-preset">
+                <SizeOption
+                  name={p.name}
+                  detail={`${p.width}×${p.height}, ${p.dpi} DPI`}
+                  isChosen={presetName === p.name}
+                  hint={p.name}
+                  onChoose={() => choosePreset(p)}
+                />
+                <button
+                  type="button"
+                  className="icon-button preset-forget"
+                  aria-label={t('Delete this preset')}
+                  title={t('Delete this preset')}
+                  onClick={() => deletePreset(p.name)}
+                >
+                  <X size={14} aria-hidden />
+                </button>
+              </div>
+            ))}
+            <h3>{t('Screen')}</h3>
+            {SCREENS.map(s => (
+              <SizeOption
+                key={s.name}
+                name={t(s.name)}
+                detail={`${s.width}×${s.height}`}
+                isChosen={chosen === s.name}
+                onChoose={() => chooseSize(s.name)}
+              />
+            ))}
+            <h3>{`${t('Paper, at')} ${dpiValue ?? DEFAULT_DPI} DPI`}</h3>
+            {papers.map(p => {
+              const fits = p.width <= MAX_SIZE && p.height <= MAX_SIZE
+              return (
+                <SizeOption
+                  key={p.name}
+                  name={t(p.name)}
+                  detail={`${p.width}×${p.height}`}
+                  isChosen={chosen === p.name}
+                  disabled={!fits}
+                  hint={fits ? undefined : t('Too big at this resolution')}
+                  onChoose={() => chooseSize(p.name)}
+                />
+              )
+            })}
+            <h3>{t('Pixel art')}</h3>
+            {PIXEL_ART.map(s => (
+              <SizeOption
+                key={s.name}
+                name={`${s.width}×${s.height}`}
+                isChosen={chosen === s.name}
+                onChoose={() => chooseSize(s.name)}
+              />
+            ))}
+          </div>
+          <div className="new-project-settings">
+            {/* One row for each choice, its name at the left; only the resolution's own buttons share its row */}
+            <div className="new-project-fields">
+              <label htmlFor={`${id}-width`}>{t('Width')}</label>
+              <div className="new-project-row">
+                <input
+                  id={`${id}-width`}
+                  type="number"
+                  min={MIN_SIZE}
+                  max={MAX_SIZE}
+                  value={width}
+                  onChange={e => typeSize(setWidth, e.target.value)}
+                />
+              </div>
+              <label htmlFor={`${id}-height`}>{t('Height')}</label>
+              <div className="new-project-row">
+                <input
+                  id={`${id}-height`}
+                  type="number"
+                  min={MIN_SIZE}
+                  max={MAX_SIZE}
+                  value={height}
+                  onChange={e => typeSize(setHeight, e.target.value)}
+                />
+              </div>
+              <label
+                htmlFor={`${id}-dpi`}
+                title={t('How many pixels make an inch on paper. It matters for printing; the screen ignores it')}
+              >
+                {t('Resolution')}
+              </label>
+              <div className="new-project-row">
+                <input
+                  id={`${id}-dpi`}
+                  type="number"
+                  min={MIN_DPI}
+                  max={MAX_DPI}
+                  value={dpi}
+                  onChange={e => changeDpi(e.target.value)}
+                />
+                DPI
+                {COMMON_DPIS.map(common => (
+                  <button
+                    key={common}
+                    type="button"
+                    aria-pressed={dpiValue === common}
+                    onClick={() => changeDpi(String(common))}
+                  >
+                    {common}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="hint">
+              {t('From')} {MIN_SIZE} {t('to')} {MAX_SIZE} {t('pixels on each side.')}
+              <span className="size-on-paper">{paperSize}</span>
+            </p>
+            <fieldset className="new-project-row">
+              <legend>{t('Background')}</legend>
+              <input
+                type="color"
+                aria-label={t('Background color')}
+                value={color}
+                disabled={isTransparent}
+                onChange={e => {
+                  setPresetName(null)
+                  setColor(e.target.value)
+                }}
+              />
+              <button
+                type="button"
+                aria-pressed={isTransparent}
+                onClick={() => {
+                  setPresetName(null)
+                  setIsTransparent(t => !t)
+                }}
+              >
+                {t('Transparent')}
+              </button>
+            </fieldset>
+            <div className="paper-preview-box">
+              {isValid && (
+                <div className={isTransparent ? 'paper-preview transparent' : 'paper-preview'} style={previewStyle} />
+              )}
+            </div>
+            <div className="new-project-row save-preset">
+              {newPresetName === null ? (
+                <button type="button" disabled={!isValid} onClick={() => setNewPresetName(`${width}×${height}`)}>
+                  {t('Save as preset…')}
+                </button>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    aria-label={t('Name of the preset')}
+                    maxLength={MAX_PRESET_NAME}
+                    value={newPresetName}
+                    autoFocus
+                    onFocus={e => e.target.select()}
+                    onChange={e => setNewPresetName(e.target.value)}
+                    onKeyDown={handleNameKey}
+                  />
+                  <button type="button" disabled={!newPresetName.trim() || !isValid} onClick={savePreset}>
+                    {t('Save preset')}
+                  </button>
+                  <button type="button" onClick={() => setNewPresetName(null)}>
+                    {t('Cancel')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
         <div className="dialog-actions">
           <button type="button" onClick={onCancel}>
@@ -235,5 +410,29 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         </div>
       </form>
     </dialog>
+  )
+}
+
+// A size in the list: its name, and its pixels when the name doesn't say them (a preset's are under its name)
+function SizeOption({
+  name,
+  detail,
+  isChosen,
+  disabled = false,
+  hint,
+  onChoose,
+}: {
+  name: string
+  detail?: string
+  isChosen: boolean
+  disabled?: boolean
+  hint?: string
+  onChoose: () => void
+}) {
+  return (
+    <button type="button" role="option" aria-selected={isChosen} disabled={disabled} title={hint} onClick={onChoose}>
+      <span className="size-name">{name}</span>
+      {detail && <span className="hint">{detail}</span>}
+    </button>
   )
 }

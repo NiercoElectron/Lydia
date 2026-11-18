@@ -54,6 +54,8 @@ import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection
 import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
 import { desktop, nameOfFile, sameItems, writeFile } from '../desktop'
 import { downloadBlob, timestamp } from '../files'
+import { noteDrawingLook } from '../recentDrawings'
+import { CHANGES_URL, GUIDE_URL } from '../links'
 import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import { isTyping } from '../engine/view'
 import {
@@ -77,10 +79,6 @@ import {
   TRAY_DRAG_TYPE,
   type TrayImage,
 } from '../tray'
-
-const REPOSITORY = 'https://github.com/NiercoElectron/Lydia/blob/main'
-const GUIDE_URL = `${REPOSITORY}/docs/guide.md`
-const CHANGES_URL = `${REPOSITORY}/CHANGELOG.md`
 
 const EXPORTED_SHOWN_MS = 6000 // how long the name of an exported image stays on the bar
 
@@ -113,6 +111,18 @@ export function Editor({
   const [project, setProject] = useState(opened)
   const [engine, setEngine] = useState<Engine | null>(null)
   const snapshot = useEngineSnapshot(engine)
+
+  // A drawing opened from its file in the desktop app is among the recent ones (see recentDrawings.ts): its size is
+  // noted now, and its picture when it is saved or closed with nothing left unsaved
+  useEffect(() => {
+    if (opened.file) void noteDrawingLook(opened.file, opened.width, opened.height, null)
+  }, [opened])
+  function noteLook(file: string) {
+    if (!engine) return
+    // The picture is made at once, before the engine goes with the drawing; only making its file waits
+    const picture = engine.drawingThumbnail()
+    void picture.then(each => noteDrawingLook(file, project.width, project.height, each))
+  }
   const [tool, setTool] = useState<Tool>('brush')
   const [color, setColor] = useState('#000000')
   const [background, setBackground] = useState('#ffffff') // the color kept behind the brush's, swapped by X
@@ -526,6 +536,7 @@ export function Editor({
           throw error
         }
         setFilePath(target)
+        noteLook(target)
       } else {
         downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
       }
@@ -550,6 +561,7 @@ export function Editor({
       setQuestion({ next, stay })
       return
     }
+    if (filePath) noteLook(filePath)
     void autosave.saver.current?.close()
     next()
   }

@@ -107,12 +107,6 @@ for (const language of ['en', 'pt-BR', 'es']) {
   let found = await spilling()
   check(`${language}: all the names fit`, found.length === 0, found.join(', '))
 
-  await page.click('.advanced-menu > button')
-  await sleep(150)
-  found = await spilling()
-  check(`${language}: Advanced stays inside its column`, found.length === 0, found.join(', '))
-  await page.click('.advanced-menu > button')
-
   await page.keyboard.press('q')
   await sleep(200)
   found = await spilling()

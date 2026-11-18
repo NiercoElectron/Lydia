@@ -17,12 +17,14 @@ import {
   loadPixelPerfect,
   loadSharpPixels,
   loadStabilizer,
+  loadStrokeOpen,
   loadTaper,
   saveBrushOutline,
   savePixelGrid,
   savePixelPerfect,
   saveSharpPixels,
   saveStabilizer,
+  saveStrokeOpen,
   saveTaper,
 } from '../settings'
 import { themeColor, useTheme } from '../theme'
@@ -204,6 +206,17 @@ export function useStabilizer(engine: Engine | null) {
     })
   }, [])
   return [settings, change] as const
+}
+
+// Whether the settings of the stroke are open (decision 91), and the way to open or close them. It is remembered, for
+// every tool and the Brush Designer alike
+export function useStrokeOpen(): [boolean, () => void] {
+  const [isOpen, setIsOpen] = useState(loadStrokeOpen)
+  function toggle() {
+    saveStrokeOpen(!isOpen)
+    setIsOpen(!isOpen)
+  }
+  return [isOpen, toggle]
 }
 
 // How the strokes' ends thin out, as chosen last time

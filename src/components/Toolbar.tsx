@@ -1,10 +1,10 @@
-import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, ChevronDown, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../i18n'
+import { useStrokeOpen } from './engineHooks'
 import type { CurveMakes } from '../engine/curves'
 import { MAX_TAPER, type TaperSettings, type TaperThins } from '../engine/dabs'
 import { MAX_FILL_EXPAND, type FillSettings } from '../engine/fill'
-import { PIXEL_GRID_ZOOM } from '../engine/pixelGrid'
 import type { SelectionMode, WandSettings } from '../engine/selection'
 import { canListFonts, computerFonts, INCLUDED_FONTS } from '../engine/fonts'
 import { MAX_STABILIZER, type StabilizerSettings } from '../engine/stabilizer'
@@ -43,7 +43,6 @@ import {
 } from '../engine/tools'
 import { WARP_SIDES } from '../engine/warp'
 import type { BlendMode } from '../engine/layers'
-import { AdvancedMenu } from './AdvancedMenu'
 import { TOOLS } from './toolList'
 import { BLEND_MODE_GROUPS } from './blendModeList'
 import { SliderValue } from './SliderValue'
@@ -175,9 +174,9 @@ type Props = {
   onToolChange: (tool: Tool) => void // between the brush's modes
 }
 
-// The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity, with its stabilizer and taper under
-// Advanced and, for a pixel brush, Pixel-perfect; the size and strength of smudge, blur or liquify, with the stabilizer
-// and liquify's modes; the fill bucket's settings, or the selection's, with the magic wand's. The move tool has none. While a transform is made,
+// The settings of the chosen tool (the color is in the color panel, see ColorPanel.tsx): the brush's size and opacity,
+// with the stroke's spacing, stabilizer and taper under Stroke and, for a pixel brush, Pixel-perfect; the size and
+// strength of smudge, blur or liquify, with the stabilizer and liquify's modes; the fill bucket's settings, or the selection's, with the magic wand's. The move tool has none. While a transform is made,
 // its own settings instead
 export function Toolbar({
   tool,
@@ -216,6 +215,7 @@ export function Toolbar({
   onToolChange,
 }: Props) {
   const { t } = useLanguage()
+  const [isStrokeOpen, toggleStroke] = useStrokeOpen()
   const isSelecting = tool === 'select' || tool === 'lasso' || tool === 'wand'
   const isMoving = tool === 'move'
   if (transform.transform) {
@@ -330,8 +330,19 @@ export function Toolbar({
           </select>
         </label>
       )}
-      {usesTip(tool) && (
-        <AdvancedMenu>
+      {usesTip(tool) && <StrokeButton isOpen={isStrokeOpen} onToggle={toggleStroke} />}
+      {(tool === 'brush' || tool === 'eraser') && isPixelBrush && (
+        <button
+          aria-pressed={isPixelPerfectOn}
+          onClick={onPixelPerfectToggle}
+          title={t('Lines without doubled corners: each step of a line is a single pixel')}
+        >
+          {t('Pixel-perfect')}
+        </button>
+      )}
+      <RulerButtons controls={rulers} />
+      {usesTip(tool) && isStrokeOpen && (
+        <div className="stroke-settings">
           {isPaintTool(tool) && !isPixelBrush && (
             <label title={t('The distance between copies of the tip, compared with the brush size')}>
               {t('Spacing')}
@@ -353,18 +364,8 @@ export function Toolbar({
           )}
           <StabilizerControls stabilizer={stabilizer} onChange={onStabilizerChange} />
           {isPaintTool(tool) && <TaperControls taper={taper} onChange={onTaperChange} />}
-        </AdvancedMenu>
+        </div>
       )}
-      {(tool === 'brush' || tool === 'eraser') && isPixelBrush && (
-        <button
-          aria-pressed={isPixelPerfectOn}
-          onClick={onPixelPerfectToggle}
-          title={t('Lines without doubled corners: each step of a line is a single pixel')}
-        >
-          {t('Pixel-perfect')}
-        </button>
-      )}
-      <RulerButtons controls={rulers} />
       <SymmetryButtons controls={symmetry} />
     </div>
   )
@@ -1097,6 +1098,26 @@ function TransformButtons({ controls, smooth, mode, warpSide }: TransformButtons
   )
 }
 
+// The button that opens and closes the settings of the stroke: how it is placed, smoothed and tapered, changed less
+// often than the size (decision 91). It stays where it is and looks like the panel's other buttons that turn something
+// on, lit while they are open; they show under its row (in "stroke-settings"). Also used by the Brush Designer
+export function StrokeButton({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
+  const { t } = useLanguage()
+  const Chevron = isOpen ? ChevronDown : ChevronRight
+  return (
+    <button
+      className="stroke-button"
+      aria-expanded={isOpen}
+      aria-pressed={isOpen}
+      onClick={onToggle}
+      title={t('The spacing, the stabilizer and the taper')}
+    >
+      <Chevron size={16} aria-hidden />
+      {t('Stroke')}
+    </button>
+  )
+}
+
 // The stabilizer's strength (0 is off) and the way it smooths (see stabilizer.ts). Also used by the Brush Designer
 export function StabilizerControls({
   stabilizer,
@@ -1197,7 +1218,7 @@ export function TaperControls({
         <SliderValue value={taper.end} min={0} max={MAX_TAPER} unit=" px" onChange={end => changeNow({ end })} />
       </label>
       <span className="button-group" title={t("What thins out toward the stroke's ends")}>
-        {t('Thins')}
+        <span className="group-name">{t('Thins')}</span>
         {THINS.map(({ value, label }) => (
           <button key={value} aria-pressed={taper.thins === value} onClick={() => changeNow({ thins: value })}>
             {t(label)}
@@ -1205,43 +1226,5 @@ export function TaperControls({
         ))}
       </span>
     </>
-  )
-}
-
-// Turns the pixel grid on and off. Also used by the Brush Designer
-export function GridButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
-  const { t } = useLanguage()
-  return (
-    <button
-      aria-pressed={isOn}
-      onClick={onToggle}
-      title={t('Pixel grid, shown from {zoom}% zoom (G)', { zoom: PIXEL_GRID_ZOOM * 100 })}
-    >
-      {t('Grid')}
-    </button>
-  )
-}
-
-// Shows the pixels as sharp squares at every zoom from 100%, instead of smoothing them. Also used by the Brush Designer
-export function SharpButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
-  const { t } = useLanguage()
-  return (
-    <button
-      aria-pressed={isOn}
-      onClick={onToggle}
-      title={t('Show the pixels as sharp squares when zoomed in, instead of smoothing them')}
-    >
-      {t('Sharp')}
-    </button>
-  )
-}
-
-// Shows the outline of the brush's tip under the pointer, or the cursor's cross. Also used by the Brush Designer
-export function OutlineButton({ isOn, onToggle }: { isOn: boolean; onToggle: () => void }) {
-  const { t } = useLanguage()
-  return (
-    <button aria-pressed={isOn} onClick={onToggle} title={t('The outline of the brush under the pointer')}>
-      {t('Outline')}
-    </button>
   )
 }

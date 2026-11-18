@@ -1,6 +1,6 @@
-// The Advanced menu (stabilizer and taper): closed at first, a click on the drawing only closing it, Esc, pinned to stay
-// open; the taper at the start and the end, Thins Opacity, short strokes, a click's dot, pixel brushes, undo and redo;
-// remembered
+// The stroke's settings (decision 91): under Stroke in the panel, closed at first and opened by its name, with the
+// spacing, the stabilizer and the taper, for the tools with a tip; the taper at the start and the end, Thins Opacity, short strokes, a click's dot, pixel brushes,
+// undo and redo; remembered
 import { createServer } from 'vite'
 import puppeteer from 'puppeteer-core'
 import { CACHE_DIR, LAUNCH, OUT, PORT, ROOT } from './setup.mjs'
@@ -191,7 +191,27 @@ const setRange = (labelStart, value) =>
     labelStart,
     value,
   )
-const panelShown = () => page.evaluate(() => !!document.querySelector('.advanced-panel'))
+// The names of the settings under Stroke in the panel ('' while closed), or null when there is no Stroke
+const strokeSettings = () =>
+  page.evaluate(() => {
+    if (!document.querySelector('.left-panels .stroke-button')) return null
+    const labels = [...document.querySelectorAll('.left-panels .stroke-settings label')]
+    return labels.map(each => each.textContent.split(/\d/)[0].trim()).join()
+  })
+// Where the Stroke button is on the screen, and how it looks
+const strokeButtonLook = () =>
+  page.$eval('.left-panels .stroke-button', button => {
+    const box = button.getBoundingClientRect()
+    const style = getComputedStyle(button)
+    return {
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+      font: style.fontWeight,
+      back: style.backgroundColor,
+    }
+  })
 const canUndo = () => page.evaluate(() => window.lydia.engine.getSnapshot().canUndo)
 async function line(x0, x1, y, keepDown = false) {
   await moveTo(x0, y)
@@ -207,44 +227,58 @@ await newDrawing(1000, 800)
 await keys('b')
 await chooseBrush('Hard round')
 await setSize(20)
+const strokeOpen = () => page.$eval('.left-panels .stroke-button', button => button.getAttribute('aria-expanded'))
+let shown = await strokeSettings()
+check('the brush has Stroke in its panel, closed at first', shown === '' && (await strokeOpen()) === 'false', shown)
+const closedLook = await strokeButtonLook()
 check(
-  'Advanced shows with the brush, closed',
-  (await page.evaluate(() => !!document.querySelector('.advanced-menu'))) && !(await panelShown()),
+  'its button is beside Rulers, on the same row',
+  await page.evaluate(() => {
+    const rulers = [...document.querySelectorAll('.left-panels .toolbar > button')].find(
+      b => b.textContent === 'Rulers',
+    )
+    return rulers.getBoundingClientRect().y === document.querySelector('.stroke-button').getBoundingClientRect().y
+  }),
 )
-await click('Advanced ▾')
+await page.click('.left-panels .stroke-button')
+shown = await strokeSettings()
 check(
-  '…it opens with the spacing, the stabilizer and the taper',
-  (await panelShown()) &&
-    (await hasStabilizer()) &&
-    (await page.evaluate(() =>
-      [...document.querySelectorAll('.advanced-panel label')].map(l => l.textContent.split(/\d/)[0].trim()).join(),
-    )) === 'Spacing,Stabilizer,Taper start,Taper end',
+  'it opens them, with the spacing, the stabilizer and the taper',
+  shown === 'Spacing,Stabilizer,Taper start,Taper end' && (await hasStabilizer()) && (await strokeOpen()) === 'true',
+  shown,
 )
-const heightBefore = await page.evaluate(() => window.lydia.app.canvas.getBoundingClientRect().height)
+const openLook = await strokeButtonLook()
+check(
+  'the button stays where it was, as big, lit like a button that is on',
+  JSON.stringify(openLook) === JSON.stringify(closedLook),
+  `${JSON.stringify(closedLook)} → ${JSON.stringify(openLook)}`,
+)
+check(
+  'under the size and the opacity, and under its own row',
+  await page.evaluate(() => {
+    const top = selector => document.querySelector(selector).getBoundingClientRect().top
+    const opacity = [...document.querySelectorAll('.left-panels .toolbar > label')].find(each =>
+      each.textContent.startsWith('Opacity'),
+    )
+    const button = document.querySelector('.stroke-button').getBoundingClientRect()
+    return opacity.getBoundingClientRect().top < button.top && top('.stroke-settings') >= button.bottom
+  }),
+)
 await moveTo(500, 700)
 await page.mouse.down()
 await page.mouse.up()
 await sleep(100)
-check('a click on the drawing only closes it, and paints nothing', !(await panelShown()) && !(await canUndo()))
-await click('Advanced ▾')
-await keys('Escape')
-check('Esc closes it', !(await panelShown()))
-await click('Advanced ▾')
-await page.click('.advanced-panel .icon-button')
-await moveTo(500, 700)
-await page.mouse.down()
-await page.mouse.up()
-await sleep(100)
-check('pinned, it stays open, and the click paints', (await panelShown()) && (await canUndo()))
-check(
-  'the drawing area keeps its size',
-  heightBefore === (await page.evaluate(() => window.lydia.app.canvas.getBoundingClientRect().height)),
-)
-await keys('s')
-check('another tool: no Advanced', !(await panelShown()))
-await keys('b')
-check('back to the brush: still open (pinned)', await panelShown())
+check('a click on the drawing paints, as always', await canUndo())
 await keys('Control', 'z')
+await keys('s')
+check('a tool without a tip: no Stroke', (await strokeSettings()) === null)
+await keys('e')
+shown = await strokeSettings()
+check('the eraser has it too, still open', shown === 'Spacing,Stabilizer,Taper start,Taper end', shown)
+await keys('b')
+await page.click('.left-panels .stroke-button')
+check('it closes again', (await strokeSettings()) === '' && (await strokeOpen()) === 'false')
+await page.click('.left-panels .stroke-button')
 
 // The start thins out over 100 pixels
 await setRange('Taper start', 100)
@@ -346,11 +380,12 @@ await page.mouse.up()
 await page.evaluate(() => new Promise(r => requestAnimationFrame(r)))
 check('a long stroke ends quickly', Date.now() - t0 < 300, `${Date.now() - t0} ms`)
 
-const saved = await page.evaluate(() => [
-  localStorage.getItem('lydia.taper'),
-  localStorage.getItem('lydia.advancedPinned'),
-])
-check('remembered', saved[0] === '{"start":0,"end":100,"thins":"size"}' && saved[1] === 'on', saved.join(' '))
+const saved = await page.evaluate(() => [localStorage.getItem('lydia.taper'), localStorage.getItem('lydia.strokeOpen')])
+check(
+  'remembered, and Stroke open',
+  saved[0] === '{"start":0,"end":100,"thins":"size"}' && saved[1] === 'on',
+  saved.join(' '),
+)
 
 check('no errors', problems.length === 0, problems.join(' | '))
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED')

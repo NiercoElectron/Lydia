@@ -32,9 +32,9 @@ const check = (name, ok, extra = '') => {
   if (!ok) failures++
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`)
 }
-const button = text =>
-  page.evaluateHandle(text => [...document.querySelectorAll('button')].find(b => b.textContent === text), text)
-const click = async text => (await button(text)).click()
+// A button by its text: on the page, or an item of a menu, which is on the page too, only hidden (see MenuBar.tsx)
+const click = text =>
+  page.evaluate(text => [...document.querySelectorAll('button')].find(b => b.textContent === text).click(), text)
 const isDisabled = text =>
   page.evaluate(text => [...document.querySelectorAll('button')].find(b => b.textContent === text).disabled, text)
 const setRange = (selector, value) =>
@@ -232,10 +232,9 @@ check(
 )
 await waitForTip()
 await click('Save to my brushes')
-await page.waitForFunction(
-  () => document.querySelector('.designer-panel').textContent.includes('Saved to your brushes'),
-  { timeout: 5000 },
-)
+await page.waitForFunction(() => document.querySelector('.top-row').textContent.includes('Saved to your brushes'), {
+  timeout: 5000,
+})
 const stored = () =>
   page.evaluate(
     () =>
@@ -384,7 +383,7 @@ await paperStroke([
   [256, 320],
   [360, 200],
 ])
-await setRange('.editor-bar label[title^="How much"] input', 40)
+await setRange('.options-side label[title^="How much"] input', 40)
 await paperStroke([
   [180, 330],
   [330, 330],

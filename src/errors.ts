@@ -14,6 +14,7 @@ export const ERRORS = {
   'LYD-107': 'This autosaved drawing is damaged.',
   'LYD-108': 'Could not autosave the drawing.',
   'LYD-109': 'Could not recover the drawing.',
+  'LYD-110': 'This drawing is no longer at {file}. It may have been moved, renamed or deleted.',
   'LYD-201': 'This is not a Lydia brush.',
   'LYD-202': 'This brush was made by a newer version of Lydia. Update Lydia to use it.',
   'LYD-203': 'The tip of this brush is not a PNG image.',

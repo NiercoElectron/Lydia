@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { mkdir, open, readdir, rename, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { noteRecent } from './recent.mjs'
 
 // Lydia's files on the computer: its folders in Documents, and writing and reading them for the page. The page can only
 // reach files that came from here: a path chosen in a window of the system, or one in these folders
@@ -44,6 +45,7 @@ async function chooseToSave(event, name) {
   const defaultPath = path.join(projects(), `${safeName(name)}.${PROJECT_EXTENSION}`)
   if (TEST_FOLDER) {
     allowFile(defaultPath)
+    await noteRecent(defaultPath)
     return defaultPath
   }
   const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
@@ -52,6 +54,7 @@ async function chooseToSave(event, name) {
   })
   if (canceled || !filePath) return null
   allowFile(filePath)
+  await noteRecent(filePath)
   return filePath
 }
 
@@ -59,6 +62,7 @@ async function chooseToOpen(event) {
   if (TEST_FOLDER) {
     const file = path.join(projects(), process.env.LYDIA_TEST_OPEN)
     allowFile(file)
+    await noteRecent(file)
     return file
   }
   const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
@@ -68,6 +72,7 @@ async function chooseToOpen(event) {
   })
   if (canceled || filePaths.length === 0) return null
   allowFile(filePaths[0])
+  await noteRecent(filePaths[0])
   return filePaths[0]
 }
 

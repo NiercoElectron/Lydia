@@ -109,7 +109,7 @@ and PixiJS (WebGL 2).
 - Export the drawing as a PNG or JPEG image, at full size or enlarged (2× to 8×) with sharp square pixels
 - Save and open projects as `.lyd` files
 - The desktop app: projects, exports, brushes and the tray as files in `Documents\Lydia`, a `.lyd` opened with a double
-  click, memory limits read from the computer, the size of the interface, and new versions that arrive by themselves (on
+  click, the drawings opened lately on the start screen, with a picture each, memory limits read from the computer, the size of the interface, and new versions that arrive by themselves (on
   macOS a note leads to the download)
 - Autosave in the browser, with a Recover list after a crash, and the drawing reopened by itself when the browser loses
   the graphics card

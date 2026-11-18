@@ -74,20 +74,31 @@ to download it.
 
 ## The start screen
 
-- **New project…** opens a window to choose the paper:
-  - a size: paper sizes (A4, US Letter…) and screen sizes (Full HD…), or any width and height from 16 to 10000
-    pixels;
+It has three columns, as Krita's: **Start** and **Links** at the left, the drawings in the middle, and what's new at
+the right. On a narrow window they go one under the other.
+
+- **New project…** opens a window to choose the paper. At its left, a list of sizes, as in Krita: **Custom**, screen
+  sizes (Full HD, 4K UHD, Square), paper sizes at the resolution chosen (A4, US Letter…) and pixel art (64×64, 128×128,
+  256×256). At its right:
+  - the size, from the list or typed in: any width and height from 16 to 10000 pixels (a size typed in is Custom);
   - a **Resolution** in DPI (72, 150, 300, 600, or typed in), which only matters for printing: exported images say it,
     so they print at the size of their paper;
   - a background color, or **Transparent**.
 
-  Lydia remembers the last choice.
+  Lydia remembers the last choice. **Save as preset…** keeps what is chosen (size, resolution and background) with a
+  name you type: it goes under **My presets**, at the top of the list, and choosing it brings all three back. A preset
+  saved with a name already used takes its place, and the **×** beside a preset (under the pointer) deletes it.
 
 - **Open project** opens a `.lyd` file saved by Lydia.
 - **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Its window chooses first what it starts from, the
   kind of brush, **Smooth** or **Pixel** (for pixel art), and the size of the paper for its tip: 256, 512 or 1024 pixels for
   a smooth brush, 16, 32 or 64 for a pixel brush.
-- **Recover**, under them, shows up when there are drawings closed with changes that weren't saved (see
+- **Links**: the **Guide** (this page), Lydia on **GitHub**, and **Report a bug**, which opens GitHub's form for one.
+- **Recent**, in the middle, in the desktop app: the drawings opened or saved lately, newest first, each with a
+  picture of how it was when last saved or closed. A click opens it, and its **×** takes it out of the list (the file
+  stays where it is). One whose file was moved, renamed or deleted says so (LYD-110) and leaves the list. In a browser
+  there is no such list: a page can't open a file again without it being chosen again.
+- **Recover**, in the middle too, shows up when there are drawings closed with changes that weren't saved (see
   [Autosave](#autosave-and-recovering-a-drawing)).
 - **What's New?**, at the right (below, in a narrow window): what changed in each version, the newest open. Click a
   version to open or close it.
@@ -175,12 +186,13 @@ they stay until taken out.
   pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with.
   With a brush that follows the pen's tilt, it leans with the pen, in the air too. The Pixel brush's outline
   goes along the pixels it will paint. A brush of 24 pixels or more on the screen has a dot in its middle, to aim
-  with. A brush smaller than 8 pixels on the screen shows a cross instead. The
-  **Outline** button, next to Grid, turns it off, for the cross always.
-- **Advanced**, in the bar, opens a panel over the drawing with the settings changed less often: the stabilizer and
-  the taper, below. Clicking elsewhere (which doesn't paint) or Esc closes it. Its **pin** keeps it open, also the
-  next time; the Advanced button then closes it.
-- **The stabilizer** smooths the strokes, for steady lines with a shaky hand. **Stabilizer**, under Advanced, goes from
+  with. A brush smaller than 8 pixels on the screen shows a cross instead. **View > Brush outline** turns it off, for
+  the cross always.
+- **Stroke**, in the panel under the size and the opacity, has the settings of the stroke: the spacing, the
+  stabilizer and the taper, below. Its button, beside Rulers, opens them under its row, and again closes them; Lydia remembers how you
+  left it. They are there for the brush, the eraser, smudge, blur and liquify (the spacing and the taper for the brush
+  and the eraser).
+- **The stabilizer** smooths the strokes, for steady lines with a shaky hand. **Stabilizer**, under Stroke, goes from
   0 (off) to 100 and is the same for every brush:
   - **Smooth**: the brush chases the pen, lagging behind it and cutting its wobbles. The stronger, the more it lags.
     When the pen holds still, the brush keeps going until it reaches it;
@@ -190,7 +202,7 @@ they stay until taken out.
   While the brush lags, a line joins it to the pen, and the outline is where the brush is. When the pen comes up, the
   stroke goes on to where it left.
 
-- **The taper** thins out the ends of every stroke, even with the mouse, like a stroke of ink. Under Advanced:
+- **The taper** thins out the ends of every stroke, even with the mouse, like a stroke of ink. Under Stroke:
   - **Taper start** and **Taper end**: over how many pixels of the paper (0 is not at all) the stroke thins out from
     its start, and before its end. The end thins out the moment the pen comes up, since only then is it known;
   - **Thins**: what thins out, the **Size**, the **Opacity** or **Both**.
@@ -203,7 +215,7 @@ they stay until taken out.
   they only paint its higher places, leaving the grooves white; pressed harder, they fill more of them. Going over the
   same place again in one stroke doesn't fill them. With the mouse, a brush paints as at full pressure, which still
   leaves some grooves white.
-  - **Spacing**, under **Advanced**, is how far apart the copies of the tip go. Smaller closes up a brush that stamps. It stays
+  - **Spacing**, under **Stroke**, is how far apart the copies of the tip go. Smaller closes up a brush that stamps. It stays
     for each brush while the drawing is open, and the brush itself doesn't change: the **Brush Designer** changes that.
   - **Import…** adds brushes from `.lydbrush` files, and from other apps: Krita's `.kpp` and `.bundle`, GIMP's `.gbr` and `.gih`
     and Photoshop's `.abr`. Dropping the files on the window does the same. A brush from another app becomes a Lydia brush,
@@ -242,7 +254,7 @@ Brush's button in the tool column goes back to the mode used last.
 - They only read the active layer, and only change that layer: a line on the layer above isn't pulled in.
 - With a selection, they only change what is inside it. With the layer's transparency locked, they only color the paint
   already there.
-- **The stabilizer**, under Advanced, works here too.
+- **The stabilizer**, under Stroke, works here too.
 
 ## Liquify
 
@@ -621,15 +633,23 @@ can't open it again, the drawing is in **Recover**.
 
 Opened from the start screen, it draws the tip of a new brush, or changes a brush: **Start from** chooses one, which
 opens with its tip on the paper and its settings (the Pixel brush isn't there: its tip is worked out for each size).
+It is laid out like the editor: the menus and the buttons that save the brush on top, the tools and their settings at
+the left, the paper in the middle with the view's controls under it, and the brush at the right, with the area to try
+it always at its foot.
 
-- Paint the tip on the paper: black paints fully, gray paints lightly, white doesn't paint. **Brush** and **Eraser**,
-  with **Edge** (Soft or Hard), **Strength** and **Size** in the bar; **Clear paper** starts again.
+- Paint the tip on the paper: black paints fully, gray paints lightly, white doesn't paint. **Brush** and **Eraser**
+  are in the column at the left, with **Edge** (Soft or Hard), **Strength**, **Size** and **Stroke** (the stabilizer
+  and the taper, as in the editor) beside them. **Edit > Clear paper** starts again. **View** has Fit, Flip, the
+  pixel grid, sharp pixels and the brush outline.
 - **Use image…** puts an image on the paper, made smaller if it doesn't fit: dark places paint, light or transparent
   ones don't. It can be retouched and undone like anything painted. **Invert** turns the paper around: what painted
   doesn't, and the other way round.
-- Give it a **Name**, and choose how it paints: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow,
-  Wash (the stroke doesn't pile up over itself) and the pen's pressure. **Noise** gives every copy of the tip a
-  texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
+- Give it a **Name**, and choose how it paints. The settings are in groups, as in Krita's brush editor: choosing a
+  group in the list shows its settings beside it. Pointing at each setting explains it.
+  - **Shape**: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow and Wash (the stroke doesn't pile up
+    over itself).
+  - **Pressure**: what the pen's pressure changes, the size or the flow.
+  - **Noise** gives every copy of the tip a texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast.
 - **Pen tilt** is for pens that tell how they lean (most drawing pens and tablets do), each setting starting off:
   - **Turn the tip**: the tip turns toward where the pen leans, like a flat marker. **Angle** is how it is turned when
     the pen leans to the right.
@@ -644,15 +664,18 @@ opens with its tip on the paper and its settings (the Pixel brush isn't there: i
   **Picture**, one of the four that come with Lydia (Paper, Rough, Canvas, Noise) or **Import…** any image (darker is
   higher, where light pressure already paints), its **Depth** (how much of the paper a light touch leaves out; 0% is
   no grain) and its **Scale** (how big the picture is on the paper). The picture goes in the brush's file.
-- **Try it** paints with the brush as it is now, at any size; **Clear** wipes the test area.
-- **Save to my brushes** adds it to the brush list, and **Export file** saves it as a `.lydbrush` file. A brush that
+- **Try it**, always in sight under the settings, paints with the brush as it is now, at any size; **Clear** wipes
+  the test area.
+- **Save to my brushes**, on top (and in the File menu), adds it to the brush list, and **Export file** saves it as a
+  `.lydbrush` file. **File > Back** goes back to the start screen. A brush that
   comes with Lydia never changes: it opens as a copy. Your own is saved with **Save changes**, or kept as a new brush,
   leaving it as it was, with **Save copy**.
 
-**A pixel brush** (Pixel in the window that opens it) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
-Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
-The tip is cut to its painted pixels. The settings that turn or flatten the tip or give it noise or a paper grain are
-left out (with Pen tilt, only Bigger stays); the new brush starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
+**A pixel brush** (Pixel in the window that opens it) is drawn on a small paper, zoomed in with the pixel grid, with
+Lydia's Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to
+choose. The tip is cut to its painted pixels. The settings that turn or flatten the tip are left out (with Pen tilt,
+only Bigger stays), and so are Noise and Paper grain; the new brush starts placing its tip at every pixel (Spacing
+1%), at one size whatever the pen's pressure.
 
 ## When something goes wrong
 

@@ -24,6 +24,9 @@ type Desktop = {
   abortWriting: (id: number) => Promise<void>
   sizeOf: (file: string) => Promise<number>
   readChunk: (file: string, offset: number, length: number) => Promise<Uint8Array>
+  listRecent: () => Promise<{ file: string; time: number }[]>
+  openRecent: (file: string) => Promise<boolean> // false: it isn't in the list
+  forgetRecent: (file: string) => Promise<void>
   openFolder: () => Promise<string>
   takeUpdate: () => Promise<Update | null>
   onUpdate: (listener: (update: Update) => void) => void

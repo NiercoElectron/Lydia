@@ -646,14 +646,14 @@ const choose = name =>
   }, name)
 const spacingShown = () =>
   page.evaluate(() => {
-    const row = [...document.querySelectorAll('.advanced-panel label')].find(each =>
+    const row = [...document.querySelectorAll('.left-panels .toolbar label')].find(each =>
       each.textContent.startsWith('Spacing'),
     )
     return row ? Number(row.querySelector('input').value) : null
   })
 const setSpacing = value =>
   page.evaluate(value => {
-    const row = [...document.querySelectorAll('.advanced-panel label')].find(each =>
+    const row = [...document.querySelectorAll('.left-panels .toolbar label')].find(each =>
       each.textContent.startsWith('Spacing'),
     )
     const input = row.querySelector('input')
@@ -678,9 +678,9 @@ const strokeCovers = () =>
 
 await choose('Gray tip')
 await sleep(400)
-await page.click('.advanced-menu > button')
-await sleep(150)
-check('Advanced shows the spacing of the brush', (await spacingShown()) === 40, `${await spacingShown()}`)
+await page.click('.stroke-button[aria-expanded="false"]')
+await sleep(100)
+check('Stroke shows the spacing of the brush', (await spacingShown()) === 40, `${await spacingShown()}`)
 await setSpacing(100)
 await sleep(150)
 const apart = await strokeCovers()
@@ -700,7 +700,6 @@ const kept = await page.evaluate(async () => {
   return (await loadBrushes()).find(each => each.preset.name === 'Gray tip').preset.spacing
 })
 check('the brush keeps its own spacing', near(kept, 0.4), `${kept}`)
-await page.click('.advanced-menu > button')
 
 // Only what is meant: the errors above were shown on purpose, as messages
 check('no errors or warnings on the page', problems.length === 0, problems.join(' | '))

@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { allowFile, setUpFiles } from './files.mjs'
 import { readMemory } from './memory.mjs'
+import { noteRecent, setUpRecent } from './recent.mjs'
 import { installIfWanted, setUpUpdates } from './updates.mjs'
 
 // The desktop app: a window that shows Lydia. It is the same app as in the browser, built by Vite into "dist", and this
@@ -48,6 +49,7 @@ const projectIn = args => args.slice(1).find(arg => arg.toLowerCase().endsWith('
 
 function openProject(file) {
   allowFile(file)
+  void noteRecent(file)
   const [window] = BrowserWindow.getAllWindows()
   if (window) {
     if (window.isMinimized()) window.restore()
@@ -164,6 +166,7 @@ app.whenReady().then(async () => {
   memory = await readMemory()
   protocol.handle(SCHEME, serveBuiltApp)
   setUpFiles()
+  setUpRecent()
   setUpUpdates()
   const started = projectIn(process.argv)
   if (started) openProject(started)

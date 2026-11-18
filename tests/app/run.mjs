@@ -10,7 +10,7 @@ const SIDE_BY_SIDE = 4 // the tests running at a time, each with its own server,
 const FIRST_PORT = 5198
 const TIME_LIMIT = 10 * 60 * 1000
 // They measure how long things take, so they run alone at the end: the others would slow them down
-const ALONE = ['advanced-menu', 'fill', 'move-tool', 'pixel-grid', 'selections', 'tool-column', 'tray']
+const ALONE = ['fill', 'move-tool', 'pixel-grid', 'selections', 'stroke-settings', 'tool-column', 'tray']
 // A busy computer can make them miss a limit by a little, so they fail only when every try does
 const TRIES_ALONE = 3
 

@@ -305,8 +305,13 @@ await page.click('.home-actions button:nth-child(3)')
 await click('Open Brush Designer')
 await page.waitForFunction(() => document.querySelector('.shape-controls'), { timeout: 60000 })
 const controls = await page.$eval('.shape-controls', el => el.textContent)
-await page.$eval('.shape-controls h3', el => el.scrollIntoView())
+await page.evaluate(() =>
+  [...document.querySelectorAll('.shape-tabs button')].find(each => each.textContent === 'Pen tilt').click(),
+)
+await sleep(100)
+const tiltShown = await page.$$eval('.shape-page:not([hidden]) label', labels => labels.map(each => each.textContent))
 await page.screenshot({ path: `${OUT}/pen-tilt-designer.png` })
+check('under its own tab', tiltShown.length === 3 && tiltShown[0].includes('Turn the tip'), tiltShown.join(' / '))
 check(
   'the Brush Designer has the pen tilt settings',
   ['Pen tilt', 'Turn the tip', 'Bigger', 'Flatter'].every(each => controls.includes(each)),
