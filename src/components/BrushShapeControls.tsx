@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { errorMessage } from '../errors'
 import { useLanguage } from '../i18n'
-import type { BrushShape, NoiseMode } from '../engine/brushFile'
+import { MAX_TILT_FLATTEN, MAX_TILT_SIZE, type BrushShape, type NoiseMode } from '../engine/brushFile'
 import { grainFromImage } from '../engine/brushTip'
 import { GRAINS, grainPicture, type GrainId } from '../grains'
 import { SliderValue } from './SliderValue'
@@ -28,7 +28,7 @@ type Props = {
 }
 
 // The settings of a brush, in the Brush Designer. Fractions in the file are shown as percents. A pixel brush's tip is
-// never turned and has no noise nor paper grain, so those settings are left out for it
+// never turned nor flattened, and has no noise nor paper grain, so those settings are left out for it
 export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Props) {
   const { t } = useLanguage()
   const change = (changes: Partial<BrushShape>) => onChange({ ...shape, ...changes })
@@ -129,6 +129,42 @@ export function BrushShapeControls({ shape, onChange, grain, onGrainChange }: Pr
         checked={shape.pressureFlow}
         onChange={checked => change({ pressureFlow: checked })}
       />
+      <h3>{t('Pen tilt')}</h3>
+      {!isPixel && (
+        <Check
+          label={t('Turn the tip')}
+          hint={t(
+            'The tip turns toward where the pen leans. Angle is how it is turned when the pen leans to the right',
+          )}
+          checked={shape.tiltTurn}
+          onChange={checked => change({ tiltTurn: checked })}
+        />
+      )}
+      <Slider
+        label={t('Bigger')}
+        hint={t(
+          'How much bigger the brush gets as the pen leans: at 100%, twice as big lying down. Upright, it is the brush size',
+        )}
+        min={0}
+        max={percent(MAX_TILT_SIZE)}
+        step={5}
+        value={percent(shape.tiltSize)}
+        unit="%"
+        onChange={value => change({ tiltSize: value / 100 })}
+      />
+      {!isPixel && (
+        <Slider
+          label={t('Flatter')}
+          hint={t(
+            'How flat the tip gets as the pen leans, lying down. With Turn the tip, a round tip makes the long mark of a pencil on its side',
+          )}
+          min={0}
+          max={percent(MAX_TILT_FLATTEN)}
+          value={percent(shape.tiltFlatten)}
+          unit="%"
+          onChange={value => change({ tiltFlatten: value / 100 })}
+        />
+      )}
       {!isPixel && (
         <>
           <h3>{t('Noise')}</h3>

@@ -34,7 +34,7 @@ import type { Dab } from './dabs'
 // dab's center, size, angle, flow and seed. Like the other dabs, they are painted white into the stroke's own tiles
 // (see brush.ts)
 
-const FLOATS_PER_DAB = 6 // x, y, size, angle, alpha, seed
+const FLOATS_PER_DAB = 7 // x, y, size, angle, alpha, seed, roundness
 const MODES = { mix: 0, drops: 1, worn: 2 }
 // "worn" wears away a blurred copy of the tip, so that a hard tip has an edge to wear: read from its smaller copy of
 // about this many pixels across, and blurred over this much of the tip around each point
@@ -49,6 +49,7 @@ in float aSize;
 in float aAngle;
 in float aAlpha;
 in float aSeed;
+in float aRoundness;
 
 uniform mat3 uProjectionMatrix;
 uniform mat3 uWorldTransformMatrix;
@@ -63,7 +64,8 @@ flat out uint vSeed;
 void main(void) {
   // A corner of the tip's picture, with a margin around it for drops that stick out, turned with the dab
   vec2 square = aPosition * (1.0 + 2.0 * uMargin);
-  vec2 corner = square * uTipShape * vec2(aSize, abs(aSize)); // a negative size mirrors the tip, left to right
+  // A negative size mirrors the tip, left to right; the pen's tilt can squash it along its own up and down
+  vec2 corner = square * uTipShape * vec2(aSize, abs(aSize) * aRoundness);
   float c = cos(aAngle);
   float s = sin(aAngle);
   vec2 position = aCenter + vec2(corner.x * c - corner.y * s, corner.x * s + corner.y * c);
@@ -229,6 +231,7 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
       aAngle: perDab('float32', 3),
       aAlpha: perDab('float32', 4),
       aSeed: perDab('float32', 5),
+      aRoundness: perDab('float32', 6),
     },
     indexBuffer: new Uint32Array([0, 1, 2, 0, 2, 3]),
   })
@@ -277,6 +280,7 @@ export function createNoiseDabs(renderer: WebGLRenderer, startTexture: Texture, 
       dabData[at + 3] = dab.angle
       dabData[at + 4] = dab.alpha
       dabData[at + 5] = dab.seed
+      dabData[at + 6] = dab.roundness ?? 1
     })
     dabBuffer.update(dabs.length * FLOATS_PER_DAB * 4)
     geometry.instanceCount = dabs.length

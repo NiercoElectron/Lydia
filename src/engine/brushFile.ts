@@ -24,6 +24,12 @@ export type BrushShape = {
   wash: boolean // the stroke doesn't pile up over itself: each pixel keeps the most paint one dab gave it
   pressureSize: boolean // the pen's pressure changes the size of the dabs
   pressureFlow: boolean // the pen's pressure changes how much paint each dab puts down
+  // The pen's tilt (see dabs.ts): the tip turns toward where the pen leans; it gets bigger as the pen leans, up to
+  // 1 + "tiltSize" times lying down; and it gets flatter, down to 1 - "tiltFlatten" of its height. A pixel brush's tip
+  // never turns nor flattens, so it only uses "tiltSize"
+  tiltTurn: boolean
+  tiltSize: number
+  tiltFlatten: number
   // Filtered noise in each dab (see noiseDabs.ts): how much of the paint it decides (0 = no noise), how many grains
   // fit across the tip, how many layers of finer grains are added, how many times longer than tall the grains are
   // (streaks across the tip), and its contrast
@@ -74,6 +80,9 @@ export const DEFAULT_SHAPE: BrushShape = {
   wash: false,
   pressureSize: true,
   pressureFlow: false,
+  tiltTurn: false,
+  tiltSize: 0,
+  tiltFlatten: 0,
   noiseMode: 'mix',
   noiseAmount: 0,
   noiseGrain: 8,
@@ -86,6 +95,10 @@ export const DEFAULT_SHAPE: BrushShape = {
   grainScale: 1,
 }
 
+// How much the pen's tilt can change a brush: up to 3 times as big lying down, and down to a tenth of its height
+export const MAX_TILT_SIZE = 2
+export const MAX_TILT_FLATTEN = 0.9
+
 // The smallest and biggest values of each number, so a file can't make Lydia place millions of dabs
 const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
   spacing: [0.01, 10],
@@ -93,6 +106,8 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
   angleJitter: [0, 1],
   scatter: [0, 5],
   flow: [0, 1],
+  tiltSize: [0, MAX_TILT_SIZE],
+  tiltFlatten: [0, MAX_TILT_FLATTEN],
   noiseAmount: [0, 1],
   noiseGrain: [1, 64],
   noiseLayers: [1, 4],
@@ -125,6 +140,8 @@ const LIMITS: { [K in keyof BrushShape]?: [number, number] } = {
 // the paper: darker is higher, where light pressure already paints, and lighter is the grooves, which only more
 // pressure fills ("grainDepth" says how deep they are). Versions of Lydia before 0.14.0, which brought it, paint
 // without it.
+//
+// "tiltTurn", "tiltSize" and "tiltFlatten" came in 1.2.0; versions before it paint as if the pen had no tilt.
 //
 // A missing field takes its usual value (DEFAULT_SHAPE), and fields Lydia doesn't know are left alone, so a file from
 // a newer version of the same format still opens. A brush file is only data: nothing in it is ever run, so brushes downloaded from anywhere

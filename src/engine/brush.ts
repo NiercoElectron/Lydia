@@ -13,6 +13,7 @@ import {
   type DabPath,
   type StrokePoint,
   type TaperSettings,
+  type Tilt,
 } from './dabs'
 import type { GpuTiles } from './gpuTiles'
 import { createGrainPass, grainOf, type GrainSettings } from './grain'
@@ -366,8 +367,9 @@ export function createBrush(
   let strokePoints: StrokePoint[] = []
   let strokeDabs: Dab[] = []
 
-  // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1
-  function startStroke(x: number, y: number, pressure: number) {
+  // Start a stroke at this point of the paper. The pen's pressure goes from 0 to 1; its tilt, if it has one, is how it
+  // leans on the paper (see dabs.ts)
+  function startStroke(x: number, y: number, pressure: number, tilt?: Tilt) {
     history.begin(stack.active)
     const { color, opacity, blendMode } = settings
     const erase = settings.tool === 'eraser'
@@ -380,10 +382,11 @@ export function createBrush(
       pixelPerfect: settings.pixelPerfect && shape.pixel !== 'none',
       grain: grainOf(tip, shape),
     }
-    strokePoints = [{ x, y, pressure }]
+    const first = tilt ? { x, y, pressure, tilt } : { x, y, pressure }
+    strokePoints = [first]
     strokeDabs = []
     path = createDabPath(spacedShape(), strokeStart.size, { ...strokeStart, tip: tip.image })
-    paintDabs(path.start({ x, y, pressure }))
+    paintDabs(path.start(first))
   }
 
   // Continue the stroke through these points
@@ -400,7 +403,8 @@ export function createBrush(
     a.angle === b.angle &&
     a.alpha === b.alpha &&
     a.seed === b.seed &&
-    a.pressure === b.pressure
+    a.pressure === b.pressure &&
+    a.roundness === b.roundness
 
   // The end of a stroke can only taper once the stroke has ended and its length is known, and a short stroke's start
   // tapers less than was painted (see dabs.ts). So the stroke is worked out again from its points, with the same random
@@ -441,14 +445,14 @@ export function createBrush(
   // view.ts); null before the first one
   let lastEnd: Point | null = null
 
-  // Paint a straight line from one point of the paper to another, at this pressure, as a stroke of its own. A pixel
-  // brush's goes along the pixels Bresenham's way (see dabs.ts). Returns whether it changed anything (and so was
-  // added to the undo history)
-  function paintLine(from: Point, to: Point, pressure: number) {
-    const start = { ...from, pressure }
-    const end = { ...to, pressure }
+  // Paint a straight line from one point of the paper to another, at this pressure and tilt, as a stroke of its own.
+  // A pixel brush's goes along the pixels Bresenham's way (see dabs.ts). Returns whether it changed anything (and so
+  // was added to the undo history)
+  function paintLine(from: Point, to: Point, pressure: number, tilt?: Tilt) {
+    const start = { x: from.x, y: from.y, pressure, tilt }
+    const end = { x: to.x, y: to.y, pressure, tilt }
     const points = shape.pixel === 'none' ? [start, end] : pixelLinePoints(shape, settings.size, start, end, tip.image)
-    startStroke(points[0].x, points[0].y, pressure)
+    startStroke(points[0].x, points[0].y, pressure, tilt)
     continueStroke(points.slice(1))
     const changed = endStroke()
     lastEnd = to // exactly where it was asked to end, for the next line, even where the pixels are rounded
@@ -462,7 +466,8 @@ export function createBrush(
     const pixelSize =
       shape.pixel === 'drawn' ? Math.max(1, Math.round(settings.size / tipSide)) * tipSide : settings.size
     const tipReach = shape.pixel === 'none' ? settings.size * (tip.reach / 2 + noiseReach(shape)) : pixelSize / 2 + 1
-    return tipReach + shape.scatter * settings.size
+    // The pen's tilt can make it bigger
+    return (tipReach + shape.scatter * settings.size) * (1 + shape.tiltSize)
   }
 
   // How much the tip is turned now, in radians, clockwise: as the brush is made, and also with the direction of the

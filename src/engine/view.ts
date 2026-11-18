@@ -1,6 +1,6 @@
 import { Graphics, type Application, type Container } from 'pixi.js'
 import type { Brush } from './brush'
-import type { StrokePoint } from './dabs'
+import { penSize, type Pen, type StrokePoint, type Tilt } from './dabs'
 import type { MixTools } from './mixTools'
 import { pixelBrushOutline, tipOutline } from './brushOutline'
 import type { BrushTip } from './brushTip'
@@ -38,6 +38,9 @@ const CENTER_DOT = 24 // a brush at least this many pixels of the screen across 
 const DOT_SIDE = 2 // the dot's side, in pixels of the screen, made whole pixels of the display
 const DOT_LENGTH = 0.01 // the dot is a piece of line this long and as wide as its side: a square, and a hair more
 const CHOOSE_RULER = 10 // pixels of the screen a stroke goes before it chooses one of several rulers (see rulers.ts)
+// A pen leaning this far from upright counts as lying down: Wacom's pens tell up to 60°, and few tell more
+const LYING_DOWN = Math.PI / 3
+const MOST_TILT = 89 // degrees: a pen's tilt is kept under 90°, where it would lie flat and its top have no place
 const LINE_END_REACH = 12 // how close to the end of a line shape the pointer has to go, in pixels of the screen
 const LINE_END_RADIUS = 6
 const SYMMETRY_HANDLE = 60 // how far from the symmetry's center the handle that turns it starts, in pixels of the screen
@@ -269,6 +272,37 @@ export function createView(
   // The pen's pressure makes the brush smaller or bigger; the mouse always paints at full size
   const pressureOf = (e: PointerEvent) => (e.pointerType === 'pen' ? e.pressure : 1)
 
+  // Which way a direction on the screen points on the paper, with the view turned and flipped, as long as before
+  function paperDirection(x: number, y: number): Point {
+    const cos = Math.cos(world.rotation)
+    const sin = Math.sin(world.rotation)
+    const paperX = (cos * x + sin * y) / world.scale.x
+    const paperY = (cos * y - sin * x) / world.scale.y
+    const scale = Math.hypot(x, y) / Math.hypot(paperX, paperY)
+    return { x: paperX * scale, y: paperY * scale }
+  }
+
+  // How the pen leans, on the paper (see dabs.ts). A pen tells it as two angles, in degrees: how far its top leans to
+  // the right ("tiltX") and toward the person drawing, down the screen ("tiltY"). Upright, both are 0, as they are for
+  // a pen that doesn't know its tilt: then it has none, like the mouse
+  function tiltOf(e: { pointerType: string; tiltX: number; tiltY: number }): Tilt | undefined {
+    if (e.pointerType !== 'pen' || (!e.tiltX && !e.tiltY)) return undefined
+    const clamped = (degrees: number) => (Math.max(-MOST_TILT, Math.min(MOST_TILT, degrees)) * Math.PI) / 180
+    // Where the pen's top is over the screen, for a pen as long as 1 going up from it
+    const x = Math.tan(clamped(e.tiltX))
+    const y = Math.tan(clamped(e.tiltY))
+    const lean = Math.min(1, Math.atan(Math.hypot(x, y)) / LYING_DOWN)
+    const toward = paperDirection(x, y)
+    const length = Math.hypot(toward.x, toward.y)
+    return { x: (toward.x / length) * lean, y: (toward.y / length) * lean }
+  }
+
+  // The pen at a pointer event: its pressure, and its tilt, if it has one
+  function penOf(e: PointerEvent): Pen {
+    const tilt = tiltOf(e)
+    return tilt ? { pressure: pressureOf(e), tilt } : { pressure: pressureOf(e) }
+  }
+
   // Pick the color the screen shows under the pointer. Where there is none (outside the paper, or nothing painted on a
   // transparent paper), the color stays as it was
   function pickColor(e: PointerEvent) {
@@ -285,7 +319,7 @@ export function createView(
     hoverPoint = null
     const line = e.shiftKey ? straightLineTo(onScreen(e)) : null
     if (line) {
-      const changed = brush.paintLine(line.from, line.to, pressureOf(e))
+      const changed = brush.paintLine(line.from, line.to, pressureOf(e), tiltOf(e))
       return {
         move() {},
         up() {
@@ -301,17 +335,19 @@ export function createView(
   // it stays exactly on them
   function stroke(e: PointerEvent, worker: Brush | MixTools | Liquify, onChanged: () => void): Gesture {
     hoverPoint = null
-    const point = { ...toPaper(e), pressure: pressureOf(e) }
+    const point: StrokePoint = { ...toPaper(e), ...penOf(e) }
     const rulers = actions.getRulers()
     if (rulers.isOn && rulers.list.length > 0) hold = createHold(rulers.list, point, CHOOSE_RULER / currentZoom())
-    worker.startStroke(point.x, point.y, point.pressure)
+    // Only the brush and the eraser follow the pen's tilt
+    if (worker === brush) brush.startStroke(point.x, point.y, point.pressure, point.tilt)
+    else worker.startStroke(point.x, point.y, point.pressure)
     if (stabilizerSettings.strength > 0) {
       stabilizer = createStabilizer(stabilizerSettings, point, currentZoom(), performance.now())
     }
     return {
       move(e) {
         // The browser groups fast movements into one event; get all the points in between
-        const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), pressure: pressureOf(ev) }))
+        const points = (e.getCoalescedEvents?.() ?? [e]).map(ev => ({ ...toPaper(ev), ...penOf(ev) }))
         worker.continueStroke(held(stabilizer ? stabilizer.follow(points, performance.now()) : points))
       },
       up(e) {
@@ -853,7 +889,8 @@ export function createView(
   //
   // With the mouse, it is as big as the brush paints at full pressure. With a pen and a brush whose size follows the
   // pressure, it is as big as the pen paints now: while painting, at the pen's pressure, and while the pen is in the
-  // air, at the last pressure it painted with, so the outline is the size the next stroke will likely be (decision 69)
+  // air, at the last pressure it painted with, so the outline is the size the next stroke will likely be (decision 69).
+  // A brush that follows the pen's tilt shows it as the pen leans now, in the air too: turned, bigger and flatter
   const brushOutline = createContrastLines(app.stage, pixelGrid)
   let isOutlineOn = true
   let isOutlineShown = false
@@ -863,19 +900,30 @@ export function createView(
   // The pen's latest pressure while it touched the drawing, kept while it is in the air; null with the mouse, or a pen
   // that hasn't touched the drawing yet
   let penPressure: number | null = null
+  // How the pen leans now, as it told it (see tiltOf), while it is over the drawing; null with the mouse
+  let penTilt: { tiltX: number; tiltY: number } | null = null
 
-  function notePressure(e: PointerEvent) {
+  function notePen(e: PointerEvent) {
     if (e.pointerType !== 'pen') penPressure = null
     else if (e.buttons & 1 && e.pressure > 0) penPressure = e.pressure
+    penTilt = e.pointerType === 'pen' ? { tiltX: e.tiltX, tiltY: e.tiltY } : null
   }
 
   function showBrushOutline() {
     const at = pointer
     const used = gesture?.tool ?? currentTool()
-    // Smudge, blur and liquify keep their size: the pen's pressure changes their strength
-    const pressure = penPressure !== null && brush.getShape().pressureSize && !hasStrength(used) ? penPressure : 1
+    // Smudge, blur and liquify keep their size: the pen's pressure changes their strength. Nor do they follow its tilt
+    const shape = brush.getShape()
+    const pen: Pen = {
+      pressure: penPressure ?? 1,
+      tilt: penTilt && !hasStrength(used) ? tiltOf({ pointerType: 'pen', ...penTilt }) : undefined,
+    }
     const isCircle = used === 'liquify' // it doesn't work through the brush's tip
-    const size = isCircle ? Math.max(brush.settings.size, MIN_LIQUIFY_SIZE) : brush.settings.size * pressure
+    const size = isCircle
+      ? Math.max(brush.settings.size, MIN_LIQUIFY_SIZE)
+      : hasStrength(used)
+        ? brush.settings.size
+        : penSize(shape, brush.settings.size, pen)
     const isShown =
       isOutlineOn &&
       at !== null &&
@@ -900,11 +948,14 @@ export function createView(
 
     const center = line ? line.to : ((hold ?? stabilizer)?.brushAt() ?? paperAt(at))
     const tip = brush.getTip()
-    const pixelTip = brush.getShape().pixel
+    const pixelTip = shape.pixel
     const isPixel = pixelTip !== 'none'
-    const angle = brush.tipAngle()
+    const lean = pen.tilt ? Math.min(1, Math.hypot(pen.tilt.x, pen.tilt.y)) : 0
+    const turn = shape.tiltTurn && pen.tilt && lean > 0 ? Math.atan2(pen.tilt.y, pen.tilt.x) : 0
+    const angle = brush.tipAngle() + turn
+    const roundness = 1 - shape.tiltFlatten * lean
     const { position, scale, rotation } = world
-    const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle, line?.from.x, line?.from.y]
+    const key = [at.x, at.y, center.x, center.y, isShown, size, isPixel, angle, roundness, line?.from.x, line?.from.y]
       .concat([position.x, position.y, scale.x, scale.y, rotation, isCircle, app.renderer.resolution])
       .join()
     if (key === outlineKey && tip === outlineTip) return
@@ -926,7 +977,10 @@ export function createView(
       const cos = Math.cos(angle) * size
       const sin = Math.sin(angle) * size
       loops = tipOutline(tip).map(loop =>
-        loop.map(p => ({ x: center.x + p.x * cos - p.y * sin, y: center.y + p.x * sin + p.y * cos })),
+        loop.map(p => {
+          const y = p.y * roundness // squashed along its own up and down, before it turns (see dabPainter.ts)
+          return { x: center.x + p.x * cos - y * sin, y: center.y + p.x * sin + y * cos }
+        }),
       )
     }
     const onScreenLoops = loops.map(loop => loop.map(toScreen))
@@ -1043,7 +1097,7 @@ export function createView(
   function handlePointerDown(e: PointerEvent) {
     if (gesture) return // already busy with another pointer
     pointer = onScreen(e) // a pen can touch the drawing without hovering over it first
-    notePressure(e)
+    notePen(e)
     if (e.button !== 0 && e.button !== 1) return
     e.preventDefault() // the middle button would otherwise start the browser's auto-scroll
     // That also keeps the keyboard where it was, so take it away from a text field (like the brush name) as any other
@@ -1080,7 +1134,7 @@ export function createView(
 
   function handlePointerMove(e: PointerEvent) {
     pointer = onScreen(e)
-    notePressure(e)
+    notePen(e)
     if (gesture) {
       if (e.pointerId === gesture.pointerId) gesture.move(e)
       return

@@ -1,4 +1,4 @@
-import type { StrokePoint } from './dabs'
+import { penBetween, type StrokePoint } from './dabs'
 import type { Point } from './selection'
 
 // Rulers (decision 78): while they are on, a stroke doesn't go where the pen goes, but along the ruler that fits it. It
@@ -94,9 +94,9 @@ type Track = (last: StrokePoint, pen: StrokePoint) => StrokePoint[]
 const freeTrack: Track = (_, pen) => [pen]
 
 function straightTrack(start: Point, direction: Point): Track {
-  return (_, { x, y, pressure }) => {
+  return (_, { x, y, pressure, tilt }) => {
     const along = (x - start.x) * direction.x + (y - start.y) * direction.y
-    return [{ x: start.x + direction.x * along, y: start.y + direction.y * along, pressure }]
+    return [{ x: start.x + direction.x * along, y: start.y + direction.y * along, pressure, tilt }]
   }
 }
 
@@ -160,7 +160,7 @@ function ellipseTrack(ruler: Extract<Ruler, { kind: 'ellipse' }>, start: Point):
       points.push({
         x: center.x + x * cos - y * sin,
         y: center.y + x * sin + y * cos,
-        pressure: last.pressure + (pen.pressure - last.pressure) * share,
+        ...penBetween(last, pen, share),
       })
     }
     turn = next

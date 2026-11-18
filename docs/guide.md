@@ -161,7 +161,9 @@ they stay until taken out.
 - In the **Brushes** panel, the search finds a brush by its name. **All**, **Favorites** and **Recent** choose a list: the star on
   a brush keeps it in the favorites, and Recent has the last ones used. A **category** shows only its brushes, and pressing it
   again shows them all. A brush added to Lydia goes to Special.
-- With a pen, the pressure changes the size or the amount of paint, as each brush is made to.
+- With a pen, the pressure changes the size or the amount of paint, as each brush is made to. A brush can also follow
+  how the pen leans (see [Pen tilt](#the-brush-designer) in the Brush Designer): turned toward where it leans, bigger
+  or flatter. The mouse, and pens that don't tell how they lean, paint as with the pen upright.
 - Hold **Alt** to pick a color from the drawing while painting.
 - **Straight lines:** **Shift + click** paints a straight line from where the last stroke ended, and again from
   there; while Shift is held, the line shows. Hold **Ctrl** too to keep it to a few angles: with a pixel brush, the
@@ -170,7 +172,8 @@ they stay until taken out.
 - **The outline:** over the drawing, the brush shows the outline of its tip instead of the cursor, as big as it paints
   and turned as it paints (brushes like Dashes turn it with the stroke). It is one thin line that takes its color from
   what is under it, so it shows on any color. With the mouse, that is its size at full
-  pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with. The Pixel brush's outline
+  pressure; with a pen, the size it paints at the pen's pressure, and in the air at the last pressure it painted with.
+  With a brush that follows the pen's tilt, it leans with the pen, in the air too. The Pixel brush's outline
   goes along the pixels it will paint. A brush of 24 pixels or more on the screen has a dot in its middle, to aim
   with. A brush smaller than 8 pixels on the screen shows a cross instead. The
   **Outline** button, next to Grid, turns it off, for the cross always.
@@ -205,7 +208,8 @@ they stay until taken out.
   - **Import…** adds brushes from `.lydbrush` files, and from other apps: Krita's `.kpp` and `.bundle`, GIMP's `.gbr` and `.gih`
     and Photoshop's `.abr`. Dropping the files on the window does the same. A brush from another app becomes a Lydia brush,
     with what Lydia has of it, so it may paint differently: a window lists what each one left out. Its own way of painting
-    (Krita's color smudge, for example), pressure curves and a second tip don't come along. A `.kpp` of Krita 4 on its own
+    (Krita's color smudge, for example), pressure curves and a second tip don't come along. The tip turned and
+    flattened by the pen's tilt comes along; the size by the tilt doesn't, as those apps grow it the other way round. A `.kpp` of Krita 4 on its own
     doesn't bring its tip: use the `.bundle` it came in, if there is one.
   - **Export** saves the chosen brush as a file, to share it.
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
@@ -626,6 +630,16 @@ opens with its tip on the paper and its settings (the Pixel brush isn't there: i
 - Give it a **Name**, and choose how it paints: Spacing, Angle, Turn with the stroke, Random angle, Scatter, Flow,
   Wash (the stroke doesn't pile up over itself) and the pen's pressure. **Noise** gives every copy of the tip a
   texture (Mix, Drops or Worn), with its Grain, Layers, Stretch and Contrast. Pointing at each setting explains it.
+- **Pen tilt** is for pens that tell how they lean (most drawing pens and tablets do), each setting starting off:
+  - **Turn the tip**: the tip turns toward where the pen leans, like a flat marker. **Angle** is how it is turned when
+    the pen leans to the right.
+  - **Bigger**: the brush grows as the pen leans, up to 3 times as big lying down (at 200%). Upright, it is the brush
+    size.
+  - **Flatter**: the tip gets flat as the pen leans. With Turn the tip, a round tip makes the long, soft mark of a pencil
+    on its side.
+
+  A pen leaning 60° counts as lying down. The mouse paints as with the pen upright.
+
 - **Paper grain** gives the brush the texture of a paper (see [Brush and eraser](#brush-and-eraser)): choose its
   **Picture**, one of the four that come with Lydia (Paper, Rough, Canvas, Noise) or **Import…** any image (darker is
   higher, where light pressure already paints), its **Depth** (how much of the paper a light touch leaves out; 0% is
@@ -637,8 +651,8 @@ opens with its tip on the paper and its settings (the Pixel brush isn't there: i
 
 **A pixel brush** (Pixel in the window that opens it) is drawn on a small paper, zoomed in with the pixel grid, with Lydia's
 Pixel brush: each pixel of the tip paints fully (black) or not at all (white), with no edge or strength to choose.
-The tip is cut to its painted pixels. The settings that turn the tip or give it noise or a paper grain are left
-out; the new brush starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
+The tip is cut to its painted pixels. The settings that turn or flatten the tip or give it noise or a paper grain are
+left out (with Pen tilt, only Bigger stays); the new brush starts placing its tip at every pixel (Spacing 1%), at one size whatever the pen's pressure.
 
 ## When something goes wrong
 

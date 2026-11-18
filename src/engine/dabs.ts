@@ -12,9 +12,39 @@ export type Dab = {
   seed: number // the dab's own random numbers, for brushes with noise (see noiseDabs.ts)
   pressure: number // the pen's pressure there, from 0 to 1, how far it fills the paper's grain (see grain.ts)
   flipped?: boolean // the tip is mirrored left to right, before it is turned (see symmetry.ts)
+  // How much of its height the tip keeps, squashed along its own up and down before it is turned, by the pen's tilt
+  // (1 when missing: none)
+  roundness?: number
 }
 
-export type StrokePoint = { x: number; y: number; pressure: number }
+// How the pen leans, on the paper: toward where its top leans, as long as how far it leans, from 0 (upright) to 1
+// (lying as far down as pens tell, see view.ts). The mouse, a finger and pens that don't know their tilt have none
+export type Tilt = { x: number; y: number }
+
+// What the pen does at a point of a stroke: its pressure, from 0 to 1, and its tilt, if it has one
+export type Pen = { pressure: number; tilt?: Tilt }
+
+export type StrokePoint = { x: number; y: number } & Pen
+
+// How far the pen leans, from 0 (upright, or no tilt) to 1
+export const leanOf = (pen: Pen) => (pen.tilt ? Math.min(1, Math.hypot(pen.tilt.x, pen.tilt.y)) : 0)
+
+// The pen "t" of the way from one point of a stroke to the next (0 at "a", 1 at "b"), for the points in between
+export function penBetween(a: Pen, b: Pen, t: number): Pen {
+  const pressure = a.pressure + (b.pressure - a.pressure) * t
+  if (!a.tilt && !b.tilt) return { pressure }
+  const from = a.tilt ?? { x: 0, y: 0 }
+  const to = b.tilt ?? { x: 0, y: 0 }
+  return { pressure, tilt: { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t } }
+}
+
+// How big a dab is at this pen, for a brush of this size: smaller with less pressure, if the brush says so, and bigger
+// as the pen leans, up to 1 + "tiltSize" times, lying down. The brush size is the size with the pen upright, so the
+// mouse and pens without tilt paint as they always did
+export function penSize(shape: BrushShape, size: number, pen: Pen) {
+  const pressed = shape.pressureSize ? size * pen.pressure : size
+  return shape.tiltSize > 0 ? pressed * (1 + shape.tiltSize * leanOf(pen)) : pressed
+}
 
 // A stroke's ends can be tapered: thinner, fainter or both toward its tips, over this many pixels of the paper from
 // its start and before its end, growing evenly to the full size or paint
@@ -103,18 +133,22 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
     return Math.max(TAPER_TIP, share)
   }
 
-  const sizeAt = (pressure: number, taperShare: number) => {
-    const dabSize = (shape.pressureSize ? size * pressure : size) * (thinsSize ? taperShare : 1)
+  const sizeAt = (pen: Pen, taperShare: number) => {
+    const dabSize = penSize(shape, size, pen) * (thinsSize ? taperShare : 1)
     return isPixel ? wholePixelSize(dabSize, tipSide) : dabSize
   }
 
-  // A dab at this point, "along" pixels from the start of the stroke
-  function dabAt(x: number, y: number, pressure: number, direction: number, along: number): Dab {
+  // A dab at this point, with the pen as it is there, "along" pixels from the start of the stroke
+  function dabAt(x: number, y: number, pen: Pen, direction: number, along: number): Dab {
+    const { pressure } = pen
     const taperShare = taperAt(along)
-    const dabSize = sizeAt(pressure, taperShare)
+    const dabSize = sizeAt(pen, taperShare)
     const alpha = (shape.pressureFlow ? shape.flow * pressure : shape.flow) * (thinsOpacity ? taperShare : 1)
     const seed = shape.noisePerStroke ? strokeSeed : Math.floor(random() * SEEDS)
+    const lean = leanOf(pen)
     let angle = shape.angle * DEGREES + (shape.followStroke ? direction : 0)
+    // The tip turns toward where the pen leans: as drawn when it leans to the right. Upright, there is no way to turn
+    if (shape.tiltTurn && lean > 0) angle += Math.atan2(pen.tilt!.y, pen.tilt!.x)
     if (shape.angleJitter > 0) angle += (random() - 0.5) * shape.angleJitter * FULL_TURN
     if (shape.scatter > 0) {
       // Anywhere in a circle around the point, evenly
@@ -132,6 +166,10 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
       const top = Math.round(y - height / 2)
       return { x: left + width / 2, y: top + height / 2, size: dabSize, angle: 0, alpha, seed, pressure }
     }
+    // Lying down, the tip is squashed to 1 - "tiltFlatten" of its height: with the tip turned with the tilt, a round
+    // tip becomes the long mark of a pencil on its side
+    const roundness = 1 - shape.tiltFlatten * lean
+    if (roundness < 1) return { x, y, size: dabSize, angle, alpha, seed, pressure, roundness }
     return { x, y, size: dabSize, angle, alpha, seed, pressure }
   }
 
@@ -160,7 +198,7 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
     lastDab = null
     const dabs: Dab[] = []
     if (shape.followStroke) waitingDab = point
-    else place(dabs, dabAt(point.x, point.y, point.pressure, 0, 0))
+    else place(dabs, dabAt(point.x, point.y, point, 0, 0))
     return dabs
   }
 
@@ -179,11 +217,11 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
       directionY = directionY * DIRECTION_MEMORY + dy
       const direction = Math.atan2(directionY, directionX)
       if (waitingDab) {
-        place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, direction, 0))
+        place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab, direction, 0))
         waitingDab = null
       }
 
-      const sizeHere = sizeAt(point.pressure, taperAt(travelled))
+      const sizeHere = sizeAt(point, taperAt(travelled))
       const spacing = Math.max(
         1,
         shape.rootSpacing ? shape.rootSpacing * Math.sqrt(sizeHere) : sizeHere * shape.spacing,
@@ -195,7 +233,7 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
         distanceSinceLastDab = pastEdge(
           isAcross ? last.x : last.y,
           Math.sign(isAcross ? dx : dy),
-          sizeAt(last.pressure, taperAt(travelled)) * (isAcross ? across : down),
+          sizeAt(last, taperAt(travelled)) * (isAcross ? across : down),
         )
       }
       isFirstMove = false
@@ -203,8 +241,7 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
       while (along <= distance) {
         // A pixel brush's dab is worked out a hair further, inside the pixel the pen enters there
         const t = isPixel ? Math.min(1, (along + 1e-6) / distance) : along / distance
-        const pressure = last.pressure + (point.pressure - last.pressure) * t
-        place(dabs, dabAt(last.x + dx * t, last.y + dy * t, pressure, direction, travelled + along))
+        place(dabs, dabAt(last.x + dx * t, last.y + dy * t, penBetween(last, point, t), direction, travelled + along))
         along += spacing
       }
       distanceSinceLastDab = distance - (along - spacing)
@@ -219,8 +256,8 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
   // dab, so a stroke ends exactly where the pen left
   function end(): Dab[] {
     const dabs: Dab[] = []
-    if (waitingDab) place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab.pressure, 0, 0))
-    else if (isPixel && last) place(dabs, dabAt(last.x, last.y, last.pressure, 0, travelled))
+    if (waitingDab) place(dabs, dabAt(waitingDab.x, waitingDab.y, waitingDab, 0, 0))
+    else if (isPixel && last) place(dabs, dabAt(last.x, last.y, last, 0, travelled))
     waitingDab = null
     last = null
     return dabs
@@ -237,8 +274,8 @@ export function createDabPath(shape: BrushShape, size: number, options: DabPathO
 
 export type DabPath = ReturnType<typeof createDabPath>
 
-// A pixel brush's straight line from one point of the paper to another, as the points to paint it through, at this
-// pressure: one for each place of the tip's corner along the line, a pixel further along its longer side each time,
+// A pixel brush's straight line from one point of the paper to another, as the points to paint it through, with the
+// pen as it was at its start: one for each place of the tip's corner along the line, a pixel further along its longer side each time,
 // so the line has one pixel in each column (or row). Across the shorter side, each is the pixel nearest to the line,
 // as Bresenham's line algorithm finds them (halfway, the later one). A line of whole steps (2 across for 1 down, 3
 // for 1, 1 for 1...), as Ctrl makes them (see straightLine.ts), has them all equal from its start instead: rounding to
@@ -253,7 +290,7 @@ export function pixelLinePoints(
 ): StrokePoint[] {
   const isDrawn = shape.pixel === 'drawn' && tip !== undefined
   const tipSide = isDrawn ? Math.max(tip.width, tip.height) : 1
-  const side = wholePixelSize(shape.pressureSize ? size * from.pressure : size, tipSide)
+  const side = wholePixelSize(penSize(shape, size, from), tipSide)
   const width = isDrawn ? (side * tip.width) / tipSide : side
   const height = isDrawn ? (side * tip.height) / tipSide : side
   const x = Math.round(from.x - width / 2)
@@ -275,7 +312,7 @@ export function pixelLinePoints(
     const aside = longer === 0 ? 0 : shorterAt(i) * shorterSign
     const cornerX = x + (isAcross ? along : aside)
     const cornerY = y + (isAcross ? aside : along)
-    points.push({ x: cornerX + width / 2, y: cornerY + height / 2, pressure: from.pressure })
+    points.push({ x: cornerX + width / 2, y: cornerY + height / 2, pressure: from.pressure, tilt: from.tilt })
   }
   return points
 }

@@ -1,5 +1,5 @@
 import { LydiaError } from '../errors'
-import type { BrushShape } from './brushFile'
+import { MAX_TILT_FLATTEN, type BrushShape } from './brushFile'
 import { roundTip, type BrushPicture, type ForeignBrush, type LeftOut } from './foreignBrush'
 
 // Photoshop's brushes (.abr). Adobe doesn't describe this format, so what is read here comes from how GIMP and Krita read
@@ -12,6 +12,9 @@ const SECTION_TAG = '8BIM'
 const SAMPLED = 2
 const MAX_SIDE = 16384
 const PRESSURE = 2 // the pen's pressure in Photoshop's list of what can control something
+const TILT = 3 // the pen's tilt, in the same list
+// How round Photoshop keeps a tip whose roundness follows the pen's tilt, in percent, when the file doesn't say
+const MINIMUM_ROUNDNESS = 25
 const OFF = 0
 
 // A place in some bytes, moving forward as they are read
@@ -267,7 +270,16 @@ function brushOf(preset: Described, pictures: Map<string, BrushPicture>, fileNam
     const roundness = dynamics(preset.roundnessDynamics)
     shape.pressureSize = size.control === PRESSURE
     shape.angleJitter = angle.jitter
-    const others = [size, angle, roundness].some(each => each.control !== OFF && each.control !== PRESSURE)
+    // The tip turned and flattened by the pen's tilt. Its size by the tilt isn't Lydia's (it doesn't only grow as
+    // the pen leans), so it is left out with the other things that change a brush
+    shape.tiltTurn = angle.control === TILT
+    if (roundness.control === TILT) {
+      shape.tiltFlatten = Math.min(MAX_TILT_FLATTEN, 1 - numberIn(preset, 'minimumRoundness', MINIMUM_ROUNDNESS) / 100)
+    }
+    const isTilted = (each: typeof size) => each !== size && each.control === TILT
+    const others = [size, angle, roundness].some(
+      each => each.control !== OFF && each.control !== PRESSURE && !isTilted(each),
+    )
     const otherPressure = angle.control === PRESSURE || roundness.control === PRESSURE
     if (others || otherPressure || size.jitter > 0 || roundness.jitter > 0) leftOut.push('sensors')
   }

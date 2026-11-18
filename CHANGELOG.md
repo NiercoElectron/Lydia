@@ -7,6 +7,13 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+### Added
+
+- **The pen's tilt**: a brush can follow how the pen leans. In the Brush Designer, under **Pen tilt**, **Turn the tip**
+  turns it toward where the pen leans, **Bigger** makes it grow as the pen leans, and **Flatter** squashes it, like the
+  side of a pencil. Every brush can use them, and they start off, so no brush changes by itself. The brush's outline
+  leans with the pen, also in the air. Brushes from Krita and Photoshop bring their tip turned and flattened by the tilt.
+
 ## [1.1.1] - 2026-11-16
 
 ### Fixed

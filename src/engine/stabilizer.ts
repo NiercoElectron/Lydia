@@ -1,4 +1,4 @@
-import type { StrokePoint } from './dabs'
+import { penBetween, type StrokePoint } from './dabs'
 
 // The stabilizer smooths strokes: the brush doesn't paint exactly where the pen is, but follows it, so that a shaky
 // hand draws smooth lines. It works in one of two ways, as in Photoshop and Krita:
@@ -42,7 +42,7 @@ export function createStabilizer(settings: StabilizerSettings, start: StrokePoin
     const closed = 1 - Math.exp(-elapsed / slowness)
     brush.x += (target.x - brush.x) * closed
     brush.y += (target.y - brush.y) * closed
-    brush.pressure += (target.pressure - brush.pressure) * closed
+    Object.assign(brush, penBetween(brush, target, closed))
   }
 
   // The pen moved through these points since the last time. Those the browser grouped into one event came over the
@@ -58,6 +58,7 @@ export function createStabilizer(settings: StabilizerSettings, start: StrokePoin
         brush.x += (pen.x - brush.x) * pulled
         brush.y += (pen.y - brush.y) * pulled
         brush.pressure = pen.pressure
+        brush.tilt = pen.tilt
         passed.push({ ...brush })
       }
       return passed
@@ -71,7 +72,7 @@ export function createStabilizer(settings: StabilizerSettings, start: StrokePoin
         const target = {
           x: pen.x + (point.x - pen.x) * t,
           y: pen.y + (point.y - pen.y) * t,
-          pressure: pen.pressure + (point.pressure - pen.pressure) * t,
+          ...penBetween(pen, point, t),
         }
         chase(target, elapsed / steps)
         passed.push({ ...brush })

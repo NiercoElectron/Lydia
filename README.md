@@ -10,8 +10,8 @@
 
 <!-- SCREENSHOT -->
 
-- **Brushes that feel like ink and pencil**: pressure, tapered ends, paper grain, a stabilizer, pixel-art brushes, and
-  brushes opened from Krita, GIMP and Photoshop
+- **Brushes that feel like ink and pencil**: pressure and pen tilt, tapered ends, paper grain, a stabilizer, pixel-art
+  brushes, and brushes opened from Krita, GIMP and Photoshop
 - **Layers like in Photoshop**: blend modes, folders, clipping masks, smart objects
 - **Curves like Photoshop's pen**, editable shapes and text, symmetry and perspective rulers
 - **Liquify, smudge and filters**, and transforms with a mesh
@@ -48,6 +48,8 @@ and PixiJS (WebGL 2).
   color's code, H/S/V sliders and the colors painted with lately; and a palette of colors kept on purpose, for all
   drawings or saved with one
 - Brushes and eraser, with mouse or pen; the pen's pressure can change the brush size and how much paint it puts down
+- Brushes that follow the pen's tilt: the tip turned toward where the pen leans, bigger or flatter as it leans, like a
+  pencil on its side
 - The brush's outline under the pointer, in the shape of its tip and as big as it paints, one thin line that shows on
   any color (View > Brush outline)
 - A stabilizer for smoother strokes: the brush chases the pen (Smooth) or is pulled by it on a string (String)
@@ -156,10 +158,6 @@ What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 What comes next, and the ideas waiting their turn, are in [ROADMAP.md](ROADMAP.md): Linux, and opening and pasting
 images, first.
-
-Later, once there is a pen with tilt to try it on:
-
-- [ ] Pen tilt: the brush follows how the pen leans, like a pencil
 
 ## Getting started
 

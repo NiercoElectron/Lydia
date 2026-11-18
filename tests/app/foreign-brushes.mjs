@@ -155,7 +155,8 @@ function objectBody(className, items) {
 }
 const object = (className, items) => Buffer.concat([Buffer.from('Objc'), objectBody(className, items)])
 
-function abr() {
+// With these brush presets instead of the usual two
+function abr(only) {
   const key = '11111111-2222-3333-4444-555555555555'
   // The first line packed: 16 bytes of 0, then the others stored the same way, with a square of paint
   const lines = []
@@ -200,7 +201,8 @@ function abr() {
       ]),
     ],
   ])
-  const list = Buffer.concat([Buffer.from('VlLs'), u32(2), sampled, computed])
+  const presets = only ?? [sampled, computed]
+  const list = Buffer.concat([Buffer.from('VlLs'), u32(presets.length), ...presets])
   const description = Buffer.concat([u32(16), objectBody('null', [['Brsh', list]])])
   const desc = Buffer.concat([Buffer.from('8BIMdesc'), u32(description.length), description])
   return Buffer.concat([u16(6), u16(2), samp, desc])
@@ -317,6 +319,40 @@ check('its flow, with the opacity', near(brush?.shape.flow, 0.25), `${brush?.sha
 check('it follows the pressure in size only', brush?.shape.pressureSize && !brush?.shape.pressureFlow)
 check('and it washes', brush?.shape.wash === true)
 check('its tip is round', brush?.middle === 255 && brush?.corner === 0, `${brush?.middle} ${brush?.corner}`)
+
+// The pen's tilt (decision 90): the tip turned by the direction the pen leans in comes along. Krita's size by the
+// tilt grows as the pen stands up, the other way round from Lydia's, so it is still named
+const tiltSensor = id => `<!DOCTYPE params> <params id="${id}"> <curve>0,0;1,1;</curve> </params>`
+result = await imported(
+  'tilt.kpp',
+  kpp(
+    `<Preset name="Leaning tip" paintopid="paintbrush">
+      ${param('brush_definition', autoBrush)}
+      ${param('PressureSize', 'false')}
+      ${param('PressureRotation', 'true')}${param('RotationSensor', tiltSensor('tiltdirection'))}
+    </Preset>`,
+  ),
+)
+check("a .kpp whose tip turns with the pen's tilt is added", result.added === 1, JSON.stringify(result))
+check('with nothing left out', result.report.length === 0, result.report.join())
+brush = await brushNamed('Leaning tip')
+check('and its tip turns with the tilt', brush?.shape.tiltTurn === true && brush?.shape.tiltSize === 0)
+result = await imported(
+  'tilt-size.kpp',
+  kpp(
+    `<Preset name="Standing tip" paintopid="paintbrush">
+      ${param('brush_definition', autoBrush)}
+      ${param('PressureSize', 'true')}${param('SizeSensor', tiltSensor('tiltelevation'))}
+    </Preset>`,
+  ),
+)
+check(
+  "Krita's size by the tilt is named as left out",
+  result.report[0]?.includes('what changes it besides pressure'),
+  result.report.join(),
+)
+brush = await brushNamed('Standing tip')
+check('and not taken as Lydia’s', brush?.shape.tiltSize === 0 && brush?.shape.tiltTurn === false)
 
 result = await imported(
   'engine.kpp',
@@ -442,6 +478,48 @@ check('and what stayed out', result.report[0]?.includes('its way of mixing or ef
 brush = await brushNamed('Worked out')
 check('a tip worked out by Photoshop has its shape', brush?.middle === 255 && near(brush?.height, 256))
 check('and a brush with no dynamics has no pressure', brush?.shape.pressureSize === false)
+check('nor follows the tilt', brush?.shape.tiltTurn === false && brush?.shape.tiltFlatten === 0)
+
+// The pen's tilt in Photoshop: its angle and roundness come along, with the roundness it keeps lying down. Its size
+// by the tilt isn't Lydia's, so it is named
+const tilted = (name, items) =>
+  object('brushPreset', [
+    ['Nm  ', text(name)],
+    [
+      'Brsh',
+      object('computedBrush', [
+        ['Hrdn', unitFloat(100)],
+        ['Rndn', unitFloat(100)],
+        ['Spcn', unitFloat(10)],
+        ['Intr', bool(true)],
+      ]),
+    ],
+    ['useTipDynamics', bool(true)],
+    ...items,
+  ])
+result = await imported(
+  'tilt.abr',
+  abr([
+    tilted('Leaning in Photoshop', [
+      ['angleDynamics', object('brVr', [['bVTy', long(3)]])],
+      ['roundnessDynamics', object('brVr', [['bVTy', long(3)]])],
+      ['minimumRoundness', unitFloat(40)],
+    ]),
+    tilted('Bigger in Photoshop', [['szVr', object('brVr', [['bVTy', long(3)]])]]),
+  ]),
+)
+check('an .abr with the tilt brings its brushes', result.added === 2, JSON.stringify(result))
+brush = await brushNamed('Leaning in Photoshop')
+check(
+  'its tip turns and flattens with the tilt',
+  brush?.shape.tiltTurn === true && near(brush?.shape.tiltFlatten, 0.6),
+  JSON.stringify(brush?.shape),
+)
+check(
+  'and only the size by the tilt is named',
+  result.report.length === 1 && result.report[0].startsWith('Bigger in Photoshop'),
+  result.report.join(' / '),
+)
 
 // ----- What can't be read -----
 result = await imported('bad.abr', Buffer.concat([u16(99), u16(1)]))

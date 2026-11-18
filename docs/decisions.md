@@ -1256,7 +1256,7 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     a pixel dab never turns and has no noise. It starts placing its tip at every pixel (Spacing 1%), as the Pixel
     brush does, and at one size whatever the pen's pressure, which can be turned on.
   - The pen's tilt left the Painting stage for later (my choice), for the Brushes stage: it can only be tried with a
-    pen that knows its tilt. The Painting stage ends here.
+    pen that knows its tilt. The Painting stage ends here. (It came in decision 90.)
 - **Why:**
   - Pixel artists use their own brushes: patterns, dithering, small shapes stamped again and again. The Pixel brush
     only had round tips.
@@ -2813,6 +2813,57 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   autosave; nonsense in a file. On the screen: a curve being drawn, and the points of one edited.
   `tests/app/shapes.mjs` now also checks a shape that makes sense in a file, with a real brush: its file brush wasn't
   one, so only the broken shapes were checked.
+
+## 90. The pen's tilt
+
+- **Date:** 2026-11-18
+- **Status:** adopted; not yet tried with a real pen that tells its tilt
+- **Problem:** a pencil drawn on its side makes a wide, soft mark, and a flat marker turns with the hand. Pens for
+  drawing tell how they lean, and Photoshop, Krita and Clip Studio let a brush follow it. Lydia only read the pressure:
+  the tilt was left for later in decision 48, until someone with such a pen could try it. A tester with one will.
+- **Decision:** my choices:
+  - **Three things the tilt can change**, each brush with its own in the Brush Designer, under **Pen tilt**:
+    - **Turn the tip**: the tip turns toward where the pen leans, as with Photoshop's Pen Tilt on the angle and Krita's
+      tilt direction. Angle is how the tip is turned when the pen leans to the right.
+    - **Bigger**: the brush grows as the pen leans, up to 3 times as big lying down (200%).
+    - **Flatter**: the tip is squashed along its own up and down as the pen leans, down to a tenth of its height (90%).
+      With Turn the tip, a round tip makes the long mark of a pencil on its side.
+  - **Every brush can use it**: the settings are there for every brush, off until a brush turns them on. No brush that
+    comes with Lydia changes.
+  - **Brushes from Krita and Photoshop bring it**, where they use it for something Lydia has: Krita's rotation by the
+    tilt direction, and Photoshop's angle and roundness by Pen Tilt, with the roundness the tip keeps lying down. Their
+    size by the tilt works differently from Lydia's (it doesn't only grow as the pen leans), so the import still names
+    it as left out.
+  - Claude chose the rest:
+    - **The brush size is the size with the pen upright**, and leaning only makes it bigger. The mouse, a finger and pens
+      that don't tell their tilt (they say upright) paint exactly as before, even with a brush that uses the tilt.
+    - **Leaning 60° counts as lying down**: Wacom's pens tell up to 60°.
+    - **A pixel brush only gets Bigger**: its tip never turns (decision 48), nor flattens.
+    - **The outline follows the tilt** (decision 69), with the pen in the air too, so the turned and flattened tip shows
+      before it touches the drawing.
+    - Smudge, Blur and Liquify don't follow the tilt: their tip keeps its size, and the pressure changes their strength.
+- **How:**
+  - `src/engine/view.ts` reads the pen's `tiltX` and `tiltY` from each pointer event: where its top leans over the
+    screen. That direction is turned back by the view's turn and flip, so it is the paper's, and how far it leans, from
+    0 to 1 at 60°, is its length (`tiltOf`).
+  - Each point of a stroke keeps the tilt next to the pressure (`Pen` in `src/engine/dabs.ts`), and the stabilizer and
+    the rulers carry it along like the pressure. Points in between get a tilt in between (`penBetween`).
+  - A dab's size, angle and roundness come from the pen at its place (`penSize` and `dabAt`). The roundness squashes the
+    tip before it is turned, in `dabPainter.ts`, in the noise of `noiseDabs.ts`, and in the pressure kept for the
+    paper's grain. Symmetry mirrors and turns a dab as before, so its copies lean the mirrored way.
+  - The brush file has `tiltTurn`, `tiltSize` and `tiltFlatten`. A brush from before has none of them, and paints as it
+    did; versions of Lydia before this one paint a new brush as if the pen had no tilt.
+  - Krita's tilt direction and Photoshop's Pen Tilt are read by `kritaBrush.ts` and `photoshopBrush.ts`. Photoshop's
+    roundness without its smallest roundness in the file keeps 25%, Photoshop's own.
+- **Checked:** `tests/app/pen-tilt.mjs` sends a pen's events with their tilt, as Chrome gets them from a real pen: the
+  dabs (a brush without tilt as before, the tip turned, bigger at full and half lean with the pressure still counting,
+  flatter, a pixel brush only bigger, the tilt between two points); the brush file keeping it, one from before without
+  it, and too much in a file; a stroke twice as thick lying down, as thick as the brush upright and with the mouse, half
+  as much more at 30°, and a straight line with Shift; a flattened mark across when leaning right and down when leaning
+  down, and down the paper with the view turned a quarter; the outline turning and growing with the pen in the air, round
+  with the mouse; the settings in the Brush Designer. `tests/app/foreign-brushes.mjs` checks the tilt brought from a
+  Krita preset and from Photoshop's brushes, and the size by the tilt named as left out. On the screen: the strokes and
+  marks, and the outline of a pen leaning. Not yet tried with a real pen with tilt: the tester will.
 
 ## Open questions
 

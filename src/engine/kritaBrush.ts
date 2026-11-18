@@ -156,6 +156,9 @@ function shapeOf(settings: Settings, brush: Element | null, leftOut: LeftOut[]) 
   shape.pressureFlow = [opacity, flow].some(({ isOn, ids }) => isOn && ids.includes('pressure'))
   if (rotation.isOn) {
     shape.followStroke = rotation.ids.includes('drawingangle')
+    // The tip turned by the direction the pen leans in. Krita's size by the pen's tilt grows as the pen stands up,
+    // the other way round from Lydia's, so it is left out with the other things that change a brush
+    shape.tiltTurn = rotation.ids.includes('tiltdirection')
     if (rotation.ids.some(id => id.startsWith('fuzzy'))) shape.angleJitter = numberOf(settings.get('RotationValue'), 1)
   }
   if (settings.get('PressureScatter') === 'true') {
@@ -164,7 +167,9 @@ function shapeOf(settings: Settings, brush: Element | null, leftOut: LeftOut[]) 
 
   const known = ['pressure', 'drawingangle', 'fuzzy', 'fuzzystroke']
   const inUse = [size, opacity, flow, rotation, ...(settings.get('PressureScatter') === 'true' ? [scatter] : [])]
-  if (inUse.some(({ isOn, ids }) => isOn && ids.some(id => !known.includes(id)))) leftOut.push('sensors')
+  const isKnown = (sensor: typeof size, id: string) =>
+    known.includes(id) || (sensor === rotation && id === 'tiltdirection')
+  if (inUse.some(sensor => sensor.isOn && sensor.ids.some(id => !isKnown(sensor, id)))) leftOut.push('sensors')
   if (rotation.isOn && rotation.ids.includes('pressure')) leftOut.push('sensors')
   if (inUse.some(({ isOn, hasOwnCurve }) => isOn && hasOwnCurve)) leftOut.push('curves')
   return shape
