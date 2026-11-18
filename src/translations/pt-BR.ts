@@ -671,4 +671,34 @@ export const ptBR: Record<string, string> = {
   'If you discard them, the last autosaved copy stays in Recover, on the start screen.':
     'Se descartar, a última cópia salva automaticamente continua em Recuperar, na tela inicial.',
   Discard: 'Descartar',
+  Pressure: 'Pressão',
+  'Pen tilt': 'Inclinação da caneta',
+  'Turn the tip': 'Girar a ponta',
+  'The tip turns toward where the pen leans. Angle is how it is turned when the pen leans to the right':
+    'A ponta gira na direção em que a caneta se inclina. Ângulo define a rotação quando a caneta se inclina para a direita',
+  Bigger: 'Maior',
+  'How much bigger the brush gets as the pen leans: at 100%, twice as big lying down. Upright, it is the brush size':
+    'Quanto o pincel aumenta ao inclinar a caneta: em 100%, dobra de tamanho com a caneta deitada. Na vertical, mantém o tamanho do pincel',
+  Flatter: 'Mais achatada',
+  'How flat the tip gets as the pen leans, lying down. With Turn the tip, a round tip makes the long mark of a pencil on its side':
+    'Quanto a ponta se achata ao deitar a caneta. Com Girar a ponta, uma ponta redonda faz a marca alongada de um lápis de lado',
+  'Delete the preset "{name}"? It cannot be undone.': 'Excluir a predefinição "{name}"? Não é possível desfazer.',
+  'My presets': 'Minhas predefinições',
+  'Delete this preset': 'Excluir esta predefinição',
+  'Too big at this resolution': 'Grande demais nesta resolução',
+  'Pixel art': 'Pixel art',
+  'Save as preset…': 'Salvar predefinição…',
+  'Name of the preset': 'Nome da predefinição',
+  'Save preset': 'Salvar predefinição',
+  'The spacing, the stabilizer and the taper': 'Espaçamento, estabilizador e afinamento',
+  Stroke: 'Traço',
+  'Saved: {name}': 'Salvo: {name}',
+  'Take out of the list': 'Remover da lista',
+  'Take it out of the list. The file stays where it is': 'Remova da lista. O arquivo permanece onde está',
+  Start: 'Começar',
+  Links: 'Links',
+  'Report a bug': 'Relatar um erro',
+  'The drawings you open or save show here.': 'Os desenhos que você abre ou salva aparecem aqui.',
+  'Drawings closed with changes that were not saved show here, to recover them.':
+    'Desenhos fechados com alterações não salvas aparecem aqui para recuperação.',
 }

@@ -674,4 +674,34 @@ export const es: Record<string, string> = {
   'If you discard them, the last autosaved copy stays in Recover, on the start screen.':
     'Si los descartas, la última copia guardada automáticamente sigue en Recuperar, en la pantalla inicial.',
   Discard: 'Descartar',
+  Pressure: 'Presión',
+  'Pen tilt': 'Inclinación del lápiz',
+  'Turn the tip': 'Girar la punta',
+  'The tip turns toward where the pen leans. Angle is how it is turned when the pen leans to the right':
+    'La punta gira hacia donde se inclina el lápiz. Ángulo define la rotación cuando el lápiz se inclina hacia la derecha',
+  Bigger: 'Más grande',
+  'How much bigger the brush gets as the pen leans: at 100%, twice as big lying down. Upright, it is the brush size':
+    'Cuánto crece el pincel al inclinar el lápiz: al 100%, duplica su tamaño con el lápiz acostado. En vertical, mantiene el tamaño del pincel',
+  Flatter: 'Más plana',
+  'How flat the tip gets as the pen leans, lying down. With Turn the tip, a round tip makes the long mark of a pencil on its side':
+    'Cuánto se aplana la punta al acostar el lápiz. Con Girar la punta, una punta redonda hace la marca alargada de un lápiz de lado',
+  'Delete the preset "{name}"? It cannot be undone.': '¿Eliminar el ajuste "{name}"? No se puede deshacer.',
+  'My presets': 'Mis ajustes',
+  'Delete this preset': 'Eliminar este ajuste',
+  'Too big at this resolution': 'Demasiado grande a esta resolución',
+  'Pixel art': 'Pixel art',
+  'Save as preset…': 'Guardar ajuste…',
+  'Name of the preset': 'Nombre del ajuste',
+  'Save preset': 'Guardar ajuste',
+  'The spacing, the stabilizer and the taper': 'Espaciado, estabilizador y afinamiento',
+  Stroke: 'Trazo',
+  'Saved: {name}': 'Guardado: {name}',
+  'Take out of the list': 'Quitar de la lista',
+  'Take it out of the list. The file stays where it is': 'Quita de la lista. El archivo permanece donde está',
+  Start: 'Empezar',
+  Links: 'Enlaces',
+  'Report a bug': 'Informar de un error',
+  'The drawings you open or save show here.': 'Los dibujos que abres o guardas aparecen aquí.',
+  'Drawings closed with changes that were not saved show here, to recover them.':
+    'Los dibujos cerrados con cambios sin guardar aparecen aquí para recuperarlos.',
 }
