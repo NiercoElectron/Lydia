@@ -2817,10 +2817,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 ## 90. The pen's tilt
 
 - **Date:** 2026-11-18
-- **Status:** adopted; not yet tried with a real pen that tells its tilt
+- **Status:** adopted
 - **Problem:** a pencil drawn on its side makes a wide, soft mark, and a flat marker turns with the hand. Pens for
   drawing tell how they lean, and Photoshop, Krita and Clip Studio let a brush follow it. Lydia only read the pressure:
-  the tilt was left for later in decision 48, until someone with such a pen could try it. A tester with one will.
+  the tilt was left for later in decision 48, until someone with such a pen could try it. A tester has one.
 - **Decision:** my choices:
   - **Three things the tilt can change**, each brush with its own in the Brush Designer, under **Pen tilt**:
     - **Turn the tip**: the tip turns toward where the pen leans, as with Photoshop's Pen Tilt on the angle and Krita's
@@ -2863,7 +2863,8 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   down, and down the paper with the view turned a quarter; the outline turning and growing with the pen in the air, round
   with the mouse; the settings in the Brush Designer. `tests/app/foreign-brushes.mjs` checks the tilt brought from a
   Krita preset and from Photoshop's brushes, and the size by the tilt named as left out. On the screen: the strokes and
-  marks, and the outline of a pen leaning. Not yet tried with a real pen with tilt: the tester will.
+  marks, and the outline of a pen leaning. A tester tried it with a pen that tells its tilt, the day it was made, with
+  a brush made in the Brush Designer: it followed the pen.
 
 ## Open questions
 
