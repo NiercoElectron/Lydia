@@ -2831,9 +2831,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   - **Every brush can use it**: the settings are there for every brush, off until a brush turns them on. No brush that
     comes with Lydia changes.
   - **Brushes from Krita and Photoshop bring it**, where they use it for something Lydia has: Krita's rotation by the
-    tilt direction, and Photoshop's angle and roundness by Pen Tilt, with the roundness the tip keeps lying down. Their
-    size by the tilt works differently from Lydia's (it doesn't only grow as the pen leans), so the import still names
-    it as left out.
+    tilt direction, and its size growing as the pen lies down (Krita's tilted pencils and chisel markers), and
+    Photoshop's angle and roundness by Pen Tilt, with the roundness the tip keeps lying down. A size shrinking as the pen
+    lies down (Krita's usual curve), Photoshop's size by Pen Tilt and Krita's tip shape by the tilt (Ratio) aren't
+    Lydia's, so the import names them as left out.
   - Claude chose the rest:
     - **The brush size is the size with the pen upright**, and leaning only makes it bigger. The mouse, a finger and pens
       that don't tell their tilt (they say upright) paint exactly as before, even with a brush that uses the tilt.
@@ -2853,8 +2854,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     paper's grain. Symmetry mirrors and turns a dab as before, so its copies lean the mirrored way.
   - The brush file has `tiltTurn`, `tiltSize` and `tiltFlatten`. A brush from before has none of them, and paints as it
     did; versions of Lydia before this one paint a new brush as if the pen had no tilt.
-  - Krita's tilt direction and Photoshop's Pen Tilt are read by `kritaBrush.ts` and `photoshopBrush.ts`. Photoshop's
-    roundness without its smallest roundness in the file keeps 25%, Photoshop's own.
+  - Krita's tilt and Photoshop's Pen Tilt are read by `kritaBrush.ts` and `photoshopBrush.ts`. Krita's files name the
+    tilt's direction `ascension` and how upright the pen stands `declination`. A size by `declination` whose curve goes
+    down, from lying to upright, becomes Bigger: as many times bigger lying down as its curve's start is its end (up to
+    Lydia's 3 times). Photoshop's roundness without its smallest roundness in the file keeps 25%, Photoshop's own.
 - **Checked:** `tests/app/pen-tilt.mjs` sends a pen's events with their tilt, as Chrome gets them from a real pen: the
   dabs (a brush without tilt as before, the tip turned, bigger at full and half lean with the pressure still counting,
   flatter, a pixel brush only bigger, the tilt between two points); the brush file keeping it, one from before without
@@ -2862,9 +2865,15 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   as much more at 30°, and a straight line with Shift; a flattened mark across when leaning right and down when leaning
   down, and down the paper with the view turned a quarter; the outline turning and growing with the pen in the air, round
   with the mouse; the settings in the Brush Designer. `tests/app/foreign-brushes.mjs` checks the tilt brought from a
-  Krita preset and from Photoshop's brushes, and the size by the tilt named as left out. On the screen: the strokes and
-  marks, and the outline of a pen leaning. A tester tried it with a pen that tells its tilt, the day it was made, with
-  a brush made in the Brush Designer: it followed the pen.
+  Krita preset (turned, and bigger lying down) and from Photoshop's brushes, and what is named as left out: Krita's
+  size shrinking as the pen lies down, its Ratio by the tilt, and Photoshop's size by Pen Tilt. On the screen: the
+  strokes and marks, and the outline of a pen leaning.
+
+  A tester tried it with a pen that tells its tilt, the day it was made, with a brush made in the Brush Designer: it
+  followed the pen. Krita's Pencil-5 Tilted, brought from Krita 4's own bundle, came without its tilt: Claude had read
+  Krita's tilt by names Krita doesn't use (`tiltdirection`, `tiltelevation`), in the test too. Read with the real
+  names, all six brushes of that bundle that follow the tilt turn with it, and the tilted pencil and the chisel marker
+  grow lying down.
 
 ## Open questions
 

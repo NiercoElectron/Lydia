@@ -208,9 +208,9 @@ they stay until taken out.
   - **Import…** adds brushes from `.lydbrush` files, and from other apps: Krita's `.kpp` and `.bundle`, GIMP's `.gbr` and `.gih`
     and Photoshop's `.abr`. Dropping the files on the window does the same. A brush from another app becomes a Lydia brush,
     with what Lydia has of it, so it may paint differently: a window lists what each one left out. Its own way of painting
-    (Krita's color smudge, for example), pressure curves and a second tip don't come along. The tip turned and
-    flattened by the pen's tilt comes along; the size by the tilt doesn't, as those apps grow it the other way round. A `.kpp` of Krita 4 on its own
-    doesn't bring its tip: use the `.bundle` it came in, if there is one.
+    (Krita's color smudge, for example), pressure curves and a second tip don't come along. What a brush does with the
+    pen's tilt comes along where Lydia has it: the tip turned, bigger as the pen lies down (Krita), flattened
+    (Photoshop). A `.kpp` of Krita 4 on its own doesn't bring its tip: use the `.bundle` it came in, if there is one.
   - **Export** saves the chosen brush as a file, to share it.
   - **Delete** takes an added brush out of Lydia (the ones that come with Lydia stay).
   - In the desktop app added brushes are files in `Documents\Lydia\Brushes`. Copying a `.lydbrush` file there adds it, when you

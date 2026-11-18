@@ -320,39 +320,60 @@ check('it follows the pressure in size only', brush?.shape.pressureSize && !brus
 check('and it washes', brush?.shape.wash === true)
 check('its tip is round', brush?.middle === 255 && brush?.corner === 0, `${brush?.middle} ${brush?.corner}`)
 
-// The pen's tilt (decision 90): the tip turned by the direction the pen leans in comes along. Krita's size by the
-// tilt grows as the pen stands up, the other way round from Lydia's, so it is still named
-const tiltSensor = id => `<!DOCTYPE params> <params id="${id}"> <curve>0,0;1,1;</curve> </params>`
+// The pen's tilt (decision 90), with Krita's own names for it, as Krita's pencils and markers have them: the tip
+// turned by the direction the pen leans in ("ascension"), and the size growing as the pen lies down (a curve going
+// down with how upright it stands, "declination") come along. A size shrinking as the pen lies down, Krita's usual
+// curve, and the tip's shape changed by the pen (Ratio) are named
+const tiltSensor = (id, curve = '0,0;1,1;') => `<!DOCTYPE params> <params id="${id}"> <curve>${curve}</curve> </params>`
 result = await imported(
   'tilt.kpp',
   kpp(
     `<Preset name="Leaning tip" paintopid="paintbrush">
       ${param('brush_definition', autoBrush)}
-      ${param('PressureSize', 'false')}
-      ${param('PressureRotation', 'true')}${param('RotationSensor', tiltSensor('tiltdirection'))}
+      ${param('PressureSize', 'true')}${param('SizeSensor', tiltSensor('declination', '0,1;1,0.5;'))}
+      ${param('PressureRotation', 'true')}${param('RotationSensor', tiltSensor('ascension'))}
     </Preset>`,
   ),
 )
-check("a .kpp whose tip turns with the pen's tilt is added", result.added === 1, JSON.stringify(result))
+check("a .kpp whose tip follows the pen's tilt is added", result.added === 1, JSON.stringify(result))
 check('with nothing left out', result.report.length === 0, result.report.join())
 brush = await brushNamed('Leaning tip')
-check('and its tip turns with the tilt', brush?.shape.tiltTurn === true && brush?.shape.tiltSize === 0)
+check(
+  'its tip turns with the tilt, and grows twice as big lying down',
+  brush?.shape.tiltTurn === true && near(brush?.shape.tiltSize, 1) && brush?.shape.pressureSize === false,
+  JSON.stringify(brush?.shape),
+)
 result = await imported(
   'tilt-size.kpp',
   kpp(
     `<Preset name="Standing tip" paintopid="paintbrush">
       ${param('brush_definition', autoBrush)}
-      ${param('PressureSize', 'true')}${param('SizeSensor', tiltSensor('tiltelevation'))}
+      ${param('PressureSize', 'true')}${param('SizeSensor', tiltSensor('declination'))}
     </Preset>`,
   ),
 )
 check(
-  "Krita's size by the tilt is named as left out",
+  "Krita's size shrinking as the pen lies down is named as left out",
   result.report[0]?.includes('what changes it besides pressure'),
   result.report.join(),
 )
 brush = await brushNamed('Standing tip')
 check('and not taken as Lydia’s', brush?.shape.tiltSize === 0 && brush?.shape.tiltTurn === false)
+result = await imported(
+  'tilt-ratio.kpp',
+  kpp(
+    `<Preset name="Flattened tip" paintopid="paintbrush">
+      ${param('brush_definition', autoBrush)}
+      ${param('PressureSize', 'false')}
+      ${param('PressureRatio', 'true')}${param('RatioSensor', tiltSensor('declination'))}
+    </Preset>`,
+  ),
+)
+check(
+  "the tip's shape changed by the tilt is named as left out",
+  result.report[0]?.includes('what changes it besides pressure'),
+  result.report.join(),
+)
 
 result = await imported(
   'engine.kpp',

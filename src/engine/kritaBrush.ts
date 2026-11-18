@@ -1,5 +1,5 @@
 import { LydiaError } from '../errors'
-import type { BrushShape } from './brushFile'
+import { MAX_TILT_SIZE, type BrushShape } from './brushFile'
 import { pixelsOfPng, roundTip, tipOfPng, type BrushPicture, type ForeignBrush, type LeftOut } from './foreignBrush'
 import { readGbr, readGih } from './gimpBrush'
 import { inflate, readZip } from './zipFile'
@@ -14,6 +14,10 @@ const CHUNK_OVERHEAD = 12
 const PAINTBRUSH = 'paintbrush'
 const WASH = '2' // the "PaintOpAction" of a stroke that doesn't pile up over itself
 const LINEAR_CURVE = '0,0;1,1;'
+// Krita's own names for what the pen's tilt tells: the direction it leans in, and how upright it stands (a curve's
+// start is lying down, its end upright)
+const TILT_DIRECTION = 'ascension'
+const TILT_ELEVATION = 'declination'
 
 type Settings = Map<string, string>
 type Files = Map<string, Uint8Array> // by file name, with no folder
@@ -52,13 +56,25 @@ async function textsOfPng(bytes: Uint8Array) {
 const fromBase64 = (text: string) => Uint8Array.from(atob(text.replace(/\s+/g, '')), char => char.charCodeAt(0))
 const baseName = (path: string) => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
-// What a setting that can follow the pen is doing: whether it is on, what changes it, and whether its curve is its own
+// What a setting that can follow the pen is doing: whether it is on, what changes it, and the curve of each of those
 function sensorOf(settings: Settings, name: string) {
   const isOn = settings.get(`Pressure${name}`) !== 'false' && settings.get(`${name}UseCurve`) !== 'false'
   const text = settings.get(`${name}Sensor`) ?? ''
   const ids = [...text.matchAll(/\bid="(\w+)"/g)].map(match => match[1]).filter(id => id !== 'sensorslist')
-  const curves = [...text.matchAll(/<curve>([^<]*)<\/curve>/g)].map(match => match[1].trim())
-  return { isOn, ids, hasOwnCurve: curves.some(curve => curve !== LINEAR_CURVE) }
+  const curveOf = (id: string) =>
+    text.match(new RegExp(`\\bid="${id}"[^>]*>\\s*<curve>([^<]*)</curve>`))?.[1].trim() ?? LINEAR_CURVE
+  return { isOn, ids, curveOf }
+}
+
+// What a curve gives at its start (0) and at its end (1), from its first and last points, and whether it is a straight
+// line from one to the other, which Lydia's settings can be exactly
+function curveEnds(curve: string) {
+  const points = curve
+    .split(';')
+    .filter(Boolean)
+    .map(point => point.split(',').map(Number))
+  const [first, last] = [points[0] ?? [0, 0], points.at(-1) ?? [1, 1]]
+  return { start: first[1], end: last[1], isStraight: points.length === 2 && first[0] === 0 && last[0] === 1 }
 }
 
 // Read one of the numbers of a setting, or of an attribute of the tip
@@ -156,11 +172,16 @@ function shapeOf(settings: Settings, brush: Element | null, leftOut: LeftOut[]) 
   shape.pressureFlow = [opacity, flow].some(({ isOn, ids }) => isOn && ids.includes('pressure'))
   if (rotation.isOn) {
     shape.followStroke = rotation.ids.includes('drawingangle')
-    // The tip turned by the direction the pen leans in. Krita's size by the pen's tilt grows as the pen stands up,
-    // the other way round from Lydia's, so it is left out with the other things that change a brush
-    shape.tiltTurn = rotation.ids.includes('tiltdirection')
+    // The tip turned by the direction the pen leans in
+    shape.tiltTurn = rotation.ids.includes(TILT_DIRECTION)
     if (rotation.ids.some(id => id.startsWith('fuzzy'))) shape.angleJitter = numberOf(settings.get('RotationValue'), 1)
   }
+  // The size by how upright the pen stands, growing as it lies down (a curve going down), is Lydia's Bigger. Lydia's
+  // brush size is the upright one, so it grows by as many times as the curve's start (lying) is its end (upright).
+  // Shrinking as the pen lies down (Krita's usual curve), it isn't Lydia's, and is left out
+  const standing = size.isOn && size.ids.includes(TILT_ELEVATION) ? curveEnds(size.curveOf(TILT_ELEVATION)) : null
+  const isBigger = standing !== null && standing.end > 0 && standing.start > standing.end
+  if (isBigger) shape.tiltSize = Math.min(MAX_TILT_SIZE, standing.start / standing.end - 1)
   if (settings.get('PressureScatter') === 'true') {
     shape.scatter = numberOf(settings.get('ScatterValue') ?? settings.get('Scattering/Amount'), 0)
   }
@@ -168,10 +189,19 @@ function shapeOf(settings: Settings, brush: Element | null, leftOut: LeftOut[]) 
   const known = ['pressure', 'drawingangle', 'fuzzy', 'fuzzystroke']
   const inUse = [size, opacity, flow, rotation, ...(settings.get('PressureScatter') === 'true' ? [scatter] : [])]
   const isKnown = (sensor: typeof size, id: string) =>
-    known.includes(id) || (sensor === rotation && id === 'tiltdirection')
+    known.includes(id) ||
+    (sensor === rotation && id === TILT_DIRECTION) ||
+    (sensor === size && id === TILT_ELEVATION && isBigger)
   if (inUse.some(sensor => sensor.isOn && sensor.ids.some(id => !isKnown(sensor, id)))) leftOut.push('sensors')
   if (rotation.isOn && rotation.ids.includes('pressure')) leftOut.push('sensors')
-  if (inUse.some(({ isOn, hasOwnCurve }) => isOn && hasOwnCurve)) leftOut.push('curves')
+  // The tip's shape changed by the pen (Krita's Ratio): Lydia doesn't have it
+  if (settings.get('PressureRatio') === 'true') leftOut.push('sensors')
+  // A straight curve of the size by the tilt is all in Bigger; other curves aren't Lydia's
+  const isWhole = (sensor: typeof size, id: string) =>
+    sensor === size && id === TILT_ELEVATION && isBigger && standing.isStraight
+  const hasOwnCurve = (sensor: typeof size) =>
+    sensor.ids.some(id => sensor.curveOf(id) !== LINEAR_CURVE && !isWhole(sensor, id))
+  if (inUse.some(sensor => sensor.isOn && hasOwnCurve(sensor))) leftOut.push('curves')
   return shape
 }
 
