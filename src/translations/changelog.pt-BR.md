@@ -1,5 +1,23 @@
 # Histórico de alterações
 
+## [1.2.0] - 2026-11-19
+
+Pincéis que acompanham a inclinação da caneta, tela inicial e Editor de pincéis com organização inspirada no Krita e no editor, desenhos abertos recentemente, predefinições próprias para novos desenhos e avisos de salvamento.
+
+### Added
+
+- **Inclinação da caneta**: o pincel pode acompanhar a inclinação da caneta. No Editor de pincéis, em **Inclinação da caneta**, **Girar a ponta** gira na direção da inclinação, **Maior** aumenta o pincel ao inclinar e **Mais achatada** achata a ponta, como a lateral de um lápis. Todos os pincéis podem usar essas opções, que começam desativadas para que nenhum pincel mude sozinho. O contorno do pincel acompanha a inclinação, inclusive com a caneta no ar. Pincéis do Krita e do Photoshop trazem seus ajustes de inclinação quando o Lydia oferece o recurso: lápis e marcadores inclinados do Krita giram e aumentam conforme a caneta se deita.
+- **Desenhos recentes** na tela inicial do aplicativo para computador: desenhos abertos ou salvos recentemente, cada um com uma miniatura, abrem com um clique.
+- **Predefinições próprias** na janela Novo projeto: **Salvar predefinição…** guarda tamanho, resolução e fundo com um nome, em **Minhas predefinições**, no topo da lista. Excluir uma predefinição pede confirmação.
+- **Avisos de salvamento**: salvar um desenho, exportar uma imagem e salvar ou exportar um pincel mostram um aviso na parte inferior com o nome do arquivo, que desaparece sozinho. O aviso não interrompe o desenho.
+
+### Changed
+
+- A tela inicial tem três colunas, como no Krita: **Começar** e **Links** (o guia, o GitHub e um formulário para relatar erros), os desenhos (recentes e para recuperar) e as novidades.
+- A janela **Novo projeto** tem uma lista de tamanhos à esquerda, como no Krita, incluindo tamanhos para pixel art. Largura, altura e resolução ficam em linhas próprias, com um controle deslizante ao lado da largura e da altura.
+- Espaçamento, estabilizador e afinamento ficam em **Traço**, no painel, em vez do menu Avançado sobre o desenho. O botão ao lado de Réguas abre e fecha essas opções, e o Lydia lembra como você deixou.
+- O Editor de pincéis segue o visual do editor: menus e botões de salvamento no topo, Pincel e Borracha em uma coluna com suas configurações ao lado e o pincel à direita. As configurações ficam em grupos (Forma, Pressão, Inclinação da caneta, Ruído, Textura do papel), como no editor de pincéis do Krita, e a área para testar o pincel fica sempre visível.
+
 ## [1.1.1] - 2026-11-16
 
 ### Fixed

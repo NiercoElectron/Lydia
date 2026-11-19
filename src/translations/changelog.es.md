@@ -1,5 +1,23 @@
 # Historial de cambios
 
+## [1.2.0] - 2026-11-19
+
+Pinceles que siguen la inclinación del lápiz, pantalla inicial y Editor de pinceles con una organización inspirada en Krita y en el editor, dibujos abiertos recientemente, ajustes propios para dibujos nuevos y avisos de guardado.
+
+### Added
+
+- **Inclinación del lápiz**: el pincel puede seguir la inclinación del lápiz. En el Editor de pinceles, en **Inclinación del lápiz**, **Girar la punta** gira hacia la inclinación, **Más grande** aumenta el pincel al inclinar y **Más plana** aplana la punta, como el lateral de un lápiz. Todos los pinceles pueden usar estas opciones, que empiezan desactivadas para que ningún pincel cambie por sí solo. El contorno del pincel sigue la inclinación, incluso con el lápiz en el aire. Los pinceles de Krita y Photoshop traen sus ajustes de inclinación cuando Lydia ofrece la función: los lápices y marcadores inclinados de Krita giran y crecen al acostar el lápiz.
+- **Dibujos recientes** en la pantalla inicial de la aplicación de escritorio: los dibujos abiertos o guardados recientemente, cada uno con una miniatura, se abren con un clic.
+- **Ajustes propios** en la ventana Nuevo proyecto: **Guardar ajuste…** guarda el tamaño, la resolución y el fondo con un nombre, en **Mis ajustes**, al principio de la lista. Eliminar un ajuste pide confirmación.
+- **Avisos de guardado**: guardar un dibujo, exportar una imagen y guardar o exportar un pincel muestran un aviso en la parte inferior con el nombre del archivo, que desaparece solo. El aviso no interrumpe el dibujo.
+
+### Changed
+
+- La pantalla inicial tiene tres columnas, como en Krita: **Empezar** y **Enlaces** (la guía, GitHub y un formulario para informar de errores), los dibujos (recientes y para recuperar) y las novedades.
+- La ventana **Nuevo proyecto** tiene una lista de tamaños a la izquierda, como en Krita, incluidos tamaños para pixel art. La anchura, la altura y la resolución tienen una fila propia, con un control deslizante junto a la anchura y la altura.
+- El espaciado, el estabilizador y el afinamiento están en **Trazo**, en el panel, en lugar del menú Avanzado sobre el dibujo. El botón junto a Reglas abre y cierra estas opciones, y Lydia recuerda cómo las dejaste.
+- El Editor de pinceles sigue el aspecto del editor: menús y botones de guardado arriba, Pincel y Borrador en una columna con sus ajustes al lado y el pincel a la derecha. Los ajustes están en grupos (Forma, Presión, Inclinación del lápiz, Ruido, Textura del papel), como en el editor de pinceles de Krita, y la zona para probar el pincel está siempre visible.
+
 ## [1.1.1] - 2026-11-16
 
 ### Fixed
