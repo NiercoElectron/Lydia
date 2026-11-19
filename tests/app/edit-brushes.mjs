@@ -77,9 +77,12 @@ const stored = () =>
       }),
   )
 const waitForSaved = () =>
-  page.waitForFunction(() => document.querySelector('.top-row').textContent.includes('Saved to your brushes'), {
-    timeout: 5000,
-  })
+  page.waitForFunction(
+    () =>
+      document.querySelector('.saved-notice').textContent.includes('Saved to your brushes') &&
+      document.querySelector('.designer-save button').disabled,
+    { timeout: 5000 },
+  )
 const startOptions = () => page.$$eval('.start-brush option', options => options.map(o => o.textContent))
 // Open the Brush Designer from the start screen on the brush with this name
 async function open(name) {

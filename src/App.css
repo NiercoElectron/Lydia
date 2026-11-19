@@ -426,6 +426,12 @@ label.theme-choice {
   margin: 4px 0;
 }
 
+/* The slider of a side fills its row beside the field */
+.new-project-fields input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Its button and the field of the name have the same height, so the window keeps its size */
 .save-preset {
   min-height: 2.2em;
@@ -924,6 +930,34 @@ fieldset.new-project-row {
   border-radius: 4px;
   background: var(--panel);
   box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* What was just saved, at the bottom in the middle, over the drawing but above the view's buttons (decision 93) */
+.saved-notice {
+  position: fixed;
+  bottom: 56px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 2px 8px var(--shadow);
+  transform: translateX(-50%);
+}
+
+.saved-notice[hidden] {
+  display: none;
+}
+
+.saved-notice span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .update-notice p {

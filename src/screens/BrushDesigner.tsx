@@ -1,12 +1,13 @@
 import { errorMessage, LydiaError } from '../errors'
 import { useLanguage } from '../i18n'
 import { Redo2, Undo2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { builtInBrush, saveBrush, tipOf, type LibraryBrush } from '../brushLibrary'
 import { BrushShapeControls, type GrainChoice } from '../components/BrushShapeControls'
 import { BrushTestArea } from '../components/BrushTestArea'
 import { DrawSpace } from '../components/DrawSpace'
 import { MenuBar, type Menu } from '../components/MenuBar'
+import { SavedNotice, type Saved } from '../components/SavedNotice'
 import { SliderValue } from '../components/SliderValue'
 import {
   useBackdrop,
@@ -188,7 +189,9 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
     () => (brush && startTip ? brushFile(start.name, startTip, start.shape, start.grain) : null),
     [brush, startTip, start],
   )
-  const isSaved = file !== null && file === savedFile
+  const [saved, setSaved] = useState<Saved | null>(null) // what was just saved or exported, shown for a moment
+  const noteSaved = (text: string) => setSaved({ text, at: Date.now() })
+  const doneSaved = useCallback(() => setSaved(null), [])
   const isUnsaved = file !== null && file !== (savedFile ?? openedFile)
 
   // Ask before closing the tab with a brush that isn't saved
@@ -207,6 +210,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
       setSavedId(id)
       setSavedFile(file)
       saveBrushId(id)
+      noteSaved(t('Saved to your brushes. Open a drawing to paint with it.'))
     } catch (error) {
       alert(errorMessage(error, 'LYD-212'))
     }
@@ -223,6 +227,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
       setSavedId(id)
       setSavedFile(copy)
       saveBrushId(id)
+      noteSaved(t('Saved to your brushes. Open a drawing to paint with it.'))
     } catch (error) {
       alert(errorMessage(error, 'LYD-212'))
     }
@@ -250,7 +255,10 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
   }
 
   function handleExport() {
-    if (file) downloadBlob(new Blob([file], { type: 'application/octet-stream' }), brushFileName(name))
+    if (!file) return
+    const exportName = brushFileName(name)
+    downloadBlob(new Blob([file], { type: 'application/octet-stream' }), exportName)
+    noteSaved(t('Exported: {name}', { name: exportName }))
   }
 
   function handleBack() {
@@ -313,6 +321,7 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
 
   return (
     <div className="editor">
+      <SavedNotice saved={saved} onDone={doneSaved} />
       <header className="editor-bar">
         <MenuBar menus={menus} />
         <div className="top-row">
@@ -334,7 +343,6 @@ export function BrushDesigner({ tipSize, pixel, brush, gpuMemory, onBack }: Prop
           >
             <Redo2 size={20} aria-hidden />
           </button>
-          {isSaved && <span className="notice">{t('Saved to your brushes. Open a drawing to paint with it.')}</span>}
           <div className="designer-save">
             <button onClick={() => void handleSave()} disabled={!isUnsaved}>
               {saveLabel}

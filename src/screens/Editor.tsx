@@ -14,6 +14,7 @@ import {
 } from '../brushLibrary'
 import { BrushImportReport } from '../components/BrushImportReport'
 import { NewProjectDialog } from '../components/NewProjectDialog'
+import { SavedNotice, type Saved } from '../components/SavedNotice'
 import { useProjectOpening } from '../components/projectOpening'
 import { UnsavedDialog, type UnsavedAnswer } from '../components/UnsavedDialog'
 import { BrushesPanel } from '../components/BrushesPanel'
@@ -52,7 +53,7 @@ import { DEFAULT_FILL, type FillSettings } from '../engine/fill'
 import { PROJECT_EXTENSION, type ProjectData } from '../engine/projectFile'
 import { DEFAULT_WAND, type Point, type WandSettings } from '../engine/selection'
 import { hasStrength, type LiquifyMode, type StrengthTool, type Tool } from '../engine/tools'
-import { desktop, nameOfFile, sameItems, writeFile } from '../desktop'
+import { baseName, desktop, nameOfFile, sameItems, writeFile } from '../desktop'
 import { downloadBlob, timestamp } from '../files'
 import { noteDrawingLook } from '../recentDrawings'
 import { CHANGES_URL, GUIDE_URL } from '../links'
@@ -80,8 +81,6 @@ import {
   type TrayImage,
 } from '../tray'
 
-const EXPORTED_SHOWN_MS = 6000 // how long the name of an exported image stays on the bar
-
 type Props = {
   project: ProjectData
   gpuMemory: number // GB of the graphics card's memory to use (see settings.ts)
@@ -105,7 +104,9 @@ export function Editor({
 }: Props) {
   const { t, locale } = useLanguage()
   const [filePath, setFilePath] = useState(opened.file ?? null) // where it is saved, in the desktop app
-  const [exported, setExported] = useState<string | null>(null) // the image just exported, shown for a moment
+  const [saved, setSaved] = useState<Saved | null>(null) // what was just saved or exported, shown for a moment
+  const noteSaved = (text: string) => setSaved({ text, at: Date.now() })
+  const doneSaved = useCallback(() => setSaved(null), [])
   const drawingName = filePath === null ? null : nameOfFile(filePath)
   // The drawing the engine starts from: the one opened, or the one in RAM when the graphics card was lost
   const [project, setProject] = useState(opened)
@@ -326,7 +327,9 @@ export function Editor({
   )
 
   function exportBrush(chosen: LibraryBrush) {
-    downloadBlob(new Blob([chosen.file], { type: 'application/octet-stream' }), brushFileName(chosen.preset.name))
+    const name = brushFileName(chosen.preset.name)
+    downloadBlob(new Blob([chosen.file], { type: 'application/octet-stream' }), name)
+    noteSaved(t('Exported: {name}', { name }))
   }
 
   async function deleteBrush(chosen: LibraryBrush) {
@@ -511,12 +514,9 @@ export function Editor({
     const name = `${drawingName ?? 'lydia'}-${timestamp()}${scale > 1 ? `@${scale}x` : ''}.${extension}`
     runTask('Exporting…', 'LYD-305', async () => {
       const image = await engine.exportImage(type)
-      if (!desktop) {
-        downloadBlob(image, name)
-        return
-      }
-      await writeFile(await desktop.exportPath(name), image)
-      setExported(name)
+      if (desktop) await writeFile(await desktop.exportPath(name), image)
+      else downloadBlob(image, name)
+      noteSaved(t('Exported: {name}', { name }))
     })
   }
 
@@ -537,8 +537,11 @@ export function Editor({
         }
         setFilePath(target)
         noteLook(target)
+        noteSaved(t('Saved: {name}', { name: baseName(target) }))
       } else {
-        downloadBlob(await engine.saveProject(), `lydia-${timestamp()}${PROJECT_EXTENSION}`)
+        const name = `lydia-${timestamp()}${PROJECT_EXTENSION}`
+        downloadBlob(await engine.saveProject(), name)
+        noteSaved(t('Saved: {name}', { name }))
       }
       await autosave.saver.current?.markSaved()
       isSaved = true
@@ -602,12 +605,6 @@ export function Editor({
   useEffect(() => {
     if (wantsToLeave) leave(onBack, onStay)
   })
-
-  useEffect(() => {
-    if (exported === null) return
-    const timer = setTimeout(() => setExported(null), EXPORTED_SHOWN_MS)
-    return () => clearTimeout(timer)
-  }, [exported])
 
   useEffect(() => {
     document.title = drawingName === null ? 'Lydia' : `${drawingName}${snapshot.isModified ? ' *' : ''} - Lydia`
@@ -884,6 +881,7 @@ export function Editor({
   return (
     <div className="editor">
       {importReport && <BrushImportReport {...importReport} onClose={() => setImportReport(null)} />}
+      <SavedNotice saved={saved} onDone={doneSaved} />
       {opening.input}
       {isChoosingNew && (
         <NewProjectDialog
@@ -916,7 +914,6 @@ export function Editor({
           >
             <Redo2 size={20} aria-hidden />
           </button>
-          {exported && <span className="notice">{t('Exported: {name}', { name: exported })}</span>}
           {autosave.failure && <span className="notice">{autosave.failure}</span>}
           <SettingsMenu />
         </div>

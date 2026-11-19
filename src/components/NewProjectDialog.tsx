@@ -170,6 +170,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
   }
 
   function deletePreset(name: string) {
+    if (!window.confirm(t('Delete the preset "{name}"? It cannot be undone.', { name }))) return
     changePresets(presets.filter(p => p.name !== name))
     if (presetName === name) setPresetName(null)
   }
@@ -300,6 +301,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
                   value={width}
                   onChange={e => typeSize(setWidth, e.target.value)}
                 />
+                <SizeSlider label={t('Width')} value={width} onChange={value => typeSize(setWidth, value)} />
               </div>
               <label htmlFor={`${id}-height`}>{t('Height')}</label>
               <div className="new-project-row">
@@ -311,6 +313,7 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
                   value={height}
                   onChange={e => typeSize(setHeight, e.target.value)}
                 />
+                <SizeSlider label={t('Height')} value={height} onChange={value => typeSize(setHeight, value)} />
               </div>
               <label
                 htmlFor={`${id}-dpi`}
@@ -410,6 +413,22 @@ export function NewProjectDialog({ onCreate, onCancel }: Props) {
         </div>
       </form>
     </dialog>
+  )
+}
+
+// A slider beside a side's field, over the whole range of sizes, with each step of it the same number of pixels.
+// While the field holds something that isn't a size, the slider stays at the nearest end
+function SizeSlider({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      type="range"
+      aria-label={label}
+      min={MIN_SIZE}
+      max={MAX_SIZE}
+      step={1}
+      value={Math.min(MAX_SIZE, Math.max(MIN_SIZE, Number(value) || MIN_SIZE))}
+      onChange={e => onChange(e.target.value)}
+    />
   )
 }
 

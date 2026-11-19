@@ -236,6 +236,20 @@ await page.evaluate(() => {
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Export PNG').click())
 await sleep(800)
 check('the file name says @4x', /^lydia-.+@4x\.png$/.test(names[0] ?? ''), names.join())
+const notice = () => page.$eval('.saved-notice', n => (n.hidden ? '' : n.textContent))
+check('a notice says it was exported', (await notice()) === `Exported: ${names[0]}`, await notice())
+await page.keyboard.down('Control')
+await page.keyboard.press('s')
+await page.keyboard.up('Control')
+await sleep(800)
+check(
+  'and one that the drawing was saved (downloaded here)',
+  (await notice()) === `Saved: ${names.at(-1)}` && names.at(-1).endsWith('.lyd'),
+  await notice(),
+)
+await page.click('.saved-notice button')
+await sleep(100)
+check('its × closes it', (await notice()) === '')
 
 // Kept with the drawing: saved, read again
 const saved = await page.evaluate(async () => {

@@ -286,6 +286,11 @@ check('Ctrl+S saves in Projects', existsSync(projectFile))
 const firstSize = statSync(projectFile).size
 check('it is a Lydia project', readFileSync(projectFile).subarray(0, 4).toString().startsWith('LYD'), String(firstSize))
 check('the window shows its name', (await page.title()) === 'Untitled - Lydia', await page.title())
+check(
+  'and a notice that it was saved',
+  (await page.$eval('.saved-notice', n => n.textContent)) === 'Saved: Untitled.lyd',
+  await page.$eval('.saved-notice', n => n.textContent),
+)
 await stroke(40)
 const whileChanged = await page.title()
 check('and that it has changes', whileChanged === 'Untitled * - Lydia', whileChanged)
@@ -302,12 +307,14 @@ check(
 check('with nothing left over', readdirSync(projects).length === 1, readdirSync(projects).join())
 
 await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent === 'Export PNG').click())
-await page.waitForSelector('.notice', { timeout: 10000 })
+await page.waitForFunction(() => document.querySelector('.saved-notice').textContent.startsWith('Exported'), {
+  timeout: 10000,
+})
 const images = readdirSync(exportsFolder)
 check('Export goes straight to Exports', images.length === 1 && images[0].endsWith('.png'), images.join())
 check('with the name of the drawing', images[0]?.startsWith('Untitled-'), images[0])
 check('and is a PNG', readFileSync(path.join(exportsFolder, images[0])).subarray(1, 4).toString() === 'PNG')
-const shownName = await page.$eval('.notice', element => element.textContent)
+const shownName = await page.$eval('.saved-notice', element => element.textContent)
 check('it says so', shownName.includes(images[0]), shownName)
 
 // Open it again, from the start screen and by the system

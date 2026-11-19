@@ -80,14 +80,16 @@ the right. On a narrow window they go one under the other.
 - **New project…** opens a window to choose the paper. At its left, a list of sizes, as in Krita: **Custom**, screen
   sizes (Full HD, 4K UHD, Square), paper sizes at the resolution chosen (A4, US Letter…) and pixel art (64×64, 128×128,
   256×256). At its right:
-  - the size, from the list or typed in: any width and height from 16 to 10000 pixels (a size typed in is Custom);
+  - the size, from the list, typed in or with the slider beside each side: any width and height from 16 to 10000
+    pixels (a size typed in is Custom);
   - a **Resolution** in DPI (72, 150, 300, 600, or typed in), which only matters for printing: exported images say it,
     so they print at the size of their paper;
   - a background color, or **Transparent**.
 
   Lydia remembers the last choice. **Save as preset…** keeps what is chosen (size, resolution and background) with a
   name you type: it goes under **My presets**, at the top of the list, and choosing it brings all three back. A preset
-  saved with a name already used takes its place, and the **×** beside a preset (under the pointer) deletes it.
+  saved with a name already used takes its place, and the **×** beside a preset (under the pointer) deletes it, after
+  asking.
 
 - **Open project** opens a `.lyd` file saved by Lydia.
 - **Brush Designer** draws a new brush (see [below](#the-brush-designer)). Its window chooses first what it starts from, the
@@ -609,6 +611,9 @@ forgotten.
 
 Exported images carry the drawing's resolution, so they print at the size of their paper (an image enlarged 4 times
 says 4 times as many pixels in an inch, so it too prints at that size, only sharper).
+
+Once a drawing, an image or a brush is saved or exported, a notice at the bottom of the window says so, with the file's
+name. It goes away by itself after a few seconds, or with its **×**, and you can go on drawing while it shows.
 
 ### Autosave and recovering a drawing
 

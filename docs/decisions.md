@@ -2954,7 +2954,10 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
     - A preset keeps the **size, the resolution and the background**, and choosing it brings all three back, as
       Krita's templates do.
     - They are in a group of their own, **My presets**, at the top of the list under Custom, only when there is one.
-    - A **×** that shows under the pointer deletes one.
+    - A **×** that shows under the pointer deletes one, **after asking**, like deleting a brush or a drawing to
+      recover.
+    - A **slider** beside the width and the height, **linear**: each step of it is the same number of pixels, from 16
+      to 10000.
   - Claude chose the rest of the presets: the name starts as the size (`2000×3000`), and a name already used replaces
     that preset. Escape in the name leaves the name, not the window. A preset is shown chosen until anything it set is
     changed, and its size and resolution go under its name, since a name can be long. They are kept in the browser's
@@ -2972,13 +2975,40 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
 - **Checked:** `tests/app/home.mjs`: the three columns, the links and where they go, no Recent list in a browser, the
   page with no scrolling on my screen, the New project window's list (A3 at the resolution typed, a pixel art size, a
   size typed in as Custom) and its size staying the same, its rows (one field under the other, lined up, the
-  resolution's buttons on its row), and the presets: the name asked for, Escape and Enter in it, the group under
-  Custom, the size, resolution and background brought back, a changed size leaving the preset, the same name
-  replacing it, still there when the window opens again, and the × showing under the pointer and deleting it.
+  resolution's buttons on its row), the sliders (their range, setting the field, making the size Custom), and the
+  presets: the name asked for, Escape and Enter in it, the group under Custom, the size, resolution and background
+  brought back, a changed size leaving the preset, the same name replacing it, still there when the window opens
+  again, and the × showing under the pointer, asking first, keeping it on Cancel and deleting it on OK.
   `tests/app/desktop.mjs`, in the real desktop app: the drawing
   saved listed with its picture, opened with a click, the message when its file went away and the list without it,
   back in the list when opened with Open project, and its × taking it out with the file staying. On the screen: the
   start screen and the New project window in Portuguese, at 2560×1440 at 150%.
+
+## 93. A notice when something is saved
+
+- **Date:** 2026-11-18
+- **Status:** adopted
+- **Problem:** saving gave no sign it had worked. A drawing saved with Ctrl+S only lost the `*` in the window's
+  title, an exported image said so in a small text on the top bar of the desktop app only, and a brush saved in the
+  Brush Designer said so on its top bar until it changed again. Saving a brush file said nothing at all.
+- **Decision:** my choices:
+  - **A notice that goes away by itself**, not a window with OK: it says what was saved without stopping the drawing,
+    even at each Ctrl+S.
+  - For **drawings** (Save and Save as…), **exported images**, and **brushes** (saved to my brushes, as a copy, or
+    exported as a file, in the editor and the Brush Designer). **Not the autosave**: it would show every few minutes
+    without anything done.
+  - Claude chose the rest: the notice is at the bottom in the middle of the window, over the drawing and above the
+    view's buttons, with a check mark and the file's name ("Saved: drawing.lyd", "Exported: drawing.png", or the
+    Brush Designer's sentence "Saved to your brushes. Open a drawing to paint with it."). It stays 6 seconds, as the
+    old text on the bar did, and has a × to close it sooner. In a browser it shows too, with the name of the file
+    downloaded. It takes the place of the old texts on the top bars.
+- **How:** `src/components/SavedNotice.tsx`, a `role="status"` box always in the page (so screen readers hear each
+  notice), given what was saved and when, so the same file saved twice shows again for as long again. The editor and
+  the Brush Designer each have one.
+- **Checked:** `tests/app/enlarged-export.mjs`: the notice of an exported image and of a drawing saved (downloaded in
+  a browser), and its × closing it. `tests/app/brush-designer.mjs`: a brush saved and exported.
+  `tests/app/edit-brushes.mjs` waits for it after each save. `tests/app/desktop.mjs`, in the desktop app: Ctrl+S
+  says the name of the file, and so does an export.
 
 ## Open questions
 

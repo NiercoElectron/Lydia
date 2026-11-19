@@ -17,14 +17,16 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 - **Recent drawings** on the start screen of the desktop app: the drawings opened or saved lately, each with a
   picture, open with a click.
 - **Presets of your own** in the New project window: **Save as preset…** keeps the size, the resolution and the
-  background with a name, under **My presets** at the top of the list.
+  background with a name, under **My presets** at the top of the list. Deleting one asks first.
+- **A notice when something is saved**: saving a drawing, exporting an image, and saving or exporting a brush show a
+  notice at the bottom with the file's name, which goes away by itself. It doesn't stop you drawing.
 
 ### Changed
 
 - The start screen has three columns, as Krita's: **Start** and **Links** (the guide, GitHub, and a form to report a
   bug), the drawings (recent ones and those to recover), and what's new.
 - The **New project** window has a list of sizes at its left, as Krita's, with sizes for pixel art too, and the width,
-  height and resolution each on a row of their own.
+  height and resolution each on a row of their own, and a slider beside the width and the height.
 - The spacing, the stabilizer and the taper are under **Stroke** in the panel, instead of in the Advanced menu over the
   drawing. Its button, beside Rulers, opens and closes them, and Lydia remembers how you left it.
 - The Brush Designer looks like the editor: menus and the buttons that save on top, Brush and Eraser in a column with

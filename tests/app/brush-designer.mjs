@@ -232,9 +232,16 @@ check(
 )
 await waitForTip()
 await click('Save to my brushes')
-await page.waitForFunction(() => document.querySelector('.top-row').textContent.includes('Saved to your brushes'), {
-  timeout: 5000,
-})
+await page.waitForFunction(
+  () =>
+    document.querySelector('.saved-notice').textContent.includes('Saved to your brushes') &&
+    document.querySelector('.designer-save button').disabled,
+  { timeout: 5000 },
+)
+check(
+  'a notice says it was saved',
+  (await page.$eval('.saved-notice', n => n.textContent)) === 'Saved to your brushes. Open a drawing to paint with it.',
+)
 const stored = () =>
   page.evaluate(
     () =>
@@ -289,6 +296,11 @@ check(
     parsed.flow === 0.5 &&
     parsed.tip === all[0].tip,
   exported.name,
+)
+check(
+  'and one that it was exported',
+  (await page.$eval('.saved-notice', n => n.textContent)) === 'Exported: bar-test.lydbrush',
+  await page.$eval('.saved-notice', n => n.textContent),
 )
 
 // ----- Leaving with changes asks first -----

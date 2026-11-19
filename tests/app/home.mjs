@@ -158,6 +158,26 @@ check(
   JSON.stringify(rows),
 )
 check('the resolution and its buttons share a row', Math.abs(rows.dpiButton - rows.tops[2]) <= 4, JSON.stringify(rows))
+const sliders = () =>
+  page.$$eval('.new-project-fields input[type=range]', list => list.map(each => `${each.ariaLabel} ${each.value}`))
+check(
+  'the width and the height have a slider each',
+  (await sliders()).join() === 'Width 65,Height 64',
+  (await sliders()).join(),
+)
+await page.evaluate(() => {
+  const slider = document.querySelector('.new-project-fields input[type=range]')
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, '5008')
+  slider.dispatchEvent(new Event('input', { bubbles: true }))
+})
+await sleep(50)
+check(
+  'the slider sets the field, a pixel at a time, from 16 to 10000',
+  (await typed()).startsWith('5008,64,') &&
+    (await page.$eval('.new-project-fields input[type=range]', s => `${s.min} ${s.max} ${s.step}`)) === '16 10000 1',
+  await typed(),
+)
+check('and makes the size Custom', (await chosenInList()) === 'Custom', await chosenInList())
 
 // ----- Presets of one's own -----
 const clickText = text =>
@@ -242,6 +262,23 @@ await sleep(100)
 await pressAction(1)
 await page.waitForSelector('dialog.new-project[open]')
 check('the presets are still there the next time', (await presetNames()).join() === 'Comic page')
+const asked = []
+const answerWith = isYes => dialog => {
+  asked.push(dialog.message())
+  return isYes ? dialog.accept() : dialog.dismiss()
+}
+const no = answerWith(false)
+page.once('dialog', no)
+await page.click('.preset-forget')
+await sleep(100)
+check(
+  '× asks first, and Cancel keeps it',
+  asked[0] === 'Delete the preset "Comic page"? It cannot be undone.' &&
+    (await presetNames()).join() === 'Comic page' &&
+    (await isOpen('dialog.new-project')),
+  asked.join(),
+)
+page.once('dialog', answerWith(true))
 await page.click('.preset-forget')
 await sleep(100)
 check(
