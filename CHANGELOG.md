@@ -7,6 +7,11 @@ with each small feature) ([decision 20](docs/decisions.md#20-version-numbers)). 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-19
+
+Brushes that follow the pen's tilt, a start screen and a Brush Designer laid out like Krita's and the editor, with the
+drawings opened lately, presets of your own for new drawings, and a notice when something is saved.
+
 ### Added
 
 - **The pen's tilt**: a brush can follow how the pen leans. In the Brush Designer, under **Pen tilt**, **Turn the tip**
@@ -704,7 +709,8 @@ The first usable version.
 - Export the drawing as a PNG image.
 - Sharp drawing on high-density screens.
 
-[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/NiercoElectron/Lydia/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/NiercoElectron/Lydia/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/NiercoElectron/Lydia/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/NiercoElectron/Lydia/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/NiercoElectron/Lydia/compare/v1.0.0...v1.0.1

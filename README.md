@@ -153,7 +153,9 @@ editable, filters, editable text, a new interface with menus, named tools, brush
 pictures of the layers, brushes opened from Krita, GIMP and Photoshop, and the desktop app for Windows and macOS, with real
 folders for brushes and the tray, memory limits read from the computer and updates that arrive by themselves. Then, from a
 pen user's requests: curves like the pen in Photoshop, a symmetry that turns, Smudge and Liquify as modes of the Brush,
-zooming with Ctrl + Space, and New and Open in the editor.
+zooming with Ctrl + Space, and New and Open in the editor. Then brushes that follow the pen's tilt, a start screen
+like Krita's with the drawings opened lately, a Brush Designer laid out like the editor, presets for new drawings and
+a notice when something is saved.
 What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 
 What comes next, and the ideas waiting their turn, are in [ROADMAP.md](ROADMAP.md): Linux, and opening and pasting

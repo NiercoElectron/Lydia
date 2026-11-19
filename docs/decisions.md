@@ -248,7 +248,9 @@ most of the code (decision 19). Where an idea or a suggestion came from Claude, 
   74). 0.16.0 brought the Safety stage: autosave with a Recover list, and surviving a lost graphics card (decisions 75
   and 76). 0.17.0 brought the Guides stage: symmetry, rulers and shapes (decisions 77 to 79), 0.18.0 filters and text (decisions 80 and 81), and 0.19.0 the new interface (decision 82), with 0.19.1 keeping every button and name inside its column and 0.19.2 bringing a new start screen and the interface's own font (decisions 83 and 84). 0.20.0 opens brushes from Krita, GIMP and Photoshop, with a thin outline that takes its color from the drawing (decisions 85 and 86). 1.0.0 is the desktop app, packaged with Electron (decision 87), and 1.0.1 puts a dot in the middle of a big brush
   (decision 86). 1.1.0 brings what a pen user asked for, with a curves tool (decisions 88 and 89), and 1.1.1 makes the
-  dot sharp. The full list is in [CHANGELOG.md](../CHANGELOG.md).
+  dot sharp. 1.2.0 brings the pen's tilt (decision 90), the stroke settings in the panel and a Brush Designer laid out
+  like the editor (decision 91), a start screen like Krita's with recent drawings and size presets (decision 92), and
+  a notice when something is saved (decision 93). The full list is in [CHANGELOG.md](../CHANGELOG.md).
 - **Why:** the 0 tells anyone looking that Lydia is still in development and may change, and the numbers show how far
   along it is. A version for each small feature made five versions in two days; one for each stage is a version
   worth trying, and its changelog tells what the stage brought.
